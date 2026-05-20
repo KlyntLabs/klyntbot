@@ -13,7 +13,6 @@ storage = { workspace = true }
 ai-core = { workspace = true }
 ai-core-macros = { workspace = true }
 feature-tasks = { workspace = true }
-feature-finance = { workspace = true }
 tools-core = { workspace = true }
 jiff = { workspace = true }
 serde = { workspace = true, features = ["derive"] }

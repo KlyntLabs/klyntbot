@@ -167,7 +167,6 @@ impl AppCore {
         // meaningful clusters like "concept", "fact", daily productivity entries, etc.
         let existing_ids: HashSet<String> = fabric_notes.iter().map(|n| n.id.clone()).collect();
         for source_type in &[
-            SourceType::Finance,
             SourceType::Productivity,
             SourceType::Okr,
             SourceType::Learning,

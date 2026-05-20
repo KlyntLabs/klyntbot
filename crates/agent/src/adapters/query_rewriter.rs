@@ -671,13 +671,13 @@ mod tests {
     };
     use context_engine::ActiveView;
 
-    fn finance_context() -> RetrievalContext {
+    fn task_context() -> RetrievalContext {
         RetrievalContext {
-            active_skill: Some("finance-management".into()),
+            active_skill: Some("task-management".into()),
             active_task: Some(ActiveTaskContext {
-                title: "March budget review".into(),
+                title: "March task review".into(),
                 project_name: None,
-                domain: Some("finance".into()),
+                domain: Some("tasks".into()),
             }),
             ..Default::default()
         }
@@ -724,7 +724,7 @@ mod tests {
     #[tokio::test]
     async fn heuristic_enriches_vague_query_with_skill_and_task() {
         let rewriter = ContextualQueryRewriter::heuristic_only();
-        let ctx = finance_context();
+        let ctx = task_context();
         let result = rewriter.rewrite("how are we doing?", &ctx).await;
         assert!(result.is_some());
         let r = result.unwrap();
@@ -740,7 +740,7 @@ mod tests {
     #[tokio::test]
     async fn high_specificity_returns_none() {
         let rewriter = ContextualQueryRewriter::heuristic_only();
-        let ctx = finance_context();
+        let ctx = task_context();
         let result = rewriter
             .rewrite("show me March FIRE projection", &ctx)
             .await;
@@ -1080,7 +1080,7 @@ mod tests {
         // Low specificity + task context → heuristic succeeds → LLM never called
         let provider = std::sync::Arc::new(MockRewriteProvider::new("this should not appear"));
         let rewriter = ContextualQueryRewriter::new(Some(provider), None, 5000);
-        let ctx = finance_context();
+        let ctx = task_context();
 
         let result = rewriter.rewrite("what about that?", &ctx).await;
         assert!(result.is_some());
@@ -1179,7 +1179,7 @@ mod tests {
             ..Default::default()
         })));
         let rewriter = ContextualQueryRewriter::heuristic_only().with_champion_overrides(overrides);
-        let ctx = finance_context();
+        let ctx = task_context();
         // Heuristic produces confidence ~0.75, but threshold is 0.95 → should return None
         let result = rewriter.rewrite("how are we doing?", &ctx).await;
         assert!(
@@ -1223,7 +1223,7 @@ mod tests {
         let overrides = std::sync::Arc::new(std::sync::RwLock::new(None));
         let rewriter = ContextualQueryRewriter::heuristic_only()
             .with_champion_overrides(std::sync::Arc::clone(&overrides));
-        let ctx = finance_context();
+        let ctx = task_context();
 
         // No champion → default behavior
         let result1 = rewriter.rewrite("how are we doing?", &ctx).await;

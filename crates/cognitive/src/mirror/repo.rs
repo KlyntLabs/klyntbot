@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 use crate::mirror::{
-    BrainVersion, CategorySpend, FeedbackTarget, FinanceDriftSnapshot, MetaRule, MetaRuleAction,
+    BrainVersion, FeedbackTarget, MetaRule, MetaRuleAction,
     MetaRuleSource, MetaRuleStatus, NarrativeSnippet, PreviewRecommendation, RoutingSnapshot,
     TaskFocusSnapshot, TrendNarrative, TrialEarlySignals, TrialPreview, UserFeedback,
 };
@@ -810,16 +810,6 @@ impl MirrorRepo {
         .await
     }
 
-    pub async fn cleanup_old_finance_drift_snapshots(&self, max_age_days: u32) -> Result<u64> {
-        self.delete_older_than(
-            "mirror_finance_drift_snapshots",
-            "captured_at",
-            max_age_days,
-            None,
-        )
-        .await
-    }
-
     // -----------------------------------------------------------------------
     // Task focus snapshots
     // -----------------------------------------------------------------------
@@ -879,60 +869,6 @@ impl MirrorRepo {
             completion_rate,
             longest_unfinished_secs,
             top_tasks,
-        }))
-    }
-
-    // -----------------------------------------------------------------------
-    // Finance drift snapshots
-    // -----------------------------------------------------------------------
-
-    pub async fn insert_finance_drift_snapshot(&self, snap: &FinanceDriftSnapshot) -> Result<()> {
-        let cat_json = serde_json::to_string(&snap.per_category)
-            .map_err(|e| common::KlyntbotError::Storage(format!("serialize categories: {e}")))?;
-        sqlx::query(
-            "INSERT INTO mirror_finance_drift_snapshots
-             (id, captured_at, window_hours, total_transactions, over_budget_count, per_category_json)
-             VALUES (?, ?, ?, ?, ?, ?)",
-        )
-        .bind(snap.id.to_string())
-        .bind(snap.captured_at.to_string())
-        .bind(snap.window_hours as i64)
-        .bind(snap.total_transactions as i64)
-        .bind(snap.over_budget_count as i64)
-        .bind(cat_json)
-        .execute(self.db())
-        .await
-        .map_err(|e| common::KlyntbotError::Storage(format!("insert finance drift: {e}")))?;
-        Ok(())
-    }
-
-    pub async fn get_latest_finance_drift_snapshot(&self) -> Result<Option<FinanceDriftSnapshot>> {
-        let row = sqlx::query(
-            "SELECT id, captured_at, window_hours, total_transactions, over_budget_count, per_category_json
-             FROM mirror_finance_drift_snapshots ORDER BY captured_at DESC LIMIT 1",
-        )
-        .fetch_optional(self.db())
-        .await
-        .map_err(|e| common::KlyntbotError::Storage(format!("latest finance drift: {e}")))?;
-        let Some(row) = row else { return Ok(None) };
-        let id: String = row.try_get(0)?;
-        let captured_at: String = row.try_get(1)?;
-        let window_hours: i64 = row.try_get(2)?;
-        let total_transactions: i64 = row.try_get(3)?;
-        let over_budget_count: i64 = row.try_get(4)?;
-        let per_category_json: String = row.try_get(5)?;
-        let per_category: HashMap<String, CategorySpend> = serde_json::from_str(&per_category_json)
-            .map_err(|e| common::KlyntbotError::Storage(format!("deserialize categories: {e}")))?;
-        Ok(Some(FinanceDriftSnapshot {
-            id: Uuid::parse_str(&id)
-                .map_err(|e| common::KlyntbotError::Storage(format!("uuid: {e}")))?,
-            captured_at: captured_at
-                .parse()
-                .map_err(|e| common::KlyntbotError::Storage(format!("ts: {e}")))?,
-            window_hours: window_hours as u8,
-            total_transactions: total_transactions as u32,
-            over_budget_count: over_budget_count as u32,
-            per_category,
         }))
     }
 
@@ -1212,7 +1148,7 @@ mod tests {
     fn make_meta_rule() -> MetaRule {
         MetaRule {
             id: Uuid::new_v4(),
-            trigger_condition: "user corrects finance twice".to_string(),
+            trigger_condition: "user corrects tasks twice".to_string(),
             action: MetaRuleAction::ForceClarification,
             source: MetaRuleSource::CorrectionDerived,
             effectiveness_score: 0.5,
@@ -1236,7 +1172,7 @@ mod tests {
         assert_eq!(rules.len(), 1);
         let got = &rules[0];
         assert_eq!(got.id, rule.id);
-        assert_eq!(got.trigger_condition, "user corrects finance twice");
+        assert_eq!(got.trigger_condition, "user corrects tasks twice");
         assert_eq!(got.source, MetaRuleSource::CorrectionDerived);
         assert_eq!(got.status, MetaRuleStatus::Pending);
         assert_eq!(got.signal_count, 0);
@@ -1407,7 +1343,7 @@ mod tests {
             early_signals: TrialEarlySignals {
                 correction_rate_delta: -0.15,
                 confidence_trend: TrendDirection::Falling,
-                dominant_skill_shift: Some("finance-management".to_string()),
+                dominant_skill_shift: Some("task-management".to_string()),
                 messages_scored: 0,
             },
             recommendation,

@@ -13,7 +13,6 @@ use super::cognitive::CognitiveConfig;
 use super::confidence::ConfidenceConfig;
 use super::content::ContentConfig;
 use super::conversation::ConversationConfig;
-use super::finance::FinanceConfig;
 use super::gateway::GatewayConfig;
 use super::integrations::IntegrationsConfig;
 use super::language::LanguageConfig;
@@ -129,9 +128,6 @@ pub struct Config {
 
     #[serde(default)]
     pub learning: LearningConfig,
-
-    #[serde(default)]
-    pub finance: FinanceConfig,
 
     #[serde(default)]
     pub notes: NotesConfig,

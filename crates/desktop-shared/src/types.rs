@@ -55,7 +55,6 @@ pub enum EntityKind {
     Productivity,
     Note,
     Notebook,
-    Finance,
     Source,
     Conversation,
     MirrorSnippet,
@@ -78,14 +77,6 @@ impl EntityKind {
             "productivity" => Some(Self::Productivity),
             "note" => Some(Self::Note),
             "notebook" => Some(Self::Notebook),
-            "finance"
-            | "finance_account"
-            | "finance_transaction"
-            | "finance_budget"
-            | "finance_goal"
-            | "finance_liability"
-            | "finance_portfolio"
-            | "finance_investment" => Some(Self::Finance),
             "source" => Some(Self::Source),
             "conversation" => Some(Self::Conversation),
             "mirrorsnippet" | "mirror_snippet" => Some(Self::MirrorSnippet),

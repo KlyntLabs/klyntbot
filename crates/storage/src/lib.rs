@@ -10,7 +10,6 @@ pub mod sqlite_types;
 
 pub mod circuit_breaker;
 pub mod error;
-pub mod finance_storage;
 pub mod messages;
 pub mod pool;
 pub mod repos;
@@ -63,21 +62,12 @@ pub use repos::{CoachingStrategyRepo, CoachingStrategyRow, UpsertCoachingStrateg
 pub use repos::{DecisionLogRepo, InteractionLogRepo, LearningStateRepo, OutcomeRepo};
 pub use repos::{OverallStats, StrategyRepo, ToolStatsRow};
 
-// ── Finance ─────────────────────────────────────────────────────────
-pub use finance_storage::FinanceStorage;
-pub use repos::{
-    FinanceAccountRepo, FinanceAllocationRepo, FinanceBudgetRepo, FinanceExchangeRateRepo,
-    FinanceGoalRepo, FinanceInvestmentRepo, FinanceLiabilityRepo, FinanceSnapshotRepo,
-    FinanceTransactionRepo,
-};
-
 // ── Row structs ─────────────────────────────────────────────────────
 pub use rows::agent_task::AgentTaskRow;
 pub use rows::area::AreaRow;
 pub use rows::cron::CronJobRow;
 pub use rows::custom_column::{CustomColumnRow, CustomColumnValueRow};
 pub use rows::entity_link::EntityLinkRow;
-pub use rows::finance::FinanceInvestmentTxRow;
 pub use rows::key_result::KeyResultRow;
 pub use rows::learning::{
     DecisionLogRow, InteractionLogRow, LearningStateRow, OutcomeRow, StrategyRecordRow,

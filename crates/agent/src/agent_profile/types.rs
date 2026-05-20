@@ -288,7 +288,7 @@ description: Task management specialist
 tools: [task, area, project]
 triggers: [todo, task, create a task]
 max_iterations: 10
-can_delegate_to: [finance]
+can_delegate_to: [learning]
 always_skills: [todo]
 ---
 
@@ -303,7 +303,7 @@ You are the task management agent.
         assert_eq!(profile.tools, vec!["task", "area", "project"]);
         assert_eq!(profile.triggers, vec!["todo", "task", "create a task"]);
         assert_eq!(profile.max_iterations, 10);
-        assert_eq!(profile.can_delegate_to, vec!["finance"]);
+        assert_eq!(profile.can_delegate_to, vec!["learning"]);
         assert_eq!(profile.always_skills, vec!["todo"]);
         assert!(profile.instructions.contains("task management agent"));
     }
@@ -364,7 +364,7 @@ Skill body content here.
         assert!(allowed.contains("task"));
         assert!(allowed.contains("area"));
         assert!(allowed.contains("ask_user"));
-        assert!(!allowed.contains("finance"));
+        assert!(!allowed.contains("learning"));
     }
 
     #[test]

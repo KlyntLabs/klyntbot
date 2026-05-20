@@ -12,15 +12,6 @@ pub mod decision_log;
 pub mod dnd_override;
 pub mod entity_link_repo;
 
-pub mod finance_account_repo;
-pub mod finance_allocation_repo;
-pub mod finance_budget_repo;
-pub mod finance_exchange_rate_repo;
-pub mod finance_goal_repo;
-pub mod finance_investment_repo;
-pub mod finance_liability_repo;
-pub mod finance_snapshot_repo;
-pub mod finance_transaction_repo;
 pub mod held_notifications;
 pub mod interaction_log;
 pub mod key_result;
@@ -64,15 +55,6 @@ pub use custom_column::CustomColumnRepo;
 pub use decision_log::DecisionLogRepo;
 pub use dnd_override::{DndOverrideRepo, DndOverrideRow};
 pub use entity_link_repo::EntityLinkRepo;
-pub use finance_account_repo::FinanceAccountRepo;
-pub use finance_allocation_repo::FinanceAllocationRepo;
-pub use finance_budget_repo::FinanceBudgetRepo;
-pub use finance_exchange_rate_repo::FinanceExchangeRateRepo;
-pub use finance_goal_repo::FinanceGoalRepo;
-pub use finance_investment_repo::FinanceInvestmentRepo;
-pub use finance_liability_repo::FinanceLiabilityRepo;
-pub use finance_snapshot_repo::FinanceSnapshotRepo;
-pub use finance_transaction_repo::FinanceTransactionRepo;
 pub use held_notifications::HeldNotificationsRepo;
 pub use interaction_log::InteractionLogRepo;
 pub use key_result::KeyResultRepo;
@@ -151,7 +133,6 @@ pub struct Repos {
     pub decision_log: DecisionLogRepo,
     pub session_context: SessionContextRepo,
     pub session_memory: SessionMemoryRepo,
-    pub finance: crate::FinanceStorage,
     pub interaction_log: InteractionLogRepo,
     pub status_workflows: StatusWorkflowRepo,
     pub task_groups: TaskGroupRepo,
@@ -192,7 +173,6 @@ impl Repos {
             decision_log: DecisionLogRepo::new(db.clone()),
             session_context: SessionContextRepo::new(db.clone()),
             session_memory: SessionMemoryRepo::new(db.clone()),
-            finance: crate::FinanceStorage::from_pool(&db),
             interaction_log: InteractionLogRepo::new(db.clone()),
             status_workflows: StatusWorkflowRepo::new(db.clone()),
             task_groups: TaskGroupRepo::new(db.clone()),

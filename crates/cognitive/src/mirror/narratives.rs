@@ -172,18 +172,18 @@ mod tests {
     #[test]
     fn test_snippet_from_routing_drift() {
         let alert = MirrorAlert::RoutingDrift {
-            skill: "finance-management".to_string(),
+            skill: "task-management".to_string(),
             delta: 18.5,
-            suggestion: "strengthen finance routing".to_string(),
+            suggestion: "strengthen task routing".to_string(),
         };
         let snippet = snippet_from_alert(&alert);
-        assert!(snippet.headline.contains("finance-management"));
+        assert!(snippet.headline.contains("task-management"));
         assert_eq!(snippet.alert_type, MirrorAlertType::RoutingDrift);
         assert!(snippet.suggested_action.is_some());
         // Verify the suggested action is BoostSkill for the right skill
         match snippet.suggested_action.unwrap() {
             SuggestedAction::BoostSkill { skill } => {
-                assert_eq!(skill, "finance-management");
+                assert_eq!(skill, "task-management");
             }
             other => panic!("Expected BoostSkill, got {other:?}"),
         }
@@ -206,14 +206,14 @@ mod tests {
         let rule_id = Uuid::new_v4();
         let alert = MirrorAlert::MetaRuleProposed {
             rule_id,
-            rule_text: "When user corrects me twice about finance, ask for clarification"
+            rule_text: "When user corrects me twice about tasks, ask for clarification"
                 .to_string(),
             source: MetaRuleSource::CorrectionDerived,
         };
         let snippet = snippet_from_alert(&alert);
         assert_eq!(snippet.alert_type, MirrorAlertType::MetaRuleProposed);
         assert!(snippet.headline.contains("learned something"));
-        assert!(snippet.body.contains("finance"));
+        assert!(snippet.body.contains("tasks"));
         assert!(snippet.suggested_action.is_some());
     }
 }

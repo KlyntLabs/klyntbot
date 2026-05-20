@@ -20,9 +20,6 @@ pub fn translate(event: &DomainEvent) -> Option<AiSignal> {
     if let Some(e) = feature_tasks::events::try_from_domain_event(event) {
         return Some(with_domain(e, RecallDomain::Tasks));
     }
-    if let Some(e) = feature_finance::events::try_from_domain_event(event) {
-        return Some(with_domain(e, RecallDomain::Finance));
-    }
     if let Some(e) = feature_coaching::events::try_from_domain_event(event) {
         return Some(with_domain(e, RecallDomain::Coaching));
     }
@@ -198,7 +195,6 @@ fn translate_system_event(event: &DomainEvent) -> Option<AiSignal> {
 pub fn build_feature_registry() -> ai_core::AiFeatureRegistry {
     let mut reg = ai_core::AiFeatureRegistry::new();
     feature_tasks::TasksFeature::register(&mut reg);
-    feature_finance::FinanceFeature::register(&mut reg);
     feature_productivity::ProductivityFeature::register(&mut reg);
     feature_notes::NotesFeature::register(&mut reg);
     feature_learning::LearningFeature::register(&mut reg);
@@ -212,7 +208,6 @@ pub fn build_feature_registry() -> ai_core::AiFeatureRegistry {
 pub fn build_metric_registry() -> ai_core::MetricRegistry {
     let mut reg = ai_core::MetricRegistry::new();
     reg.register_all(feature_tasks::TaskEvent::FEATURE_METRICS);
-    reg.register_all(feature_finance::FinanceEvent::FEATURE_METRICS);
     reg.register_all(feature_coaching::events::CoachingEvent::FEATURE_METRICS);
     reg.register_all(feature_productivity::events::ProductivityEvent::FEATURE_METRICS);
     reg.register_all(feature_language_learning::LanguageLearningEvent::FEATURE_METRICS);

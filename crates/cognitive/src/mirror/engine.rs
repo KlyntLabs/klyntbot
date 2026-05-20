@@ -15,7 +15,7 @@ use tokio_util::sync::CancellationToken;
 use crate::mirror::{
     sources::{
         ApprovalHistorySource, ConfigArchiverSource, CostCeilingSource,
-        FinanceSpendingDriftSource, MetaRuleSignalSource, RoutingSignalSource,
+        MetaRuleSignalSource, RoutingSignalSource,
         TaskFocusPatternSource, TrialPreviewSource,
     },
     AutotunerBridge, MirrorFacade, MirrorRepo, NarrativeHandler,
@@ -57,7 +57,6 @@ impl MirrorEngine {
             trial_evaluator,
         ));
         let task_focus = Arc::new(TaskFocusPatternSource::new(repo.clone()));
-        let finance_drift = Arc::new(FinanceSpendingDriftSource::new(repo.clone()));
 
         // Wrap each in a runner; spawn flush loops for sources that declare an interval.
         let mut consumers: Vec<Arc<dyn SignalConsumer>> = Vec::new();
@@ -77,7 +76,6 @@ impl MirrorEngine {
         register!(config_archiver);
         register!(trial);
         register!(task_focus);
-        register!(finance_drift);
 
         let mut ah_source: Option<Arc<ApprovalHistorySource>> = None;
         if let Some(ap_repo) = approval_pattern_repo {
@@ -128,7 +126,7 @@ mod tests {
         assert_eq!(
             built.consumers.len(),
             7,
-            "routing + meta_rule + config_archiver + trial + task_focus + finance_drift + cost_ceiling"
+            "routing + meta_rule + config_archiver + trial + task_focus + cost_ceiling"
         );
         for h in built.flush_handles.iter() {
             assert!(!h.is_finished());

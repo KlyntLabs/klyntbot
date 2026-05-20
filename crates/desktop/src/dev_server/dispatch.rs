@@ -99,9 +99,6 @@ pub(super) async fn dispatch(
     if let Some(r) = commands::status::dispatch_dev(cmd, core, &body).await {
         return into_api_result(r);
     }
-    if let Some(r) = commands::finance::dispatch_dev(cmd, core, &body).await {
-        return into_api_result(r);
-    }
     if let Some(r) = commands::notes::dispatch_dev(cmd, core, &body).await {
         return into_api_result(r);
     }

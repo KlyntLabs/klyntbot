@@ -39,7 +39,7 @@ pub use agent_profile::skill_loader;
 
 // ── Module re-exports (backward-compatible paths) ────────────────────────────
 pub use adapters::{
-    agent_task, cognitive_embedder, cognitive_handlers, conversation_recall, cron, finance,
+    agent_task, cognitive_embedder, cognitive_handlers, conversation_recall, cron,
     learning as learning_handler, llm_summary, mirror_handlers, productivity, progress,
     task_embedding,
 };
@@ -54,7 +54,6 @@ pub use conversation_recall::ConversationRecallHandlerImpl;
 pub use cron::CronHandlerAdapter;
 pub use events::AgentEvent;
 pub use execution::{CycleOutcome, ExecutionCore, ExecutionParams, ToolExecutionResult};
-pub use finance::FinanceHandlerImpl;
 pub use learning::LearningService;
 pub use learning_handler::LearningHandlerImpl;
 pub use productivity::ProductivityHandlerImpl;

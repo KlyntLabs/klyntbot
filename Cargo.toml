@@ -15,7 +15,6 @@ members = [
     "crates/storage",
     "crates/tools-core",
     "crates/tools-core-macros",
-    "crates/feature-finance",
     "crates/analytics",
     "crates/mcp",
     "crates/notifications",
@@ -148,7 +147,6 @@ context_engine = { path = "crates/context_engine" }
 storage = { path = "crates/storage" }
 tools-core = { path = "crates/tools-core" }
 tools-core-macros = { path = "crates/tools-core-macros" }
-feature-finance = { path = "crates/feature-finance" }
 feature-notes = { path = "crates/feature-notes" }
 feature-productivity = { path = "crates/feature-productivity" }
 cognitive = { path = "crates/cognitive" }
@@ -312,7 +310,6 @@ serde_json.workspace = true
 tokio.workspace = true
 tokio-util.workspace = true
 uuid.workspace = true
-feature-finance.workspace = true
 feature-tasks.workspace = true
 feature-productivity.workspace = true
 feature-coaching.workspace = true

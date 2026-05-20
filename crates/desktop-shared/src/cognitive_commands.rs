@@ -55,13 +55,11 @@ pub struct UserModelSummaryResponse {
     pub identity_count: usize,
     pub energy_count: usize,
     pub work_count: usize,
-    pub finance_count: usize,
     pub learning_count: usize,
     pub preferences_count: usize,
     pub identity_preview: Vec<String>,
     pub energy_preview: Vec<String>,
     pub work_preview: Vec<String>,
-    pub finance_preview: Vec<String>,
     pub learning_preview: Vec<String>,
     pub preferences_preview: Vec<String>,
 }

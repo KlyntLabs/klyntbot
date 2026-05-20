@@ -1381,7 +1381,6 @@ fn format_user_model(model: &crate::types::UserModel) -> String {
         ("identity", &model.identity),
         ("energy", &model.energy),
         ("work", &model.work),
-        ("finance", &model.finance),
         ("learning", &model.learning),
         ("preferences", &model.preferences),
     ];

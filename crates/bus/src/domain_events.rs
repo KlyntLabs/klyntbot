@@ -262,46 +262,6 @@ pub enum DomainEvent {
         deviation_pct: f64,
     },
 
-    // -- Finance --
-    TransactionRecorded {
-        category: String,
-        amount: f64,
-        is_over_budget: bool,
-    },
-    BudgetAlert {
-        category: String,
-        spent: f64,
-        limit: f64,
-    },
-    AccountCreated {
-        account_id: String,
-        name: String,
-        currency: String,
-    },
-    BudgetCreated {
-        budget_id: String,
-        name: String,
-        amount: i64,
-        currency: String,
-    },
-    GoalCreated {
-        goal_id: String,
-        name: String,
-        target_amount: i64,
-    },
-    GoalAchieved {
-        goal_id: String,
-        name: String,
-    },
-    /// Goal progress recorded for goal_progress_velocity metric.
-    FinanceGoalProgress {
-        goal_id: String,
-        name: String,
-        current_amount: i64,
-        target_amount: i64,
-        delta: i64,
-    },
-
     // -- Notes --
     NoteCreated {
         note_id: String,
@@ -793,13 +753,6 @@ impl DomainEvent {
             Self::TaskFocusChanged { .. } => "TaskFocusChanged",
             Self::TaskFocusExpired { .. } => "TaskFocusExpired",
             Self::EstimationRecorded { .. } => "EstimationRecorded",
-            Self::TransactionRecorded { .. } => "TransactionRecorded",
-            Self::BudgetAlert { .. } => "BudgetAlert",
-            Self::AccountCreated { .. } => "AccountCreated",
-            Self::BudgetCreated { .. } => "BudgetCreated",
-            Self::GoalCreated { .. } => "GoalCreated",
-            Self::GoalAchieved { .. } => "GoalAchieved",
-            Self::FinanceGoalProgress { .. } => "FinanceGoalProgress",
             Self::NoteCreated { .. } => "NoteCreated",
             Self::NoteUpdated { .. } => "NoteUpdated",
             Self::NoteContentChanged { .. } => "NoteContentChanged",
@@ -939,8 +892,6 @@ impl DomainEvent {
     pub const KIND_PRODUCTIVITY_SCORE_COMPUTED: &'static str = "ProductivityScoreComputed";
     /// `event_type` value for [`DomainEvent::TaskDeferred`].
     pub const KIND_TASK_DEFERRED: &'static str = "TaskDeferred";
-    /// `event_type` value for [`DomainEvent::TransactionRecorded`].
-    pub const KIND_TRANSACTION_RECORDED: &'static str = "TransactionRecorded";
     /// `event_type` value for [`DomainEvent::NoteStudied"].
     pub const KIND_NOTE_STUDIED: &'static str = "NoteStudied";
     /// `event_type` value for [`DomainEvent::PracticeUnitCompleted`].
@@ -992,10 +943,6 @@ impl DomainEvent {
     pub const KIND_TASK_FOCUS_EXPIRED: &'static str = "TaskFocusExpired";
     /// `event_type` value for [`DomainEvent::ProductivitySessionEnded`].
     pub const KIND_PRODUCTIVITY_SESSION_ENDED: &'static str = "ProductivitySessionEnded";
-    /// `event_type` value for [`DomainEvent::BudgetAlert`].
-    pub const KIND_BUDGET_ALERT: &'static str = "BudgetAlert";
-    /// `event_type` value for [`DomainEvent::FinanceGoalProgress`].
-    pub const KIND_FINANCE_GOAL_PROGRESS: &'static str = "FinanceGoalProgress";
     /// `event_type` value for [`DomainEvent::FocusSessionSuspended`].
     pub const KIND_FOCUS_SESSION_SUSPENDED: &'static str = "FocusSessionSuspended";
     /// `event_type` value for [`DomainEvent::CronCatchUpReady`].
@@ -1060,14 +1007,6 @@ impl DomainEvent {
             | Self::SessionCreated { .. }
             | Self::SessionEnded { .. }
             | Self::QualityScored { .. } => D::Energy,
-
-            Self::TransactionRecorded { .. }
-            | Self::BudgetAlert { .. }
-            | Self::AccountCreated { .. }
-            | Self::BudgetCreated { .. }
-            | Self::GoalCreated { .. }
-            | Self::GoalAchieved { .. }
-            | Self::FinanceGoalProgress { .. } => D::Finance,
 
             Self::UserStatedFact { domain, .. } => D::Custom(domain.clone()),
             Self::UserCorrectedAI { .. } => D::Learning,

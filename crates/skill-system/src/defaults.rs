@@ -32,51 +32,6 @@ pub fn compiled_skill_defaults() -> HashMap<String, Vec<(&'static str, &'static 
         ],
     );
 
-    // ── finance-management ───────────────────────────────────────────────────
-    map.insert(
-        "finance-management".to_string(),
-        vec![
-            (
-                "SKILL.md",
-                include_str!("../../../skills/finance-management/SKILL.md"),
-            ),
-            (
-                "references/analytics-actions.md",
-                include_str!("../../../skills/finance-management/references/analytics-actions.md"),
-            ),
-            (
-                "references/budgeting.md",
-                include_str!("../../../skills/finance-management/references/budgeting.md"),
-            ),
-            (
-                "references/currency-engine.md",
-                include_str!("../../../skills/finance-management/references/currency-engine.md"),
-            ),
-            (
-                "references/financial-health.md",
-                include_str!("../../../skills/finance-management/references/financial-health.md"),
-            ),
-            (
-                "references/fire-planning.md",
-                include_str!("../../../skills/finance-management/references/fire-planning.md"),
-            ),
-            (
-                "references/portfolio-analysis.md",
-                include_str!("../../../skills/finance-management/references/portfolio-analysis.md"),
-            ),
-            (
-                "references/spending-intelligence.md",
-                include_str!(
-                    "../../../skills/finance-management/references/spending-intelligence.md"
-                ),
-            ),
-            (
-                "scripts/validate_amount.md",
-                include_str!("../../../skills/finance-management/scripts/validate_amount.md"),
-            ),
-        ],
-    );
-
     // ── learning ─────────────────────────────────────────────────────────────
     map.insert(
         "learning".to_string(),

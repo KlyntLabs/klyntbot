@@ -20,7 +20,6 @@ use std::fmt;
 pub enum EventDomain {
     Work,
     Energy,
-    Finance,
     Learning,
     Coaching,
     General,
@@ -45,7 +44,6 @@ impl EventDomain {
         match self {
             Self::Work => "work",
             Self::Energy => "energy",
-            Self::Finance => "finance",
             Self::Learning => "learning",
             Self::Coaching => "coaching",
             Self::General => "general",
@@ -71,7 +69,6 @@ impl EventDomain {
         match s {
             "work" => Self::Work,
             "energy" => Self::Energy,
-            "finance" => Self::Finance,
             "learning" => Self::Learning,
             "coaching" => Self::Coaching,
             "general" => Self::General,
@@ -118,7 +115,6 @@ mod tests {
         for d in [
             EventDomain::Work,
             EventDomain::Energy,
-            EventDomain::Finance,
             EventDomain::Learning,
             EventDomain::Coaching,
             EventDomain::General,
@@ -146,16 +142,11 @@ mod tests {
 
     #[test]
     fn display_matches_as_str() {
-        assert_eq!(format!("{}", EventDomain::Finance), "finance");
         assert_eq!(format!("{}", EventDomain::Custom("x".to_string())), "x");
     }
 
     #[test]
     fn serde_serializes_as_string() {
-        let d = EventDomain::Finance;
-        assert_eq!(serde_json::to_string(&d).unwrap(), "\"finance\"");
-        let parsed: EventDomain = serde_json::from_str("\"finance\"").unwrap();
-        assert_eq!(parsed, EventDomain::Finance);
         let parsed: EventDomain = serde_json::from_str("\"unknown\"").unwrap();
         assert_eq!(parsed, EventDomain::Custom("unknown".to_string()));
     }

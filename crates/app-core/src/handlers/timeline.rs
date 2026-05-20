@@ -69,7 +69,7 @@ impl AppCore {
         }
 
         // 2–6. Independent queries — run concurrently for lower latency
-        let (time_entries_res, tasks_res, txs_res, notes_res) = tokio::join!(
+        let (time_entries_res, tasks_res, notes_res) = tokio::join!(
             async {
                 if !want(sources, TimelineSource::Task) {
                     return None;
@@ -87,22 +87,6 @@ impl AppCore {
                 self.repos.tasks.tasks_for_timeline(start, end).await.ok()
             },
             async {
-                if !want(sources, TimelineSource::Finance) {
-                    return None;
-                }
-                let filter = storage::rows::finance::FinanceTransactionFilter {
-                    date_from: jiff::civil::Date::strptime("%Y-%m-%d", start)
-                        .ok()
-                        .map(|d| d.into()),
-                    date_to: jiff::civil::Date::strptime("%Y-%m-%d", end)
-                        .ok()
-                        .map(|d| d.into()),
-                    limit: Some(100),
-                    ..Default::default()
-                };
-                self.repos.finance.transactions.list(&filter).await.ok()
-            },
-            async {
                 if !want(sources, TimelineSource::Note) {
                     return None;
                 }
@@ -118,9 +102,6 @@ impl AppCore {
                     .into_iter()
                     .flat_map(|t| normalize_task(t, start, end)),
             );
-        }
-        if let Some(txs) = txs_res {
-            entries.extend(txs.into_iter().map(normalize_transaction));
         }
         if let Some(notes) = notes_res {
             entries.extend(notes.into_iter().map(|n| normalize_note_activity(n, start)));
@@ -146,7 +127,7 @@ impl AppCore {
                                 | TimelineEntryType::TaskCompleted
                                 | TimelineEntryType::NoteCreated
                                 | TimelineEntryType::NoteUpdated
-                                | TimelineEntryType::TransactionRecorded
+
                         )
                     });
                     entries.extend(domain_entries);
@@ -265,17 +246,6 @@ fn normalize_domain_event(e: cognitive::DomainEventRow) -> Option<TimelineEntry>
                 "var(--timeline-note)",
             )
         }
-        bus::DomainEvent::KIND_TRANSACTION_RECORDED => (
-            TimelineEntryType::TransactionRecorded,
-            TimelineSource::Finance,
-            format!(
-                "Transaction: {}",
-                field(inner, "category").unwrap_or("Uncategorized")
-            ),
-            None,
-            Some("/finance/transactions".into()),
-            "var(--timeline-finance)",
-        ),
         // Skip events we don't want on the timeline
         bus::DomainEvent::KIND_CHAT_TURN_COMPLETED
         | bus::DomainEvent::KIND_USER_STATED_FACT
@@ -459,44 +429,6 @@ fn format_with_separators(n: u64) -> String {
     result
 }
 
-fn normalize_transaction(tx: storage::rows::finance::FinanceTransactionRow) -> TimelineEntry {
-    let is_expense = tx.tx_type == "expense";
-    let entry_type = if is_expense {
-        TimelineEntryType::ExpenseRecorded
-    } else {
-        TimelineEntryType::IncomeRecorded
-    };
-    let amount_display = format_timeline_amount(tx.amount, &tx.currency, is_expense);
-    let title = match &tx.category {
-        Some(cat) => format!("{} {}", amount_display, cat),
-        None => amount_display,
-    };
-
-    TimelineEntry {
-        id: tx.id.clone(),
-        source: TimelineSource::Finance,
-        entry_type,
-        title,
-        description: tx.notes.clone(),
-        started_at: tx.created_at.to_string(),
-        ended_at: None,
-        duration_secs: None,
-        entity_id: Some(tx.id),
-        entity_route: Some("/finance".into()),
-        color: if is_expense {
-            "var(--timeline-finance-expense)".into()
-        } else {
-            "var(--timeline-finance-income)".into()
-        },
-        metadata: Some(serde_json::json!({
-            "amount": tx.amount,
-            "txType": tx.tx_type,
-            "category": tx.category,
-            "counterparty": tx.counterparty,
-        })),
-    }
-}
-
 fn normalize_note_activity(note: feature_notes::models::NoteRow, start: &str) -> TimelineEntry {
     let start_bound = format!("{start}T00:00:00Z");
     let is_created = note.created_at >= start_bound && note.created_at == note.updated_at;
@@ -595,9 +527,6 @@ fn compute_summary(entries: &[TimelineEntry]) -> TimelineSummary {
             TimelineEntryType::TaskCreated => tasks_created += 1,
             TimelineEntryType::TaskDue => {}
             TimelineEntryType::NoteCreated | TimelineEntryType::NoteUpdated => notes_touched += 1,
-            TimelineEntryType::TransactionRecorded
-            | TimelineEntryType::ExpenseRecorded
-            | TimelineEntryType::IncomeRecorded => transactions_count += 1,
             TimelineEntryType::AppUsage => {
                 *app_durations.entry(entry.title.clone()).or_insert(0) += dur;
             }

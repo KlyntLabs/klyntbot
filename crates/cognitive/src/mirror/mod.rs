@@ -12,12 +12,12 @@ pub use narratives::{snippet_from_alert, NarrativeHandler};
 pub use repo::MirrorRepo;
 pub use retention::{MirrorRetentionConfig, MirrorRetentionService};
 pub use sources::{
-    ConfigArchiverSource, FinanceSpendingDriftSource, MetaRuleSignalSource, RoutingSignalSource,
+    ConfigArchiverSource, MetaRuleSignalSource, RoutingSignalSource,
     TaskFocusPatternSource, TrialPreviewSource,
 };
 pub use types::{
-    AutotunerBridge, BrainVersion, CategorySpend, EarlyTrialEvaluator, FeedbackTarget,
-    FinanceDriftSnapshot, GeneratedNarrative, MetaRule, MetaRuleAction, MetaRuleSource,
+    AutotunerBridge, BrainVersion, EarlyTrialEvaluator, FeedbackTarget,
+    GeneratedNarrative, MetaRule, MetaRuleAction, MetaRuleSource,
     MetaRuleStatus, MirrorAlert, MirrorAlertSeverity, MirrorAlertType, MirrorResponse, MirrorState,
     NarrativeContext, NarrativeSnippet, PreviewRecommendation, RoutingSnapshot, SkillRouteStats,
     SuggestedAction, TaskFocusSnapshot, TodoSnapshot, TrendDirection, TrendNarrative,

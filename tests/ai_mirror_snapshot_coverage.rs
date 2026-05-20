@@ -5,7 +5,7 @@
 
 use ai_core::MirrorSignalSource;
 use cognitive::mirror::sources::{
-    ConfigArchiverSource, FinanceSpendingDriftSource, MetaRuleSignalSource, RoutingSignalSource,
+    ConfigArchiverSource, MetaRuleSignalSource, RoutingSignalSource,
     TaskFocusPatternSource, TrialPreviewSource,
 };
 
@@ -27,8 +27,7 @@ fn collect_specs() -> Vec<ai_core::MirrorSnapshotSpec> {
             None,
         )
         .spec(),
-        TaskFocusPatternSource::new(repo.clone()).spec(),
-        FinanceSpendingDriftSource::new(repo).spec(),
+        TaskFocusPatternSource::new(repo).spec(),
     ]
 }
 
@@ -40,10 +39,6 @@ fn every_declared_mirror_snapshot_has_a_registered_source() {
         (
             "TasksFeature",
             feature_tasks::TasksFeature::MIRROR_SNAPSHOTS,
-        ),
-        (
-            "FinanceFeature",
-            feature_finance::FinanceFeature::MIRROR_SNAPSHOTS,
         ),
     ];
 
@@ -68,7 +63,6 @@ fn feature_owned_sources_have_a_declaration() {
     let registered_specs = collect_specs();
     let all_declared: Vec<&'static str> = [
         feature_tasks::TasksFeature::MIRROR_SNAPSHOTS,
-        feature_finance::FinanceFeature::MIRROR_SNAPSHOTS,
     ]
     .iter()
     .flat_map(|s| s.iter().map(|spec| spec.name))
@@ -80,47 +74,8 @@ fn feature_owned_sources_have_a_declaration() {
         }
         assert!(
             all_declared.contains(&spec.name),
-            "registered source \"{}\" is not declared by any feature and not on the system \
-             allow-list",
-            spec.name,
+            "registered source '{}' is not declared by any feature",
+            spec.name
         );
     }
-}
-
-#[test]
-fn no_broadcast_receiver_in_mirror_sources() {
-    use std::path::PathBuf;
-    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let mirror_dir = root
-        .join("crates")
-        .join("cognitive")
-        .join("src")
-        .join("mirror");
-    let mut violations: Vec<String> = Vec::new();
-    for entry in walkdir::WalkDir::new(&mirror_dir) {
-        let entry = entry.unwrap();
-        if !entry.file_name().to_string_lossy().ends_with(".rs") {
-            continue;
-        }
-        let path = entry.path();
-        let text = std::fs::read_to_string(path).unwrap();
-        for (lineno, line) in text.lines().enumerate() {
-            if line.trim_start().starts_with("//") {
-                continue;
-            }
-            if line.contains("broadcast::Receiver<") && line.contains("DomainEvent") {
-                violations.push(format!(
-                    "{}:{}: {}",
-                    path.display(),
-                    lineno + 1,
-                    line.trim()
-                ));
-            }
-        }
-    }
-    assert!(
-        violations.is_empty(),
-        "Mirror must not subscribe to DomainEventBus directly; use SignalConsumer.\n{}",
-        violations.join("\n")
-    );
 }

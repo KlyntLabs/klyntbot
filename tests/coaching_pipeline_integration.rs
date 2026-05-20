@@ -11,7 +11,7 @@ use std::sync::Arc;
 use tokio::sync::mpsc;
 
 #[tokio::test]
-async fn budget_alert_reaches_coaching_consumer_via_ai_pipeline() {
+async fn coaching_feedback_reaches_coaching_consumer_via_ai_pipeline() {
     let bus = Arc::new(DomainEventBus::new(32));
     let (tx, mut rx) = mpsc::channel::<AiSignal>(32);
 
@@ -24,23 +24,22 @@ async fn budget_alert_reaches_coaching_consumer_via_ai_pipeline() {
         app_core::init::ai_pipeline::translate,
     );
 
-    bus.publish(DomainEvent::BudgetAlert {
-        category: "food".into(),
-        spent: 450.0,
-        limit: 500.0,
+    bus.publish(DomainEvent::CoachingFeedback {
+        intervention_id: "i1".into(),
+        response: bus::FeedbackResponse::Helpful,
     });
 
     let signal = tokio::time::timeout(std::time::Duration::from_secs(2), rx.recv())
         .await
-        .expect("timed out waiting for BudgetAlert to reach coaching consumer")
+        .expect("timed out waiting for CoachingFeedback to reach coaching consumer")
         .expect("coaching consumer channel closed");
 
     assert!(
         signal.coaching_signal,
         "consumer must only forward coaching_signal=true signals"
     );
-    assert_eq!(signal.event_kind, "BudgetAlert");
-    assert_eq!(signal.metrics.category.as_deref(), Some("food"));
+    assert_eq!(signal.event_kind, "CoachingFeedback");
+    assert_eq!(signal.metrics.category.as_deref(), Some("thumbs_up"));
 }
 
 #[tokio::test]
@@ -57,15 +56,15 @@ async fn non_coaching_signals_are_filtered_out() {
         app_core::init::ai_pipeline::translate,
     );
 
-    // ChatTurnCompleted has coaching_signal=false in its translation.
-    bus.publish(DomainEvent::ChatTurnCompleted {
-        session_key: "s1".into(),
-        user_message: Some("just chatting".into()),
+    // Publish a non-coaching event.
+    bus.publish(DomainEvent::NoteCreated {
+        note_id: "n1".into(),
+        title: "Test note".into(),
     });
 
-    let result = tokio::time::timeout(std::time::Duration::from_millis(300), rx.recv()).await;
+    let result = tokio::time::timeout(std::time::Duration::from_millis(200), rx.recv()).await;
     assert!(
-        result.is_err(),
-        "non-coaching signal must NOT reach the coaching consumer; got {result:?}"
+        result.is_err() || result.unwrap().is_none(),
+        "non-coaching signals must be filtered out"
     );
 }

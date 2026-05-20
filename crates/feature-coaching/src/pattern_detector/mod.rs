@@ -115,8 +115,8 @@ impl PatternDetector {
                     confidence: (budget.len() as f64 / 5.0).min(0.9),
                     signal_count: budget.len() as i32,
                     description: format!("Budget warnings triggered {} times", budget.len()),
-                    domain: ai_core::RecallDomain::Finance,
-                    rule_text: "Review spending patterns when budget pressure is detected".into(),
+                    domain: ai_core::RecallDomain::Productivity,
+                    rule_text: "Review productivity patterns when pressure is detected".into(),
                 });
             }
         }

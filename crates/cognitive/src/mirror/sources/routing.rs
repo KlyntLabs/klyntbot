@@ -303,7 +303,7 @@ mod tests {
             .await
             .unwrap();
         source
-            .accumulate(&skill_routed_signal("finance", 0.75))
+            .accumulate(&skill_routed_signal("tasks", 0.75))
             .await
             .unwrap();
 

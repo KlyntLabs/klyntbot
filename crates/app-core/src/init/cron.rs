@@ -145,12 +145,8 @@ const JOB_FOCUS_CHECK: &str = "todo_focus_check";
 const JOB_DAILY_DIGEST: &str = "todo_daily_digest";
 const JOB_OVERDUE_CHECK: &str = "todo_overdue_check";
 const JOB_WEEKLY_REPORT: &str = "__klyntbot_weekly_report";
-const JOB_FINANCE_DAILY_REVIEW: &str = "__klyntbot_finance_daily_review";
 const JOB_ATOM_DECAY: &str = "__klyntbot_atom_decay_daily";
 const JOB_ATOM_EXTRACTION_CATCHALL: &str = "__klyntbot_atom_extraction_catchall";
-const JOB_FINANCE_BUDGET_CHECK: &str = "__klyntbot_finance_budget_check";
-const JOB_FINANCE_PRICE_REFRESH: &str = "__klyntbot_finance_price_refresh";
-const JOB_FINANCE_HEALTH_CHECK: &str = "__klyntbot_finance_health_check";
 const JOB_MORNING_BRIEFING: &str = "__klyntbot_morning_briefing";
 const JOB_WEEKLY_KNOWLEDGE_DIGEST: &str = "__klyntbot_weekly_knowledge_digest";
 
@@ -358,26 +354,6 @@ fn register_cron_callbacks(
             JOB_WEEKLY_REPORT,
             "weekly_report",
             "Generate weekly progress report using the weekly-report skill"
-        );
-        register_bus_job!(
-            JOB_FINANCE_DAILY_REVIEW,
-            "finance_daily_review",
-            "Run finance daily review and send summary"
-        );
-        register_bus_job!(
-            JOB_FINANCE_BUDGET_CHECK,
-            "finance_budget_check",
-            "Check budget thresholds and send alerts"
-        );
-        register_bus_job!(
-            JOB_FINANCE_PRICE_REFRESH,
-            "finance_price_refresh",
-            "Refresh investment prices"
-        );
-        register_bus_job!(
-            JOB_FINANCE_HEALTH_CHECK,
-            "finance_health_check",
-            "Run finance data health check"
         );
     }
 
@@ -1271,18 +1247,6 @@ async fn ensure_cron_jobs(
     // This keeps a fresh install clean.
 
     // ── Protected system jobs (AI background work, infrastructure) ────────
-
-    // Finance price refresh (system — must run automatically when enabled)
-    if config.finance.enabled && config.finance.price_refresh.enabled {
-        ensure_job!(
-            JOB_FINANCE_PRICE_REFRESH,
-            scheduling::CronSchedule::Every {
-                every_ms: config.finance.price_refresh.interval_hours as u64 * 60 * 60 * 1000,
-            },
-            "Refresh investment prices",
-            "system"
-        );
-    }
 
     // Autotuner nightly — now delegated to run_phase6_autotuner via the
     // Reforge Phase 6 bridge (Task 12 complete). The cron row is kept so

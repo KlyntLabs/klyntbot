@@ -47,20 +47,6 @@ async fn every_feature_event_produces_a_typed_signal() {
             deviation_pct: Some(80.0),
         }
         .into(),
-        feature_finance::events::FinanceEvent::TransactionRecorded {
-            _tx_id: "tx".into(),
-            category: "groceries".into(),
-            amount: 100,
-            currency: "USD".into(),
-            _is_over_budget: false,
-        }
-        .into(),
-        feature_finance::events::FinanceEvent::BudgetAlert {
-            category: "dining".into(),
-            spent: 100,
-            limit: 75,
-        }
-        .into(),
     ];
 
     for e in &events {
@@ -75,9 +61,6 @@ async fn every_feature_event_produces_a_typed_signal() {
             .any(|s| s.domain == RecallDomain::Tasks
                 && matches!(s.salience, SalienceVerdict::Extract))
     );
-    assert!(seen
-        .iter()
-        .any(|s| s.domain == RecallDomain::Finance && s.importance >= 0.8));
     for s in &seen {
         assert!(!s.content.is_empty(), "every signal must have content");
         assert!((0.0..=1.0).contains(&s.importance), "importance in range");

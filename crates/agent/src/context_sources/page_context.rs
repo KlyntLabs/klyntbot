@@ -44,7 +44,6 @@ impl ContextSource for PageContextSource {
             "task" => self.task_context(entity_id?).await,
             "objective" => self.objective_context(entity_id?).await,
             "area" => self.area_context(entity_id?).await,
-            kind if kind.starts_with("finance") => self.finance_context(kind).await,
             _ => None,
         };
 
@@ -188,39 +187,4 @@ impl PageContextSource {
         Some(out)
     }
 
-    async fn finance_context(&self, kind: &str) -> Option<String> {
-        let sub = kind.strip_prefix("finance.").unwrap_or("overview");
-        match sub {
-            "budgets" => {
-                let budgets = self.repos.finance.budgets.list_active().await.ok()?;
-                let mut out = format!("**Finance — Budgets ({}):**\n", budgets.len());
-                for b in &budgets {
-                    out.push_str(&format!("- {} ({} {})\n", b.name, b.amount, b.currency));
-                }
-                Some(out)
-            }
-            "investments" => {
-                let portfolios = self
-                    .repos
-                    .finance
-                    .investments
-                    .list_portfolios()
-                    .await
-                    .ok()?;
-                let mut out = format!("**Finance — Portfolios ({}):**\n", portfolios.len());
-                for p in &portfolios {
-                    out.push_str(&format!("- {} ({})\n", p.name, p.currency));
-                }
-                Some(out)
-            }
-            _ => {
-                let accounts = self.repos.finance.accounts.list(false).await.ok()?;
-                let mut out = format!("**Finance — Accounts ({}):**\n", accounts.len());
-                for a in &accounts {
-                    out.push_str(&format!("- {} ({}: {})\n", a.name, a.currency, a.balance));
-                }
-                Some(out)
-            }
-        }
-    }
 }

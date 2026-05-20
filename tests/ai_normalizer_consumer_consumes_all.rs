@@ -130,8 +130,6 @@ async fn normalizer_consumes_every_translator_signal() {
             RecallDomain::Productivity,
             "Session done",
         ),
-        signal("TransactionRecorded", RecallDomain::Finance, "Transaction"),
-        signal("BudgetAlert", RecallDomain::Finance, "Alert"),
         signal("ToolCallExecuted", RecallDomain::General, "Tool call"),
         signal("UserStatedFact", RecallDomain::General, "Fact"),
         signal("UserCorrectedAI", RecallDomain::General, "Correction"),

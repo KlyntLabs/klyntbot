@@ -21,10 +21,6 @@ const DEFAULT_SKILLS: &[(&str, &str)] = &[
         include_str!("../../../skills/task-management/SKILL.md"),
     ),
     (
-        "finance-management.md",
-        include_str!("../../../skills/finance-management/SKILL.md"),
-    ),
-    (
         "automation.md",
         include_str!("../../../skills/automation/SKILL.md"),
     ),

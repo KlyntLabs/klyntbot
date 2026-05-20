@@ -126,9 +126,6 @@ pub(super) async fn init_storage(
         feature_language_learning::language_learning_migrations()
     );
 
-    // Run finance feature migrations.
-    run_migration!("finance", feature_finance::finance_migrations());
-
     // Run focus feature migrations (DND sessions).
     run_migration!(
         "focus",

@@ -81,13 +81,11 @@ impl AppCore {
             identity_count: model.identity.len(),
             energy_count: model.energy.len(),
             work_count: model.work.len(),
-            finance_count: model.finance.len(),
             learning_count: model.learning.len(),
             preferences_count: model.preferences.len(),
             identity_preview: model.identity.iter().take(3).map(fact_preview).collect(),
             energy_preview: model.energy.iter().take(3).map(fact_preview).collect(),
             work_preview: model.work.iter().take(3).map(fact_preview).collect(),
-            finance_preview: model.finance.iter().take(3).map(fact_preview).collect(),
             learning_preview: model.learning.iter().take(3).map(fact_preview).collect(),
             preferences_preview: model.preferences.iter().take(3).map(fact_preview).collect(),
         })

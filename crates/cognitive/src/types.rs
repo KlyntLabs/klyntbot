@@ -170,7 +170,6 @@ pub struct UserModel {
     pub identity: Vec<SemanticFact>,
     pub energy: Vec<SemanticFact>,
     pub work: Vec<SemanticFact>,
-    pub finance: Vec<SemanticFact>,
     pub learning: Vec<SemanticFact>,
     pub preferences: Vec<SemanticFact>,
     /// Facts from domains not covered by the named fields above
@@ -185,7 +184,6 @@ impl UserModel {
         self.identity.len()
             + self.energy.len()
             + self.work.len()
-            + self.finance.len()
             + self.learning.len()
             + self.preferences.len()
             + self.other.len()
@@ -197,7 +195,6 @@ impl UserModel {
             !self.identity.is_empty(),
             !self.energy.is_empty(),
             !self.work.is_empty(),
-            !self.finance.is_empty(),
             !self.learning.is_empty(),
             !self.preferences.is_empty(),
             !self.other.is_empty(),

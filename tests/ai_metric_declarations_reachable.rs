@@ -6,14 +6,12 @@ use feature_productivity::events::ProductivityEvent;
 fn every_registry_spec_is_declared() {
     let mut reg = MetricRegistry::new();
     reg.register_all(feature_tasks::TaskEvent::FEATURE_METRICS);
-    reg.register_all(feature_finance::FinanceEvent::FEATURE_METRICS);
     reg.register_all(CoachingEvent::FEATURE_METRICS);
     reg.register_all(ProductivityEvent::FEATURE_METRICS);
 
     for spec in reg.all() {
         let found = [
             feature_tasks::TaskEvent::FEATURE_METRICS,
-            feature_finance::FinanceEvent::FEATURE_METRICS,
             CoachingEvent::FEATURE_METRICS,
             ProductivityEvent::FEATURE_METRICS,
         ]
@@ -32,7 +30,6 @@ fn every_registry_spec_is_declared() {
 fn reached_10_or_more_metrics() {
     let mut reg = MetricRegistry::new();
     reg.register_all(feature_tasks::TaskEvent::FEATURE_METRICS);
-    reg.register_all(feature_finance::FinanceEvent::FEATURE_METRICS);
     reg.register_all(CoachingEvent::FEATURE_METRICS);
     reg.register_all(ProductivityEvent::FEATURE_METRICS);
     assert!(

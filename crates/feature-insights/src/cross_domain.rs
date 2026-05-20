@@ -11,7 +11,6 @@ use serde::Serialize;
 pub enum EntityDomain {
     Task,
     Note,
-    Finance,
     Productivity,
 }
 
@@ -97,7 +96,6 @@ pub fn domain_str(domain: &EntityDomain) -> &'static str {
     match domain {
         EntityDomain::Task => "task",
         EntityDomain::Note => "note",
-        EntityDomain::Finance => "finance",
         EntityDomain::Productivity => "productivity",
     }
 }
@@ -282,13 +280,6 @@ mod tests {
         }
     }
 
-    fn finance_ref(id: &str, title: &str) -> EntityRef {
-        EntityRef {
-            domain: EntityDomain::Finance,
-            id: id.to_string(),
-            title: title.to_string(),
-        }
-    }
 
     fn note_ref(id: &str, title: &str) -> EntityRef {
         EntityRef {

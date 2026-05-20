@@ -281,7 +281,7 @@ metadata:
   klyntbot:
     type: orchestrator
     tools: [tasks, project, area]
-    can_delegate_to: [finance-management]
+    can_delegate_to: [learning]
     max_iterations: 12
     always_skills: [todo, daily-planner]
 ---
@@ -306,7 +306,7 @@ You are the task management specialist.
         );
         assert_eq!(
             pkg.metadata.klyntbot.as_ref().unwrap().can_delegate_to,
-            vec!["finance-management"]
+            vec!["learning"]
         );
         assert_eq!(
             pkg.metadata.klyntbot.as_ref().unwrap().max_iterations,

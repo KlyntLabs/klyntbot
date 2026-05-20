@@ -71,7 +71,6 @@ dependencies = [
  "dashmap",
  "feature-alarms",
  "feature-coaching",
- "feature-finance",
  "feature-language-learning",
  "feature-notes",
  "feature-productivity",
@@ -396,7 +395,6 @@ dependencies = [
  "desktop-shared",
  "dirs",
  "feature-coaching",
- "feature-finance",
  "feature-focus",
  "feature-insights",
  "feature-language-learning",
@@ -2423,7 +2421,6 @@ dependencies = [
  "config",
  "context_engine",
  "dashmap",
- "feature-finance",
  "feature-notes",
  "feature-tasks",
  "futures-util",
@@ -4877,7 +4874,6 @@ dependencies = [
  "bus",
  "cognitive",
  "common",
- "feature-finance",
  "feature-tasks",
  "jiff",
  "serde",
@@ -4887,32 +4883,6 @@ dependencies = [
  "tokio-util",
  "tools-core",
  "tracing",
- "uuid",
-]
-
-[[package]]
-name = "feature-finance"
-version = "0.1.1"
-dependencies = [
- "ai-core",
- "ai-core-macros",
- "analytics",
- "async-trait",
- "bus",
- "common",
- "dashmap",
- "jiff",
- "reqwest 0.13.3",
- "rust_decimal",
- "serde",
- "serde_json",
- "sqlx",
- "storage",
- "tempfile",
- "tokio",
- "tools-core",
- "tracing",
- "urlencoding",
  "uuid",
 ]
 
@@ -7643,7 +7613,6 @@ dependencies = [
  "context_engine",
  "dashmap",
  "feature-coaching",
- "feature-finance",
  "feature-productivity",
  "feature-tasks",
  "jiff",

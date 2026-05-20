@@ -89,14 +89,6 @@ impl AppCore {
                     .to_string(),
                 active_skill: payload["active_skill"].as_str().map(|s| s.to_string()),
             },
-            bus::DomainEvent::KIND_BUDGET_ALERT => bus::DomainEvent::BudgetAlert {
-                category: payload["category"]
-                    .as_str()
-                    .unwrap_or("general")
-                    .to_string(),
-                spent: payload["spent"].as_f64().unwrap_or(0.0),
-                limit: payload["limit"].as_f64().unwrap_or(0.0),
-            },
             bus::DomainEvent::KIND_DISTRACTION_DETECTED => bus::DomainEvent::DistractionDetected {
                 app: payload["app"].as_str().unwrap_or("unknown").to_string(),
                 duration_secs: payload["duration_secs"].as_i64(),

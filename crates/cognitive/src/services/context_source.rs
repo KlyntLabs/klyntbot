@@ -189,7 +189,6 @@ impl ContextSource for CognitiveContextSource {
             ("Identity", &model.identity),
             ("Energy & Rhythms", &model.energy),
             ("Work Patterns", &model.work),
-            ("Finance", &model.finance),
             ("Learning", &model.learning),
             ("Preferences", &model.preferences),
             ("Other Context", &model.other),
@@ -486,8 +485,7 @@ mod tests {
     async fn context_source_uses_recall_registry() {
         let pool = setup().await;
         let registry = ai_core::RecallProviderRegistry::new()
-            .with(feature_tasks::TasksFeature::default())
-            .with(feature_finance::FinanceFeature::default());
+            .with(feature_tasks::TasksFeature::default());
 
         let fact_repo = SemanticFactRepo::new(pool.clone());
         let rule_repo = ProceduralRuleRepo::new(pool);

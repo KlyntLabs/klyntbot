@@ -12,13 +12,11 @@ pub use loader::{
 };
 pub use schema::hot::{HotConfig, HotConfigDiff};
 pub use schema::{
-    default_finance_categories, AutoTunerConfig, BookEntityResolutionConfig, BookIndexConfig,
+    AutoTunerConfig, BookEntityResolutionConfig, BookIndexConfig,
     BookRetrievalCfg, Config, ContentConfig, ContentSourceConfig, DiscordConfig, EmailConfig,
-    ExecutionConfig, ExtendedThinkingConfig, FinanceBudgetingConfig, FinanceCategoryConfig,
-    FinanceConfig, FinanceDefaultCategory, FinanceExpectedReturnsConfig, FinanceInflationConfig,
-    FinancePriceRefreshConfig, FinanceSchedulingConfig, FireConfig, LearningConfig,
+    ExecutionConfig, ExtendedThinkingConfig, LearningConfig,
     LifecycleConfig, McpAuthConfig, McpConfig, McpOAuthCredentials, McpServerDef,
     McpServerSettings, McpTransport, PackTier, PacksConfig, ProviderManagerConfig, Secret,
-    ShortcutsConfig, SixJarRatios, SlackConfig, TelegramConfig, TodoEnrichmentConfig, TrustLevel,
+    ShortcutsConfig, SlackConfig, TelegramConfig, TodoEnrichmentConfig, TrustLevel,
     WakeDeliveryConfig, DEFAULT_STARTUP_TIMEOUT_SEC, DEFAULT_TOOL_TIMEOUT_SEC,
 };

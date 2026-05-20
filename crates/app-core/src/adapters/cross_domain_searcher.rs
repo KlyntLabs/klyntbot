@@ -25,7 +25,7 @@ fn table_for_domain(domain: &EntityDomain) -> Option<&'static str> {
         EntityDomain::Note => Some("note_embeddings"),
         // Finance uses tree_node_embeddings filtered by source_type="finance".
         // Handled separately in search_other_domains.
-        EntityDomain::Finance | EntityDomain::Productivity => None,
+        EntityDomain::Productivity => None,
     }
 }
 
@@ -33,7 +33,6 @@ fn table_for_domain(domain: &EntityDomain) -> Option<&'static str> {
 const SEARCHABLE_DOMAINS: &[EntityDomain] = &[
     EntityDomain::Task,
     EntityDomain::Note,
-    EntityDomain::Finance,
 ];
 
 /// LanceDB retrieval threshold — intentionally lower than the heuristic's
@@ -174,7 +173,7 @@ impl CrossDomainSearcherImpl {
         match domain {
             EntityDomain::Task => self.lookup_task(id).await,
             EntityDomain::Note => self.lookup_note(id).await,
-            EntityDomain::Finance => self.lookup_finance_node(id).await,
+
             _ => None,
         }
     }
@@ -204,39 +203,19 @@ impl CrossDomainSearcher for CrossDomainSearcherImpl {
                 continue;
             }
 
-            // Finance nodes live in tree_node_embeddings filtered by source_type.
-            let hits: Vec<(String, f64)> = if *target_domain == EntityDomain::Finance {
-                match self
-                    .vector_store
-                    .search_tree_nodes_by_source_type(
-                        &query_vec,
-                        "finance",
-                        SEARCH_LIMIT,
-                        SEARCH_THRESHOLD,
-                    )
-                    .await
-                {
-                    Ok(h) => h,
-                    Err(e) => {
-                        warn!(error = %e, "cross-domain finance tree node search failed");
-                        continue;
-                    }
-                }
-            } else {
-                let table = match table_for_domain(target_domain) {
-                    Some(t) => t,
-                    None => continue,
-                };
-                match self
-                    .vector_store
-                    .search_similar(table, &query_vec, SEARCH_LIMIT, SEARCH_THRESHOLD)
-                    .await
-                {
-                    Ok(h) => h,
-                    Err(e) => {
-                        warn!(table, error = %e, "cross-domain vector search failed");
-                        continue;
-                    }
+            let table = match table_for_domain(target_domain) {
+                Some(t) => t,
+                None => continue,
+            };
+            let hits: Vec<(String, f64)> = match self
+                .vector_store
+                .search_similar(table, &query_vec, SEARCH_LIMIT, SEARCH_THRESHOLD)
+                .await
+            {
+                Ok(h) => h,
+                Err(e) => {
+                    warn!(table, error = %e, "cross-domain vector search failed");
+                    continue;
                 }
             };
 

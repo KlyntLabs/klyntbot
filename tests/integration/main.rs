@@ -6,7 +6,6 @@ mod channels;
 mod chat_lifecycle;
 mod cognitive;
 mod cron_bridge_restart;
-mod finance;
 mod learning;
 mod mcp_alarm_tool;
 mod memory;

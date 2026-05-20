@@ -216,7 +216,6 @@ pub async fn load_user_model(fact_repo: &SemanticFactRepo) -> UserModel {
                 "identity" => model.identity = facts,
                 "energy" => model.energy = facts,
                 "work" => model.work = facts,
-                "finance" => model.finance = facts,
                 "learning" => model.learning = facts,
                 "preferences" => model.preferences = facts,
                 _ => model.other.extend(facts),

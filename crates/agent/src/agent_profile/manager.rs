@@ -19,7 +19,6 @@ macro_rules! include_agent {
 const BUILTIN_AGENTS: &[(&str, &str)] = &[
     include_agent!("general"),
     include_agent!("task"),
-    include_agent!("finance"),
     include_agent!("automation"),
     include_agent!("communication"),
 ];
@@ -53,8 +52,6 @@ const BUILTIN_AGENT_SKILLS: &[(&str, &str, &str)] = &[
     include_agent_skill!("task", "project-management"),
     include_agent_skill!("task", "weekly-review"),
     include_agent_skill!("task", "retrospective"),
-    include_agent_skill!("finance", "budgeting"),
-    include_agent_skill!("finance", "spending-analysis"),
     include_agent_skill!("automation", "cron"),
 ];
 
@@ -389,7 +386,6 @@ mod tests {
         let mgr = make_test_manager();
         assert!(mgr.get("general").is_some());
         assert!(mgr.get("task").is_some());
-        assert!(mgr.get("finance").is_some());
     }
 
     #[test]
@@ -397,13 +393,6 @@ mod tests {
         let mgr = make_test_manager();
         let matched = mgr.match_agent("create a task for reviewing the budget");
         assert_eq!(matched.name, "task");
-    }
-
-    #[test]
-    fn test_match_agent_finance() {
-        let mgr = make_test_manager();
-        let matched = mgr.match_agent("check my budget spending");
-        assert_eq!(matched.name, "finance");
     }
 
     #[test]
@@ -417,8 +406,7 @@ mod tests {
     fn test_match_agent_ambiguous_prefers_more_hits() {
         let mgr = make_test_manager();
         let matched = mgr.match_agent("create a task about my budget");
-        // Both task and finance could match — should return one with more trigger hits
-        assert!(matched.name == "task" || matched.name == "finance");
+        assert!(matched.name == "task");
     }
 
     #[test]
@@ -483,7 +471,6 @@ mod tests {
         // Inject a unit vector for "task" and orthogonal vectors for others
         let task_vec = vec![1.0_f32, 0.0, 0.0];
         inject_embedding(&mut mgr, "task", task_vec.clone());
-        inject_embedding(&mut mgr, "finance", vec![0.0, 1.0, 0.0]);
         inject_embedding(&mut mgr, "automation", vec![0.0, 0.0, 1.0]);
 
         // No keyword hit, but query points straight at task (cosine = 1.0 ≥ 0.5)
@@ -498,15 +485,12 @@ mod tests {
     #[test]
     fn test_blend_scores_keyword_wins_over_weak_semantic() {
         let mut mgr = make_test_manager();
-        // task has keyword hit (0.6), finance has higher semantic but below 0.5
         inject_embedding(&mut mgr, "task", vec![0.6_f32, 0.0, 0.0]);
-        inject_embedding(&mut mgr, "finance", vec![0.0_f32, 1.0, 0.0]);
 
         let mut kw: HashMap<String, f64> = HashMap::new();
         kw.insert("task".to_string(), 0.6);
 
-        // Query is slightly tilted toward finance but not enough (sem < 0.5 with no kw)
-        let query = vec![0.3_f32, 0.4, 0.0]; // closer to finance but not by a lot
+        let query = vec![0.3_f32, 0.4, 0.0];
         let selected = mgr.blend_scores(&kw, &query);
         assert_eq!(
             selected.name, "task",

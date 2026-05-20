@@ -620,63 +620,63 @@ fn test_signal_accumulator_distraction_streak_removed() {
 fn test_signal_accumulator_cooldown_prevents_refire() {
     let mut acc = SignalAccumulator::new();
 
-    // Use budget_warning trigger (distraction_streak was removed as a coaching trigger).
-    // Push enough budget alerts to fire the condition.
+    // Use focus_warning trigger.
+    // Push enough focus alerts to fire the condition.
     for _ in 0..3 {
         acc.push_event(&AiSignal {
-            domain: RecallDomain::Finance,
-            event_kind: "BudgetAlert",
+            domain: RecallDomain::Productivity,
+            event_kind: "FocusAlert",
             importance: 0.9,
             salience: SalienceVerdict::Extract,
-            content: "Budget alert: dining spent 280 of 300".into(),
+            content: "Focus alert: session interrupted".into(),
             entity: None,
             timestamp: jiff::Timestamp::now(),
-            raw_event: Some(DomainEvent::BudgetAlert {
-                category: "dining".into(),
-                spent: 280.0,
-                limit: 300.0,
+            raw_event: Some(DomainEvent::DistractionDetected {
+                app: "notification".into(),
+                duration_secs: Some(30),
+                context: "focus session".into(),
             }),
             metrics: AiMetrics {
-                category: Some("dining".into()),
-                amount: Some(280.0),
+                category: Some("focus".into()),
+                amount: Some(1.0),
                 ..AiMetrics::default()
             },
             coaching_signal: true,
-            coaching_rule: Some("Review spending patterns when budget pressure is detected".into()),
+            coaching_rule: Some("Review productivity patterns when pressure is detected".into()),
             metric_samples: vec![],
         });
     }
 
     let situation = distraction_situation();
 
-    // First eval fires budget_warning
+    // First eval fires focus_warning
     let fired1 = acc.evaluate(&situation);
     assert!(
-        fired1.iter().any(|t| t.condition_name == "budget_warning"),
-        "First eval should fire budget_warning"
+        fired1.iter().any(|t| t.condition_name == "focus_warning"),
+        "First eval should fire focus_warning"
     );
 
     // Push another alert immediately
     acc.push_event(&AiSignal {
-        domain: RecallDomain::Finance,
-        event_kind: "BudgetAlert",
+        domain: RecallDomain::Productivity,
+        event_kind: "FocusAlert",
         importance: 0.9,
         salience: SalienceVerdict::Extract,
-        content: "Budget alert: dining spent 290 of 300".into(),
+        content: "Focus alert: session interrupted again".into(),
         entity: None,
         timestamp: jiff::Timestamp::now(),
-        raw_event: Some(DomainEvent::BudgetAlert {
-            category: "dining".into(),
-            spent: 290.0,
-            limit: 300.0,
+        raw_event: Some(DomainEvent::DistractionDetected {
+            app: "notification".into(),
+            duration_secs: Some(30),
+            context: "focus session".into(),
         }),
         metrics: AiMetrics {
-            category: Some("dining".into()),
+            category: Some("focus".into()),
             amount: Some(290.0),
             ..AiMetrics::default()
         },
         coaching_signal: true,
-        coaching_rule: Some("Review spending patterns when budget pressure is detected".into()),
+        coaching_rule: Some("Review productivity patterns when pressure is detected".into()),
         metric_samples: vec![],
     });
 

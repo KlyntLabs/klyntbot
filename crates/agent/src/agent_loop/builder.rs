@@ -34,7 +34,7 @@ use super::{AgentLoop, LastActiveChannel};
 /// Builder for constructing an [`AgentLoop`] with all its dependencies.
 ///
 /// Required fields (`bus`, `provider`, `config`) are constructor params.
-/// Optional: `pool` (enables feature-tasks, finance), `cron_executor`, `notification_handle`.
+/// Optional: `pool` (enables feature-tasks), `cron_executor`, `notification_handle`.
 ///
 /// # Example
 /// ```ignore
@@ -255,7 +255,7 @@ impl AgentLoopBuilder {
         });
 
         // ── Create repos from pool (real or in-memory fallback) ──────────
-        // Storage-dependent features (todo, finance, sessions) are disabled via
+        // Storage-dependent features (todo, sessions) are disabled via
         // the `if self.pool.is_some()` guards below when no real pool is provided.
         let storage_pool = if let Some(pool) = self.pool.clone() {
             storage::StoragePool::from_existing(pool)
@@ -391,8 +391,7 @@ impl AgentLoopBuilder {
                 cognitive_retrieval_config = Some(retrieval_config);
 
                 let recall_registry = ai_core::RecallProviderRegistry::new()
-                    .with(feature_tasks::TasksFeature::default())
-                    .with(feature_finance::FinanceFeature::default());
+                    .with(feature_tasks::TasksFeature::default());
                 let cog_source =
                     cognitive::CognitiveContextSource::new(fact_repo.clone(), rule_repo)
                         .with_static_fact_limit(config.cognitive.static_fact_limit)
@@ -824,9 +823,6 @@ impl AgentLoopBuilder {
             forge.add_searcher(Arc::new(crate::domain_searchers::TaskSearcher::new(
                 repos.clone(),
             )));
-            forge.add_searcher(Arc::new(crate::domain_searchers::FinanceSearcher::new(
-                repos.clone(),
-            )));
             // NoteTreeNavigator with optional community search (Phase 2)
             if config.cognitive.book_index.enabled {
                 let tree_repo: Arc<dyn context_engine::book_index::BookTreeRepo> = Arc::new(
@@ -951,27 +947,6 @@ impl AgentLoopBuilder {
                             }
                         });
                         info!("CommunityBuilder subscriber started");
-
-                        // FinanceTreeBuilder subscriber (event-driven finance tree + LanceDB embed)
-                        let finance_tree_builder = Arc::new(
-                            crate::adapters::finance_tree_builder::FinanceTreeBuilder::new(
-                                tree_repo.clone(),
-                                Arc::new(vs.clone()),
-                                text_embedder.clone(),
-                                self.context_update_queue.clone(),
-                                self.domain_event_bus.clone(),
-                            ),
-                        );
-                        let finance_tree_rx = domain_bus.subscribe();
-                        let finance_tree_shutdown = tree_builder_parent_token.child_token();
-                        let _finance_tree_handle = tokio::spawn({
-                            let builder = Arc::clone(&finance_tree_builder);
-                            let shutdown = finance_tree_shutdown.clone();
-                            async move {
-                                builder.run(finance_tree_rx, shutdown).await;
-                            }
-                        });
-                        info!("FinanceTreeBuilder subscriber started");
 
                         // ProductivityTreeBuilder subscriber (event-driven productivity tree + LanceDB embed)
                         let productivity_tree_builder =
@@ -1441,49 +1416,6 @@ impl AgentLoopBuilder {
                     memory_tool.with_enhancement_trace_store(Arc::clone(&latest_enhancement_trace));
 
                 tool_registry.register(memory_tool);
-            }
-        }
-
-        // ── Finance tool (requires real pool) ─────────────────────────────
-        if let Some(pool) = &self.pool {
-            if config.finance.enabled {
-                let cache_ttl = config.finance.price_refresh.cache_ttl_minutes;
-                let finance_storage = storage::FinanceStorage::from_pool(pool);
-                let rate_cache = feature_finance::rate_cache::RateCache::new(
-                    finance_storage.exchange_rates.clone(),
-                    i64::from(cache_ttl),
-                );
-                let mut price_service =
-                    feature_finance::PriceService::with_rate_cache(cache_ttl, rate_cache.clone());
-
-                // Apply config exchange rate overrides
-                if let Some(ref overrides) = config.finance.exchange_rates {
-                    price_service.set_exchange_rate_overrides(overrides.clone());
-                }
-
-                let finance_handler_impl =
-                    Arc::new(crate::adapters::finance::FinanceHandlerImpl::new(
-                        repos.clone(),
-                        price_service.clone(),
-                        config.finance.clone(),
-                    ));
-
-                let mut finance_tool = feature_finance::FinanceTool::new(
-                    finance_storage,
-                    price_service,
-                    config.finance.default_currency.clone(),
-                )
-                .with_rate_cache(rate_cache)
-                .with_finance_handler(
-                    Arc::clone(&finance_handler_impl) as Arc<dyn feature_finance::FinanceHandler>
-                );
-
-                // Wire DomainEventBus for transaction and budget events
-                if let Some(ref domain_bus) = self.domain_event_bus {
-                    finance_tool = finance_tool.with_domain_bus(Arc::clone(domain_bus));
-                }
-
-                tool_registry.register(finance_tool);
             }
         }
 

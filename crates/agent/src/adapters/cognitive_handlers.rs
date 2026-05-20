@@ -76,9 +76,6 @@ impl HeuristicExtractionHandler {
                     }]
                 }
             }
-            bus::DomainEvent::KIND_BUDGET_ALERT => {
-                vec![fact("finance", "budget_pressure", 0.9, "observed")]
-            }
             bus::DomainEvent::KIND_COACHING_FEEDBACK => {
                 vec![fact("coaching", "coaching_response", 0.9, "observed")]
             }

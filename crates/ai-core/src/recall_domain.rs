@@ -4,7 +4,6 @@
 pub enum RecallDomain {
     General,
     Tasks,
-    Finance,
     Productivity,
     Learning,
     Mirror,
@@ -18,7 +17,6 @@ impl RecallDomain {
         match self {
             RecallDomain::General => "general",
             RecallDomain::Tasks => "tasks",
-            RecallDomain::Finance => "finance",
             RecallDomain::Productivity => "productivity",
             RecallDomain::Learning => "learning",
             RecallDomain::Mirror => "mirror",
@@ -34,7 +32,6 @@ impl RecallDomain {
     pub fn from_str_or_general(s: &str) -> Self {
         match s {
             "tasks" => RecallDomain::Tasks,
-            "finance" => RecallDomain::Finance,
             "productivity" => RecallDomain::Productivity,
             "learning" => RecallDomain::Learning,
             "mirror" => RecallDomain::Mirror,

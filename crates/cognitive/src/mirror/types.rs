@@ -349,30 +349,6 @@ pub struct TaskFocusSnapshot {
 }
 
 // ---------------------------------------------------------------------------
-// Finance Drift types
-// ---------------------------------------------------------------------------
-
-#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
-#[serde(rename_all = "camelCase")]
-pub struct FinanceDriftSnapshot {
-    pub id: Uuid,
-    #[specta(type = crate::specta_helpers::Timestamp)]
-    pub captured_at: Timestamp,
-    pub window_hours: u8,
-    pub total_transactions: u32,
-    pub over_budget_count: u32,
-    pub per_category: HashMap<String, CategorySpend>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
-#[serde(rename_all = "camelCase")]
-pub struct CategorySpend {
-    pub total_amount: f64,
-    pub transaction_count: u32,
-    pub budget_alerts: u32,
-}
-
-// ---------------------------------------------------------------------------
 // Coding Todo types
 // ---------------------------------------------------------------------------
 

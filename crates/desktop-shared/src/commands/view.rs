@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct SetActiveViewParams {
-    /// Dashboard identifier (e.g., "finance", "tasks", "projects", "notes", "dashboard").
+    /// Dashboard identifier (e.g., "tasks", "projects", "notes", "dashboard").
     pub dashboard: String,
     /// Specific entity focused within the dashboard (e.g., "FIRE projection", project ID).
     pub focused_entity: Option<String>,

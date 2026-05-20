@@ -414,7 +414,6 @@ impl AppCore {
         let entity_domain = match domain {
             "task" => EntityDomain::Task,
             "note" => EntityDomain::Note,
-            "finance" => EntityDomain::Finance,
             _ => return,
         };
         self.check_cross_domain(entity_domain, id, title, created_at_str)

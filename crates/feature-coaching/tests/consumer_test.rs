@@ -25,8 +25,8 @@ async fn coaching_signals_forwarded() {
 
 fn dummy_signal() -> AiSignal {
     AiSignal {
-        domain: ai_core::RecallDomain::Finance,
-        event_kind: "BudgetAlert",
+        domain: ai_core::RecallDomain::Productivity,
+        event_kind: "FocusAlert",
         importance: 0.9,
         salience: ai_core::SalienceVerdict::Extract,
         content: "alert".into(),

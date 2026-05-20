@@ -15,7 +15,6 @@ pub struct MirrorRetentionConfig {
     pub reverted_brain_version_days: u32,
     pub trial_preview_days: u32,
     pub task_focus_snapshot_days: u32,
-    pub finance_drift_snapshot_days: u32,
     pub sweep_interval_secs: u64,
 }
 
@@ -29,7 +28,6 @@ impl Default for MirrorRetentionConfig {
             reverted_brain_version_days: 730,
             trial_preview_days: 180,
             task_focus_snapshot_days: 90,
-            finance_drift_snapshot_days: 90,
             sweep_interval_secs: 24 * 3600, // daily
         }
     }
@@ -61,7 +59,7 @@ impl MirrorRetentionService {
     }
 
     pub async fn sweep_once(repo: &MirrorRepo, config: &MirrorRetentionConfig) {
-        let (r1, r2, r3, r4, r5, r6, r7, r8) = tokio::join!(
+        let (r1, r2, r3, r4, r5, r6, r7) = tokio::join!(
             repo.cleanup_old_snapshots(config.routing_snapshot_days),
             repo.cleanup_old_snippets(config.snippet_days),
             repo.cleanup_old_trend_narratives(config.narrative_days),
@@ -69,7 +67,6 @@ impl MirrorRetentionService {
             repo.cleanup_reverted_brain_versions(config.reverted_brain_version_days),
             repo.cleanup_old_trial_previews(config.trial_preview_days),
             repo.cleanup_old_task_focus_snapshots(config.task_focus_snapshot_days),
-            repo.cleanup_old_finance_drift_snapshots(config.finance_drift_snapshot_days),
         );
         for (name, res) in [
             ("snapshots", r1),
@@ -79,7 +76,6 @@ impl MirrorRetentionService {
             ("brain_versions", r5),
             ("trial_previews", r6),
             ("task_focus_snapshots", r7),
-            ("finance_drift_snapshots", r8),
         ] {
             if let Err(e) = res {
                 tracing::warn!("mirror retention cleanup_old_{name} failed: {e}");

@@ -5,7 +5,6 @@ pub mod area;
 pub mod cron;
 pub mod custom_column;
 pub mod entity_link;
-pub mod finance;
 pub mod held_notification;
 pub mod key_result;
 pub mod learning;

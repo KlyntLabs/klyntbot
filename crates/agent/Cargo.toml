@@ -24,7 +24,6 @@ klynt-hooks.workspace = true
 klynt-truncation = { path = "../klynt-truncation" }
 feature-alarms.workspace = true
 feature-tasks.workspace = true
-feature-finance.workspace = true
 feature-productivity.workspace = true
 feature-coaching.workspace = true
 feature-language-learning.workspace = true

@@ -23,7 +23,7 @@ pub use tools;
 
 // Re-export commonly used types for convenience
 pub use agent::{
-    AgentEvent, AgentLoop, FinanceHandlerImpl, ProgressHandlerImpl, StreamingHandle,
+    AgentEvent, AgentLoop, ProgressHandlerImpl, StreamingHandle,
     SubagentManager,
 };
 pub use bus::{InboundMessage, MessageBus, OutboundMessage};

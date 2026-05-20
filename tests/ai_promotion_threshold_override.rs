@@ -16,16 +16,6 @@ fn tasks_override_beats_global() {
     assert_eq!(effective_general, global);
 }
 
-#[test]
-fn finance_override_is_lower_still() {
-    let mut overrides = HashMap::new();
-    if let Some(n) = feature_finance::FinanceFeature::PROMOTE_THRESHOLD_OVERRIDE {
-        overrides.insert(RecallDomain::Finance, n);
-    }
-    let effective = effective_threshold(&RecallDomain::Finance, &overrides, 5);
-    assert_eq!(effective, 2);
-}
-
 fn effective_threshold(
     domain: &RecallDomain,
     overrides: &HashMap<RecallDomain, usize>,

@@ -16,8 +16,6 @@ pub mod correction_tracker;
 pub mod cron;
 pub mod entity_embedder;
 pub mod entity_tree_linker;
-pub mod finance;
-pub mod finance_tree_builder;
 pub mod fsrs_writeback;
 pub mod learning;
 pub mod learning_tree_builder;

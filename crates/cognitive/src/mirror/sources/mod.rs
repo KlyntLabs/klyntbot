@@ -4,7 +4,6 @@
 pub mod approval_history;
 pub mod config_archiver;
 pub mod cost_ceiling;
-pub mod finance_drift;
 pub mod meta_rule;
 pub mod routing;
 pub mod skill_effectiveness;
@@ -14,7 +13,6 @@ pub mod trial;
 pub use approval_history::ApprovalHistorySource;
 pub use config_archiver::ConfigArchiverSource;
 pub use cost_ceiling::CostCeilingSource;
-pub use finance_drift::FinanceSpendingDriftSource;
 pub use meta_rule::MetaRuleSignalSource;
 pub use routing::RoutingSignalSource;
 pub use skill_effectiveness::{EffectivenessScores, SkillEffectivenessSource};

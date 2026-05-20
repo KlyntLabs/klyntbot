@@ -348,15 +348,6 @@ impl BackgroundConsolidationService {
                             DomainEvent::TaskCreated { task_id, .. } => {
                                 upsert_domain_entity(&entity_repo, task_id, "task", task_id).await;
                             }
-                            DomainEvent::TransactionRecorded { category, .. } => {
-                                upsert_domain_entity(
-                                    &entity_repo,
-                                    category,
-                                    "finance_category",
-                                    category,
-                                )
-                                .await;
-                            }
                             _ => {}
                         }
                     }
@@ -1111,8 +1102,6 @@ fn event_type_key(event: &DomainEvent) -> &'static str {
         DomainEvent::TaskCompleted { .. } => "TaskCompleted",
         DomainEvent::TaskDeferred { .. } => "TaskDeferred",
 
-        DomainEvent::TransactionRecorded { .. } => "TransactionRecorded",
-        DomainEvent::BudgetAlert { .. } => "BudgetAlert",
         DomainEvent::ChatTurnCompleted { .. } => "ChatTurnCompleted",
         DomainEvent::UserStatedFact { .. } => "UserStatedFact",
         DomainEvent::UserCorrectedAI { .. } => "UserCorrectedAI",
@@ -1316,9 +1305,6 @@ mod tests {
         let pool = crate::repos::cognitive_test_pool().await;
         let entity_repo = crate::repos::EntityRepo::new(pool.clone());
 
-        // Upsert the same entity twice (simulating two TransactionRecorded events
-        // for the same category)
-        upsert_domain_entity(&entity_repo, "Groceries", "finance_category", "groceries").await;
         upsert_domain_entity(&entity_repo, "Groceries", "finance_category", "groceries").await;
 
         let found = entity_repo.find_by_name("Groceries").await.unwrap();

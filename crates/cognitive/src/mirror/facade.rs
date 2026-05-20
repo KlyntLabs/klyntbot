@@ -816,7 +816,7 @@ mod tests {
     fn make_meta_rule() -> MetaRule {
         MetaRule {
             id: Uuid::new_v4(),
-            trigger_condition: "user corrects finance twice".to_string(),
+            trigger_condition: "user corrects tasks twice".to_string(),
             action: MetaRuleAction::ForceClarification,
             source: MetaRuleSource::CorrectionDerived,
             effectiveness_score: 0.5,

@@ -130,12 +130,12 @@ impl SignalAccumulator {
                 }
             }
             "budget_warning" => {
-                let budget_alerts = self.count_events(bus::DomainEvent::KIND_BUDGET_ALERT);
-                if budget_alerts >= 1 {
+                let focus_alerts = self.count_events("FocusAlert");
+                if focus_alerts >= 1 {
                     Some(TriggerFired {
-                        condition_name: "budget_warning".into(),
+                        condition_name: "focus_warning".into(),
                         confidence: 0.9,
-                        context: format!("{budget_alerts} budget alert(s)"),
+                        context: format!("{focus_alerts} focus alert(s)"),
                     })
                 } else {
                     None
@@ -236,8 +236,8 @@ mod tests {
     fn test_push_ai_signal_updates_window() {
         let mut acc = SignalAccumulator::new();
         let sig = ai_core::AiSignal {
-            domain: ai_core::RecallDomain::Finance,
-            event_kind: "BudgetAlert",
+            domain: ai_core::RecallDomain::Productivity,
+            event_kind: "FocusAlert",
             importance: 0.9,
             salience: ai_core::SalienceVerdict::Extract,
             content: "".into(),
