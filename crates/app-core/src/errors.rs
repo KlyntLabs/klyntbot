@@ -37,12 +37,6 @@ pub fn parse_date_or_err(s: &str) -> Result<jiff::Timestamp, ApiError> {
     parse_date(s).ok_or_else(|| ApiError::new("VALIDATION", format!("invalid date: {s}")))
 }
 
-/// Parse an RFC3339 timestamp or return an `INVALID_DATE` `ApiError`.
-pub fn parse_rfc3339_or_err(field: &str, s: &str) -> Result<jiff::Timestamp, ApiError> {
-    common::parse_datetime_jiff(s, "UTC")
-        .ok_or_else(|| ApiError::new("INVALID_DATE", format!("Bad {field}: {s}")))
-}
-
 /// Parse a local date into UTC day boundaries, accounting for timezone offset.
 ///
 /// `tz_offset_mins` is the JS-style offset (e.g. -420 for UTC+7, meaning local = UTC + 7h).

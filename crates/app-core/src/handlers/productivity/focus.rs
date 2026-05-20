@@ -1,13 +1,10 @@
-//! Focus session handlers — start, end, status, pomodoro, breaks, auto-focus.
+//! Focus session handlers — start, end, status, pomodoro, breaks.
 
 use desktop_shared::commands::{FocusSessionResponse, IntelligenceSessionResponse};
 use desktop_shared::errors::ApiError;
-use desktop_shared::events::AutoFocusPayload;
-use feature_productivity::auto_focus::AutoFocusEvent;
-use feature_productivity::types::FocusSession;
 
 use super::converters::session_to_response;
-use crate::errors::{map_prod_err, parse_date_or_err, parse_local_day_range, parse_rfc3339_or_err};
+use crate::errors::{map_prod_err, parse_date_or_err, parse_local_day_range};
 use crate::state::AppCore;
 
 impl AppCore {
@@ -170,141 +167,4 @@ impl AppCore {
         Ok(session.map(session_to_response))
     }
 
-    /// Create or get an active auto-detected focus session (called when auto-focus starts).
-    #[tracing::instrument(skip(self), err)]
-    pub async fn productivity_auto_focus_start(&self) -> Result<FocusSessionResponse, ApiError> {
-        let repos = self.productivity_repos()?;
-
-        // Check if there's already an active auto-detected session
-        if let Ok(Some(active)) = repos.sessions.get_active().await {
-            if active.source == feature_productivity::types::SessionSource::AutoDetected
-                && active.ended_at.is_none()
-            {
-                return Ok(session_to_response(active));
-            }
-        }
-
-        // Create a new active session (no end time yet)
-        let focus_session = FocusSession {
-            id: uuid::Uuid::new_v4().to_string(),
-            action_id: None,
-            project_id: None,
-            session_type: feature_productivity::types::SessionType::Focus,
-            target_mins: None,
-            started_at: jiff::Timestamp::now(),
-            ended_at: None, // Still active
-            actual_mins: None,
-            interruptions: 0,
-            distraction_events: vec![],
-            quality_score: None,
-            completed: false,
-            notes: Some("Auto-detected focus session".to_string()),
-            source: feature_productivity::types::SessionSource::AutoDetected,
-        };
-        repos
-            .sessions
-            .create(&focus_session)
-            .await
-            .map_err(map_prod_err)?;
-        Ok(session_to_response(focus_session))
-    }
-
-    /// End the active auto-detected session with final stats (called when auto-focus ends).
-    #[tracing::instrument(skip(self), err)]
-    pub async fn productivity_auto_focus_end(
-        &self,
-        event: AutoFocusEvent,
-    ) -> Result<FocusSessionResponse, ApiError> {
-        let repos = self.productivity_repos()?;
-
-        // Find the active auto-detected session
-        let active = repos
-            .sessions
-            .get_active()
-            .await
-            .map_err(map_prod_err)?
-            .ok_or_else(|| ApiError::new("NOT_FOUND", "No active focus session"))?;
-
-        if active.source != feature_productivity::types::SessionSource::AutoDetected {
-            return Err(ApiError::new(
-                "INVALID_STATE",
-                "Active session is not auto-detected",
-            ));
-        }
-
-        // Extract stats from the Ended event
-        let (started_at, ended_at, productive_ratio, total_secs) = match event {
-            AutoFocusEvent::Ended {
-                started_at,
-                ended_at,
-                productive_ratio,
-                total_secs,
-                ..
-            } => (started_at, ended_at, productive_ratio, total_secs),
-            _ => {
-                return Err(ApiError::new(
-                    "INVALID_EVENT",
-                    "Expected Ended event for auto-focus end",
-                ))
-            }
-        };
-
-        let actual_mins = total_secs / 60;
-
-        // Update the session with final stats
-        let mut updated = active.clone();
-        updated.started_at = started_at;
-        updated.ended_at = Some(ended_at);
-        updated.actual_mins = Some(actual_mins);
-        updated.quality_score = Some(productive_ratio);
-        updated.completed = true;
-
-        repos
-            .sessions
-            .update(&updated)
-            .await
-            .map_err(map_prod_err)?;
-
-        Ok(session_to_response(updated))
-    }
-
-    /// Confirm and persist a completed auto-detected focus session.
-    /// Called from the UI toast after the FSM has already ended the session.
-    #[tracing::instrument(skip(self), err)]
-    pub async fn productivity_auto_focus_confirm(
-        &self,
-        payload: AutoFocusPayload,
-    ) -> Result<FocusSessionResponse, ApiError> {
-        let repos = self.productivity_repos()?;
-
-        let started_at = parse_rfc3339_or_err("started_at", &payload.started_at)?;
-        let ended_at = parse_rfc3339_or_err("ended_at", &payload.ended_at)?;
-
-        let session = FocusSession {
-            id: uuid::Uuid::new_v4().to_string(),
-            action_id: None,
-            project_id: None,
-            session_type: feature_productivity::types::SessionType::Focus,
-            target_mins: None,
-            started_at,
-            ended_at: Some(ended_at),
-            actual_mins: Some(payload.duration_mins),
-            interruptions: 0,
-            distraction_events: vec![],
-            quality_score: Some(payload.productive_ratio),
-            completed: true,
-            notes: Some(format!(
-                "Auto-detected: {} ({}min)",
-                payload.dominant_app, payload.duration_mins
-            )),
-            source: feature_productivity::types::SessionSource::AutoDetected,
-        };
-
-        repos
-            .sessions
-            .create(&session)
-            .await
-            .map_err(map_prod_err)?;
-        Ok(session_to_response(session))
-    }
 }

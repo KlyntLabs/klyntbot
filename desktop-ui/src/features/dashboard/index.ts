@@ -1,7 +1,6 @@
 export { Dashboard } from "./components/Dashboard";
 export { ProductivityStrip } from "./components/ProductivityStrip";
 export { AddGoalDialog } from "./components/productivity/AddGoalDialog";
-export { AutoFocusToast } from "./components/productivity/AutoFocusToast";
 export { FocusStateIndicator } from "./components/productivity/FocusStateIndicator";
 export { FocusTrayIndicator } from "./components/productivity/FocusTrayIndicator";
 export { GoalsProgress } from "./components/productivity/GoalsProgress";

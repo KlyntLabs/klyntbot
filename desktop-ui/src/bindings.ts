@@ -3564,30 +3564,6 @@ async productivityInsightDismiss(id: string) : Promise<Result<null, ApiError>> {
     else return { status: "error", error: e  as any };
 }
 },
-async productivityAutoFocusStart() : Promise<Result<FocusSessionResponse, ApiError>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("productivity_auto_focus_start") };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
-async productivityAutoFocusEnd(event: unknown) : Promise<Result<FocusSessionResponse, ApiError>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("productivity_auto_focus_end", { event }) };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
-async productivityAutoFocusConfirm(payload: AutoFocusPayload) : Promise<Result<FocusSessionResponse, ApiError>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("productivity_auto_focus_confirm", { payload }) };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
 async distractionRespond(response: DistractionResponse) : Promise<Result<null, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("distraction_respond", { response }) };
@@ -4681,7 +4657,6 @@ enhancementStagePayload: EnhancementStagePayload,
 entityCreatedPayload: EntityCreatedPayload,
 entityUpdated: EntityUpdatedPayload,
 executionStartedPayload: ExecutionStartedPayload,
-focusAutoDetected: AutoFocusPayload,
 focusDndUnavailable: FocusDndUnavailablePayload,
 focusStateChanged: FocusStatePayload,
 focusSync: FocusSyncPayload,
@@ -4748,7 +4723,6 @@ enhancementStagePayload: "enhancement-stage-payload",
 entityCreatedPayload: "entity-created-payload",
 entityUpdated: "entity:updated",
 executionStartedPayload: "execution-started-payload",
-focusAutoDetected: "focus:auto_detected",
 focusDndUnavailable: "focus:dnd_unavailable",
 focusStateChanged: "focus:state_changed",
 focusSync: "focus:sync",
@@ -4944,7 +4918,6 @@ defaultInput: string | null;
  * Name of the system default output device (if available).
  */
 defaultOutput: string | null }
-export type AutoFocusPayload = { startedAt: string; endedAt: string; durationMins: number; dominantApp: string; productiveRatio: number }
 export type AutoTunerStatus = { champion: ChampionSummary; activeExperiment: ExperimentSummary | null; paused: boolean; brainGrowth: BrainGrowth | null; metricsHealth: MetricsHealth | null; experimentPace: string | null }
 export type BacklinkResponse = { note: NoteResponse; context: string | null }
 export type BadgeKind = "success" | "warn" | "error" | "info"

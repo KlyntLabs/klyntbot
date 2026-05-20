@@ -268,7 +268,7 @@ impl AppCore {
         Ok(rows)
     }
 
-    // ── V2: Insights & Auto-Focus ─────────────────────────────────────
+    // ── V2: Insights ──────────────────────────────────────────────────
 
     #[tracing::instrument(skip(self), err)]
     pub async fn productivity_insights(

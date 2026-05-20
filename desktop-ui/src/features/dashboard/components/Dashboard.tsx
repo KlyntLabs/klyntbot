@@ -8,7 +8,6 @@ import {
   useSidebarToggle,
 } from "../lib/layers";
 import { DashboardTopbar } from "./DashboardTopbar";
-import { AutoFocusToast } from "./productivity/AutoFocusToast";
 import { FocusStateIndicator } from "./productivity/FocusStateIndicator";
 import { DayView } from "./views/DayView";
 import { MonthView } from "./views/MonthView";
@@ -46,7 +45,6 @@ export function Dashboard() {
               <h1 className="sr-only">Dashboard</h1>
               <DashboardTopbar />
               <FocusStateIndicator />
-              <AutoFocusToast />
               <div className="dashboard__content">{view}</div>
             </div>
           </SidebarContext.Provider>

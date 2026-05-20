@@ -950,8 +950,7 @@
 @media (prefers-reduced-motion: reduce) {
   .dashboard__focus-state-pill-dot--pulsing,
   .lc-spin,
-  .dashboard__activity-feed-row--new,
-  .dashboard__auto-focus-toast {
+  .dashboard__activity-feed-row--new {
     animation: none;
   }
   .dashboard__score-ring-svg circle,
@@ -981,14 +980,8 @@
   .dashboard__goal-dialog-metric-btn,
   .dashboard__summary-close,
   .dashboard__summary-entry-link,
-  .dashboard__auto-focus-toast-confirm,
-  .dashboard__auto-focus-toast-dismiss,
   .dashboard__goal-dialog-footer button {
     transition: none;
-  }
-  .dashboard__auto-focus-toast {
-    transform: none;
-    opacity: 1;
   }
 }
 /* ── SummaryPanel ──────────────────────────────────────────────────── */
@@ -1951,80 +1944,6 @@
 .dashboard__focus-state-pill-dot--pulsing {
   animation: pulse 2s ease-in-out infinite;
 }
-.dashboard__auto-focus-toast {
-  margin: 4px 16px;
-  padding: 12px 16px;
-  border-radius: 8px;
-  background: var(--surface-card-strong);
-  border: 1px solid var(--ds-border-subtle);
-  border-left: 2px solid var(--success);
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  animation: fade-in 0.3s ease-out;
-}
-.dashboard__auto-focus-toast-icon {
-  flex-shrink: 0;
-}
-.dashboard__auto-focus-toast-body {
-  flex: 1;
-  min-width: 0;
-}
-.dashboard__auto-focus-toast-body > div {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: var(--fs-2xs);
-  font-weight: 500;
-  color: var(--ds-text-strong);
-}
-.dashboard__auto-focus-toast-ratio {
-  font-size: var(--fs-2xs);
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--success) 15%, transparent);
-  color: var(--success);
-  font-weight: 500;
-}
-.dashboard__auto-focus-toast-body p {
-  font-size: var(--fs-2xs);
-  font-weight: 300;
-  color: var(--ds-text-subtle);
-  margin: 2px 0 0 0;
-}
-.dashboard__auto-focus-toast-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-}
-.dashboard__auto-focus-toast-confirm,
-.dashboard__auto-focus-toast-dismiss {
-  font-size: var(--fs-2xs);
-  font-weight: 500;
-  padding: 6px 12px;
-  border-radius: 8px;
-  border: none;
-  cursor: pointer;
-}
-.dashboard__auto-focus-toast-confirm {
-  background: color-mix(in srgb, var(--success) 15%, transparent);
-  color: var(--success);
-}
-.dashboard__auto-focus-toast-confirm:hover {
-  background: color-mix(in srgb, var(--success) 25%, transparent);
-}
-.dashboard__auto-focus-toast-confirm:disabled {
-  opacity: 0.5;
-}
-.dashboard__auto-focus-toast-dismiss {
-  background: var(--surface-control);
-  color: var(--ds-text-subtle);
-}
-.dashboard__auto-focus-toast-dismiss:hover {
-  background: var(--surface-control-hover);
-}
-
 /* ── ProductivityStrip (orphan) ───────────────────────────────────── */
 .dashboard__strip {
   border-bottom: 1px solid var(--ds-border-subtle);

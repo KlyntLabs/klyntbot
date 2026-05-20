@@ -54,6 +54,5 @@ export function defaultDashboardMocks() {
     productivityGoalsQuery: vi.fn().mockResolvedValue([]),
     productivityGoalCreate: vi.fn(),
     productivityGoalDelete: vi.fn(),
-    productivityAutoFocusConfirm: vi.fn(),
   };
 }

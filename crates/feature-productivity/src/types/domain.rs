@@ -354,7 +354,7 @@ pub struct TimeEntry {
 }
 
 /// Duration of a single activity bucket window, in seconds (5 minutes).
-/// Shared between BucketAggregator (bucket boundaries) and AutoFocusDetector (window evaluation).
+/// Used by BucketAggregator for bucket boundaries.
 pub const BUCKET_DURATION_SECS: i64 = 300;
 
 /// Real-time tick emitted by ActivityTracker every poll interval.

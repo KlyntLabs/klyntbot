@@ -1,5 +1,5 @@
 import { listen } from "@tauri-apps/api/event";
-import type { AutoFocusPayload, FocusStatePayload } from "@/bindings";
+import type { FocusStatePayload } from "@/bindings";
 import type {
   AppServerEvent,
   DictationEvent,
@@ -114,7 +114,6 @@ const menuComposerCycleAccessHub = createEventHub<void>("menu-composer-cycle-acc
 const menuComposerCycleReasoningHub = createEventHub<void>("menu-composer-cycle-reasoning");
 const menuComposerCycleCollaborationHub = createEventHub<void>("menu-composer-cycle-collaboration");
 const focusStateChangedHub = createEventHub<FocusStatePayload>("focus:state_changed");
-const focusAutoDetectedHub = createEventHub<AutoFocusPayload>("focus:auto_detected");
 const approvalRequestHub = createEventHub<Record<string, unknown>>("agent:approval_request");
 const costUpdateHub = createEventHub<Record<string, unknown>>("agent:cost_update");
 
@@ -374,13 +373,6 @@ export function subscribeFocusStateChanged(
   options?: SubscriptionOptions,
 ): Unsubscribe {
   return focusStateChangedHub.subscribe(onEvent, options);
-}
-
-export function subscribeFocusAutoDetected(
-  onEvent: (payload: AutoFocusPayload) => void,
-  options?: SubscriptionOptions,
-): Unsubscribe {
-  return focusAutoDetectedHub.subscribe(onEvent, options);
 }
 
 export function subscribeApprovalRequest(

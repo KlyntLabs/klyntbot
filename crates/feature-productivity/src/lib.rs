@@ -1,5 +1,4 @@
 pub mod aggregator;
-pub mod auto_focus;
 pub mod batch_writer;
 pub mod bucket_aggregator;
 pub mod config;

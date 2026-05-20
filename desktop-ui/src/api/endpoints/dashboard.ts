@@ -1,11 +1,9 @@
 import type {
   ActivityCategoryResponse,
   ActivityTimelineResponse,
-  AutoFocusPayload,
   CalendarEvent,
   CalendarEventInput,
   DashboardIntelligenceResponse,
-  FocusSessionResponse,
   GoalProgressResponse,
   HourlyBreakdownResponse,
   IntelligenceSessionResponse,
@@ -179,11 +177,3 @@ export async function productivityGoalDelete(id: number): Promise<void> {
   return;
 }
 
-export async function productivityAutoFocusConfirm(
-  payload: AutoFocusPayload,
-): Promise<FocusSessionResponse> {
-  const r = await commands.productivityAutoFocusConfirm(payload);
-  if (r.status !== "ok")
-    throw new Error(r.error.message ?? "productivity auto-focus confirm failed");
-  return r.data;
-}

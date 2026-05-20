@@ -10,7 +10,6 @@ use desktop_shared::commands::{
     IntelligenceSessionResponse, ProductivityPatternsResponse, ProductivityProjectResponse,
     ProductivitySummaryResponse, TimeEntryResponse, TrackedAppResponse, WeeklyAssessmentResponse,
 };
-use desktop_shared::events::AutoFocusPayload;
 use desktop_shared::{errors::ApiError, CommandResult};
 use tauri::State;
 
@@ -212,7 +211,7 @@ pub async fn productivity_recategorize_app(
         .await
 }
 
-// ── V2: Insights & Auto-Focus ─────────────────────────────────────────
+// ── V2: Insights ──────────────────────────────────────────────────────
 
 #[klynt_command]
 pub async fn productivity_insights(date: Option<String>) -> Vec<InsightCardResponse> {
@@ -222,37 +221,6 @@ pub async fn productivity_insights(date: Option<String>) -> Vec<InsightCardRespo
 #[klynt_command]
 pub async fn productivity_insight_dismiss(id: String) -> () {
     state.productivity_insight_dismiss(id).await
-}
-
-#[klynt_raw_command]
-#[tauri::command(rename_all = "snake_case")]
-#[specta::specta]
-pub async fn productivity_auto_focus_start(
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<FocusSessionResponse> {
-    state.productivity_auto_focus_start().await
-}
-
-#[klynt_raw_command]
-#[tauri::command(rename_all = "snake_case")]
-#[specta::specta]
-pub async fn productivity_auto_focus_end(
-    state: State<'_, Arc<AppCore>>,
-    event: desktop_shared::specta_helpers::JsonValueWrapper,
-) -> CommandResult<FocusSessionResponse> {
-    let event: feature_productivity::auto_focus::AutoFocusEvent =
-        serde_json::from_value(event.0).map_err(|e| ApiError::new("BAD_REQUEST", e.to_string()))?;
-    state.productivity_auto_focus_end(event).await
-}
-
-#[klynt_raw_command]
-#[tauri::command(rename_all = "snake_case")]
-#[specta::specta]
-pub async fn productivity_auto_focus_confirm(
-    state: State<'_, Arc<AppCore>>,
-    payload: AutoFocusPayload,
-) -> CommandResult<FocusSessionResponse> {
-    state.productivity_auto_focus_confirm(payload).await
 }
 
 #[klynt_raw_command]
@@ -678,15 +646,6 @@ pub(crate) async fn dispatch_dev(
         }
         "calendar_sync_events" => dev::val(
             core.calendar_sync_events(try_field!(dev::parse_params(body)))
-                .await,
-        ),
-        "productivity_auto_focus_start" => dev::val(core.productivity_auto_focus_start().await),
-        "productivity_auto_focus_end" => dev::val(
-            core.productivity_auto_focus_end(try_field!(dev::parse_params(body)))
-                .await,
-        ),
-        "productivity_auto_focus_confirm" => dev::val(
-            core.productivity_auto_focus_confirm(try_field!(dev::parse_params(body)))
                 .await,
         ),
         "distraction_respond" => {

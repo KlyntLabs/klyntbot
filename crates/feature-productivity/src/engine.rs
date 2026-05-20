@@ -3,12 +3,11 @@
 
 use std::sync::Arc;
 
-use tokio::sync::{broadcast, mpsc};
+use tokio::sync::broadcast;
 use tokio_util::sync::CancellationToken;
 
 use bus::DomainEventBus;
 
-use crate::auto_focus::{AutoFocusDetector, AutoFocusEvent};
 use crate::batch_writer::BatchWriter;
 use crate::bucket_aggregator::BucketAggregator;
 use crate::config::ProductivityConfig;
@@ -25,10 +24,8 @@ pub struct ProductivityEngine {
     tracker: ActivityTracker,
     batch_writer: Option<BatchWriter>,
     bucket_aggregator: Option<BucketAggregator>,
-    auto_focus: Option<AutoFocusDetector>,
     distraction_analyzer: Option<DistractionAnalyzer>,
     cancel_token: CancellationToken,
-    auto_focus_rx: Option<mpsc::Receiver<AutoFocusEvent>>,
     tick_sender: broadcast::Sender<ActivityTick>,
     domain_bus: Option<Arc<DomainEventBus>>,
     repos: ProductivityRepos,
@@ -89,20 +86,6 @@ impl ProductivityEngine {
             cancel.child_token(),
         );
 
-        // AutoFocusDetector
-        let (auto_focus_tx, auto_focus_rx) = mpsc::channel(32);
-        let auto_focus = if config.focus.auto_detect_enabled {
-            Some(AutoFocusDetector::start(
-                tick_tx.subscribe(),
-                auto_focus_tx,
-                config.focus.clone(),
-                config.tracking.poll_interval_secs,
-                cancel.child_token(),
-            ))
-        } else {
-            None
-        };
-
         // DistractionAnalyzer
         let distraction_analyzer = DistractionAnalyzer::start_with_bus(
             tick_tx.subscribe(),
@@ -115,19 +98,12 @@ impl ProductivityEngine {
             tracker,
             batch_writer: Some(batch_writer),
             bucket_aggregator: Some(bucket_aggregator),
-            auto_focus,
             distraction_analyzer: Some(distraction_analyzer),
             cancel_token: cancel,
-            auto_focus_rx: Some(auto_focus_rx),
             tick_sender: tick_tx,
             domain_bus,
             repos: repos.clone(),
         }
-    }
-
-    /// Take the auto-focus event receiver (for desktop crate to consume).
-    pub fn take_auto_focus_rx(&mut self) -> Option<mpsc::Receiver<AutoFocusEvent>> {
-        self.auto_focus_rx.take()
     }
 
     /// Get a reference to the tick broadcast sender (for IntelligenceLayer subscription).
@@ -173,17 +149,12 @@ impl ProductivityEngine {
                 ba.stop().await;
             }
         };
-        let af_fut = async {
-            if let Some(mut af) = self.auto_focus.take() {
-                af.stop().await;
-            }
-        };
         let da_fut = async {
             if let Some(mut da) = self.distraction_analyzer.take() {
                 da.stop().await;
             }
         };
-        tokio::join!(bw_fut, ba_fut, af_fut, da_fut);
+        tokio::join!(bw_fut, ba_fut, da_fut);
     }
 
     pub fn domain_bus(&self) -> Option<&Arc<DomainEventBus>> {

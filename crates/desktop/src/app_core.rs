@@ -8,7 +8,6 @@ use std::sync::{Arc, Mutex, OnceLock};
 use ::app_core::events::{AppEventEmitter, CompoundEmitter};
 use ::app_core::EventChannels;
 use desktop_shared::events;
-use feature_productivity::auto_focus::AutoFocusEvent;
 use feature_productivity::dashboard_emitter::{DashboardEmitter, DashboardEvent};
 use serde_json::Value;
 use tauri::{Emitter, Manager};
@@ -165,93 +164,6 @@ fn wire_event_channels(
     global_event_tx: &broadcast::Sender<(String, Value)>,
 ) {
     let shutdown = &core.shutdown_token;
-
-    // Auto-focus events → Tauri event + tray timer sync
-    if let Some(mut auto_focus_rx) = channels.auto_focus_rx {
-        let handle = app_handle.clone();
-        let token = shutdown.clone();
-        tokio::spawn(async move {
-            loop {
-                tokio::select! {
-                    _ = token.cancelled() => break,
-                    msg = auto_focus_rx.recv() => {
-                        let Some(event) = msg else { break };
-                        match event {
-                            AutoFocusEvent::Started {
-                                started_at,
-                                dominant_app,
-                                dominant_category,
-                            } => {
-                                let payload = serde_json::json!({
-                                    "startedAt": started_at.to_string(),
-                                    "dominantApp": dominant_app,
-                                    "dominantCategory": dominant_category,
-                                });
-                                if let Err(e) = handle.emit(events::FOCUS_AUTO_STARTED, payload) {
-                                    warn!("failed to emit auto-focus started event: {e}");
-                                }
-
-                                // Start the tray focus timer so the UI reflects the active session
-                                if let Some(timer) = handle.try_state::<Arc<crate::focus_timer::FocusTimer>>() {
-                                    // Read focus duration from config, fall back to 45 min
-                                    let work_mins = handle
-                                        .try_state::<Arc<AppCore>>()
-                                        .and_then(|core| {
-                                            core.config.try_read().ok().map(|c| {
-                                                c.productivity.focus.default_duration_mins
-                                            })
-                                        })
-                                        .unwrap_or(45);
-                                    let config = crate::focus_timer::FocusSessionConfig {
-                                        work_secs: work_mins * 60,
-                                        short_break_secs: 5 * 60,
-                                        long_break_secs: 15 * 60,
-                                        long_break_after: 4,
-                                    };
-                                    let title = if dominant_app.is_empty() {
-                                        None
-                                    } else {
-                                        Some(dominant_app)
-                                    };
-                                    if let Err(e) = timer
-                                        .start(handle.clone(), config, None, title, false, true, true)
-                                        .await
-                                    {
-                                        warn!("failed to start focus timer for auto-focus: {e}");
-                                    }
-                                }
-                            }
-                            AutoFocusEvent::Ended {
-                                started_at,
-                                ended_at,
-                                dominant_app,
-                                dominant_category: _,
-                                productive_ratio,
-                                total_secs,
-                            } => {
-                                // Stop the tray focus timer
-                                if let Some(timer) = handle.try_state::<Arc<crate::focus_timer::FocusTimer>>() {
-                                    timer.stop(&handle).await;
-                                }
-
-                                use tauri_specta::Event;
-                                let payload = events::AutoFocusPayload {
-                                    started_at: started_at.to_string(),
-                                    ended_at: ended_at.to_string(),
-                                    duration_mins: total_secs / 60,
-                                    dominant_app,
-                                    productive_ratio,
-                                };
-                                if let Err(e) = payload.emit(&handle) {
-                                    warn!("failed to emit auto-focus ended event: {e}");
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        });
-    }
 
     // Dashboard ticks → Tauri events (activity switch, score, focus state)
     if let Some(tick_rx) = channels.dashboard_tick_rx {

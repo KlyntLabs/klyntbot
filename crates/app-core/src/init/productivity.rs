@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use bus::DomainEventBus;
-use feature_productivity::auto_focus::AutoFocusEvent;
 use feature_productivity::repos::ProductivityRepos;
 use feature_productivity::tracker::categorizer::Categorizer;
 use feature_productivity::{DailyAggregator, FocusManager, NudgeService, ProductivityEngine};
@@ -20,7 +19,6 @@ pub(super) struct ProductivityResult {
     pub nudge_service: Option<Arc<Mutex<NudgeService>>>,
     pub distraction_interceptor:
         Option<Arc<Mutex<feature_productivity::distraction::DistractionInterceptor>>>,
-    pub auto_focus_rx: Option<mpsc::Receiver<AutoFocusEvent>>,
     pub nudge_rx: Option<mpsc::Receiver<feature_productivity::types::NudgeRecord>>,
     pub distraction_alert_rx:
         Option<tokio::sync::mpsc::Receiver<feature_productivity::distraction::DistractionAlert>>,
@@ -46,7 +44,6 @@ pub(super) async fn init_productivity(
         nudge_service,
         distraction_interceptor,
         distraction_alert_rx,
-        auto_focus_rx,
         nudge_rx,
         dashboard_tick_rx,
     ) = if config.productivity.enabled {
@@ -59,7 +56,7 @@ pub(super) async fn init_productivity(
         .await
         {
             error!("productivity migration failed — feature disabled: {e}");
-            (None, None, None, None, None, None, None, None, None, None)
+            (None, None, None, None, None, None, None, None, None)
         } else {
             let prod_repos = ProductivityRepos::new(pool);
             let prod_config = &config.productivity;
@@ -95,9 +92,6 @@ pub(super) async fn init_productivity(
                 Some(Arc::clone(domain_event_bus)),
                 Some(Arc::clone(activity_svc)),
             );
-
-            // Take auto-focus receiver — caller wires to transport.
-            let auto_focus_rx = engine.take_auto_focus_rx();
 
             // Subscribe to dashboard ticks — caller wires to DashboardEmitter.
             let dashboard_tick_rx = Some(engine.subscribe());
@@ -168,13 +162,12 @@ pub(super) async fn init_productivity(
                 Some(nudge_svc),
                 Some(interceptor),
                 distraction_alert_rx,
-                auto_focus_rx,
                 Some(nudge_rx),
                 dashboard_tick_rx,
             )
         }
     } else {
-        (None, None, None, None, None, None, None, None, None, None)
+        (None, None, None, None, None, None, None, None, None)
     };
 
     ProductivityResult {
@@ -186,7 +179,6 @@ pub(super) async fn init_productivity(
         nudge_service,
         distraction_interceptor,
         distraction_alert_rx,
-        auto_focus_rx,
         nudge_rx,
         dashboard_tick_rx,
     }

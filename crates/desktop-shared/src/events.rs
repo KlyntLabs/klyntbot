@@ -70,8 +70,6 @@ pub const PRODUCTIVITY_NUDGE: &str = "productivity:nudge";
 pub const ACTIVITY_TICK: &str = "activity:tick";
 pub const ACTIVITY_SWITCH: &str = "activity:switch";
 pub const FOCUS_STATE_CHANGED: &str = "focus:state_changed";
-pub const FOCUS_AUTO_DETECTED: &str = "focus:auto_detected";
-pub const FOCUS_AUTO_STARTED: &str = "focus:auto_started";
 pub const FOCUS_SYNC: &str = "focus:sync";
 pub const FOCUS_PHASE_CHANGED: &str = "focus:phase_changed";
 pub const FOCUS_WARNING: &str = "focus:warning";
@@ -620,16 +618,6 @@ pub struct FocusStatePayload {
 
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
-pub struct AutoFocusPayload {
-    pub started_at: String,
-    pub ended_at: String,
-    pub duration_mins: i64,
-    pub dominant_app: String,
-    pub productive_ratio: f64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
-#[serde(rename_all = "camelCase")]
 pub struct ScorePayload {
     pub score: f64,
     pub productive_secs: i64,
@@ -944,10 +932,6 @@ impl tauri_specta::Event for ScorePayload {
 
 impl tauri_specta::Event for MemoryPromotedPayload {
     const NAME: &'static str = "autotuner:promotion";
-}
-
-impl tauri_specta::Event for AutoFocusPayload {
-    const NAME: &'static str = "focus:auto_detected";
 }
 
 impl tauri_specta::Event for FocusSyncPayload {

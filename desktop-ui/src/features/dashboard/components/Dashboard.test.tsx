@@ -48,9 +48,8 @@ describe("Dashboard", () => {
     expect(screen.getAllByTestId("week-day-header").length).toBe(7);
   });
 
-  it("mounts FocusStateIndicator and AutoFocusToast as siblings of dashboard__content", () => {
+  it("mounts FocusStateIndicator as a sibling of dashboard__content", () => {
     render(wrap(<Dashboard />));
     expect(screen.getByTestId("focus-state-indicator")).toBeTruthy();
-    expect(screen.getByTestId("auto-focus-toast")).toBeTruthy();
   });
 });

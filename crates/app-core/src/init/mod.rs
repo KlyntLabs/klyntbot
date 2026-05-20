@@ -24,7 +24,6 @@ use ::cognitive::pipeline::{
     AtomCollector, ChatTurnCollector, CoachingCollector, RecallCollector, SessionCollector,
 };
 use bus::MessageBus;
-use feature_productivity::auto_focus::AutoFocusEvent;
 use tokio::sync::{mpsc, Mutex, RwLock};
 use tokio_util::sync::CancellationToken;
 use tracing::{info, warn};
@@ -55,7 +54,6 @@ pub struct EventChannels {
     pub intervention_rx: mpsc::Receiver<feature_coaching::router::DeliveredIntervention>,
     pub domain_event_bus: Arc<bus::DomainEventBus>,
     pub pipeline_rx: tokio::sync::broadcast::Receiver<::cognitive::PipelineEvent>,
-    pub auto_focus_rx: Option<mpsc::Receiver<AutoFocusEvent>>,
     pub nudge_rx: Option<mpsc::Receiver<feature_productivity::types::NudgeRecord>>,
     pub dashboard_tick_rx:
         Option<tokio::sync::broadcast::Receiver<feature_productivity::ActivityTick>>,
@@ -502,7 +500,6 @@ impl AppCore {
             nudge_service,
             distraction_interceptor,
             distraction_alert_rx,
-            auto_focus_rx,
             nudge_rx,
             dashboard_tick_rx,
         } = productivity_result;
@@ -2194,7 +2191,6 @@ impl AppCore {
             intervention_rx,
             domain_event_bus,
             pipeline_rx,
-            auto_focus_rx,
             nudge_rx,
             dashboard_tick_rx,
             dashboard_poll_interval_secs,

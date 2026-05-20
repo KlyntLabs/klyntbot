@@ -60,14 +60,6 @@ pub struct FocusConfig {
     pub soft_block_llm_timeout_ms: u64,
     #[serde(default = "default_learned_rule_threshold")]
     pub learned_rule_threshold: u64,
-    #[serde(default = "default_true")]
-    pub auto_detect_enabled: bool,
-    #[serde(default = "default_auto_detect_min_mins")]
-    pub auto_detect_min_mins: u64,
-    #[serde(default = "default_auto_detect_productive_threshold")]
-    pub auto_detect_productive_threshold: f64,
-    #[serde(default = "default_auto_detect_max_switches")]
-    pub auto_detect_max_switches: u64,
     #[serde(default = "default_cooldown_grace_secs")]
     pub cooldown_grace_secs: u64,
 }
@@ -169,15 +161,6 @@ fn default_llm_timeout() -> u64 {
 fn default_learned_rule_threshold() -> u64 {
     3
 }
-fn default_auto_detect_min_mins() -> u64 {
-    15
-}
-fn default_auto_detect_productive_threshold() -> f64 {
-    0.8
-}
-fn default_auto_detect_max_switches() -> u64 {
-    2
-}
 fn default_cooldown_grace_secs() -> u64 {
     30
 }
@@ -220,10 +203,6 @@ impl Default for FocusConfig {
             soft_block_llm_enabled: true,
             soft_block_llm_timeout_ms: default_llm_timeout(),
             learned_rule_threshold: default_learned_rule_threshold(),
-            auto_detect_enabled: true,
-            auto_detect_min_mins: default_auto_detect_min_mins(),
-            auto_detect_productive_threshold: default_auto_detect_productive_threshold(),
-            auto_detect_max_switches: default_auto_detect_max_switches(),
             cooldown_grace_secs: default_cooldown_grace_secs(),
         }
     }
