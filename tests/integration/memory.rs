@@ -512,8 +512,10 @@ async fn context_engine_with_bootstrap_files() {
 
     // Should include bootstrap file content
     assert!(prompt.contains("Agent Configuration"));
-    assert!(prompt.contains("Agent Soul"));
     assert!(prompt.contains("Use tools when needed"));
+    // SOUL.md is intentionally NOT loaded by BootstrapSource —
+    // KLYNTBOT.md (served by SoulContextSource) is the single canonical
+    // personality file, so we no longer assert "Agent Soul" here.
 }
 
 #[tokio::test]
