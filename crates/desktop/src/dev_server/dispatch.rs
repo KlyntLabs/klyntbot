@@ -42,31 +42,7 @@ pub(super) async fn dispatch(
     }
 
     // ── Per-module dispatch (co-located with Tauri commands) ─────────
-    if let Some(r) = commands::approval::dispatch_dev(cmd, core, &body).await {
-        return into_api_result(r);
-    }
-    if let Some(r) = commands::coding_thread::dispatch_dev(cmd, core, &body).await {
-        return into_api_result(r);
-    }
-    if let Some(r) = commands::coding_turn::dispatch_dev(cmd, core, &body).await {
-        return into_api_result(r);
-    }
-    if let Some(r) = commands::workspace_files::dispatch_dev(cmd, core, &body).await {
-        return into_api_result(r);
-    }
-    if let Some(r) = commands::coding_review::dispatch_dev(cmd, core, &body).await {
-        return into_api_result(r);
-    }
-    if let Some(r) = commands::coding_mcp::dispatch_dev(cmd, core, &body).await {
-        return into_api_result(r);
-    }
-    if let Some(r) = commands::coding_thread_metadata::dispatch_dev(cmd, core, &body).await {
-        return into_api_result(r);
-    }
     if let Some(r) = commands::git::dispatch_dev(cmd, core, &body).await {
-        return into_api_result(r);
-    }
-    if let Some(r) = commands::providers::dispatch_dev(cmd, core, &body).await {
         return into_api_result(r);
     }
     if let Some(r) = commands::tasks::dispatch_dev(cmd, core, &body).await {
@@ -150,9 +126,6 @@ pub(super) async fn dispatch(
     if let Some(r) = commands::columns::dispatch_dev(cmd, core, &body).await {
         return into_api_result(r);
     }
-    if let Some(r) = commands::coding_memory::dispatch_dev(cmd, core, &body).await {
-        return into_api_result(r);
-    }
     if let Some(r) = commands::cognitive::dispatch_dev(cmd, core, &body).await {
         return into_api_result(r);
     }
@@ -192,9 +165,6 @@ pub(super) async fn dispatch(
     if let Some(r) = commands::pending_memory::dispatch_dev(cmd, core, &body).await {
         return into_api_result(r);
     }
-    if let Some(r) = commands::reforge::dispatch_dev(cmd, core, &body).await {
-        return into_api_result(r);
-    }
     if let Some(r) = commands::journey::dispatch_dev(cmd, core, &body).await {
         return into_api_result(r);
     }
@@ -214,30 +184,6 @@ pub(super) async fn dispatch(
         return into_api_result(r);
     }
     if let Some(r) = commands::focus::dispatch_dev(cmd, core, &body).await {
-        return into_api_result(r);
-    }
-    if let Some(r) = commands::coding_skills::dispatch_dev(cmd, core, &body).await {
-        return into_api_result(r);
-    }
-    if let Some(r) = commands::coding_status::dispatch_dev(cmd, core, &body).await {
-        return into_api_result(r);
-    }
-    if let Some(r) = commands::coding_doctor::dispatch_dev(cmd, core, &body).await {
-        return into_api_result(r);
-    }
-    if let Some(r) = commands::coding_help::dispatch_dev(cmd, core, &body).await {
-        return into_api_result(r);
-    }
-    if let Some(r) = commands::coding_jobs::dispatch_dev(cmd, core, &body).await {
-        return into_api_result(r);
-    }
-    if let Some(r) = commands::coding_resume::dispatch_dev(cmd, core, &body).await {
-        return into_api_result(r);
-    }
-    if let Some(r) = commands::coding_sessions::dispatch_dev(cmd, core, &body).await {
-        return into_api_result(r);
-    }
-    if let Some(r) = commands::coding_sessions_v2::dispatch_dev(cmd, core, &body).await {
         return into_api_result(r);
     }
     if let Some(r) = commands::workspace_lifecycle::dispatch_dev(cmd, core, &body).await {

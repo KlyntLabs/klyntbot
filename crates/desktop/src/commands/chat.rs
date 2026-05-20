@@ -121,20 +121,6 @@ pub async fn chat_force_reset(session_key: String) -> () {
     state.chat_force_reset(session_key).await
 }
 
-#[klynt_command]
-pub async fn chat_respond_approval(
-    app: tauri::AppHandle,
-    session_key: String,
-    request_id: String,
-    decision: app_core::coding::approval_handler::AppApprovalDecision,
-) -> () {
-    let core = app.state::<std::sync::Arc<app_core::AppCore>>();
-    core.respond_approval(&request_id, decision)
-        .await
-        .map_err(|e| desktop_shared::errors::ApiError::new("NOT_FOUND", e.to_string()))?;
-    let _ = session_key; // session_key unused today; Plan 4 persists per-thread rules.
-    Ok(())
-}
 
 #[klynt_command]
 pub async fn chat_save_starlark_rule(
@@ -149,13 +135,6 @@ pub async fn chat_save_starlark_rule(
         .map_err(|e| desktop_shared::errors::ApiError::new("CONFIG_ERROR", e.to_string()))
 }
 
-#[klynt_command]
-pub async fn coding_hooks_list(app: tauri::AppHandle) -> desktop_shared::HooksTomlSnapshot {
-    let core = app.state::<std::sync::Arc<app_core::AppCore>>();
-    core.coding_hooks_list()
-        .await
-        .map_err(|e| desktop_shared::errors::ApiError::new("IO_ERROR", e.to_string()))
-}
 
 // ── Dev server dispatch ─────────────────────────────────────────────
 // Note: `chat_send` is dispatched directly in `dev_server.rs` because it needs
@@ -223,18 +202,6 @@ pub(crate) async fn dispatch_dev(
                     .await,
             )
         }
-        "chat_respond_approval" => {
-            let request_id = try_field!(dev::get_str(body, "requestId"));
-            let decision: app_core::coding::approval_handler::AppApprovalDecision =
-                try_field!(dev::require(body, "decision"));
-            let result = core
-                .respond_approval(&request_id, decision)
-                .await
-                .map(|_| serde_json::Value::Null)
-                .map_err(|e| desktop_shared::errors::ApiError::new("NOT_FOUND", e.to_string()));
-            dev::val(result)
-        }
-
         "chat_save_starlark_rule" => {
             let request_id = try_field!(dev::get_str(body, "requestId"));
             let rule_source = try_field!(dev::get_str(body, "ruleSource"));
@@ -248,11 +215,6 @@ pub(crate) async fn dispatch_dev(
                     .map_err(desktop_shared::errors::ApiError::from),
             )
         }
-        "coding_hooks_list" => dev::val(
-            core.coding_hooks_list()
-                .await
-                .map_err(desktop_shared::errors::ApiError::from),
-        ),
         _ => return None,
     })
 }

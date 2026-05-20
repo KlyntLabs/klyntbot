@@ -33,8 +33,8 @@ pub use prompts::{
 };
 pub use tool_channel::{Channel, ChannelMask};
 pub use types::{
-    AppMode, ChannelName, ChatId, MessageRole, SessionKey, CLI_CHANNEL, CODING_CHANNEL,
-    MCP_CHANNEL, MIRROR_ALERT_COST_THRESHOLD_CROSSED, SYSTEM_CHANNEL, TELEGRAM_RESET_SENDER,
+    AppMode, ChannelName, ChatId, MessageRole, SessionKey, CLI_CHANNEL, MCP_CHANNEL,
+    MIRROR_ALERT_COST_THRESHOLD_CROSSED, SYSTEM_CHANNEL, TELEGRAM_RESET_SENDER,
 };
 
 pub mod session_mode;

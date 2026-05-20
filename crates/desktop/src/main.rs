@@ -103,8 +103,9 @@ fn main() {
     // sub-10ms (no Tauri runtime, no SQLite pool, no config watcher).
     let raw_args: Vec<String> = std::env::args().collect();
     if raw_args.get(1).map(String::as_str) == Some("--hook") {
-        let hook_args: Vec<String> = raw_args.into_iter().skip(2).collect();
-        std::process::exit(coding_ingest::hook_cli::run(hook_args));
+        let _hook_args: Vec<String> = raw_args.into_iter().skip(2).collect();
+        eprintln!("--hook is not supported");
+        std::process::exit(1);
     }
 
     // Pre-main hardening: ptrace deny, core-dump disable, env-var scrub.
@@ -177,7 +178,6 @@ fn run_mcp_stdio() {
             Some(config),
             None, // notification_sender — not needed for stdio MCP
             Some(event_emitter),
-            None, // approval_channel — stdio MCP defers to BlockingFallback (decline destructive)
             None,
         )
         .await

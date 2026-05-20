@@ -349,7 +349,7 @@ mod tests {
             class: ApprovalClass::Destructive,
             scope: ApprovalScope::ToolAction,
             ctx: approval::ApprovalContext {
-                mode: SessionMode::Coding,
+                mode: SessionMode::Assistant,
                 channel: approval::ChannelKind::Telegram,
                 session_id: "s1".into(),
                 user_id: None,

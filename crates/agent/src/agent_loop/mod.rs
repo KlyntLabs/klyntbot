@@ -36,17 +36,6 @@ fn preview_text(content: &str, max: usize) -> String {
     }
 }
 
-/// Check whether the thread identified by `session_key` is in plan mode.
-pub(crate) fn is_plan_mode_for_thread(
-    policies: &dashmap::DashMap<String, Arc<parking_lot::RwLock<approval::CodingApprovalPolicy>>>,
-    session_key: &str,
-) -> bool {
-    policies
-        .get(session_key)
-        .map(|lock| lock.read().is_plan_mode())
-        .unwrap_or(false)
-}
-
 /// Handle for consuming streaming agent output.
 pub struct StreamingHandle {
     /// Agent events (content chunks, tool status).
@@ -116,10 +105,6 @@ pub struct AgentLoop {
     pub(crate) hot_config: Arc<RwLock<config::HotConfig>>,
     /// Subagent manager for background task spawning (kept alive for tool_kit injection).
     pub(crate) subagent_manager: Option<Arc<crate::SubagentManager>>,
-    /// Per-coding-thread approval policies. Used to set `plan_mode_active` on RoutingContext.
-    pub(crate) coding_policies: Option<
-        Arc<dashmap::DashMap<String, Arc<parking_lot::RwLock<approval::CodingApprovalPolicy>>>>,
-    >,
     /// Optional because headless test environments do not spawn background jobs.
     pub(crate) job_supervisor: Option<tools_core::DynJobSupervisor>,
 }
@@ -740,11 +725,6 @@ impl AgentLoop {
         routing_ctx.session_key = Some(session_key.clone());
         routing_ctx.message_id = embed_msg_id.map(|id| id.to_string());
         routing_ctx.job_supervisor = self.job_supervisor.clone();
-        routing_ctx.plan_mode_active = self
-            .coding_policies
-            .as_ref()
-            .map(|policies| is_plan_mode_for_thread(policies, session_key.as_str()))
-            .unwrap_or(false);
         let response_content = self
             .run_pipeline(&msg.content, history, &routing_ctx, None, None, correction)
             .await?;
@@ -1208,10 +1188,7 @@ impl AgentLoop {
                     .unwrap_or(common::SessionMode::Assistant),
             };
 
-        let channel: common::ChannelName = match session_mode {
-            common::SessionMode::Coding => common::CODING_CHANNEL.into(),
-            common::SessionMode::Assistant | common::SessionMode::Subagent => "desktop".into(),
-        };
+        let channel: common::ChannelName = "desktop".into();
 
         // Routing context with interaction channel for ask_user tool
         let mut routing_ctx =
@@ -1219,16 +1196,7 @@ impl AgentLoop {
         routing_ctx.session_mode = session_mode;
         routing_ctx.session_key = Some(session_key.clone().into());
         routing_ctx.message_id = user_msg_id;
-        // The three other RoutingContext construction sites in this file
-        // (process_message_bus, process_correction, process_direct) set these
-        // — the streaming path used to forget, leaving coding tools like
-        // `coding_task_list` to bail with "background jobs disabled".
         routing_ctx.job_supervisor = self.job_supervisor.clone();
-        routing_ctx.plan_mode_active = self
-            .coding_policies
-            .as_ref()
-            .map(|policies| is_plan_mode_for_thread(policies, session_key.as_str()))
-            .unwrap_or(false);
 
         let cancel_token = CancellationToken::new();
         let cancel_clone = cancel_token.clone();
@@ -1253,10 +1221,6 @@ impl AgentLoop {
         // Clone Arcs for the spawned task
         let agent = Arc::clone(self);
         let sk = session_key.clone();
-        // Coding mode persists via the turn-handler bridge; skip the
-        // Done-time save_to_session to avoid a duplicate assistant row.
-        let is_coding_mode = matches!(session_mode, common::SessionMode::Coding);
-
         let handle = tokio::spawn(async move {
             tracing::debug!(session = %sk, "process_direct_streaming: pipeline task entered");
             let pipeline_event_tx = event_tx.clone();
@@ -1279,14 +1243,7 @@ impl AgentLoop {
                         response
                     };
 
-                    // Save BEFORE emitting Done so the row exists when the
-                    // streaming relay updates metadata.
-                    let message_id = if is_coding_mode {
-                        None
-                    } else {
-                        let mid = agent.save_to_session(&sk, &response).await;
-                        mid
-                    };
+                    let message_id = agent.save_to_session(&sk, &response).await;
                     let _ = event_tx
                         .send(AgentEvent::Done {
                             content: response.clone(),

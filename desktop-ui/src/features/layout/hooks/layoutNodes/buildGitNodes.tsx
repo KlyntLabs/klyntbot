@@ -1,4 +1,3 @@
-import { ActivityPanel } from "@/features/coding/components/ActivityPanel";
 import { FileTreePanel } from "@/features/files/components/FileTreePanel";
 import { GitDiffPanel } from "@/features/git/components/GitDiffPanel";
 import { GitDiffViewer } from "@/features/git/components/GitDiffViewer";
@@ -26,9 +25,6 @@ function buildGitDiffPanelNode(options: GitLayoutNodesOptions) {
   const selectedDiffPath =
     options.diffViewProps.centerMode === "diff" ? options.gitDiffViewerProps.selectedPath : null;
 
-  if (options.filePanelMode === "activity") {
-    return <ActivityPanel {...options.activityPanelProps} />;
-  }
   if (options.filePanelMode === "files" && options.fileTreeProps) {
     return <FileTreePanel {...options.fileTreeProps} />;
   }

@@ -14,14 +14,11 @@ tauri-build.workspace = true
 app-core = { workspace = true }
 approval = { workspace = true }
 autotuner = { workspace = true }
-coding-ingest = { workspace = true }
 desktop-shared = { workspace = true }
 bus = { workspace = true }
 cognitive = { workspace = true }
 common = { workspace = true }
 config = { workspace = true }
-feature-coding-todo = { workspace = true }
-feature-coding-bash = { path = "../feature-coding-bash" }
 feature-focus = { workspace = true }
 feature-launcher = { workspace = true }
 klyntbot-server = { workspace = true }
@@ -58,7 +55,6 @@ clap.workspace = true
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
 rmcp = { workspace = true, features = ["server", "transport-io", "transport-streamable-http-server"] }
 mcp-bridge = { path = "../mcp-bridge" }
-coding-agents-md = { path = "../coding-agents-md" }
 klynt-process-hardening = { path = "../klynt-process-hardening" }
 mimalloc = { workspace = true }
 specta = { workspace = true }

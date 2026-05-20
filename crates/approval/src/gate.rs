@@ -220,7 +220,7 @@ mod tests {
 
     fn ctx() -> ApprovalContext {
         ApprovalContext {
-            mode: common::SessionMode::Coding,
+            mode: common::SessionMode::Assistant,
             channel: ChannelKind::Desktop,
             session_id: "sess-1".into(),
             user_id: None,

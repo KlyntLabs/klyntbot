@@ -131,9 +131,6 @@ pub struct SubagentRuntime {
     pub model: String,
     pub tool_kit: Option<Arc<klynt_core::ToolKitBuilder>>,
     pub hook_engine: Option<Arc<klynt_hooks::HookEngine>>,
-    pub coding_policies: Option<
-        Arc<DashMap<String, Arc<parking_lot::RwLock<approval::CodingApprovalPolicy>>>>,
-    >,
     pub job_supervisor: Option<tools_core::DynJobSupervisor>,
     /// Optional lifecycle event broadcaster (injected after construction).
     pub event_tx: Arc<std::sync::Mutex<Option<tokio::sync::broadcast::Sender<crate::subagent_events::SubagentLifecycleEvent>>>>,
@@ -267,7 +264,6 @@ impl SubagentRuntime {
             self.hook_engine.clone(),
             session_id.clone(),
             agent_id.clone(),
-            self.coding_policies.clone(),
             self.job_supervisor.clone(),
             token.clone(),
             max_turns,
@@ -353,7 +349,6 @@ impl SubagentRuntime {
                 runtime.hook_engine.clone(),
                 sid.clone(),
                 aid.clone(),
-                runtime.coding_policies.clone(),
                 runtime.job_supervisor.clone(),
                 token,
                 max_turns,
@@ -424,7 +419,6 @@ impl SubagentRuntime {
             self.hook_engine.clone(),
             row.session_id.clone(),
             p.agent_id.clone(),
-            self.coding_policies.clone(),
             self.job_supervisor.clone(),
             token,
             row.turn_cap as u32,

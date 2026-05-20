@@ -10,8 +10,6 @@ describe("entityKindForCommand", () => {
     ["notebook_create", "notebook"],
     ["finance_transaction_add", "finance"],
     ["focus_session_start", "focusSession"],
-    ["coding_memory_recall_fetch", "codingFact"],
-    ["coding_memory_distill_now", "codingFact"],
     ["unknown_cmd", null],
     ["", null],
   ])("maps %s -> %s", (cmd, kind) => {

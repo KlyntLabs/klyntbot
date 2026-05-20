@@ -74,7 +74,7 @@ mod tests {
     #[test]
     fn context_remote_predicate() {
         let local = ApprovalContext {
-            mode: common::SessionMode::Coding,
+            mode: common::SessionMode::Assistant,
             channel: ChannelKind::Desktop,
             session_id: "s1".into(),
             user_id: None,

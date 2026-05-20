@@ -2,6 +2,3 @@
 //!
 //! These bridge the trait contracts defined in `coding-memory::reforge`
 //! with the concrete `providers` crate.
-
-pub mod coding_synthesis;
-pub mod rule_artifacts;

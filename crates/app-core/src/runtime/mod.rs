@@ -12,7 +12,6 @@ use desktop_shared::commands::{ChatMessageResponse, SessionContextInput};
 use desktop_shared::errors::ApiError;
 
 pub mod assistant;
-pub mod coding;
 
 /// Re-export the existing entry type under the unified name.
 pub use crate::handlers::chat::ActiveStreamEntry as ActiveTurnEntry;
@@ -59,7 +58,6 @@ pub struct StartTurnOutcome {
     pub handle: TurnHandle,
     pub user_message: Option<ChatMessageResponse>,
     pub stream_info: Option<crate::handlers::chat::ChatStreamInfo>,
-    pub coding_response: Option<crate::coding::turn_handler::CodingMessageSendResponse>,
 }
 
 /// Thread runtime trait — implemented by both assistant and coding modes.

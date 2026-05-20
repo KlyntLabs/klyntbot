@@ -1,7 +1,7 @@
-//! Authoritative discriminator for assistant vs coding sessions.
+//! Authoritative discriminator for assistant vs subagent sessions.
 //!
 //! Set at session creation, never mutated. Stored as a NOT NULL `TEXT`
-//! column on `sessions` and serialized as `"assistant"` / `"coding"`.
+//! column on `sessions` and serialized as `"assistant"` / `"subagent"`.
 
 use serde::{Deserialize, Serialize};
 
@@ -12,7 +12,6 @@ use serde::{Deserialize, Serialize};
 pub enum SessionMode {
     #[default]
     Assistant,
-    Coding,
     Subagent,
 }
 
@@ -20,7 +19,6 @@ impl SessionMode {
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Assistant => "assistant",
-            Self::Coding => "coding",
             Self::Subagent => "subagent",
         }
     }
@@ -28,7 +26,6 @@ impl SessionMode {
     pub fn parse(s: &str) -> Option<Self> {
         match s {
             "assistant" => Some(Self::Assistant),
-            "coding" => Some(Self::Coding),
             "subagent" => Some(Self::Subagent),
             _ => None,
         }
@@ -41,7 +38,7 @@ mod tests {
 
     #[test]
     fn round_trips_via_str() {
-        for m in [SessionMode::Assistant, SessionMode::Coding, SessionMode::Subagent] {
+        for m in [SessionMode::Assistant, SessionMode::Subagent] {
             assert_eq!(SessionMode::parse(m.as_str()), Some(m));
         }
     }
@@ -64,8 +61,8 @@ mod tests {
     fn serde_uses_snake_case() {
         let s = serde_json::to_string(&SessionMode::Assistant).unwrap();
         assert_eq!(s, "\"assistant\"");
-        let parsed: SessionMode = serde_json::from_str("\"coding\"").unwrap();
-        assert_eq!(parsed, SessionMode::Coding);
+        let parsed: SessionMode = serde_json::from_str("\"assistant\"").unwrap();
+        assert_eq!(parsed, SessionMode::Assistant);
     }
 
     #[test]

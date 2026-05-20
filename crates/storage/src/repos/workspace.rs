@@ -1,8 +1,7 @@
 //! Workspace repository — code-editor workspace lifecycle (Cursor/Codex-style).
 //!
 //! A `workspace` is a registered folder on disk. The `id` is a UUID string that
-//! flows into Phase 2 surfaces via `sessions.repo_id`, `coding_approval_history.repo_id`,
-//! and `GuardCtx.repo_id`. `project_id` is an optional link to a Klyntbot project
+//! flows into surfaces via `GuardCtx.repo_id`. `project_id` is an optional link to a Klyntbot project
 //! row (organizational); null for unlinked folders.
 
 use sqlx::{FromRow, SqlitePool};

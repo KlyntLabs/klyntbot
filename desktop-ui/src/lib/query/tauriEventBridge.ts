@@ -29,8 +29,6 @@ const ENTITY_INVALIDATIONS: Record<EntityKind, QueryKey[]> = {
   mirrorSnippet: [],
   brainVersion: [],
   pendingMemory: [],
-  codingFact: [qk.codingMemory.all()],
-  codingEpisode: [qk.codingMemory.all()],
 };
 
 // Static list of (event_name, queryKeys) for non-entity events that still
@@ -93,7 +91,6 @@ export async function startTauriEventBridge(
     client.invalidateQueries({ queryKey: qk.models.all() });
     client.invalidateQueries({ queryKey: qk.git.all() });
     client.invalidateQueries({ queryKey: qk.dashboard.all() });
-    client.invalidateQueries({ queryKey: qk.codingMemory.all() });
   });
   unlisteners.push(offBroad);
 

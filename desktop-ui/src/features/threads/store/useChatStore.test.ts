@@ -30,9 +30,6 @@ describe("useChatStore", () => {
       streamSnapshots: {},
       streamApprovals: {},
       streamFileEdits: {},
-      codingStateByThread: {},
-      codingRunningIds: new Set(),
-      codingRecentlyCompleted: new Map(),
     });
   });
 
@@ -114,47 +111,6 @@ describe("useChatStore", () => {
       };
       useChatStore.getState()._setStreamApprovals("sess-1", [approval]);
       expect(useChatStore.getState().streamApprovals["sess-1"]).toHaveLength(1);
-    });
-  });
-
-  describe("coding slice", () => {
-    it("applies coding events and builds reduced state", () => {
-      useChatStore.getState().applyCodingThreadEvent("coding:t1", {
-        kind: "turn_started",
-        thread_id: "coding:t1",
-        turn_id: "turn-1",
-        model: "gpt-4",
-        started_at: 1000,
-      });
-      const state = useChatStore.getState().codingStateByThread["coding:t1"];
-      expect(state?.turnState.kind).toBe("streaming");
-      expect(state?.processingStartedAt).toBe(1000);
-    });
-
-    it("tracks running coding ids globally", () => {
-      useChatStore.getState().setCodingRunningIds(new Set(["coding:t1", "coding:t2"]));
-      expect(useChatStore.getState().codingRunningIds.has("coding:t1")).toBe(true);
-      expect(useChatStore.getState().codingRunningIds.has("coding:t2")).toBe(true);
-    });
-
-    it("tracks recently completed coding ids", () => {
-      const map = new Map<string, number>();
-      map.set("coding:t1", Date.now());
-      useChatStore.getState().setCodingRecentlyCompleted(map);
-      expect(useChatStore.getState().codingRecentlyCompleted.has("coding:t1")).toBe(true);
-    });
-
-    it("resets coding thread state", () => {
-      useChatStore.getState().applyCodingThreadEvent("coding:t1", {
-        kind: "turn_started",
-        thread_id: "coding:t1",
-        turn_id: "turn-1",
-        model: "gpt-4",
-        started_at: 1000,
-      });
-      expect(useChatStore.getState().codingStateByThread["coding:t1"]).toBeDefined();
-      useChatStore.getState().resetCodingThreadState("coding:t1");
-      expect(useChatStore.getState().codingStateByThread["coding:t1"]).toBeUndefined();
     });
   });
 

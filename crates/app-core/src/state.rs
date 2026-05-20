@@ -9,7 +9,6 @@ use cognitive::situation::UserSituation;
 use common::FormResponse;
 use desktop_shared::errors::ApiError;
 use desktop_shared::types::EntityKind;
-use desktop_shared::HooksTomlSnapshot;
 use feature_coaching::{FeedbackTracker, InterventionRouter, PatternDetector, SignalAccumulator};
 use feature_focus::DndManager;
 use feature_notes::repo::{NoteRepo, PracticeSessionRepo};
@@ -59,8 +58,6 @@ pub struct AppCore {
     pub active_streams: Arc<crate::handlers::chat::ActiveStreams>,
     /// Assistant-mode thread runtime (lazily initialized).
     pub assistant_runtime: std::sync::OnceLock<Arc<dyn crate::runtime::ThreadRuntime>>,
-    /// Coding-mode thread runtime (lazily initialized).
-    pub coding_runtime: std::sync::OnceLock<Arc<dyn crate::runtime::ThreadRuntime>>,
     /// Pending ask_user interaction oneshot senders keyed by session_key.
     /// Value is (request_id, sender). Only one interaction can be pending per session
     /// because the ask_user tool blocks the agent loop until answered.
@@ -169,75 +166,7 @@ pub struct AppCore {
     pub _ai_pipeline_router: Option<ai_core::SignalRouter>,
     /// Registry of all AiFeature-derived features in the workspace.
     pub feature_registry: Arc<ai_core::AiFeatureRegistry>,
-    /// Ingestion daemon handle; `None` when spawn failed or not yet wired.
-    pub ingest_daemon: std::sync::Mutex<Option<coding_ingest::daemon::IngestDaemonHandle>>,
-    /// Coding-memory Distiller — processes ingest events into semantic facts & episodic memories.
-    pub distiller: Option<Arc<coding_memory::distiller::Distiller>>,
-    /// Coding-memory recall service (Phase 4).
-    pub recall: Option<Arc<coding_memory::recall::CodingRecallService>>,
-    /// MCP toolset for coding-memory recall tools.
-    pub coding_toolset: Option<coding_memory::CodingMemoryToolset>,
-    /// Phase-5 session-end light pass.
-    pub session_end_pass: Option<Arc<coding_memory::reforge::SessionEndPass>>,
-    /// Causal edge repo (Phase 6).
-    pub causal_edge_repo: Option<Arc<coding_memory::causal::CausalEdgeRepo>>,
-    /// Tree-sitter symbol extractor (Phase 6).
-    pub symbol_extractor: Option<Arc<dyn coding_memory::symbols::SymbolExtractor>>,
-    /// Map of repo_id → filesystem root (Phase 6 symbol validation).
-    pub repo_roots: Arc<std::sync::RwLock<std::collections::HashMap<String, std::path::PathBuf>>>,
     pub tracing_registry: std::sync::Arc<crate::tracing::TracingRegistry>,
-    /// Tracks which sessions have already fired the SessionStart hook (coding mode).
-    pub session_start_fired: Arc<dashmap::DashMap<String, ()>>,
-    /// Tracks which sessions have already fired the SessionEnd hook (prevents double-fire on cancel).
-    pub session_end_fired: Arc<dashmap::DashMap<String, ()>>,
-    /// Skill activator for coding mode — path-conditional + dynamic discovery.
-    pub coding_skill_activator: Arc<tokio::sync::Mutex<Option<klynt_skill_loader::SkillActivator>>>,
-    /// Mirror-learned approval history repo (Phase 2 Layer 3).
-    pub coding_approval_history_repo: Option<Arc<storage::repos::CodingApprovalHistoryRepo>>,
-    /// File snapshot repo for /sessions rewind (Phase 2).
-    pub snapshot_repo: Option<Arc<klynt_core::snapshots::SnapshotRepo>>,
-    // ── Phase 4: Coding thread events ─────────────────────────────────
-    /// Typed broker for ThreadEvent — publish from agent loop, subscribe from Tauri adapter.
-    pub thread_events: bus::TypedBroker<desktop_shared::coding::ThreadEvent>,
-    /// Typed broker for CostUpdate — publish after each provider call.
-    pub cost_events: bus::TypedBroker<desktop_shared::coding::CostUpdate>,
-    /// Typed broker for SubagentEvent — publish from subagent manager, subscribe from Tauri.
-    pub subagent_events: bus::TypedBroker<desktop_shared::coding::SubagentEvent>,
-    /// Active thread subscriptions keyed by subscription_id.
-    pub thread_subscriptions: Arc<dashmap::DashMap<String, ThreadSubscription>>,
-    /// Per-turn steer queue — accepts mid-turn user corrections injected via
-    /// `coding_turn_steer`. The turn handler drains the receiver between
-    /// iterations and persists each entry as a synthetic user message so the
-    /// next iteration's prompt assembly picks it up.
-    pub steer_queue: Arc<crate::coding::steer_queue::SteerQueue>,
-    /// Coding ToolKitBuilder — set by init/mod.rs after the kit is registered with
-    /// the agent runtime. Cloned on demand by handlers that need to construct a
-    /// scoped (e.g. read-only) registry — currently `coding_review_start`.
-    pub tool_kit: std::sync::Mutex<Option<Arc<klynt_core::ToolKitBuilder>>>,
-    /// Desktop approval channel — shared with the agent's ApprovalGate.
-    /// Used by `respond_approval` to resolve pending requests.
-    pub desktop_approval_channel:
-        Option<Arc<crate::desktop_approval_channel::DesktopApprovalChannel>>,
-    /// Approval grants repo — shared with the agent's ApprovalGate.
-    pub approval_grants_repo: Option<Arc<approval::ApprovalGrantsRepo>>,
-    /// Per-coding-thread approval policy. PlanMode variant is set/cleared by
-    /// coding_plan_enter / coding_plan_cancel / coding_plan_ratify.
-    pub coding_policies:
-        Arc<dashmap::DashMap<String, Arc<parking_lot::RwLock<approval::CodingApprovalPolicy>>>>,
-    /// Snapshot of items at the moment plan mode was entered, used to compute
-    /// ratify counts. Keyed by plan_session_id. In-memory only.
-    pub plan_snapshots: Arc<dashmap::DashMap<String, Vec<feature_coding_todo::types::TodoItem>>>,
-    /// Shared context update queue for injecting one-shot reminders into the agent loop.
-    pub context_update_queue: Option<Arc<bus::ContextUpdateQueue>>,
-    /// Background bash job supervisor — stores live jobs + reconciles on startup.
-    pub job_supervisor: Option<Arc<feature_coding_bash::JobSupervisor>>,
-}
-
-/// State for an active thread subscription.
-#[derive(Debug, Clone)]
-pub struct ThreadSubscription {
-    pub thread_id: String,
-    pub created_at: i64,
 }
 
 impl AppCore {
@@ -590,147 +519,7 @@ impl AppCore {
         Ok(path.to_string_lossy().into_owned())
     }
 
-    /// Respond to a pending approval request — resolves the oneshot that the
-    /// agent's tool execution is blocked on.
-    #[tracing::instrument(skip(self), err)]
-    pub async fn respond_approval(
-        &self,
-        request_id: &str,
-        decision: crate::coding::approval_handler::AppApprovalDecision,
-    ) -> common::Result<()> {
-        let channel = self.desktop_approval_channel.as_ref().ok_or_else(|| {
-            common::KlyntbotError::NotImplemented("desktop approval channel not initialized".into())
-        })?;
-        let grants_repo = self.approval_grants_repo.as_ref().ok_or_else(|| {
-            common::KlyntbotError::NotImplemented("approval grants repo not initialized".into())
-        })?;
-        crate::coding::approval_handler::respond_approval(
-            channel.clone(),
-            grants_repo.clone(),
-            self.domain_event_bus.clone(),
-            request_id,
-            decision,
-        )
-        .await
-        .map_err(|e| common::KlyntbotError::NotImplemented(e.to_string()))
-    }
-
-    #[tracing::instrument(skip(self), err)]
-    pub async fn coding_hooks_list(&self) -> common::Result<HooksTomlSnapshot> {
-        let path = self.config.read().await.data_dir_path().join("hooks.toml");
-        let content = tokio::fs::read_to_string(&path).await.unwrap_or_default();
-        let exists = !content.is_empty();
-        Ok(HooksTomlSnapshot {
-            path: path.to_string_lossy().into_owned(),
-            exists,
-            content,
-        })
-    }
-
-    #[tracing::instrument(skip(self), err)]
-    pub async fn coding_permissions_clear_mirror(
-        &self,
-        tool: String,
-        repo_id: Option<String>,
-    ) -> common::Result<u64> {
-        let repo = self.coding_approval_history_repo.clone().ok_or_else(|| {
-            common::KlyntbotError::Storage("approval history repo not initialized".into())
-        })?;
-        repo.clear_for_tool(&tool, repo_id.as_deref())
-            .await
-            .map_err(Into::into)
-    }
-
-    #[tracing::instrument(skip(self), err)]
-    pub async fn coding_sessions_rewind(
-        &self,
-        session_key: String,
-        message_id: String,
-    ) -> common::Result<desktop_shared::RewindResult> {
-        let snap_repo = self.snapshot_repo.clone().ok_or_else(|| {
-            common::KlyntbotError::Storage("snapshot repo not initialized".into())
-        })?;
-        let snaps: Vec<klynt_core::snapshots::Snapshot> = snap_repo
-            .list_after_message(&session_key, &message_id)
-            .await?;
-        let mut restored: usize = 0;
-        let mut deleted: usize = 0;
-        // Apply newest-first to undo in reverse order
-        for snap in snaps.iter().rev() {
-            if snap.file_existed {
-                tokio::fs::write(&snap.file_path, &snap.content_before).await?;
-                restored += 1;
-            } else {
-                // file didn't exist before — undo by deleting
-                let _ = tokio::fs::remove_file(&snap.file_path).await;
-                deleted += 1;
-            }
-        }
-        let removed = self
-            .repos
-            .sessions
-            .rewind_to_message(&session_key, &message_id)
-            .await?;
-        Ok(desktop_shared::RewindResult {
-            messages_removed: removed,
-            files_restored: restored,
-            files_deleted: deleted,
-        })
-    }
-
-    #[tracing::instrument(skip(self), err)]
-    pub async fn coding_sessions_export(
-        &self,
-        session_key: String,
-        format: desktop_shared::ExportFormat,
-    ) -> common::Result<desktop_shared::SessionExportResult> {
-        let bytes = match format {
-            desktop_shared::ExportFormat::Md => {
-                self.repos.sessions.export_session_md(&session_key).await?
-            }
-            desktop_shared::ExportFormat::Json => {
-                self.repos
-                    .sessions
-                    .export_session_json(&session_key)
-                    .await?
-            }
-        };
-        let dir = self.config.read().await.data_dir_path().join("exports");
-        tokio::fs::create_dir_all(&dir).await?;
-        let ext = match format {
-            desktop_shared::ExportFormat::Md => "md",
-            desktop_shared::ExportFormat::Json => "json",
-        };
-        let path = dir.join(format!("{session_key}.{ext}"));
-        tokio::fs::write(&path, &bytes).await?;
-        Ok(desktop_shared::SessionExportResult {
-            path: path.to_string_lossy().into_owned(),
-            bytes_written: bytes.len(),
-        })
-    }
-
-    #[tracing::instrument(skip(self), err)]
-    pub async fn coding_sessions_fork(
-        &self,
-        session_key: String,
-        up_to_message: Option<String>,
-    ) -> common::Result<desktop_shared::SessionForkResult> {
-        let new_key = self
-            .repos
-            .sessions
-            .fork_session(&session_key, up_to_message.as_deref())
-            .await?;
-        Ok(desktop_shared::SessionForkResult {
-            new_session_key: new_key,
-        })
-    }
-
-    // ── Workspace lifecycle (Cursor/Codex-style "open folder") ────────────
-    //
-    // Workspaces are registered folders on disk. The `id` UUID flows into
-    // `sessions.repo_id`, `coding_approval_history.repo_id`, and `GuardCtx.repo_id`
-    // (Phase 2). `project_id` (optional) links to a Klyntbot organizational
-    // project; null for one-off folders.
+    // ── Workspace lifecycle ───────────────────────────────────────────────
 
     #[tracing::instrument(skip(self), err)]
     pub async fn list_workspaces(&self) -> common::Result<serde_json::Value> {
@@ -816,60 +605,6 @@ impl AppCore {
 
     // ── Background bash jobs (coding background tasks) ─────────────────
 
-    #[tracing::instrument(skip(self), err)]
-    pub async fn coding_job_list(
-        &self,
-        thread_id: &str,
-        agent_chain: &[String],
-        active_only: bool,
-    ) -> Result<Vec<feature_coding_bash::BashJobView>, ApiError> {
-        crate::handlers::coding_jobs::coding_jobs_list(self, thread_id, agent_chain, active_only)
-            .await
-    }
-
-    #[tracing::instrument(skip(self), err)]
-    pub async fn coding_job_output(
-        &self,
-        job_id: &str,
-        since: u64,
-    ) -> Result<crate::handlers::coding_jobs::JobOutputView, ApiError> {
-        crate::handlers::coding_jobs::coding_jobs_output(self, job_id, since).await
-    }
-
-    #[tracing::instrument(skip(self), err)]
-    pub async fn coding_job_stop(
-        &self,
-        job_id: &str,
-    ) -> Result<feature_coding_bash::BashJobView, ApiError> {
-        crate::handlers::coding_jobs::coding_jobs_stop(self, job_id).await
-    }
-
-    #[tracing::instrument(skip(self), err)]
-    pub fn coding_job_log_path(&self, job_id: &str) -> Result<std::path::PathBuf, ApiError> {
-        crate::handlers::coding_jobs::coding_jobs_log_path(self, job_id)
-    }
-
-    #[tracing::instrument(skip(self), err)]
-    pub async fn coding_job_attach(
-        &self,
-        job_id: &str,
-    ) -> Result<crate::handlers::coding_jobs::AttachResult, ApiError> {
-        crate::handlers::coding_jobs::coding_task_attach(self, job_id).await
-    }
-
-    #[tracing::instrument(skip(self), err)]
-    pub async fn coding_job_detach(&self, job_id: &str) -> Result<(), ApiError> {
-        crate::handlers::coding_jobs::coding_task_detach(self, job_id).await
-    }
-
-    /// Return the background job supervisor or a "feature disabled" error.
-    #[tracing::instrument(skip(self), err)]
-    pub fn job_supervisor(&self) -> Result<&Arc<feature_coding_bash::JobSupervisor>, ApiError> {
-        self.job_supervisor
-            .as_ref()
-            .ok_or_else(|| ApiError::new("FEATURE_DISABLED", "background bash jobs not initialized"))
-    }
-
     /// Return the assistant-mode thread runtime, constructing it on first call.
     pub fn assistant_runtime(self: Arc<Self>) -> Arc<dyn crate::runtime::ThreadRuntime> {
         let core = Arc::clone(&self);
@@ -878,13 +613,6 @@ impl AppCore {
             .clone()
     }
 
-    /// Return the coding-mode thread runtime, constructing it on first call.
-    pub fn coding_runtime(self: Arc<Self>) -> Arc<dyn crate::runtime::ThreadRuntime> {
-        let core = Arc::clone(&self);
-        self.coding_runtime
-            .get_or_init(|| Arc::new(crate::runtime::coding::CodingThreadRuntime::new(core)))
-            .clone()
-    }
 }
 
 fn workspace_row_to_dto(row: storage::repos::WorkspaceRow) -> serde_json::Value {
@@ -952,7 +680,6 @@ impl AppCore {
             None,
             None,
             None,
-            None,
         )
         .await?;
         Ok(core)
@@ -971,7 +698,6 @@ impl AppCore {
             Some(config),
             None,
             Some(emitter),
-            None,
             Some(provider),
         )
         .await?;

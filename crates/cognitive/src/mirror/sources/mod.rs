@@ -2,8 +2,6 @@
 //! to the workspace `SignalRouter` via `MirrorSubscriberRunner`.
 
 pub mod approval_history;
-pub mod coding_bash;
-pub mod coding_todo;
 pub mod config_archiver;
 pub mod cost_ceiling;
 pub mod finance_drift;
@@ -14,8 +12,6 @@ pub mod task_focus;
 pub mod trial;
 
 pub use approval_history::ApprovalHistorySource;
-pub use coding_bash::BackgroundJobSignalSource;
-pub use coding_todo::TodoSignalSource;
 pub use config_archiver::ConfigArchiverSource;
 pub use cost_ceiling::CostCeilingSource;
 pub use finance_drift::FinanceSpendingDriftSource;

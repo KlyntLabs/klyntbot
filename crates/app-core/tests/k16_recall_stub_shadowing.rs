@@ -56,7 +56,7 @@ impl Tool for FakeTool {
         true
     }
     fn allowed_channels(&self) -> common::ChannelMask {
-        common::ChannelMask::CODING_ONLY
+        common::ChannelMask::ALL
     }
 }
 

@@ -40,7 +40,7 @@ impl SnapshotRepo {
     ) -> Result<i64> {
         let hash = blake3::hash(content).to_hex().to_string();
         let res = sqlx::query(
-            "INSERT INTO coding_snapshots \
+            "INSERT INTO snapshots \
              (session_key, message_id, file_path, content_before, file_existed, content_hash) \
              VALUES (?, ?, ?, ?, ?, ?)",
         )
@@ -66,7 +66,7 @@ impl SnapshotRepo {
         ghost_preexisting_untracked_json: Option<&str>,
     ) -> Result<i64> {
         let res = sqlx::query(
-            "INSERT INTO coding_snapshots \
+            "INSERT INTO snapshots \
              (session_key, message_id, file_path, content_before, file_existed, content_hash, ghost_commit_sha, ghost_repo_root, ghost_preexisting_untracked_json) \
              VALUES (?, ?, ?, X'', 1, ?, ?, ?, ?)",
         )
@@ -130,7 +130,7 @@ impl SnapshotRepo {
     }
 
     pub async fn get(&self, id: i64) -> Result<Option<Snapshot>> {
-        let row = sqlx::query("SELECT * FROM coding_snapshots WHERE id = ?")
+        let row = sqlx::query("SELECT * FROM snapshots WHERE id = ?")
             .bind(id)
             .fetch_optional(self.pool.inner())
             .await
@@ -140,7 +140,7 @@ impl SnapshotRepo {
 
     pub async fn list_for_session(&self, session_key: &str) -> Result<Vec<Snapshot>> {
         let rows =
-            sqlx::query("SELECT * FROM coding_snapshots WHERE session_key = ? ORDER BY id DESC")
+            sqlx::query("SELECT * FROM snapshots WHERE session_key = ? ORDER BY id DESC")
                 .bind(session_key)
                 .fetch_all(self.pool.inner())
                 .await
@@ -154,9 +154,9 @@ impl SnapshotRepo {
         message_id: &str,
     ) -> Result<Vec<Snapshot>> {
         let rows = sqlx::query(
-            "SELECT s.* FROM coding_snapshots s \
+            "SELECT s.* FROM snapshots s \
              WHERE s.session_key = ? AND s.id > COALESCE( \
-               (SELECT MAX(id) FROM coding_snapshots WHERE session_key = ? AND message_id = ?), 0 \
+               (SELECT MAX(id) FROM snapshots WHERE session_key = ? AND message_id = ?), 0 \
              ) ORDER BY s.id ASC",
         )
         .bind(session_key)

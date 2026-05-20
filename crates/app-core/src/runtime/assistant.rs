@@ -38,7 +38,6 @@ impl ThreadRuntime for AssistantThreadRuntime {
             handle,
             user_message: Some(user_msg),
             stream_info: Some(stream_info),
-            coding_response: None,
         })
     }
 

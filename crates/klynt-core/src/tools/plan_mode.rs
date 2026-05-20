@@ -32,7 +32,7 @@ pub struct ExitPlanModeArgs {
     category = "System",
     cost = "Free",
     tags = "plan,coding",
-    allowed_channels = "coding_only"
+    allowed_channels = "all"
 )]
 pub struct EnterPlanModeTool {
     repos: Repos,
@@ -49,7 +49,7 @@ pub struct EnterPlanModeTool {
     category = "System",
     cost = "Free",
     tags = "plan,coding",
-    allowed_channels = "coding_only"
+    allowed_channels = "all"
 )]
 pub struct ExitPlanModeTool {
     repos: Repos,

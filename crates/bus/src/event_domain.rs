@@ -34,7 +34,6 @@ pub enum EventDomain {
     Lifecycle,
     Notifications,
     Scheduler,
-    CodingMemory,
     Launcher,
     /// User-supplied tag from `DomainEvent::UserStatedFact.domain`. Not part of
     /// the fixed taxonomy — this carries payload data, not a call-site choice.
@@ -60,7 +59,6 @@ impl EventDomain {
             Self::Lifecycle => "lifecycle",
             Self::Notifications => "notifications",
             Self::Scheduler => "scheduler",
-            Self::CodingMemory => "coding_memory",
             Self::Launcher => "launcher",
             Self::Custom(s) => s.as_str(),
         }
@@ -87,7 +85,6 @@ impl EventDomain {
             "lifecycle" => Self::Lifecycle,
             "notifications" => Self::Notifications,
             "scheduler" => Self::Scheduler,
-            "coding_memory" => Self::CodingMemory,
             other => Self::Custom(other.to_string()),
         }
     }
@@ -135,7 +132,6 @@ mod tests {
             EventDomain::Lifecycle,
             EventDomain::Notifications,
             EventDomain::Scheduler,
-            EventDomain::CodingMemory,
         ] {
             assert_eq!(EventDomain::parse(d.as_str()), d);
         }

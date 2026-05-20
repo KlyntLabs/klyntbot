@@ -26,7 +26,7 @@ use tools_core::FeaturePackage;
 
 use super::super::context_sources::{
     AreaSource, BootstrapSource, IdentitySource, PageContextSource, ProductivityContextSource,
-    ProjectContextSource, SessionContextSource, SessionMemoryContextSource, TodoSource,
+    ProjectContextSource, SessionContextSource, SessionMemoryContextSource,
 };
 use super::super::{CronHandlerAdapter, SubagentManager};
 use super::{AgentLoop, LastActiveChannel};
@@ -86,12 +86,8 @@ pub struct AgentLoopBuilder {
     hot_config: Option<Arc<RwLock<config::HotConfig>>>,
     context_update_queue: Option<Arc<bus::ContextUpdateQueue>>,
     embedding_engine: Option<Arc<tools::EmbeddingEngine>>,
-    coding_recall_service: Option<Arc<coding_memory::recall::CodingRecallService>>,
     approval_channel: Option<Arc<dyn approval::ApprovalChannel>>,
     approval_suggester: Option<Arc<dyn approval::ApprovalSuggester>>,
-    coding_policies: Option<
-        Arc<dashmap::DashMap<String, Arc<parking_lot::RwLock<approval::CodingApprovalPolicy>>>>,
-    >,
     injector_registry: Option<bus::InjectorRegistry>,
     job_supervisor: Option<tools_core::DynJobSupervisor>,
 }
@@ -117,10 +113,8 @@ impl AgentLoopBuilder {
             hot_config: None,
             context_update_queue: None,
             embedding_engine: None,
-            coding_recall_service: None,
             approval_channel: None,
             approval_suggester: None,
-            coding_policies: None,
             injector_registry: None,
             job_supervisor: None,
         }
@@ -137,28 +131,12 @@ impl AgentLoopBuilder {
         self.approval_suggester = Some(suggester);
         self
     }
-    pub fn with_coding_policies(
-        mut self,
-        policies: Arc<
-            dashmap::DashMap<String, Arc<parking_lot::RwLock<approval::CodingApprovalPolicy>>>,
-        >,
-    ) -> Self {
-        self.coding_policies = Some(policies);
-        self
-    }
     pub fn with_injector_registry(mut self, registry: bus::InjectorRegistry) -> Self {
         self.injector_registry = Some(registry);
         self
     }
     pub fn with_job_supervisor(mut self, supervisor: tools_core::DynJobSupervisor) -> Self {
         self.job_supervisor = Some(supervisor);
-        self
-    }
-    pub fn with_coding_recall_service(
-        mut self,
-        service: Option<Arc<coding_memory::recall::CodingRecallService>>,
-    ) -> Self {
-        self.coding_recall_service = service;
         self
     }
     pub fn with_embedding_engine(mut self, engine: Arc<tools::EmbeddingEngine>) -> Self {
@@ -339,7 +317,6 @@ impl AgentLoopBuilder {
                 storage::SessionMemoryRepo::new(storage_pool.inner().clone()),
             )),
             Box::new(AreaSource::new(repos.areas.clone())),
-            Box::new(TodoSource::new(repos.tasks.clone())),
             Box::new(PageContextSource::new(repos.clone())),
         ];
 
@@ -637,17 +614,11 @@ impl AgentLoopBuilder {
             summary_model,
         ));
         let token_counter = context_engine::token_counter_for_model(&config.agents.defaults.model);
-        let mut context_engine =
+        let context_engine =
             context_engine::ContextEngine::new(config.cognitive.history_compression.clone())
                 .with_sources(sources)
                 .with_token_counter(Arc::clone(&token_counter))
                 .with_summary_provider(summary_provider);
-
-        if let Some(ref svc) = self.coding_recall_service {
-            context_engine.register_source(Box::new(
-                crate::context_sources::CodingRecallContextSource::new(Arc::clone(svc)),
-            ));
-        }
 
         // ── Session manager (SQL-backed) ──────────────────────────────────
         let session_manager = SessionManager::from_repo(
@@ -666,7 +637,6 @@ impl AgentLoopBuilder {
                 .model(config.agents.defaults.model.clone())
                 .max_concurrent_subagents(config.agents.defaults.max_concurrent_subagents)
                 .agent_task_repo(repos.agent_tasks.clone())
-                .coding_policies(self.coding_policies.clone())
                 .job_supervisor(self.job_supervisor.clone())
                 .repos(repos.clone())
                 .build(),
@@ -857,14 +827,6 @@ impl AgentLoopBuilder {
             forge.add_searcher(Arc::new(crate::domain_searchers::FinanceSearcher::new(
                 repos.clone(),
             )));
-            if config.coding_memory.enabled {
-                let facts = cognitive::SemanticFactRepo::new(storage_pool.inner().clone());
-                let episodes = cognitive::EpisodicMemoryRepo::new(storage_pool.inner().clone());
-                forge.add_searcher(Arc::new(coding_memory::CodeDomainSearcher::new(
-                    facts, episodes,
-                )));
-            }
-
             // NoteTreeNavigator with optional community search (Phase 2)
             if config.cognitive.book_index.enabled {
                 let tree_repo: Arc<dyn context_engine::book_index::BookTreeRepo> = Arc::new(
@@ -1749,11 +1711,6 @@ impl AgentLoopBuilder {
 
         // Approval gate: built whenever a storage pool is available so that
         // every tool call passes through ApprovalGate::check before execute.
-        // The classify hook (CodingApprovalPolicy) lets coding-mode bash/edit
-        // be reclassified per-args; tools without runtime classification fall
-        // through to their declarative approval_class.
-        // Without an injected channel we use BlockingFallbackChannel — that
-        // makes destructive ops fail loudly rather than silently passing.
         if let Some(pool) = &self.pool {
             let grants_repo = approval::ApprovalGrantsRepo::new(
                 storage::StoragePool::from_existing(pool.clone()),
@@ -1762,14 +1719,7 @@ impl AgentLoopBuilder {
                 .approval_channel
                 .clone()
                 .unwrap_or_else(|| Arc::new(approval::BlockingFallbackChannel::desktop_prompt()));
-            let coding_policy = approval::CodingApprovalPolicy::compile(&config.coding.permissions)
-                .map_err(|e| {
-                    common::KlyntbotError::Config(common::ConfigError::Invalid(format!(
-                        "approval: coding-policy compile failed: {e}"
-                    )))
-                })?;
-            let mut gate = approval::ApprovalGate::new(grants_repo, channel)
-                .with_classify_hooks(vec![Arc::new(coding_policy)]);
+            let mut gate = approval::ApprovalGate::new(grants_repo, channel);
             if let Some(suggester) = self.approval_suggester.take() {
                 gate = gate.with_suggester(suggester);
             }
@@ -1994,7 +1944,6 @@ impl AgentLoopBuilder {
             skill_store,
             hot_config,
             subagent_manager: Some(subagent_manager),
-            coding_policies: self.coding_policies.clone(),
             job_supervisor: self.job_supervisor.clone(),
         })
     }

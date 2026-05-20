@@ -14,8 +14,7 @@ use tracing::Instrument;
 
 use klynt_hooks::engine::HookFireInput;
 use klynt_hooks::events::{
-    notification::NotificationInput, session_end::SessionEndInput,
-    session_start::SessionStartInput, user_prompt_submit::UserPromptSubmitInput,
+    notification::NotificationInput, user_prompt_submit::UserPromptSubmitInput,
 };
 
 use crate::errors::map_storage_err;
@@ -238,10 +237,7 @@ pub async fn chat_send(
     } else {
         serde_json::json!({ "title": title })
     };
-    let session_mode = match mode.as_deref() {
-        Some("coding") => common::SessionMode::Coding,
-        _ => common::SessionMode::Assistant,
-    };
+    let session_mode = common::SessionMode::Assistant;
     let session_row = repos
         .sessions
         .upsert_session_with_mode(&session_key, session_mode, &metadata)
@@ -438,8 +434,6 @@ pub async fn relay_chat_stream(
     domain_event_bus: Option<Arc<bus::DomainEventBus>>,
     user_message: Option<String>,
     hook_engine: Option<Arc<klynt_hooks::HookEngine>>,
-    session_start_fired: Arc<dashmap::DashMap<String, ()>>,
-    session_end_fired: Arc<dashmap::DashMap<String, ()>>,
     guard_id: u64,
 ) {
     // Guard ensures active_streams + pending_interactions cleanup even on panic
@@ -803,25 +797,10 @@ pub async fn relay_chat_stream(
                                     source: "chat".to_string(),
                                 }
                             );
-                            if let Some(ref engine) = hook_engine {
-                                if !session_end_fired.contains_key(sk.as_str()) {
-                                    session_end_fired.insert(sk.clone(), ());
-                                    session_start_fired.remove(sk.as_str());
-                                    let input = SessionEndInput {
-                                        session_id: sk.clone(),
-                                        reason: "complete".to_string(),
-                                        duration_ms: 0,
-                                        base: Default::default(),
-                                    };
-                                    let _ = engine.fire(HookFireInput::SessionEnd(input)).await;
-                                    // Now that the hook has fired exactly once, drop the marker
-                                    // so the next turn on this session can fire SessionStart cleanly.
-                                    session_end_fired.remove(sk.as_str());
-                                }
-                            }
                             break;
                         }
                         AgentEvent::Error { message } => {
+
                             // Eager cleanup: remove active_streams entry before emitting
                             // terminal events so consumers can retry immediately.
                             if let Some(entry) = active_streams.get(sk) {
@@ -1412,23 +1391,6 @@ impl AppCore {
             }
         }
 
-        // Fire SessionStart hook once per session on first coding-mode message.
-        if mode.as_deref() == Some("coding") && !self.session_start_fired.contains_key(&session_key)
-        {
-            if let Some(engine) = self.agent.runtime().hook_engine() {
-                let input = SessionStartInput {
-                    session_id: session_key.clone(),
-                    cwd: std::env::current_dir()
-                        .ok()
-                        .and_then(|p| p.to_str().map(String::from))
-                        .unwrap_or_default(),
-                    base: Default::default(),
-                };
-                let _ = engine.fire(HookFireInput::SessionStart(input)).await;
-            }
-            self.session_start_fired.insert(session_key.clone(), ());
-        }
-
         let result = chat_send(
             &self.repos,
             &self.agent,
@@ -1488,19 +1450,6 @@ impl AppCore {
                 }
             }
         }
-        if let Some(engine) = self.agent.runtime().hook_engine() {
-            if !self.session_end_fired.contains_key(&session_key) {
-                self.session_end_fired.insert(session_key.clone(), ());
-                self.session_start_fired.remove(&session_key);
-                let input = SessionEndInput {
-                    session_id: session_key.clone(),
-                    reason: "user_cancel".to_string(),
-                    duration_ms: 0,
-                    base: Default::default(),
-                };
-                let _ = engine.fire(HookFireInput::SessionEnd(input)).await;
-            }
-        }
         chat_cancel(
             &self.active_streams,
             &self.pending_interactions,
@@ -1555,8 +1504,6 @@ impl AppCore {
                 domain_event_bus,
                 stream_info.user_message,
                 hook_engine,
-                Arc::clone(&self.session_start_fired),
-                Arc::clone(&self.session_end_fired),
                 stream_info.guard_id,
             )
             .in_current_span(),

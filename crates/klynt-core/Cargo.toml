@@ -42,11 +42,7 @@ storage = { workspace = true }
 klynt-git-utils = { path = "../klynt-git-utils" }
 sqlx = { workspace = true, features = ["runtime-tokio", "sqlite"] }
 jiff = { workspace = true }
-lsp-client = { path = "../lsp-client", optional = true }
 
-[features]
-default = ["lsp"]
-lsp = ["dep:lsp-client"]
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["full", "test-util"] }

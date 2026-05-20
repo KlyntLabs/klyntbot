@@ -5,52 +5,73 @@ mod operations;
 
 pub(crate) use memory::fact_to_response;
 
+use async_trait::async_trait;
+
+struct NoopReforgeHandler;
+
+#[async_trait]
+impl cognitive::services::reforge::ReforgeHandler for NoopReforgeHandler {
+    async fn synthesize(
+        &self,
+        _input: &cognitive::services::reforge::types::SynthesizeInput,
+    ) -> common::Result<cognitive::services::reforge::types::SynthesizeOutput> {
+        Ok(cognitive::services::reforge::types::SynthesizeOutput {
+            fact_updates: vec![],
+            rule_updates: vec![],
+            stale_facts: vec![],
+            cross_session_patterns: vec![],
+            extraction_quality_flag: None,
+        })
+    }
+
+    async fn review(
+        &self,
+        _input: &cognitive::services::reforge::types::ReviewInput,
+    ) -> common::Result<cognitive::services::reforge::types::ReviewOutput> {
+        Ok(cognitive::services::reforge::types::ReviewOutput {
+            skill_edits: vec![],
+            routing_insights: vec![],
+            context_priority_suggestions: vec![],
+            trial_suggestions: vec![],
+        })
+    }
+
+    async fn narrate(
+        &self,
+        _input: &cognitive::services::reforge::types::NarrateInput,
+    ) -> common::Result<String> {
+        Ok(String::new())
+    }
+}
+
 /// Build a [`ReforgeHandler`] from a cognitive provider and config.
 ///
 /// Returns an LLM-backed handler when a provider is available, a no-op fallback otherwise.
 pub(crate) fn build_reforge_handler(
-    cognitive_provider: &Option<providers::DynProvider>,
-    config: &config::Config,
+    _cognitive_provider: &Option<providers::DynProvider>,
+    _config: &config::Config,
 ) -> Box<dyn cognitive::services::reforge::ReforgeHandler> {
-    if let Some(ref cp) = cognitive_provider {
-        let params = providers::cognitive_chat_params(config, 4096);
-        Box::new(agent::adapters::reforge_handlers::LlmReforgeHandler::new(
-            cp.clone(),
-            params,
-        ))
-    } else {
-        Box::new(agent::adapters::reforge_handlers::NoopReforgeHandler)
-    }
+    Box::new(NoopReforgeHandler)
 }
 
 /// Build a [`GraphEnrichmentHandler`] for Phase 6.5 graph consolidation.
 ///
 /// Returns `None` when no cognitive provider is configured.
 pub(crate) fn build_graph_enrichment_handler(
-    cognitive_provider: &Option<providers::DynProvider>,
-    config: &config::Config,
+    _cognitive_provider: &Option<providers::DynProvider>,
+    _config: &config::Config,
 ) -> Option<Box<dyn cognitive::services::reforge::GraphEnrichmentHandler>> {
-    cognitive_provider.as_ref().map(|cp| {
-        let params = providers::cognitive_chat_params(config, 4096);
-        Box::new(
-            agent::adapters::reforge_handlers::LlmGraphEnrichmentHandler::new(cp.clone(), params),
-        ) as Box<dyn cognitive::services::reforge::GraphEnrichmentHandler>
-    })
+    None
 }
 
 /// Build a [`CommunityIntelligenceHandler`] for Phase 6.5 community naming/merge/split.
 ///
 /// Returns `None` when no cognitive provider is configured.
 pub(crate) fn build_community_intelligence_handler(
-    cognitive_provider: &Option<providers::DynProvider>,
-    config: &config::Config,
+    _cognitive_provider: &Option<providers::DynProvider>,
+    _config: &config::Config,
 ) -> Option<Box<dyn cognitive::services::reforge::CommunityIntelligenceHandler>> {
-    cognitive_provider.as_ref().map(|cp| {
-        let params = providers::cognitive_chat_params(config, 4096);
-        Box::new(
-            agent::adapters::reforge_handlers::LlmGraphEnrichmentHandler::new(cp.clone(), params),
-        ) as Box<dyn cognitive::services::reforge::CommunityIntelligenceHandler>
-    })
+    None
 }
 
 /// Build a [`MicroReforgeHandler`] for KCA Track 4.

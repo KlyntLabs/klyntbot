@@ -1,6 +1,6 @@
 //! MirrorEngine — lifecycle manager for the Mirror self-reflection layer.
 //!
-//! Constructs six `MirrorSignalSource` impls and wraps each in a
+//! Constructs `MirrorSignalSource` impls and wraps each in a
 //! `MirrorSubscriberRunner`. Returns the runners (as `SignalConsumer`s) for
 //! hand-off to the global `SignalRouter`, plus flush-loop handles the caller
 //! must keep alive.
@@ -14,9 +14,9 @@ use tokio_util::sync::CancellationToken;
 
 use crate::mirror::{
     sources::{
-        ApprovalHistorySource, BackgroundJobSignalSource, ConfigArchiverSource, CostCeilingSource,
+        ApprovalHistorySource, ConfigArchiverSource, CostCeilingSource,
         FinanceSpendingDriftSource, MetaRuleSignalSource, RoutingSignalSource,
-        TaskFocusPatternSource, TodoSignalSource, TrialPreviewSource,
+        TaskFocusPatternSource, TrialPreviewSource,
     },
     AutotunerBridge, MirrorFacade, MirrorRepo, NarrativeHandler,
 };
@@ -39,9 +39,7 @@ impl MirrorEngine {
         episodic_repo: Option<EpisodicMemoryRepo>,
         rule_repo: Option<ProceduralRuleRepo>,
         trial_evaluator: Option<Arc<dyn crate::mirror::types::EarlyTrialEvaluator>>,
-        approval_history_repo: Option<Arc<storage::repos::CodingApprovalHistoryRepo>>,
         approval_pattern_repo: Option<Arc<storage::repos::ApprovalPatternHistoryRepo>>,
-        bash_repo: Option<Arc<storage::repos::BashJobRepo>>,
     ) -> StartedMirror {
         let shutdown = CancellationToken::new();
         let active_timers: Arc<DashMap<String, JoinHandle<()>>> = Arc::new(DashMap::new());
@@ -60,7 +58,6 @@ impl MirrorEngine {
         ));
         let task_focus = Arc::new(TaskFocusPatternSource::new(repo.clone()));
         let finance_drift = Arc::new(FinanceSpendingDriftSource::new(repo.clone()));
-        let todo = Arc::new(TodoSignalSource::new(repo.clone()));
 
         // Wrap each in a runner; spawn flush loops for sources that declare an interval.
         let mut consumers: Vec<Arc<dyn SignalConsumer>> = Vec::new();
@@ -81,22 +78,16 @@ impl MirrorEngine {
         register!(trial);
         register!(task_focus);
         register!(finance_drift);
-        register!(todo);
 
         let mut ah_source: Option<Arc<ApprovalHistorySource>> = None;
-        if let (Some(ah_repo), Some(ap_repo)) = (approval_history_repo, approval_pattern_repo) {
-            let approval_history = Arc::new(ApprovalHistorySource::new(ap_repo, ah_repo));
+        if let Some(ap_repo) = approval_pattern_repo {
+            let approval_history = Arc::new(ApprovalHistorySource::new(ap_repo));
             ah_source = Some(approval_history.clone());
             register!(approval_history);
         }
 
-        let cost_ceiling = Arc::new(CostCeilingSource::new(repo.clone()));
+        let cost_ceiling = Arc::new(CostCeilingSource::new());
         register!(cost_ceiling);
-
-        if let (Some(ep), Some(br)) = (&episodic_repo, &bash_repo) {
-            let bg_job_source = Arc::new(BackgroundJobSignalSource::new(ep.clone(), br.clone()));
-            register!(bg_job_source);
-        }
 
         // Build the facade (unchanged API; drop the now-unused domain_event_bus).
         let mut facade = MirrorFacade::new(repo);
@@ -131,13 +122,13 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn start_produces_eight_consumers() {
+    async fn start_produces_seven_consumers() {
         let repo = crate::mirror::test_mirror_repo().await;
-        let built = MirrorEngine::start(repo, None, None, None, None, None, None, None, None);
+        let built = MirrorEngine::start(repo, None, None, None, None, None, None);
         assert_eq!(
             built.consumers.len(),
-            8,
-            "routing + meta_rule + config_archiver + trial + task_focus + finance_drift + cost_ceiling + todo"
+            7,
+            "routing + meta_rule + config_archiver + trial + task_focus + finance_drift + cost_ceiling"
         );
         for h in built.flush_handles.iter() {
             assert!(!h.is_finished());

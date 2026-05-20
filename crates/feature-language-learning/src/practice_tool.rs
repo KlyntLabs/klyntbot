@@ -22,7 +22,7 @@ impl Tool for LanguagePracticeTool {
     }
 
     fn allowed_channels(&self) -> common::ChannelMask {
-        common::ChannelMask::NON_CODING
+        common::ChannelMask::ALL
     }
 
     fn description(&self) -> &str {

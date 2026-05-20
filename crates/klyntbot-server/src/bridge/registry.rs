@@ -121,7 +121,6 @@ impl ToolRegistryBridge {
             agent_profile: "root".into(),
             plan_mode_active: false,
             plan_session_id: None,
-            previous_anti_passivity_violation: false,
             same_turn_user_msg_emitted: false,
             workspace_cwd: None,
             agent_chain: vec!["root".into()],

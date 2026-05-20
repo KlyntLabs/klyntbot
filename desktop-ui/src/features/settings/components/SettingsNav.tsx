@@ -1,5 +1,4 @@
 import Bot from "lucide-react/dist/esm/icons/bot";
-import Code from "lucide-react/dist/esm/icons/code";
 import ExternalLink from "lucide-react/dist/esm/icons/external-link";
 import FileText from "lucide-react/dist/esm/icons/file-text";
 import FlaskConical from "lucide-react/dist/esm/icons/flask-conical";
@@ -139,15 +138,6 @@ export function SettingsNav({
           onClick={() => onSelectSection("features")}
         >
           Features
-        </PanelNavItem>
-        <PanelNavItem
-          className="settings-nav"
-          icon={<Code aria-hidden />}
-          active={activeSection === "coding"}
-          showDisclosure={showDisclosure}
-          onClick={() => onSelectSection("coding")}
-        >
-          Coding
         </PanelNavItem>
         <PanelNavItem
           className="settings-nav"

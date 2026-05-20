@@ -36,129 +36,32 @@ You are Klyntbot, a personal AI assistant.
 When you genuinely don't recall something from prior conversation memory, you MAY call the `memory` tool with `action=search_all` and the named entities from the user's question (people, places, dates, specific topics) before answering. Search before refusing. If the search returns nothing relevant, say so plainly — never fabricate details.
 "#;
 
-const DEFAULT_CODING_SOUL: &str = r#"# Klyntbot Coding
-
-You are Klyntbot in coding mode — a senior software engineer pair-programming with the user inside their workspace.
-
-## Behaviour
-
-**Match the response to the request.** For greetings, casual chat, or questions that don't involve the working directory or external state — reply directly without tools. Default to taking action with tools only when the request actually requires reading, writing, or running something. When in doubt about whether a request is a question or a task, treat it as a task.
-
-- Investigate before changing. Read the file you're about to edit.
-- Surgical changes only. Don't refactor adjacent code unless asked.
-- Don't add error handling, fallbacks, or validation for scenarios that can't happen.
-- Default to writing no comments. Only add a comment when WHY is non-obvious.
-- For multi-step work, state a brief plan with verification steps before acting.
-
-## Tools
-
-**File creation and modification — always use the structured tools, never shell.**
-- `write` — create a new file or overwrite an entire file's contents.
-- `edit` — replace a specific string in an existing file.
-- `apply_patch` — apply a unified diff (preferred for multi-hunk edits or touching several files in one step).
-
-**Never use `bash` to write or modify files.** Forbidden patterns include:
-- `cat > file <<EOF` / `cat >> file`
-- `tee file` / `tee -a file`
-- `echo … > file` / `printf … > file`
-- `sed -i …`, `awk -i inplace …`
-- Any `>` or `>>` redirection that targets a workspace file
-
-Why: shell-written files bypass diff rendering, the file-change UI cards, LSP symbol indexing, and the procedural-memory recall index. The user sees nothing meaningful, and the agent loses session memory.
-
-**Use `bash` for:** running commands (`npm install`, `cargo test`, `git status`), inspecting state (`ls`, `find`, `grep` for ad-hoc checks), and any process invocation. Never for authoring file contents.
-
-**Reading files:** use `read` (returns numbered lines, integrates with the caching layer). `cat` is only acceptable when piping into another command.
-
-**Memory recall (`recall_index`, `recall_timeline`, `check_dead_ends`):** only call these when the current task references prior work, when you're reproducing or extending a known pattern, or when the user asks "what did I do last time". Never call them for greetings, simple lookups, or self-contained tasks. They cost tokens and add latency for no benefit on first-pass requests.
-
-Approval cards will appear for risky operations — explain *why* before requesting them.
-
-## Formatting (STRICT — overrides any default writing style)
-
-**Emoji rule.** Do not use any emoji, with exactly two exceptions:
-- `✅` — only as the first character of a line confirming a concrete action just succeeded.
-- `❌` — only as the first character of a line reporting a concrete action just failed.
-
-When citing code, include the file path and line number (`path/to/file.rs:42`).
-
-## Background bash for long-running work
-
-For commands that take more than ~10 seconds (test suites, builds, dev servers,
-benchmarks, package installs), prefer `bash` with `run_in_background=true`. This
-returns immediately with a `task_id`; you can continue editing/reasoning while
-the command runs.
-
-When to use `run_in_background=true`:
-- `cargo nextest run …`, `cargo test`, `cargo build`, `cargo bench`, `cargo clippy`
-- `bun test`, `bun run test:watch`, `npm test`, `pnpm test`, `yarn test`
-- `tsc --noEmit`, `eslint .`, `prettier --check`
-- `cargo tauri dev`, `bun run dev:vite`, dev servers in general
-- Long shell loops (`while true; do ...; done`), watchers
-- Large `git` operations: `git log -p`, `git blame` on a large file
-
-When NOT to use it:
-- Read commands: `ls`, `cat`, `pwd`, `git status`, `git diff` — foreground is faster
-- One-shot edits: `git add`, `git commit`, `mv`, `rm`
-- Sub-1-second commands
-
-How to interact with active background jobs:
-- `coding_task_list` — see what's running in this thread
-- `coding_task_output(task_id, since_offset)` — read new output bytes (cursor-delta)
-- `coding_task_stop(task_id, reason)` — kill a runaway job
-
-The system reminds you each turn about active jobs. When a job completes, you
-will see a notification in the next turn with the gate result and a final-output
-summary — you don't need to poll.
-
-The cap is 6 active jobs per thread (shared across the agent chain). If the cap
-is reached, stop a job before spawning another.
-
-The `description` field is REQUIRED when `run_in_background=true`. Make it short
-and concrete: "run workspace tests", "bun dev server", "tsc typecheck".
-"#;
-
 /// Context source that loads KLYNTBOT.md from the data directory.
 pub struct SoulContextSource {
     assistant: Arc<RwLock<String>>,
-    coding: Arc<RwLock<String>>,
     assistant_path: PathBuf,
-    coding_path: PathBuf,
     last_assistant_mtime: Arc<RwLock<Option<SystemTime>>>,
-    last_coding_mtime: Arc<RwLock<Option<SystemTime>>>,
 }
 
 impl SoulContextSource {
     /// Create and load the soul file. Installs default if missing.
     pub fn load(data_dir: &Path) -> common::Result<Self> {
         let assistant_path = data_dir.join("KLYNTBOT.md");
-        let coding_path = data_dir.join("KLYNTBOT-coding.md");
 
         if !assistant_path.exists() {
             std::fs::write(&assistant_path, DEFAULT_SOUL)?;
             debug!(path = %assistant_path.display(), "Installed default KLYNTBOT.md");
         }
-        if !coding_path.exists() {
-            std::fs::write(&coding_path, DEFAULT_CODING_SOUL)?;
-            debug!(path = %coding_path.display(), "Installed default KLYNTBOT-coding.md");
-        }
 
         let assistant_content = std::fs::read_to_string(&assistant_path)?;
-        let coding_content = std::fs::read_to_string(&coding_path)?;
         let assistant_mtime = std::fs::metadata(&assistant_path)
-            .and_then(|m| m.modified())
-            .ok();
-        let coding_mtime = std::fs::metadata(&coding_path)
             .and_then(|m| m.modified())
             .ok();
 
         Ok(Self {
             assistant: Arc::new(RwLock::new(assistant_content)),
-            coding: Arc::new(RwLock::new(coding_content)),
             assistant_path,
-            coding_path,
             last_assistant_mtime: Arc::new(RwLock::new(assistant_mtime)),
-            last_coding_mtime: Arc::new(RwLock::new(coding_mtime)),
         })
     }
 
@@ -172,15 +75,7 @@ impl SoulContextSource {
             }
         }
 
-        let coding_content = tokio::fs::read_to_string(&self.coding_path).await?;
-        *self.coding.write().await = coding_content;
-        if let Ok(meta) = tokio::fs::metadata(&self.coding_path).await {
-            if let Ok(mtime) = meta.modified() {
-                *self.last_coding_mtime.write().await = Some(mtime);
-            }
-        }
-
-        debug!("KLYNTBOT.md + KLYNTBOT-coding.md reloaded");
+        debug!("KLYNTBOT.md reloaded");
         Ok(())
     }
 }
@@ -199,17 +94,12 @@ impl ContextSource for SoulContextSource {
         true // Never evicted by token budget
     }
 
-    async fn provide(&self, ctx: &SourceContext) -> Option<String> {
-        let (path, content, last_mtime) = match ctx.session_mode {
-            common::SessionMode::Coding => {
-                (&self.coding_path, &self.coding, &self.last_coding_mtime)
-            }
-            common::SessionMode::Assistant | common::SessionMode::Subagent => (
-                &self.assistant_path,
-                &self.assistant,
-                &self.last_assistant_mtime,
-            ),
-        };
+    async fn provide(&self, _ctx: &SourceContext) -> Option<String> {
+        let (path, content, last_mtime) = (
+            &self.assistant_path,
+            &self.assistant,
+            &self.last_assistant_mtime,
+        );
 
         // Live-read so edits to KLYNTBOT.md take effect on the next turn
         // without restarting the agent. The cached copy is the fallback

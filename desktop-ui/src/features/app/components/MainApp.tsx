@@ -2,7 +2,6 @@ import { useAppBootstrapOrchestration } from "@app/bootstrap/useAppBootstrapOrch
 import { MainAppShell } from "@app/components/MainAppShell";
 import { AppView } from "@app/constants/appViews";
 import { useAccountSwitching } from "@app/hooks/useAccountSwitching";
-import { useAppMode } from "@app/hooks/useAppMode";
 import { useArchiveShortcut } from "@app/hooks/useArchiveShortcut";
 import { useHomeAccount } from "@app/hooks/useHomeAccount";
 import { useInterruptShortcut } from "@app/hooks/useInterruptShortcut";
@@ -25,7 +24,6 @@ import { useNewAgentDraft } from "@app/hooks/useNewAgentDraft";
 import { useOpenAppIcons } from "@app/hooks/useOpenAppIcons";
 import { usePlanReadyActions } from "@app/hooks/usePlanReadyActions";
 import { useRemoteThreadLiveConnection } from "@app/hooks/useRemoteThreadLiveConnection";
-import { useResetAppViewOnModeChange } from "@app/hooks/useResetAppViewOnModeChange";
 import { useResponseRequiredNotificationsController } from "@app/hooks/useResponseRequiredNotificationsController";
 import { useSystemNotificationThreadLinks } from "@app/hooks/useSystemNotificationThreadLinks";
 import { useTauriEvent } from "@app/hooks/useTauriEvent";
@@ -63,9 +61,6 @@ import { useApps } from "@/features/apps/hooks/useApps";
 import { ChatErrorBanner } from "@/features/chat/components/ChatErrorBanner";
 import { useChatThreads } from "@/features/chat/hooks/useChatThreads";
 import { useKlyntbotSurfaceProps } from "@/features/chat/hooks/useKlyntbotSurfaceProps";
-import { CodingThreadView } from "@/features/coding/components/CodingThreadView";
-import { useCodingThreadStatus } from "@/features/coding/hooks/useCodingThreadStatus";
-import { initThreadEventBuffer } from "@/features/coding/state/ThreadEventBuffer";
 import { useCollaborationModeSelection } from "@/features/collaboration/hooks/useCollaborationModeSelection";
 import { useCollaborationModes } from "@/features/collaboration/hooks/useCollaborationModes";
 import { useComposerEditorState } from "@/features/composer/hooks/useComposerEditorState";
@@ -411,27 +406,14 @@ export default function MainApp() {
     setSelectedServiceTier(preferredServiceTier);
   }, [preferredServiceTier]);
 
-  useEffect(() => {
-    return initThreadEventBuffer();
-  }, []);
-
   const [appView, setAppView] = useState<AppView>(AppView.Home);
   const [selectedSessionKey, setSelectedSessionKey] = useState<string | null>(null);
-  useResetAppViewOnModeChange(setAppView);
   const { threads: chatThreads, refetch: refetchChatThreads } = useChatThreads();
 
-  const { mode } = useAppMode();
-
   const onNewChat = useCallback(() => {
-    if (mode === "code") {
-      setSelectedSessionKey(null);
-      setAppView(AppView.Home);
-      setActiveWorkspaceId(null);
-      return;
-    }
     setSelectedSessionKey(`chat:${crypto.randomUUID()}`);
     setAppView(AppView.Chat);
-  }, [mode, setActiveWorkspaceId]);
+  }, []);
 
   const onSelectPlugins = useCallback(() => {
     setAppView("plugins");
@@ -674,46 +656,11 @@ export default function MainApp() {
     threadSortKey: threadListSortKey,
     onThreadCodexMetadataDetected: handleThreadCodexMetadataDetected,
   });
-  // Bridge: legacy `app-server-event` only feeds assistant-mode thread status.
-  // Coding threads emit `agent:thread_event` instead, so we merge that stream
-  // in here. The `useCodingThreadStatus` running set is the *authoritative*
-  // signal for coding threads — when a turn completes, the SSE `turn_completed`
-  // removes the id from the running set in real time. We therefore override
-  // any stale `isProcessing: true` left in the assistant store by the
-  // send-time `markProcessing(true)` call. Previously this loop only iterated
-  // over currently-running threads, so completed coding turns never got their
-  // stale flag cleared and the composer stayed in "queue" mode until a
-  // tab-switch refresh dispatched a new status.
-  const codingThreadStatus = useCodingThreadStatus();
-  const threadStatusById = useMemo(() => {
-    const merged: typeof assistantThreadStatusById = { ...assistantThreadStatusById };
-    // 1. Override `isProcessing` for any coding thread already in the merged
-    //    map — running set is canonical, even when it says "not running".
-    for (const threadId of Object.keys(merged).filter((id) => id.startsWith("coding:"))) {
-      merged[threadId] = {
-        ...merged[threadId],
-        isProcessing: Boolean(codingThreadStatus[threadId]?.isProcessing),
-      };
-    }
-    // 2. Backfill any running coding thread the assistant store hasn't seen
-    //    yet (e.g. a turn started before the thread row was created).
-    for (const [threadId, status] of Object.entries(codingThreadStatus)) {
-      if (!merged[threadId]) {
-        merged[threadId] = {
-          isProcessing: status.isProcessing,
-          hasUnread: false,
-          isReviewing: false,
-          processingStartedAt: null,
-          lastDurationMs: null,
-        };
-      }
-    }
-    return merged;
-  }, [assistantThreadStatusById, codingThreadStatus]);
+  const threadStatusById = assistantThreadStatusById;
   // Assistant-mode watchdog: if a turn is processing for >90s with no event,
   // fire and reset state so the user can retry.
   useThreadWatchdog({
-    threadId: mode === "assistant" ? activeThreadId : null,
+    threadId: activeThreadId,
     isProcessing: Boolean(activeThreadId && threadStatusById[activeThreadId]?.isProcessing),
     onFire: useCallback(
       (threadId: string) => {
@@ -1348,8 +1295,6 @@ export default function MainApp() {
     clearDraftForThread,
     workspaceHomeState,
     agentMdState,
-    pendingPromptForActiveThread,
-    consumeThreadPrompt,
   } = composerWorkspaceState;
   const {
     runs: workspaceRuns,
@@ -1997,7 +1942,6 @@ export default function MainApp() {
     updateToastNode,
     errorToastsNode,
     homeNode,
-    codeLandingNode,
     desktopTopbarLeftNode,
     gitDiffPanelNode,
     gitDiffViewerNode,
@@ -2035,24 +1979,8 @@ export default function MainApp() {
   // Coding mode reuses the polished Messages UI by piping the new
   // `agent:thread_event` stream through CodingThreadView's adapter. Same
   // bubbles, markdown, code blocks, copy buttons as assistant mode — only
-  // the event source differs.
-  const codingMessagesNode =
-    mode === "code" && activeThreadId && activeThreadId.startsWith("coding:") ? (
-      <CodingThreadView
-        threadId={activeThreadId}
-        workspaceId={activeWorkspace?.id ?? null}
-        workspacePath={activeWorkspace?.path ?? null}
-        openTargets={appSettings.openAppTargets}
-        selectedOpenAppId={appSettings.selectedOpenAppId}
-        draftPrompt={pendingPromptForActiveThread}
-        onDraftConsumed={activeThreadId ? () => consumeThreadPrompt(activeThreadId) : undefined}
-      />
-    ) : null;
-  const mainMessagesNode = codingMessagesNode
-    ? codingMessagesNode
-    : showWorkspaceHome && appView !== "chat"
-      ? workspaceHomeNode
-      : chatMessagesNode;
+  const mainMessagesNode =
+    showWorkspaceHome && appView !== "chat" ? workspaceHomeNode : chatMessagesNode;
   const compactThreadConnectionState: "live" | "polling" | "disconnected" =
     !activeWorkspace?.connected ? "disconnected" : remoteThreadConnectionState;
   const mainAppShellProps = useMainAppShellProps({
@@ -2102,7 +2030,6 @@ export default function MainApp() {
       updateToastNode,
       errorToastsNode,
       homeNode,
-      codeLandingNode,
       pluginsNode: appView === "plugins" ? <PluginsView /> : null,
       dashboardNode: appView === "calendar" ? <Dashboard /> : null,
       gitDiffPanelNode,

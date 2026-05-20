@@ -2,8 +2,6 @@ import { create } from "zustand";
 import { devtools } from "zustand/middleware";
 import type { StreamSnapshot } from "@/features/chat/types";
 import { DEFAULT_STREAM_SNAPSHOT } from "@/features/chat/types";
-import type { CodingThreadState, ThreadEvent } from "@/features/coding/state/codingEventReducer";
-import { applyThreadEvent, initialCodingState } from "@/features/coding/state/codingEventReducer";
 import type { ConversationItem } from "@/types";
 import type { ThreadAction, ThreadState } from "../hooks/useThreadsReducer";
 import { initialState as threadInitialState, threadReducer } from "../hooks/useThreadsReducer";
@@ -139,74 +137,15 @@ const createStreamSlice = (set: any, get: () => ChatStore): StreamSlice => ({
   },
 });
 
-// ── Coding Slice ──────────────────────────────────────────────────────
-
-interface CodingSlice {
-  codingStateByThread: Record<string, CodingThreadState>;
-  codingRunningIds: Set<string>;
-  codingRecentlyCompleted: Map<string, number>;
-
-  applyCodingThreadEvent: (threadId: string, event: ThreadEvent) => void;
-  setCodingRunningIds: (ids: Set<string>) => void;
-  setCodingRecentlyCompleted: (map: Map<string, number>) => void;
-  resetCodingThreadState: (threadId: string) => void;
-}
-
-const codingCoalescers = new CoalescerRegistry<ThreadEvent>();
-
-const createCodingSlice = (set: any): CodingSlice => ({
-  codingStateByThread: {},
-  codingRunningIds: new Set<string>(),
-  codingRecentlyCompleted: new Map<string, number>(),
-
-  applyCodingThreadEvent: (threadId: string, event: ThreadEvent) => {
-    const coalescer = codingCoalescers.get(threadId, {
-      flush: (events) => {
-        set((state: ChatStore) => {
-          let prev = state.codingStateByThread[threadId] ?? initialCodingState;
-          let changed = false;
-          for (const evt of events) {
-            const next = applyThreadEvent(prev, evt);
-            if (next !== prev) {
-              prev = next;
-              changed = true;
-            }
-          }
-          if (!changed) return {};
-          return {
-            codingStateByThread: { ...state.codingStateByThread, [threadId]: prev },
-          };
-        });
-      },
-      maxWaitMs: 50,
-    });
-    coalescer.push(event);
-  },
-
-  setCodingRunningIds: (ids: Set<string>) => set(() => ({ codingRunningIds: new Set(ids) })),
-
-  setCodingRecentlyCompleted: (map: Map<string, number>) =>
-    set(() => ({ codingRecentlyCompleted: new Map(map) })),
-
-  resetCodingThreadState: (threadId: string) => {
-    codingCoalescers.dispose(threadId);
-    set((state: ChatStore) => {
-      const { [threadId]: _, ...rest } = state.codingStateByThread;
-      return { codingStateByThread: rest };
-    });
-  },
-});
-
 // ── Store ─────────────────────────────────────────────────────────────
 
-export type ChatStore = ThreadsSlice & StreamSlice & CodingSlice;
+export type ChatStore = ThreadsSlice & StreamSlice;
 
 export const useChatStore = create<ChatStore>()(
   devtools(
     (set, get) => ({
       ...createThreadsSlice(set),
       ...createStreamSlice(set, get),
-      ...createCodingSlice(set),
     }),
     {
       name: "ChatStore",

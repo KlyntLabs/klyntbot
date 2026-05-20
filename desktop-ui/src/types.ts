@@ -172,8 +172,8 @@ export type ConversationItem =
       // outcome is one of: allowed | denied | deferred | skipped — matching
       // `desktop_shared::coding::approval::LayerOutcome`.
       layerDecisions?: LayerDecisions;
-      preview?: import("@/features/coding/components/preview/types").ApprovalPreview | null;
-      suggestedGrant?: import("@/features/coding/components/preview/types").SuggestedGrant | null;
+      preview?: unknown;
+      suggestedGrant?: unknown;
       status:
         | "pending"
         | "approved-once"

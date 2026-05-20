@@ -1,9 +1,0 @@
-   Compiling klyntbot v0.1.0 (/Users/jayden/Projects/Klynt/bot)
-error[E0277]: the trait bound `T: Foo` is not satisfied
-  --> src/lib.rs:42:7
-   |
-42 | impl<T> Bar for T {
-   |       ^^^^ the trait `Foo` is not implemented for `T`
-
-For more information about this error, try `rustc --explain E0277`.
-error: could not compile `klyntbot` (lib) due to 1 previous error

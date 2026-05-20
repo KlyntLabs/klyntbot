@@ -43,7 +43,7 @@ macro_rules! recall_stub {
                 true
             }
             fn allowed_channels(&self) -> common::ChannelMask {
-                common::ChannelMask::CODING_ONLY
+                common::ChannelMask::ALL
             }
         }
     };

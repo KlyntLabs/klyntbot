@@ -1,5 +1,4 @@
 import { useEffect } from "react";
-import { CodingMemoryPlugin } from "@/features/plugins/coding-memory/CodingMemoryPlugin";
 
 export function PluginsView() {
   useEffect(() => {
@@ -8,12 +7,8 @@ export function PluginsView() {
 
   return (
     <section className="plugins-view">
-      <div
-        className="plugins-view__pane"
-        data-testid="plugins-active-pane"
-        data-plugin="coding-memory"
-      >
-        <CodingMemoryPlugin />
+      <div className="plugins-view__pane" data-testid="plugins-active-pane">
+        <p className="plugins-view__empty">No plugins installed.</p>
       </div>
     </section>
   );

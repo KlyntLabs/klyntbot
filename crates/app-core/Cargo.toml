@@ -16,17 +16,12 @@ agent = { workspace = true }
 autotuner = { workspace = true }
 bus = { workspace = true }
 channels = { workspace = true }
-coding-memory = { workspace = true }
-coding-ingest = { path = "../coding-ingest" }
-coding-agents-md = { path = "../coding-agents-md" }
 klynt-git-utils = { path = "../klynt-git-utils" }
 cognitive = { workspace = true }
 common = { workspace = true }
 config = { workspace = true }
 context_engine = { workspace = true }
 feature-coaching = { workspace = true }
-feature-coding-bash = { path = "../feature-coding-bash" }
-feature-coding-todo = { workspace = true }
 feature-finance = { workspace = true }
 feature-focus = { path = "../feature-focus" }
 feature-insights = { workspace = true }

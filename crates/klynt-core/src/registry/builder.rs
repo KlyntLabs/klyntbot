@@ -29,7 +29,7 @@ use crate::tools::{
 };
 use bus::DomainEventBus;
 use klynt_execpolicy::Policy;
-use storage::{repos::CodingApprovalHistoryRepo, Repos};
+use storage::Repos;
 
 /// Shared dependencies for constructing the 13 klynt-core primitive tools.
 #[derive(Clone)]
@@ -43,7 +43,6 @@ pub struct ToolKitBuilder {
     pub hook_engine: Option<Arc<klynt_hooks::HookEngine>>,
     pub snapshot_repo: Option<Arc<crate::snapshots::SnapshotRepo>>,
     pub session_key: String,
-    pub history_repo: Option<Arc<CodingApprovalHistoryRepo>>,
     pub mirror_learning_enabled: bool,
     pub mirror_min_approvals: u32,
     pub mirror_cooldown_seconds: i64,
@@ -70,7 +69,6 @@ impl ToolKitBuilder {
             self.bus.clone(),
             self.non_ui_policy,
         );
-        web.history_repo = self.history_repo.clone();
         web.mirror_learning_enabled = self.mirror_learning_enabled;
         web.mirror_min_approvals = self.mirror_min_approvals;
         web.mirror_cooldown_seconds = self.mirror_cooldown_seconds;
@@ -78,7 +76,7 @@ impl ToolKitBuilder {
         reg.register(web);
     }
 
-    /// Five mutating tools (`ChannelMask::CODING_ONLY`).
+    /// Five mutating tools (`ChannelMask::ALL`).
     pub fn register_mutating(&self, reg: &mut ToolRegistry) {
         let mut bash = BashTool::new(
             self.cwd.clone(),
@@ -87,7 +85,6 @@ impl ToolKitBuilder {
             self.bus.clone(),
             self.non_ui_policy,
         );
-        bash.history_repo = self.history_repo.clone();
         bash.mirror_learning_enabled = self.mirror_learning_enabled;
         bash.mirror_min_approvals = self.mirror_min_approvals;
         bash.mirror_cooldown_seconds = self.mirror_cooldown_seconds;
@@ -101,7 +98,6 @@ impl ToolKitBuilder {
             self.non_ui_policy,
         );
         write.snapshot_repo = self.snapshot_repo.clone();
-        write.history_repo = self.history_repo.clone();
         write.mirror_learning_enabled = self.mirror_learning_enabled;
         write.mirror_min_approvals = self.mirror_min_approvals;
         write.mirror_cooldown_seconds = self.mirror_cooldown_seconds;
@@ -115,7 +111,6 @@ impl ToolKitBuilder {
             self.non_ui_policy,
         );
         edit.snapshot_repo = self.snapshot_repo.clone();
-        edit.history_repo = self.history_repo.clone();
         edit.mirror_learning_enabled = self.mirror_learning_enabled;
         edit.mirror_min_approvals = self.mirror_min_approvals;
         edit.mirror_cooldown_seconds = self.mirror_cooldown_seconds;
@@ -129,7 +124,6 @@ impl ToolKitBuilder {
             self.non_ui_policy,
         );
         patch.snapshot_repo = self.snapshot_repo.clone();
-        patch.history_repo = self.history_repo.clone();
         patch.mirror_learning_enabled = self.mirror_learning_enabled;
         patch.mirror_min_approvals = self.mirror_min_approvals;
         patch.mirror_cooldown_seconds = self.mirror_cooldown_seconds;
@@ -143,7 +137,6 @@ impl ToolKitBuilder {
             self.non_ui_policy,
         );
         notebook.snapshot_repo = self.snapshot_repo.clone();
-        notebook.history_repo = self.history_repo.clone();
         notebook.mirror_learning_enabled = self.mirror_learning_enabled;
         notebook.mirror_min_approvals = self.mirror_min_approvals;
         notebook.mirror_cooldown_seconds = self.mirror_cooldown_seconds;
@@ -151,7 +144,7 @@ impl ToolKitBuilder {
         reg.register(notebook);
     }
 
-    /// Two plan-mode tools (`ChannelMask::CODING_ONLY`).
+    /// Two plan-mode tools (`ChannelMask::ALL`).
     pub fn register_plan_mode(&self, reg: &mut ToolRegistry) {
         reg.register(EnterPlanModeTool::new(self.repos.clone(), self.bus.clone()));
         reg.register(ExitPlanModeTool::new(self.repos.clone(), self.bus.clone()));

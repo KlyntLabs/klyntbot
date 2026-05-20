@@ -85,7 +85,7 @@ mod tests {
             class: ApprovalClass::Destructive,
             scope: crate::ApprovalScope::ToolAction,
             ctx: crate::ApprovalContext {
-                mode: common::SessionMode::Coding,
+                mode: common::SessionMode::Assistant,
                 channel: crate::ChannelKind::Telegram,
                 session_id: "s1".into(),
                 user_id: None,

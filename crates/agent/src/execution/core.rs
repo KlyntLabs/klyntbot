@@ -611,9 +611,7 @@ impl ExecutionCore {
         cache_breakpoints: &[providers::CacheBreakpoint],
     ) -> Result<(CycleOutcome, Usage)> {
         // Pre-compute tool names once for fabrication detection.
-        // Only meaningful in assistant mode; coding mode skips the check.
         let tool_names: Vec<&str> = tools.iter().filter_map(tool_def_name).collect();
-        let in_coding = routing_ctx.channel.as_str() == common::tool_channel::CODING_CHANNEL;
 
         // When an event channel is available, stream tokens so the UI updates
         // in real-time. Non-streaming providers already have a default
@@ -1044,7 +1042,7 @@ impl ExecutionCore {
         tracing::debug!("run_cycle: no tool calls, checking content");
         if let Some(content) = response.content {
             if !content.trim().is_empty() {
-                if Self::check_fabrication(&content, &tool_names, in_coding) {
+                if Self::check_fabrication(&content, &tool_names) {
                     tracing::debug!("run_cycle: returning FabricatedResponse");
                     return Ok((CycleOutcome::FabricatedResponse { content }, usage));
                 }
@@ -1062,9 +1060,8 @@ impl ExecutionCore {
     }
 
     /// Returns true if the content looks like a fabricated tool response.
-    /// Skipped in coding mode where real tool execution is used.
-    fn check_fabrication(content: &str, tool_names: &[&str], in_coding: bool) -> bool {
-        if in_coding || tool_names.is_empty() {
+    fn check_fabrication(content: &str, tool_names: &[&str]) -> bool {
+        if tool_names.is_empty() {
             return false;
         }
         is_fabricated_tool_response(content, tool_names)

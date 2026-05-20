@@ -1,9 +1,0 @@
- ❯ src/utils/parse.test.ts (3 tests | 2 failed) 12ms
-   ✓ parse > handles empty
-   ✗ parse > handles arrays
-     → expected [] to equal [1, 2, 3]
-   ✗ parse > handles nested
-     → expected null to equal {}
-
- Test Files  1 failed (1)
-      Tests  2 failed | 1 passed (3)

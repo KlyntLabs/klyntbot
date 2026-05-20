@@ -380,7 +380,7 @@ mod tests {
 
     fn test_ctx(cwd: PathBuf) -> crate::request::ApprovalContext {
         crate::request::ApprovalContext {
-            mode: common::SessionMode::Coding,
+            mode: common::SessionMode::Assistant,
             channel: crate::request::ChannelKind::Desktop,
             session_id: "test".into(),
             user_id: None,

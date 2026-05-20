@@ -14,11 +14,6 @@ import {
   connectorMentionSlug,
   resolveBoundAppMentions,
 } from "@/features/apps/utils/appMentions";
-import { useChatStore } from "@/features/threads/store/useChatStore";
-import { CodingModePill } from "@/features/coding/components/CodingModePill";
-import { CostPill } from "@/features/coding/components/CostPill";
-import { useCodingMode } from "@/features/coding/hooks/useCodingMode";
-import { useSlashCommands } from "@/features/coding/hooks/useSlashCommands";
 import type {
   AppMention,
   AppOption,
@@ -315,10 +310,6 @@ export const Composer = memo(function Composer({
     [],
   );
 
-  const { mode } = useCodingMode(historyKey);
-  const { dispatch } = useSlashCommands();
-  const slashEnabled = mode === "coding";
-
   const {
     isAutocompleteOpen,
     autocompleteMatches,
@@ -342,9 +333,7 @@ export const Composer = memo(function Composer({
     textareaRef,
     setText: setComposerText,
     setSelectionStart,
-    slashEnabled,
-    onItemApplied: (item, context) => {
-      if (context.triggerChar !== "$" || item.group !== "Apps" || !item.mentionPath) {
+    onItemApplied: (item, context) => {      if (context.triggerChar !== "$" || item.group !== "Apps" || !item.mentionPath) {
         return;
       }
       const slug = context.insertedText.trim().toLowerCase();
@@ -413,28 +402,6 @@ export const Composer = memo(function Composer({
         return;
       }
 
-      // Slash command interception (coding mode only)
-      if (mode === "coding" && trimmed.startsWith("/")) {
-        const res = await dispatch(trimmed, historyKey ?? "");
-        if (res.kind === "render") {
-          useChatStore.getState().appendSystemItem(historyKey ?? "", res.itemKind, res.item);
-          resetHistoryNavigation();
-          setComposerText("");
-          setAppMentionBindings([]);
-          return;
-        }
-        if (res.kind === "error") {
-          useChatStore.getState().appendErrorItem(historyKey ?? "", res.message);
-          resetHistoryNavigation();
-          setComposerText("");
-          setAppMentionBindings([]);
-          return;
-        }
-        if (res.kind === "passthrough") {
-          trimmed = res.text.trim();
-        }
-      }
-
       if (trimmed) {
         recordHistory(trimmed);
       }
@@ -452,9 +419,6 @@ export const Composer = memo(function Composer({
       appMentionBindings,
       attachedImages,
       disabled,
-      dispatch,
-      historyKey,
-      mode,
       onSend,
       recordHistory,
       resetHistoryNavigation,
@@ -737,8 +701,6 @@ export const Composer = memo(function Composer({
           accessMode={accessMode}
           onSelectAccessMode={onSelectAccessMode}
         >
-          <CodingModePill threadId={historyKey} />
-          <CostPill threadId={historyKey} />
         </ComposerMetaBar>
       </div>
     </footer>

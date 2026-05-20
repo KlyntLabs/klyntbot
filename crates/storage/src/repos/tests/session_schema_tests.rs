@@ -1,35 +1,6 @@
 use crate::pool::StoragePool;
 
 #[tokio::test]
-async fn sessions_table_has_new_coding_columns() {
-    let pool = StoragePool::connect_in_memory().await.unwrap();
-    let inner = pool.inner().clone();
-
-    let cols: Vec<String> = sqlx::query_scalar("SELECT name FROM pragma_table_info('sessions')")
-        .fetch_all(&inner)
-        .await
-        .unwrap();
-
-    for required in &[
-        "cwd",
-        "repo_id",
-        "repo_branch",
-        "tool_profile",
-        "approval_mode",
-        "total_cost_usd",
-        "total_tokens",
-        "parent_session_id",
-    ] {
-        assert!(
-            cols.iter().any(|c| c == required),
-            "expected column `{}` on sessions table; columns are: {:?}",
-            required,
-            cols,
-        );
-    }
-}
-
-#[tokio::test]
 async fn sessions_has_phase4_columns() {
     let pool = StoragePool::connect_in_memory().await.unwrap();
     let inner = pool.inner().clone();

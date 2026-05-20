@@ -25,8 +25,6 @@ members = [
     "crates/feature-productivity",
     "crates/cognitive",
     "crates/feature-coaching",
-    "crates/feature-coding-bash",
-    "crates/feature-coding-todo",
     "crates/feature-insights",
     "crates/app-core",
     "crates/activity-log",
@@ -53,15 +51,11 @@ members = [
     "crates/feature-language-learning",
     "crates/ai-core",
     "crates/ai-core-macros",
-    "crates/coding-ingest",
-    "crates/coding-memory",
     "crates/mcp-bridge",
     "crates/desktop-macros",
     "crates/klynt-process-hardening",
     "crates/klynt-truncation",
     "crates/klynt-git-utils",
-    "crates/lsp-client",
-    "crates/coding-agents-md",
 ]
 
 [workspace.package]
@@ -159,8 +153,6 @@ feature-notes = { path = "crates/feature-notes" }
 feature-productivity = { path = "crates/feature-productivity" }
 cognitive = { path = "crates/cognitive" }
 feature-coaching = { path = "crates/feature-coaching" }
-feature-coding-bash = { path = "crates/feature-coding-bash" }
-feature-coding-todo = { path = "crates/feature-coding-todo" }
 feature-insights = { path = "crates/feature-insights" }
 desktop-shared = { path = "crates/desktop-shared" }
 desktop = { path = "crates/desktop" }
@@ -186,8 +178,6 @@ voice-engine = { path = "crates/voice-engine" }
 feature-language-learning = { path = "crates/feature-language-learning" }
 ai-core = { path = "crates/ai-core" }
 ai-core-macros = { path = "crates/ai-core-macros" }
-coding-ingest = { path = "crates/coding-ingest" }
-coding-memory = { path = "crates/coding-memory" }
 klynt-core = { path = "crates/klynt-core" }
 mcp = { path = "crates/mcp" }
 notifications = { path = "crates/notifications" }
@@ -329,8 +319,6 @@ feature-coaching.workspace = true
 tools-core.workspace = true
 dashmap.workspace = true
 assert_cmd.workspace = true
-coding-ingest = { path = "crates/coding-ingest" }
-coding-memory = { path = "crates/coding-memory" }
 serde.workspace = true
 klynt-core.workspace = true
 klynt-execpolicy.workspace = true

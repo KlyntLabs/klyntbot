@@ -92,14 +92,6 @@ export const qk = {
     all: () => ["system"] as const,
     mcpServers: () => ["system", "mcpServers"] as const,
   },
-  codingMemory: {
-    all: () => ["codingMemory"] as const,
-    facts: () => ["codingMemory", "facts"] as const,
-    episodes: () => ["codingMemory", "episodes"] as const,
-    recallIndex: () => ["codingMemory", "recallIndex"] as const,
-    memoryBrowser: () => ["codingMemory", "memoryBrowser"] as const,
-    status: () => ["codingMemory", "status"] as const,
-  },
   dashboard: {
     all: () => ["dashboard"] as const,
     timeline: (startDate: string, endDate: string, sources: readonly string[]) =>

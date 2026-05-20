@@ -101,36 +101,6 @@ pub trait CommunityIntelligenceHandler: Send + Sync {
 }
 
 // ---------------------------------------------------------------------------
-// CodingPhaseRunner — Phase 5 dependency inversion (L4 → L5 boundary)
-// ---------------------------------------------------------------------------
-
-/// Outcome bundle from one coding-phase run.
-#[derive(Debug, Clone, Default)]
-pub struct CodingPhaseRunnerOutcome {
-    /// Free-form action count (e.g. promotions applied, artifacts written).
-    pub applied: u32,
-    /// Optional narrative for telemetry.
-    pub narrative: Option<String>,
-}
-
-/// Bridge trait for the four coding-specific Reforge phases. Implemented in
-/// `app-core` over the concrete `coding_memory::reforge::CodingPhaseHandlers`
-/// bundle.
-#[async_trait]
-pub trait CodingPhaseRunner: Send + Sync {
-    /// Phase 2.5 — Coding Synthesis.
-    async fn run_synthesis(&self) -> common::Result<CodingPhaseRunnerOutcome>;
-    /// Phase 3.5 — Rule Artifact Generation.
-    async fn run_rule_artifacts(&self) -> common::Result<CodingPhaseRunnerOutcome>;
-    /// Phase 6.5 extension — cross-session fact dedup.
-    async fn run_cross_session_dedup(&self) -> common::Result<CodingPhaseRunnerOutcome>;
-    /// Phase 6 extension — selective-delete signal.
-    async fn run_selective_delete(&self) -> common::Result<CodingPhaseRunnerOutcome>;
-    /// Phase 6.5b — Reforge deep symbol validation (Phase 6).
-    async fn run_symbol_validation(&self) -> common::Result<CodingPhaseRunnerOutcome>;
-}
-
-// ---------------------------------------------------------------------------
 // CrossCliPhaseRunner — KCA Track 10
 // ---------------------------------------------------------------------------
 
@@ -154,25 +124,3 @@ pub trait SkillDiscoveryRunner: Send + Sync {
     async fn run_skill_discovery(&self, run_id: &str) -> common::Result<u32>;
 }
 
-/// Dispatch helper for the unit test in `tests/run_reforge_with_coding.rs`.
-pub async fn dispatch_coding_phases_for_test(
-    runner: &dyn CodingPhaseRunner,
-) -> common::Result<u32> {
-    let mut count = 0;
-    if runner.run_synthesis().await.is_ok() {
-        count += 1;
-    }
-    if runner.run_rule_artifacts().await.is_ok() {
-        count += 1;
-    }
-    if runner.run_cross_session_dedup().await.is_ok() {
-        count += 1;
-    }
-    if runner.run_selective_delete().await.is_ok() {
-        count += 1;
-    }
-    if runner.run_symbol_validation().await.is_ok() {
-        count += 1;
-    }
-    Ok(count)
-}

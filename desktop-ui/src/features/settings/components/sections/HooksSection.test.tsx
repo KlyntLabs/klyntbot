@@ -1,35 +1,13 @@
 // @vitest-environment jsdom
 
-import { act, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
 import { HooksSection } from "./HooksSection";
 
-vi.mock("@/api/client", () => ({
-  invoke: vi.fn(async (cmd: string) => {
-    if (cmd === "coding_hooks_list") {
-      return {
-        path: "/home/user/.klyntbot/hooks.toml",
-        exists: true,
-        content: '[[hook]]\nevent = "PreToolUse"\nmatcher = "Bash(*)"\ncommand = "scripts/log.sh"',
-      };
-    }
-    return {};
-  }),
-}));
-
 describe("HooksSection", () => {
-  it("renders loading state initially", () => {
+  it("renders static placeholder", () => {
     render(<HooksSection />);
-    expect(screen.getByText("Loading...")).toBeInTheDocument();
-  });
-
-  it("renders hooks.toml content after load", async () => {
-    await act(async () => {
-      render(<HooksSection />);
-    });
-    await waitFor(() => {
-      expect(screen.getByText(/hooks.toml/)).toBeInTheDocument();
-    });
-    expect(screen.getByText(/PreToolUse/)).toBeInTheDocument();
+    expect(screen.getByText(/No.*hooks.toml.*found/)).toBeInTheDocument();
+    expect(screen.getByText(/Hooks are user-managed/)).toBeInTheDocument();
   });
 });

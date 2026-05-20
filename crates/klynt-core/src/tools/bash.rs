@@ -51,7 +51,7 @@ pub struct BashArgs {
                    Approval and sandbox rules apply. Output is captured and \
                    truncated to 50KB.",
     params = "BashArgs",
-    allowed_channels = "coding_only",
+    allowed_channels = "all",
     custom_timeout_secs = "600",
     approval_class = "destructive",
     approval_scope = "command"
@@ -70,7 +70,6 @@ pub struct BashTool {
     privacy: Arc<PrivacyGuard>,
     bus: Arc<DomainEventBus>,
     non_ui_policy: common::tool_channel::NonUiPolicy,
-    pub history_repo: Option<std::sync::Arc<storage::repos::CodingApprovalHistoryRepo>>,
     pub mirror_learning_enabled: bool,
     pub mirror_min_approvals: u32,
     pub mirror_cooldown_seconds: i64,
@@ -91,7 +90,6 @@ impl BashTool {
             privacy,
             bus,
             non_ui_policy,
-            history_repo: None,
             mirror_learning_enabled: false,
             mirror_min_approvals: 5,
             mirror_cooldown_seconds: 86400,

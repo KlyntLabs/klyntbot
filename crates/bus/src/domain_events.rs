@@ -14,16 +14,6 @@ pub enum WakeType {
     FromIdle,
 }
 
-/// Sub-kind of a coding-memory write — distinguishes the two destination
-/// tables (`semantic_facts` vs `episodic_memories`) without forcing the
-/// listener to import storage types.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum CodingMemoryKind {
-    Fact,
-    Episode,
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "snake_case")]
 pub enum TodoStatus {
@@ -753,30 +743,6 @@ pub enum DomainEvent {
         budget_used: String,
         session_id: String,
     },
-    /// Coding session ended — fired after Distiller drains the final turn.
-    CodingSessionEnded {
-        /// Session id from `AgentEvent`.
-        session_id: String,
-        /// Repo id (if resolved).
-        repo_id: Option<String>,
-    },
-    /// Coding-specific Mirror alert (closed-enum extension).
-    CodingMirrorAlert {
-        /// `CodingMirrorAlertKind` as string.
-        kind: String,
-        /// `MirrorAlertSeverity` as string.
-        severity: String,
-        /// JSON-encoded payload.
-        payload: String,
-    },
-    /// A coding-memory write completed (fact upsert or episode insert).
-    /// Emitted from `coding_memory::Distiller::distill_turn` after each
-    /// successful row write so any UI panel observing recall data can
-    /// invalidate its cache.
-    CodingMemoryUpdated {
-        kind: CodingMemoryKind,
-        id: String,
-    },
     /// Launcher item was executed (opened, run, activated).
     LauncherItemExecuted {
         item_id: String,
@@ -901,9 +867,6 @@ impl DomainEvent {
             Self::MemoryRetrieved { .. } => "MemoryRetrieved",
             Self::AssistantMsgCompleted { .. } => "AssistantMsgCompleted",
             Self::RetrievalSkillApplied { .. } => "RetrievalSkillApplied",
-            Self::CodingSessionEnded { .. } => "CodingSessionEnded",
-            Self::CodingMirrorAlert { .. } => "CodingMirrorAlert",
-            Self::CodingMemoryUpdated { .. } => Self::KIND_CODING_MEMORY_UPDATED,
             Self::LauncherItemExecuted { .. } => Self::KIND_LAUNCHER_ITEM_EXECUTED,
             Self::DataVersionBumped { .. } => Self::KIND_DATA_VERSION_BUMPED,
             Self::Generic { .. } => "Generic",
@@ -1061,12 +1024,6 @@ impl DomainEvent {
     pub const KIND_MEMORY_RETRIEVED: &'static str = "MemoryRetrieved";
     pub const KIND_ASSISTANT_MSG_COMPLETED: &'static str = "AssistantMsgCompleted";
     pub const KIND_RETRIEVAL_SKILL_APPLIED: &'static str = "RetrievalSkillApplied";
-    /// `event_type` value for [`DomainEvent::CodingSessionEnded`].
-    pub const KIND_CODING_SESSION_ENDED: &'static str = "CodingSessionEnded";
-    /// `event_type` value for [`DomainEvent::CodingMirrorAlert`].
-    pub const KIND_CODING_MIRROR_ALERT: &'static str = "CodingMirrorAlert";
-    /// `event_type` value for [`DomainEvent::CodingMemoryUpdated`].
-    pub const KIND_CODING_MEMORY_UPDATED: &'static str = "CodingMemoryUpdated";
     /// `event_type` value for [`DomainEvent::LauncherItemExecuted`].
     pub const KIND_LAUNCHER_ITEM_EXECUTED: &'static str = "LauncherItemExecuted";
     /// `event_type` value for [`DomainEvent::DataVersionBumped`].
@@ -1186,10 +1143,7 @@ impl DomainEvent {
             | Self::FixAttemptFailed { .. }
             | Self::MemoryRetrieved { .. }
             | Self::AssistantMsgCompleted { .. }
-            | Self::RetrievalSkillApplied { .. }
-            | Self::CodingSessionEnded { .. }
-            | Self::CodingMirrorAlert { .. }
-            | Self::CodingMemoryUpdated { .. } => D::CodingMemory,
+            | Self::RetrievalSkillApplied { .. } => D::Agent,
 
             Self::LauncherItemExecuted { .. } => D::Launcher,
 
@@ -1197,8 +1151,8 @@ impl DomainEvent {
 
             Self::Generic { .. } => D::General,
 
-            Self::Todo(_) => D::CodingMemory,
-            Self::BashJob(_) => D::CodingMemory,
+            Self::Todo(_) => D::Agent,
+            Self::BashJob(_) => D::Agent,
         }
     }
 }
@@ -1549,7 +1503,7 @@ mod tests {
             started_at: jiff::Timestamp::now(),
         });
         assert_eq!(evt.variant_name(), "BashJob.Started");
-        assert_eq!(evt.domain(), crate::EventDomain::CodingMemory);
+        assert_eq!(evt.domain(), crate::EventDomain::Agent);
     }
 
     #[allow(dead_code)]
@@ -1569,65 +1523,6 @@ mod tests {
             }
             _ => panic!("Expected AutotunerDecision"),
         }
-    }
-}
-
-#[cfg(test)]
-mod phase4_event_tests {
-    use super::*;
-
-    #[test]
-    fn coding_memory_updated_serializes_with_kind_and_id() {
-        let evt = DomainEvent::CodingMemoryUpdated {
-            kind: CodingMemoryKind::Fact,
-            id: "fact-abc".into(),
-        };
-        let v = serde_json::to_value(&evt).unwrap();
-        // Externally-tagged: { "CodingMemoryUpdated": { "kind": "fact", "id": "fact-abc" } }
-        let inner = &v["CodingMemoryUpdated"];
-        assert_eq!(inner["kind"], serde_json::json!("fact"));
-        assert_eq!(inner["id"], serde_json::json!("fact-abc"));
-    }
-
-    #[test]
-    fn coding_memory_kind_serializes_snake_case() {
-        assert_eq!(
-            serde_json::to_value(CodingMemoryKind::Episode).unwrap(),
-            serde_json::json!("episode")
-        );
-    }
-
-    #[test]
-    fn data_version_bumped_serializes() {
-        let evt = DomainEvent::DataVersionBumped {
-            previous: 41,
-            current: 42,
-        };
-        let v = serde_json::to_value(&evt).unwrap();
-        let inner = &v["DataVersionBumped"];
-        assert_eq!(inner["previous"], 41);
-        assert_eq!(inner["current"], 42);
-    }
-
-    #[test]
-    fn coding_memory_updated_variant_name_is_stable() {
-        let evt = DomainEvent::CodingMemoryUpdated {
-            kind: CodingMemoryKind::Fact,
-            id: "x".into(),
-        };
-        assert_eq!(evt.variant_name(), "CodingMemoryUpdated");
-        assert_eq!(evt.domain().as_str(), "coding_memory");
-    }
-
-    #[test]
-    fn data_version_bumped_belongs_to_general_domain() {
-        let evt = DomainEvent::DataVersionBumped {
-            previous: 0,
-            current: 1,
-        };
-        assert_eq!(evt.variant_name(), "DataVersionBumped");
-        // No specific subsystem owns it; goes to General.
-        assert_eq!(evt.domain().as_str(), "general");
     }
 }
 

@@ -63,7 +63,6 @@ dependencies = [
  "async-trait",
  "autotuner",
  "bus",
- "coding-memory",
  "cognitive",
  "common",
  "config",
@@ -72,7 +71,6 @@ dependencies = [
  "dashmap",
  "feature-alarms",
  "feature-coaching",
- "feature-coding-bash",
  "feature-finance",
  "feature-language-learning",
  "feature-notes",
@@ -390,9 +388,6 @@ dependencies = [
  "base64 0.22.1",
  "bus",
  "channels",
- "coding-agents-md",
- "coding-ingest",
- "coding-memory",
  "cognitive",
  "common",
  "config",
@@ -401,8 +396,6 @@ dependencies = [
  "desktop-shared",
  "dirs",
  "feature-coaching",
- "feature-coding-bash",
- "feature-coding-todo",
  "feature-finance",
  "feature-focus",
  "feature-insights",
@@ -905,26 +898,6 @@ dependencies = [
  "event-listener 5.4.1",
  "event-listener-strategy",
  "pin-project-lite",
-]
-
-[[package]]
-name = "async-lsp"
-version = "0.2.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c8b8fd1e175c5ee3108095da452e816519de618beccea23aa053c00cf5e344b9"
-dependencies = [
- "futures",
- "lsp-types 0.95.1",
- "pin-project-lite",
- "rustix 1.1.4",
- "serde",
- "serde_json",
- "thiserror 2.0.18",
- "tokio",
- "tower-layer",
- "tower-service",
- "tracing",
- "waitpid-any",
 ]
 
 [[package]]
@@ -2437,88 +2410,6 @@ name = "cmp_any"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e9b18233253483ce2f65329a24072ec414db782531bdbb7d0bbc4bd2ce6b7e21"
-
-[[package]]
-name = "coding-agents-md"
-version = "0.1.1"
-dependencies = [
- "jiff",
- "proptest",
- "serde",
- "serde_json",
- "specta",
- "tempfile",
- "tracing",
-]
-
-[[package]]
-name = "coding-ingest"
-version = "0.1.1"
-dependencies = [
- "assert_cmd",
- "async-trait",
- "coding-memory",
- "cognitive",
- "common",
- "filetime",
- "git2",
- "globset",
- "jiff",
- "md5",
- "once_cell",
- "proptest",
- "serde",
- "serde_json",
- "sqlx",
- "storage",
- "tempfile",
- "thiserror 2.0.18",
- "tokio",
- "tracing",
- "url",
- "uuid",
-]
-
-[[package]]
-name = "coding-memory"
-version = "0.1.1"
-dependencies = [
- "ai-core",
- "async-trait",
- "blake3",
- "bus",
- "coding-ingest",
- "cognitive",
- "common",
- "context_engine",
- "dirs",
- "futures",
- "git2",
- "hex",
- "jiff",
- "lru 0.18.0",
- "parking_lot",
- "proptest",
- "providers",
- "serde",
- "serde_json",
- "sha2 0.11.0",
- "sqlx",
- "storage",
- "tempfile",
- "thiserror 2.0.18",
- "tiktoken-rs",
- "tokio",
- "tools-core",
- "tracing",
- "tree-sitter",
- "tree-sitter-go",
- "tree-sitter-javascript",
- "tree-sitter-python",
- "tree-sitter-rust",
- "tree-sitter-typescript",
- "uuid",
-]
 
 [[package]]
 name = "cognitive"
@@ -4240,8 +4131,6 @@ dependencies = [
  "axum",
  "bus",
  "clap 4.6.1",
- "coding-agents-md",
- "coding-ingest",
  "cognitive",
  "common",
  "config",
@@ -4249,8 +4138,6 @@ dependencies = [
  "dashmap",
  "desktop-macros",
  "desktop-shared",
- "feature-coding-bash",
- "feature-coding-todo",
  "feature-focus",
  "feature-launcher",
  "feature-productivity",
@@ -5004,75 +4891,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "feature-coding-bash"
-version = "0.1.1"
-dependencies = [
- "ai-core",
- "approval",
- "async-trait",
- "base64 0.22.1",
- "bus",
- "cognitive",
- "common",
- "config",
- "dashmap",
- "futures-util",
- "hex",
- "jiff",
- "klynt-pty",
- "klynt-sandbox",
- "libc",
- "once_cell",
- "portable-pty",
- "rand 0.9.4",
- "regex",
- "serde",
- "serde_json",
- "sha2 0.11.0",
- "specta",
- "sqlx",
- "storage",
- "subtle",
- "tempfile",
- "thiserror 2.0.18",
- "tokio",
- "tokio-tungstenite 0.28.0",
- "tokio-util",
- "tools-core",
- "tools-core-macros",
- "tracing",
- "vte",
-]
-
-[[package]]
-name = "feature-coding-todo"
-version = "0.1.0"
-dependencies = [
- "ai-core",
- "ai-core-macros",
- "approval",
- "async-trait",
- "bus",
- "common",
- "config",
- "dashmap",
- "jiff",
- "parking_lot",
- "serde",
- "serde_json",
- "specta",
- "sqlx",
- "storage",
- "thiserror 2.0.18",
- "tokio",
- "tools-core",
- "tools-core-macros",
- "tracing",
- "ulid",
- "uuid",
-]
-
-[[package]]
 name = "feature-finance"
 version = "0.1.1"
 dependencies = [
@@ -5395,15 +5213,6 @@ name = "float_next_after"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8bf7cc16383c4b8d58b9905a8509f02926ce3058053c056376248d958c9df1e8"
-
-[[package]]
-name = "fluent-uri"
-version = "0.1.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "17c704e9dbe1ddd863da1e6ff3567795087b1eb201ce80d8fa81162e1516500d"
-dependencies = [
- "bitflags 1.3.2",
-]
 
 [[package]]
 name = "flume"
@@ -6268,19 +6077,6 @@ dependencies = [
  "libc",
  "system-deps",
  "winapi",
-]
-
-[[package]]
-name = "git2"
-version = "0.20.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7b88256088d75a56f8ecfa070513a775dd9107f6530ef14919dac831af9cfe2b"
-dependencies = [
- "bitflags 2.11.1",
- "libc",
- "libgit2-sys",
- "log",
- "url",
 ]
 
 [[package]]
@@ -7658,7 +7454,6 @@ dependencies = [
  "klynt-hooks",
  "klynt-protocol",
  "klynt-sandbox",
- "lsp-client",
  "proptest",
  "regex",
  "reqwest 0.13.3",
@@ -7842,8 +7637,6 @@ dependencies = [
  "async-trait",
  "bus",
  "channels",
- "coding-ingest",
- "coding-memory",
  "cognitive",
  "common",
  "config",
@@ -8730,18 +8523,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "libgit2-sys"
-version = "0.18.4+1.9.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9b26f66f35e1871b22efcf7191564123d2a446ca0538cde63c23adfefa9b15b7"
-dependencies = [
- "cc",
- "libc",
- "libz-sys",
- "pkg-config",
-]
-
-[[package]]
 name = "libloading"
 version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8795,18 +8576,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2e99fb7a497b1e3339bc746195567ed8d3e24945ecd636e3619d20b9de9e9149"
 dependencies = [
  "cc",
- "pkg-config",
- "vcpkg",
-]
-
-[[package]]
-name = "libz-sys"
-version = "1.1.28"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fc3a226e576f50782b3305c5ccf458698f92798987f551c6a02efe8276721e22"
-dependencies = [
- "cc",
- "libc",
  "pkg-config",
  "vcpkg",
 ]
@@ -8940,19 +8709,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "112b39cec0b298b6c1999fee3e31427f74f676e4cb9879ed1a121b43661a4154"
 
 [[package]]
-name = "lsp-client"
-version = "0.1.1"
-dependencies = [
- "async-lsp",
- "common",
- "lsp-types 0.97.0",
- "serde",
- "serde_json",
- "tokio",
- "tracing",
-]
-
-[[package]]
 name = "lsp-types"
 version = "0.94.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8963,32 +8719,6 @@ dependencies = [
  "serde_json",
  "serde_repr",
  "url",
-]
-
-[[package]]
-name = "lsp-types"
-version = "0.95.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8e34d33a8e9b006cd3fc4fe69a921affa097bae4bb65f76271f4644f9a334365"
-dependencies = [
- "bitflags 1.3.2",
- "serde",
- "serde_json",
- "serde_repr",
- "url",
-]
-
-[[package]]
-name = "lsp-types"
-version = "0.97.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "53353550a17c04ac46c585feb189c2db82154fc84b79c7a66c96c2c644f66071"
-dependencies = [
- "bitflags 1.3.2",
- "fluent-uri",
- "serde",
- "serde_json",
- "serde_repr",
 ]
 
 [[package]]
@@ -9226,12 +8956,6 @@ dependencies = [
  "cfg-if",
  "digest 0.10.7",
 ]
-
-[[package]]
-name = "md5"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ae960838283323069879657ca3de837e9f7bbb4c7bf6ea7f1b290d5e9476d2e0"
 
 [[package]]
 name = "measure_time"
@@ -13020,7 +12744,6 @@ version = "1.0.149"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "83fc039473c5595ace860d8c4fafa220ff474b3fc6bfdb4293327f1a37e94d86"
 dependencies = [
- "indexmap 2.14.0",
  "itoa",
  "memchr",
  "serde",
@@ -13946,7 +13669,7 @@ dependencies = [
  "lalrpop",
  "lalrpop-util",
  "logos",
- "lsp-types 0.94.1",
+ "lsp-types",
  "memchr",
  "num-bigint",
  "num-traits",
@@ -14015,12 +13738,6 @@ dependencies = [
  "tracing",
  "uuid",
 ]
-
-[[package]]
-name = "streaming-iterator"
-version = "0.1.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2b2231b7c3057d5e4ad0156fb3dc807d900806020c5ffa3ee6ff2c8c76fb8520"
 
 [[package]]
 name = "strength_reduce"
@@ -15406,7 +15123,6 @@ version = "0.1.1"
 dependencies = [
  "async-trait",
  "bus",
- "coding-memory",
  "cognitive",
  "common",
  "config",
@@ -15609,76 +15325,6 @@ dependencies = [
  "serde",
  "thiserror 2.0.18",
  "windows-sys 0.61.2",
-]
-
-[[package]]
-name = "tree-sitter"
-version = "0.26.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "887bd495d0582c5e3e0d8ece2233666169fa56a9644d172fc22ad179ab2d0538"
-dependencies = [
- "cc",
- "regex",
- "regex-syntax 0.8.10",
- "serde_json",
- "streaming-iterator",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "tree-sitter-go"
-version = "0.25.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c8560a4d2f835cc0d4d2c2e03cbd0dde2f6114b43bc491164238d333e28b16ea"
-dependencies = [
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "tree-sitter-javascript"
-version = "0.25.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "68204f2abc0627a90bdf06e605f5c470aa26fdcb2081ea553a04bdad756693f5"
-dependencies = [
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "tree-sitter-language"
-version = "0.1.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "009994f150cc0cd50ff54917d5bc8bffe8cad10ca10d81c34da2ec421ae61782"
-
-[[package]]
-name = "tree-sitter-python"
-version = "0.25.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6bf85fd39652e740bf60f46f4cda9492c3a9ad75880575bf14960f775cb74a1c"
-dependencies = [
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "tree-sitter-rust"
-version = "0.24.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "439e577dbe07423ec2582ac62c7531120dbfccfa6e5f92406f93dd271a120e45"
-dependencies = [
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "tree-sitter-typescript"
-version = "0.23.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6c5f76ed8d947a75cc446d5fccd8b602ebf0cde64ccf2ffa434d873d7a575eff"
-dependencies = [
- "cc",
- "tree-sitter-language",
 ]
 
 [[package]]
@@ -16155,43 +15801,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "vte"
-version = "0.13.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9a0b683b20ef64071ff03745b14391751f6beab06a54347885459b77a3f2caa5"
-dependencies = [
- "arrayvec",
- "utf8parse",
- "vte_generate_state_changes",
-]
-
-[[package]]
-name = "vte_generate_state_changes"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2e369bee1b05d510a7b4ed645f5faa90619e05437111783ea5848f28d97d3c2e"
-dependencies = [
- "proc-macro2",
- "quote",
-]
-
-[[package]]
 name = "wait-timeout"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "09ac3b126d3914f9849036f826e054cbabdc8519970b8998ddaf3b5bd3c65f11"
 dependencies = [
  "libc",
-]
-
-[[package]]
-name = "waitpid-any"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "18aa3ce681e189f125c4c1e1388c03285e2fd434ef52c7203084012ac29c5e4a"
-dependencies = [
- "rustix 1.1.4",
- "windows-sys 0.59.0",
 ]
 
 [[package]]

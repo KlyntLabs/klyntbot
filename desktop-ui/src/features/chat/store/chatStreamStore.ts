@@ -7,7 +7,7 @@
  * updates. It is imported as a side-effect from `useChatStore.ts`.
  *
  * Full removal requires completing the frontend v2 `thread:event`
- * migration for assistant chat (currently coding threads use v2 via
+ * migration for assistant chat (unified threads use v2 via
  * `agent:thread_event`, but assistant chat still relies on v1).
  */
 

@@ -17,7 +17,6 @@ async fn spawn_capped_then_resume_to_completion() {
         model: "test".to_string(),
         tool_kit: None,
         hook_engine: None,
-        coding_policies: None,
         job_supervisor: None,
         event_tx: std::sync::Arc::new(std::sync::Mutex::new(None)),
     };
@@ -63,7 +62,6 @@ async fn resume_on_running_returns_error() {
         model: "test".to_string(),
         tool_kit: None,
         hook_engine: None,
-        coding_policies: None,
         job_supervisor: None,
         event_tx: std::sync::Arc::new(std::sync::Mutex::new(None)),
     };

@@ -929,33 +929,7 @@ impl AgentRuntime {
                 &self.execution_model,
             );
 
-            // Per-session cost ceiling check → Mirror alert
-            let hot = self.hot_config.read().await;
-            let ceiling_usd = hot.per_thread_cost_ceiling_usd.unwrap_or(0.0);
-            let alert_at = hot.cost_alert_at_percent;
-            drop(hot);
 
-            if ceiling_usd > 0.0 {
-                if let Some(alert) = self.cost_tracker.check_session_ceiling(
-                    session_key.as_str(),
-                    ceiling_usd,
-                    alert_at,
-                ) {
-                    if let Some(ref bus) = self.domain_event_bus {
-                        let payload = serde_json::json!({
-                            "session_key": &alert.session_key,
-                            "spend_usd": alert.spend_usd,
-                            "ceiling_usd": alert.ceiling_usd,
-                            "percent": alert.percent,
-                        });
-                        bus.publish(bus::DomainEvent::CodingMirrorAlert {
-                            kind: common::MIRROR_ALERT_COST_THRESHOLD_CROSSED.to_string(),
-                            severity: "medium".to_string(),
-                            payload: payload.to_string(),
-                        });
-                    }
-                }
-            }
         }
 
         if let Some(ref tx) = event_tx {

@@ -58,7 +58,7 @@ mod tests {
             class: ApprovalClass::Destructive,
             scope: ApprovalScope::ToolAction,
             ctx: ApprovalContext {
-                mode: common::SessionMode::Coding,
+                mode: common::SessionMode::Assistant,
                 channel: ChannelKind::Mcp,
                 session_id: "s1".into(),
                 user_id: None,

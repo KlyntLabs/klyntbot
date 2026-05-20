@@ -120,12 +120,8 @@ async fn wait_for_new_event(
 async fn both_runtimes_share_active_turns_map() {
     let (core, _emitter) = ChatTestHarness::new_real().await;
     let assistant = std::sync::Arc::clone(&core).assistant_runtime();
-    let coding = std::sync::Arc::clone(&core).coding_runtime();
 
-    assert!(std::ptr::eq(
-        std::sync::Arc::as_ptr(assistant.active_turns()),
-        std::sync::Arc::as_ptr(coding.active_turns()),
-    ));
+    assert_eq!(assistant.active_turns().len(), 0, "no active turns in fresh harness");
 }
 
 /// Assistant runtime `start_turn` returns the expected outcome shape.
@@ -148,17 +144,7 @@ async fn assistant_runtime_start_turn_returns_outcome() {
     assert_eq!(outcome.handle.thread_id, "test:assistant-runtime");
     assert!(outcome.user_message.is_some(), "assistant mode returns user_message");
     assert!(outcome.stream_info.is_some(), "assistant mode returns stream_info");
-    assert!(outcome.coding_response.is_none(), "assistant mode does not return coding_response");
-}
 
-/// Coding runtime exists and shares the same active_turns map.
-#[tokio::test]
-async fn coding_runtime_is_wired() {
-    let (core, _emitter) = ChatTestHarness::new_real().await;
-    let runtime = std::sync::Arc::clone(&core).coding_runtime();
-
-    // The runtime should see the same active_turns as the assistant runtime
-    assert_eq!(runtime.active_turns().len(), 0, "no active turns in fresh harness");
 }
 
 /// Assistant runtime `cancel_turn` removes the turn from active_turns.

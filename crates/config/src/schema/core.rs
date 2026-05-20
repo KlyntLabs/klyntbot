@@ -9,8 +9,6 @@ use super::autotuner::AutoTunerConfig;
 
 use super::capture::CaptureConfig;
 use super::channels::ChannelsConfig;
-use super::coding::CodingConfig;
-use super::coding_memory::CodingMemoryConfig;
 use super::cognitive::CognitiveConfig;
 use super::confidence::ConfidenceConfig;
 use super::content::ContentConfig;
@@ -155,14 +153,6 @@ pub struct Config {
     /// Feature packs (controls which skills and config sections are active).
     #[serde(default)]
     pub packs: PacksConfig,
-
-    /// Coding memory subsystem configuration.
-    #[serde(default)]
-    pub coding_memory: CodingMemoryConfig,
-
-    /// Cognitive memory & coaching configuration.
-    #[serde(default)]
-    pub coding: CodingConfig,
 
     #[serde(default)]
     pub cognitive: CognitiveConfig,

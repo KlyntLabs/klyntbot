@@ -13,7 +13,6 @@ ai-core.workspace = true
 common.workspace = true
 bus.workspace = true
 config.workspace = true
-coding-memory.workspace = true
 cognitive.workspace = true
 providers.workspace = true
 session.workspace = true
@@ -28,7 +27,6 @@ feature-tasks.workspace = true
 feature-finance.workspace = true
 feature-productivity.workspace = true
 feature-coaching.workspace = true
-feature-coding-bash = { path = "../feature-coding-bash" }
 feature-language-learning.workspace = true
 feature-notes.workspace = true
 mcp.workspace = true

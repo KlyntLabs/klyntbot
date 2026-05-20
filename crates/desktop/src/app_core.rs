@@ -106,7 +106,6 @@ pub async fn init(
         None,
         Some(sender),
         Some(emitter),
-        Some(approval_channel.clone() as Arc<dyn ::approval::ApprovalChannel>),
         None,
     )
     .await?;
@@ -390,9 +389,9 @@ fn wire_event_channels(
         });
     }
 
-    // Phase 4: forward CodingMemoryUpdated → entity:updated, and
-    // DataVersionBumped → data:version_bumped, so Plan 1's tauriEventBridge.ts
-    // can invalidate the matching TanStack Query keys in every webview.
+    // Phase 4: forward DataVersionBumped → data:version_bumped, so Plan 1's
+    // tauriEventBridge.ts can invalidate the matching TanStack Query keys in
+    // every webview.
     {
         let mut event_rx = channels.domain_event_bus.subscribe();
         let app_handle_clone = app_handle.clone();
@@ -402,20 +401,6 @@ fn wire_event_channels(
                 tokio::select! {
                     _ = token.cancelled() => break,
                     result = event_rx.recv() => match result {
-                        Ok(bus::DomainEvent::CodingMemoryUpdated { kind, id }) => {
-                            let entity_kind = match kind {
-                                bus::CodingMemoryKind::Fact => desktop_shared::types::EntityKind::CodingFact,
-                                bus::CodingMemoryKind::Episode => desktop_shared::types::EntityKind::CodingEpisode,
-                            };
-                            use tauri_specta::Event;
-                            let payload = desktop_shared::events::EntityUpdatedPayload {
-                                entity_kind,
-                                id,
-                            };
-                            if let Err(e) = payload.emit(&app_handle_clone) {
-                                tracing::warn!("phase4: failed to emit entity:updated for coding memory: {e}");
-                            }
-                        }
                         Ok(bus::DomainEvent::DataVersionBumped { previous, current }) => {
                             use tauri_specta::Event;
                             let payload = desktop_shared::events::DataVersionBumpedPayload {
@@ -469,61 +454,6 @@ fn wire_event_channels(
         });
     }
 
-    spawn_broker_forwarder(
-        core.thread_events.subscribe(),
-        app_handle,
-        shutdown,
-        "agent:thread_event",
-        Some(global_event_tx.clone()),
-    );
-    spawn_broker_forwarder(
-        core.cost_events.subscribe(),
-        app_handle,
-        shutdown,
-        "agent:cost_update",
-        Some(global_event_tx.clone()),
-    );
-    // Subagent lifecycle events — route Spawned by parent_session_id, others on global channel.
-    {
-        let mut rx = core.subagent_events.subscribe();
-        let handle = app_handle.clone();
-        let token = shutdown.clone();
-        let global_tx = Some(global_event_tx.clone());
-        tokio::spawn(async move {
-            loop {
-                tokio::select! {
-                    _ = token.cancelled() => break,
-                    msg = rx.recv() => match msg {
-                        Ok(evt) => {
-                            let channel = match &evt {
-                                desktop_shared::coding::SubagentEvent::Spawned { parent_session_id, .. } => {
-                                    // Tauri 2 only allows [a-zA-Z0-9-/:_] in event names.
-                                    // `/` separates the topic from the routing key; the key
-                                    // (`coding:<uuid>`) already contains `:`, so using `/`
-                                    // keeps the structure readable in logs.
-                                    format!("agent:subagent_event/{parent_session_id}")
-                                }
-                                _ => "agent:subagent_event".to_string(),
-                            };
-                            // Serialize once to Value; emit clones the value tree instead of
-                            // re-serializing from scratch.
-                            let payload = serde_json::to_value(&evt).unwrap_or_default();
-                            if let Err(e) = handle.emit(&channel, &payload) {
-                                warn!("failed to emit {channel}: {e}");
-                            }
-                            if let Some(ref tx) = global_tx {
-                                let _ = tx.send((channel, payload));
-                            }
-                        }
-                        Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
-                            warn!("subagent event forwarder lagged by {n} events");
-                        }
-                        Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
-                    }
-                }
-            }
-        });
-    }
     // ToolEvent::ApprovalRequest rides on `DomainEvent::Generic { kind:
     // "agent_event" }`. The dual-probe (`ApprovalRequest` key OR `type` field)
     // accommodates both externally- and internally-tagged serde shapes.
@@ -642,6 +572,7 @@ fn center_on_cursor_monitor(
 }
 
 /// Forward every event from a `TypedBroker` subscriber onto a Tauri event channel.
+#[allow(dead_code)]
 fn spawn_broker_forwarder<T>(
     mut rx: tokio::sync::broadcast::Receiver<T>,
     app_handle: &tauri::AppHandle,

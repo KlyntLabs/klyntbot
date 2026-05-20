@@ -145,21 +145,9 @@ pub(super) async fn init_storage(
         )
     );
 
-    // Run coding-todo feature migrations.
-    run_migration!(
-        "coding_todo",
-        [feature_coding_todo::migrations::coding_todo_migration()]
-    );
-
-    // Run cognitive migrations up-front so downstream crates (coding-memory) can
-    // ALTER their tables. Cognitive migrations are idempotent; the agent builder
+    // Run cognitive migrations up-front so downstream crates can
     // also invokes them later without conflict.
     run_migration!("cognitive", cognitive::cognitive_migrations());
-
-    // Run coding-memory migrations (scope/provenance columns on semantic_facts,
-    // episodic_memories, skill_versions; causal-edge / ingest-log / klynt_sessions
-    // tables). Must run AFTER cognitive migrations create the base tables.
-    run_migration!("coding-memory", coding_memory::coding_memory_migrations());
 
     // 3. Create LLM provider (graceful — falls back to noop for setup wizard).
     // Use the "full" variant to get the inner ProviderManager (when a fallback is configured)

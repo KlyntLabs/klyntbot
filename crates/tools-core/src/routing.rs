@@ -107,8 +107,6 @@ pub struct RoutingContext {
     pub plan_mode_active: bool,
     /// Plan session id when in plan mode; None otherwise.
     pub plan_session_id: Option<String>,
-    /// True if the previous coding_todo call had blocked items without a user message.
-    pub previous_anti_passivity_violation: bool,
     /// True if a user-facing assistant message was emitted in the current turn.
     pub same_turn_user_msg_emitted: bool,
     /// Phase 2.3a — workspace root for cwd resolution.
@@ -147,7 +145,6 @@ impl RoutingContext {
             agent_profile: "root".into(),
             plan_mode_active: false,
             plan_session_id: None,
-            previous_anti_passivity_violation: false,
             same_turn_user_msg_emitted: false,
             workspace_cwd: None,
             agent_chain: vec!["root".into()],
@@ -181,7 +178,6 @@ impl RoutingContext {
             agent_profile: "root".into(),
             plan_mode_active: false,
             plan_session_id: None,
-            previous_anti_passivity_violation: false,
             same_turn_user_msg_emitted: false,
             workspace_cwd: None,
             agent_chain: vec!["root".into()],

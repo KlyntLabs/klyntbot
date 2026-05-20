@@ -2,10 +2,6 @@ mod agent;
 pub mod ai_pipeline;
 mod channels;
 mod coaching;
-mod coding_recall;
-mod coding_retention;
-mod coding_skills;
-mod coding_subscribers;
 mod cognitive;
 mod cron;
 mod dnd;
@@ -75,7 +71,7 @@ impl AppCore {
         mode: common::AppMode,
         config_override: Option<config::Config>,
     ) -> Result<(Self, EventChannels), String> {
-        Self::init_with_sender(mode, config_override, None, None, None, None).await
+        Self::init_with_sender(mode, config_override, None, None, None).await
     }
 
     /// Initialize with an optional custom notification sender and event emitter.
@@ -91,7 +87,6 @@ impl AppCore {
         skip(
             notification_sender,
             event_emitter,
-            _approval_channel,
             provider_override
         ),
         err
@@ -101,7 +96,6 @@ impl AppCore {
         config_override: Option<config::Config>,
         notification_sender: Option<Arc<dyn common::NotificationSender>>,
         event_emitter: Option<Arc<dyn AppEventEmitter>>,
-        _approval_channel: Option<Arc<dyn approval::ApprovalChannel>>,
         provider_override: Option<providers::DynProvider>,
     ) -> Result<(Self, EventChannels), String> {
         // ── Phase 1: Storage ─────────────────────────────────────────────
@@ -124,7 +118,7 @@ impl AppCore {
         let provider = provider_override.unwrap_or(provider);
 
         // Keep a clone for the Distiller (constructed after agent init).
-        let provider_for_distiller = provider.clone();
+        let _provider_for_distiller = provider.clone();
 
         // Wire provider-degraded event forwarding to the frontend.
         // Done here (not inside init_storage) because the emitter isn't available there.
@@ -170,53 +164,6 @@ impl AppCore {
         // Context update queue for live context refresher (shared between agent + background services).
         let context_update_queue = Arc::new(bus::ContextUpdateQueue::new());
 
-        // Per-coding-thread approval policies and plan snapshots.
-        let coding_policies: Arc<
-            dashmap::DashMap<String, Arc<parking_lot::RwLock<approval::CodingApprovalPolicy>>>,
-        > = Arc::new(dashmap::DashMap::new());
-
-        // Build injector registry with PlanModeInjector so the agent loop injects plan-mode reminders.
-        let plan_mode_injector = Arc::new(feature_coding_todo::PlanModeInjector::new(Arc::clone(
-            &coding_policies,
-        )));
-
-        // ── Background bash job supervisor (coding background tasks) ─────
-        ::storage::StoragePool::run_feature_migrations(
-            storage_pool.inner(),
-            &[feature_coding_bash::migrations::coding_background_jobs_migration()],
-        )
-        .await
-        .map_err(|e| format!("coding_bash migration failed: {e}"))?;
-
-        let bash_job_repo = ::storage::BashJobRepo::new(storage_pool.inner().clone());
-        let bash_job_repo_for_mirror = bash_job_repo.clone();
-        let job_supervisor = Arc::new(feature_coding_bash::JobSupervisor::new(
-            bash_job_repo,
-            Arc::clone(&domain_event_bus),
-            Arc::clone(&context_update_queue),
-            config.data_dir_path(),
-            Arc::new(klynt_sandbox::MacOsSeatbeltRunner::new()),
-        ));
-        match job_supervisor.reconcile_on_startup().await {
-            Ok(n) if n > 0 => tracing::info!(count = n, "background jobs reconciled on startup"),
-            Ok(_) => {}
-            Err(e) => tracing::warn!("background job startup reconciliation failed: {e}"),
-        }
-        let job_supervisor_for_agent: tools_core::DynJobSupervisor = job_supervisor.clone();
-        let background_jobs_injector = Arc::new(feature_coding_bash::BackgroundJobsInjector::new(
-            Arc::clone(&job_supervisor),
-        ));
-        let exec_intel_injector: Arc<dyn bus::injection::DynamicInjector> =
-            Arc::new(feature_coding_bash::ExecutionIntelligenceInjector::new(
-                repos.coding_todo.clone(),
-                Arc::clone(&job_supervisor) as Arc<dyn tools_core::JobSupervisorHandle>,
-            ));
-        let injector_registry = bus::InjectorRegistry::new(vec![
-            plan_mode_injector as Arc<dyn bus::DynamicInjector>,
-            background_jobs_injector as Arc<dyn bus::DynamicInjector>,
-            exec_intel_injector,
-        ]);
-
         // ── Startup recovery — DND crash safety net ──────────────────────
         if let Ok(Some(dnd_row)) = repos.dnd_override.get().await {
             tracing::warn!(
@@ -226,13 +173,6 @@ impl AppCore {
             tracing::warn!("DND restore not yet implemented — cleared orphaned override record");
             let _ = repos.dnd_override.clear().await;
         }
-
-        // ── Phase-6 components (created early for distiller, recall, daemon, cron) ─
-        let symbol_extractor: Arc<dyn coding_memory::symbols::SymbolExtractor> =
-            Arc::new(coding_memory::TreeSitterExtractor::new());
-        let causal_edges = Arc::new(coding_memory::causal::CausalEdgeRepo::new(
-            storage_pool.clone(),
-        ));
 
         // ── Phase 2: Cron ────────────────────────────────────────────────
         let cron::CronResult {
@@ -246,8 +186,6 @@ impl AppCore {
             provider.clone(),
             &domain_event_bus,
             vector_store.clone(),
-            Some(symbol_extractor.clone()),
-            Some(causal_edges.clone()),
         )
         .await?;
 
@@ -366,23 +304,6 @@ impl AppCore {
                 vector_store.clone(),
             ));
 
-        // ── Phase 2.5: Coding-memory recall (must be ready before AgentLoop) ─
-        let recall =
-            coding_recall::init_coding_recall(&storage_pool, &domain_event_bus, &causal_edges)
-                .await;
-
-        // ── Phase 2.6: Desktop approval channel + grants repo ─────────────
-        let desktop_approval_channel: Arc<crate::desktop_approval_channel::DesktopApprovalChannel> =
-            Arc::new(
-                crate::desktop_approval_channel::DesktopApprovalChannel::new(
-                    event_emitter
-                        .clone()
-                        .unwrap_or_else(|| Arc::new(NoopEmitter)),
-                ),
-            );
-        let approval_grants_repo =
-            Arc::new(approval::ApprovalGrantsRepo::new(storage_pool.clone()));
-
         // ── Phase 3: Agent ───────────────────────────────────────────────
         let agent::AgentResult {
             cognitive_provider,
@@ -407,11 +328,8 @@ impl AppCore {
             Arc::clone(&hot_config),
             Some(Arc::clone(&context_update_queue)),
             appcore_embedding_engine.clone(),
-            recall.clone(),
-            Some(desktop_approval_channel.clone() as Arc<dyn approval::ApprovalChannel>),
-            Some(Arc::clone(&coding_policies)),
-            Some(injector_registry.clone()),
-            Some(job_supervisor_for_agent),
+            None,
+            None,
         )
         .await?;
 
@@ -592,10 +510,6 @@ impl AppCore {
         };
 
         // ── Phase 8: Mirror self-reflection layer (before SignalRouter so consumers can be wired in)
-        let coding_approval_history_repo =
-            ::storage::repos::CodingApprovalHistoryRepo::new(storage_pool.inner().clone());
-        let approval_pattern_history_repo =
-            ::storage::repos::ApprovalPatternHistoryRepo::new(storage_pool.inner().clone());
         let (mirror_facade, mirror_consumers, mirror_flush_handles, mirror_shutdown) = {
             let mirror_repo = ::cognitive::mirror::MirrorRepo::new(storage_pool.clone());
             let narrative_handler: Option<Arc<dyn ::cognitive::mirror::NarrativeHandler>> =
@@ -635,21 +549,8 @@ impl AppCore {
                 episodic_repo,
                 rule_repo,
                 trial_evaluator,
-                Some(Arc::new(coding_approval_history_repo.clone())),
-                Some(Arc::new(approval_pattern_history_repo.clone())),
-                Some(Arc::new(bash_job_repo_for_mirror)),
+                None,
             );
-
-            // Phase-5 coding mirror sources — pattern effectiveness, stale-memory,
-            // coding meta-rules, project-skill drift. Registered alongside the six
-            // built-in sources in `MirrorEngine::start`.
-            let coding_mirror = crate::coding_memory::mirror::register_coding_sources(
-                storage_pool.clone(),
-                mirror_repo.clone(),
-                started.shutdown.clone(),
-            )
-            .await
-            .map_err(|e| format!("register_coding_sources: {e}"))?;
 
             // Bootstrap brain version 1 on first run
             let bootstrap_archiver =
@@ -680,10 +581,8 @@ impl AppCore {
 
             let mut all_handles = started.flush_handles;
             all_handles.push(retention_handle);
-            all_handles.extend(coding_mirror.flush_handles);
 
-            let mut all_consumers = started.consumers;
-            all_consumers.extend(coding_mirror.consumers);
+            let all_consumers = started.consumers;
 
             let facade = Arc::new(facade);
 
@@ -1054,65 +953,6 @@ impl AppCore {
             Some(handle)
         };
 
-        // ── Construct coding-memory Distiller + event-forwarding channel ─
-        let (ingest_event_tx, mut ingest_event_rx) =
-            tokio::sync::mpsc::unbounded_channel::<coding_ingest::event::AgentEvent>();
-
-        let distiller = {
-            let ingest_repo = Arc::new(coding_ingest::store::IngestEventLogRepo::new(
-                storage_pool.inner().clone(),
-            ));
-            let fact_repo = ::cognitive::SemanticFactRepo::new(storage_pool.inner().clone());
-            let episode_repo = ::cognitive::EpisodicMemoryRepo::new(storage_pool.inner().clone());
-            let entity_repo = ::cognitive::repos::EntityRepo::new(storage_pool.inner().clone());
-            let writer =
-                coding_memory::distiller::DistillerWriter::new(fact_repo.clone(), episode_repo)
-                    .with_entity_repo(entity_repo);
-            let distiller_provider = provider_manager.clone().unwrap_or_else(|| {
-                Arc::new(providers::ProviderManager::new(
-                    provider_for_distiller.clone(),
-                    None,
-                    None,
-                ))
-            });
-            let retriever = Arc::new(
-                ::cognitive::UnifiedMemoryService::new(fact_repo)
-                    .with_embedder_opt(cognitive_fact_embedder.clone()),
-            ) as Arc<dyn context_engine::MemoryRetriever>;
-            // Respect coding-memory config model if set.
-            let distiller_cfg = coding_memory::distiller::DistillerConfig {
-                model: config.coding_memory.distiller.model.clone(),
-                ..Default::default()
-            };
-            let mut d = coding_memory::distiller::Distiller::with_extractor(
-                distiller_cfg,
-                ingest_repo,
-                writer,
-                distiller_provider,
-                retriever,
-                symbol_extractor.clone(),
-            );
-            d = d.with_retry_repo(coding_memory::distiller::DistillationRetryRepo::new(
-                storage_pool.inner().clone(),
-            ));
-            d = d.with_event_bus(domain_event_bus.clone());
-            Arc::new(d)
-        };
-
-        let toolset = recall
-            .as_ref()
-            .map(|r| coding_memory::CodingMemoryToolset::new(Arc::clone(r)));
-
-        // ── Register coding-memory recall tools in agent's tool registry ──
-        if let Some(ref ts) = toolset {
-            let reg = agent.tool_registry();
-            let mut registry = reg.write().await;
-            for tool in ts.mcp_tools() {
-                registry.register_dyn(tool);
-            }
-            info!("Coding-memory recall tools registered in MCP registry");
-        }
-
         // ── Register launcher tools in agent's tool registry ──
         if let Some(ref engine) = launcher_engine {
             use tools_core::FeaturePackage;
@@ -1131,93 +971,8 @@ impl AppCore {
             info!("Launcher tools registered in MCP registry");
         }
 
-        // ── Spawn coding-ingest daemon (with real-time event forwarding) ─
-        let ingest_daemon_handle = {
-            let data_dir = config.data_dir_path();
-            let git_handler: Arc<dyn coding_ingest::git_invalidation::GitInvalidationHandler> =
-                Arc::new(
-                    coding_memory::git_invalidation::GitInvalidationHandlerImpl::new(
-                        storage_pool.clone(),
-                        symbol_extractor.clone(),
-                    ),
-                );
-            let opencode_db_path = if config.coding_memory.cli.opencode.enabled {
-                dirs::home_dir().map(|h| h.join(".local/share/opencode/opencode.db"))
-            } else {
-                None
-            };
-            let codex_sessions_dir = if config.coding_memory.cli.codex.enabled {
-                dirs::home_dir().map(|h| h.join(".codex/sessions"))
-            } else {
-                None
-            };
-            let kimi_sessions_dir = if config.coding_memory.cli.kimi_cli.enabled {
-                dirs::home_dir().map(|h| h.join(".kimi").join("sessions"))
-            } else {
-                None
-            };
-            let kimi_json_path = if config.coding_memory.cli.kimi_cli.enabled {
-                dirs::home_dir().map(|h| h.join(".kimi").join("kimi.json"))
-            } else {
-                None
-            };
-            let daemon_cfg = coding_ingest::daemon::IngestDaemonConfig {
-                socket_path: data_dir.join("ingest.sock"),
-                buffer_path: data_dir.join("ingest-buffer.jsonl"),
-                lock_path: data_dir.join("desktop.lock"),
-                repo: std::sync::Arc::new(coding_ingest::store::IngestEventLogRepo::new(
-                    storage_pool.inner().clone(),
-                )),
-                event_tx: Some(ingest_event_tx),
-                op_handler: recall.as_ref().map(|r| {
-                    std::sync::Arc::new(crate::coding_memory::recall::RecallOpHandler::new(
-                        Arc::clone(r),
-                    )) as std::sync::Arc<dyn coding_ingest::daemon::OpHandler>
-                }),
-                git_invalidation_handler: Some(git_handler),
-                opencode_db_path,
-                opencode_poll_interval: None,
-                kimi_sessions_dir,
-                kimi_poll_interval: None,
-                kimi_json_path,
-                codex_sessions_dir,
-                codex_poll_interval: None,
-            };
-            match coding_ingest::daemon::spawn(daemon_cfg).await {
-                Ok(h) => Some(h),
-                Err(e) => {
-                    tracing::warn!(error = %e, "ingest daemon failed to spawn — coding CLI ingestion disabled");
-                    None
-                }
-            }
-        };
-
         // ── Tracing registry ─────────────────────────────────────────────
-        let tracing_registry = {
-            let home = dirs::home_dir().expect("home dir");
-            let data_dir = config.data_dir_path();
-            let widx = Arc::new(coding_ingest::adapters::kimi_cli::workdir::WorkdirIndex::new());
-            let _ = widx.refresh(&home.join(".kimi/kimi.json")).await;
-            let mut registry = crate::tracing::TracingRegistry::new();
-            registry.register(Arc::new(
-                crate::tracing::providers::kimi::KimiTracingProvider::new(&home, &data_dir, widx),
-            ));
-            let claude_root = home.join(".claude/projects");
-            let imported_claude_root = data_dir.join("coding_memory/imported_claude_code");
-            registry.register(Arc::new(
-                crate::tracing::providers::claude_code::ClaudeCodeTracingProvider::new(
-                    claude_root,
-                    imported_claude_root,
-                ),
-            ));
-            registry.register(Arc::new(
-                crate::tracing::providers::klynt::KlyntTracingProvider::new(
-                    repos.clone(),
-                    data_dir.clone(),
-                ),
-            ));
-            Arc::new(registry)
-        };
+        let tracing_registry = Arc::new(crate::tracing::TracingRegistry::new());
 
         // ── Snapshot lifecycle config before moving config into Arc ──────
         let lifecycle_config_snapshot = config.lifecycle.clone();
@@ -1342,147 +1097,9 @@ impl AppCore {
             journey_tracker: Some(journey_tracker),
             _ai_pipeline_router: ai_pipeline_router,
             feature_registry,
-            ingest_daemon: std::sync::Mutex::new(ingest_daemon_handle),
-            distiller: Some(distiller.clone()),
-            recall: recall.clone(),
-            coding_toolset: toolset,
-            session_end_pass: None,
-            causal_edge_repo: None,
-            symbol_extractor: None,
-            repo_roots: Arc::new(std::sync::RwLock::new(std::collections::HashMap::new())),
             tracing_registry,
-            session_start_fired: Arc::new(dashmap::DashMap::new()),
-            session_end_fired: Arc::new(dashmap::DashMap::new()),
-            coding_skill_activator: Arc::new(tokio::sync::Mutex::new(None)),
-            coding_approval_history_repo: Some(Arc::new(coding_approval_history_repo)),
-            snapshot_repo: Some(Arc::new(klynt_core::snapshots::SnapshotRepo::new(
-                storage_pool.clone(),
-            ))),
-            thread_events: bus::TypedBroker::new(1024),
-            cost_events: bus::TypedBroker::new(1024),
-            subagent_events: bus::TypedBroker::new(256),
-            thread_subscriptions: Arc::new(dashmap::DashMap::new()),
-            steer_queue: Arc::new(crate::coding::steer_queue::SteerQueue::new()),
-            tool_kit: std::sync::Mutex::new(None),
-            desktop_approval_channel: Some(desktop_approval_channel),
-            approval_grants_repo: Some(approval_grants_repo),
-            coding_policies: Arc::clone(&coding_policies),
-            plan_snapshots: Arc::new(dashmap::DashMap::new()),
-            context_update_queue: Some(Arc::clone(&context_update_queue)),
-            job_supervisor: Some(job_supervisor),
             assistant_runtime: std::sync::OnceLock::new(),
-            coding_runtime: std::sync::OnceLock::new(),
         };
-
-        // ── Phase-5 SessionEndPass wiring ────────────────────────────────
-        {
-            let session_summary_repo =
-                coding_memory::reforge::SessionSummaryRepo::new(storage_pool.clone());
-            let co_act = ::cognitive::CoActivationRepo::new(storage_pool.inner().clone());
-            let utilization =
-                coding_memory::recall::telemetry::RecallInvocationRepo::new(storage_pool.clone());
-            let ep_repo = Arc::new(::cognitive::EpisodicMemoryRepo::new(
-                storage_pool.inner().clone(),
-            ));
-            let causal_detector = Arc::new(coding_memory::causal::CausalEdgeDetector::new(
-                causal_edges.clone(),
-                ep_repo,
-            ));
-            let session_end_pass = Arc::new(
-                coding_memory::reforge::SessionEndPass::new(
-                    session_summary_repo.clone(),
-                    co_act,
-                    utilization,
-                )
-                .with_causal_detector(causal_detector),
-            );
-            crate::coding_memory::reforge::register_session_end_dispatch(
-                domain_event_bus.clone(),
-                session_end_pass.clone(),
-            )
-            .await;
-            core.session_end_pass = Some(session_end_pass);
-            core.causal_edge_repo = Some(causal_edges);
-        }
-
-        // ── Phase-6 symbol extractor + repo roots ────────────────────────
-        {
-            core.symbol_extractor = Some(symbol_extractor);
-        }
-
-        // ── Distiller event receiver + sweep timers ──────────────────────
-        {
-            let d = distiller.clone();
-            let token = shutdown_token.clone();
-            tokio::spawn(async move {
-                loop {
-                    tokio::select! {
-                        _ = token.cancelled() => break,
-                        Some(event) = ingest_event_rx.recv() => {
-                            if let Err(e) = d.accept_event(event).await {
-                                tracing::debug!(error = %e, "distiller accept_event failed");
-                            }
-                        }
-                    }
-                }
-            });
-
-            let d_idle = distiller.clone();
-            spawn_periodic_timer(&shutdown_token, 60, move || {
-                let d = d_idle.clone();
-                tokio::spawn(async move {
-                    if let Err(e) = d.sweep_idle().await {
-                        tracing::warn!(error = %e, "distiller idle sweep failed");
-                    }
-                });
-            });
-
-            let d_retry = distiller.clone();
-            spawn_periodic_timer(&shutdown_token, 60, move || {
-                let d = d_retry.clone();
-                tokio::spawn(async move {
-                    match d.sweep_retries().await {
-                        Ok(n) if n > 0 => {
-                            tracing::info!(count = n, "distiller retry sweep processed rows")
-                        }
-                        Ok(_) => {}
-                        Err(e) => tracing::warn!(error = %e, "distiller retry sweep failed"),
-                    }
-                });
-            });
-            info!("coding-memory Distiller wired — event receiver + sweepers started");
-
-            // Wire direct DomainEventBus subscribers for coding mirror signals.
-            if let Err(e) = coding_subscribers::init_coding_subscribers(
-                Arc::clone(&domain_event_bus),
-                &storage_pool,
-            )
-            .await
-            {
-                tracing::warn!(error = %e, "init_coding_subscribers failed");
-            }
-
-            // Auto-install the Claude Code hook if enabled (default: true).
-            // Idempotent — re-running over an existing install just refreshes
-            // the absolute path of the desktop binary in case it moved.
-            {
-                let cfg = shared_config.read().await;
-                if cfg.coding_memory.cli.claude_code.enabled {
-                    if let (Ok(home), Ok(exe)) = (std::env::var("HOME"), std::env::current_exe()) {
-                        let settings = std::path::PathBuf::from(home)
-                            .join(".claude")
-                            .join("settings.json");
-                        let _ = tokio::task::spawn_blocking(move || {
-                            crate::coding_memory::installer::ClaudeCodeInstaller::install(
-                                &settings, &exe,
-                            )
-                        })
-                        .await;
-                        info!("coding-memory: Claude Code hook auto-installed");
-                    }
-                }
-            }
-        }
 
         // ── Voice service initialization ────────────────────────────────
         {
@@ -1917,26 +1534,14 @@ impl AppCore {
         if let Some(ref facade) = core.mirror_facade {
             let reg = core.agent.tool_registry();
             let mut registry = reg.write().await;
-            let coding_alerts =
-                ::coding_memory::mirror::coding_alerts_query::CodingAlertsQuery::new(
-                    storage_pool.clone(),
-                );
-            registry.register(
-                tools::MirrorTool::new(Arc::clone(facade)).with_coding_alerts(coding_alerts),
-            );
+            registry.register(tools::MirrorTool::new(Arc::clone(facade)));
             info!("Mirror tool registered");
         }
 
         // ── Register BashTool in agent's tool registry (post-init) ──────
         {
             let config_guard = core.config.read().await;
-            let exclude_globs: Vec<&str> = config_guard
-                .coding_memory
-                .ingest
-                .exclude_paths
-                .iter()
-                .map(String::as_str)
-                .collect();
+            let exclude_globs: Vec<&str> = vec![];
             let privacy = Arc::new(
                 klynt_core::privacy::PrivacyGuard::from_globs(&exclude_globs)
                     .expect("privacy globs"),
@@ -1988,104 +1593,27 @@ impl AppCore {
                 repos: core.repos.clone(),
                 non_ui_policy,
                 hook_engine: hook_engine.clone(),
-                snapshot_repo: core.snapshot_repo.clone(),
+                snapshot_repo: None,
                 session_key: String::new(),
-                history_repo: core.coding_approval_history_repo.clone(),
-                mirror_learning_enabled: config_guard.coding.permissions.mirror_learning,
-                mirror_min_approvals: config_guard.coding.permissions.mirror_min_approvals,
-                mirror_cooldown_seconds: (config_guard.coding.permissions.mirror_cooldown_hours
-                    as i64)
-                    * 3600,
+                mirror_learning_enabled: false,
+                mirror_min_approvals: 0,
+                mirror_cooldown_seconds: 0,
                 repo_id: String::new(),
             };
             {
                 let reg = core.agent.tool_registry();
                 let mut registry = reg.write().await;
                 kit.register_all(&mut registry);
-                // Phase 2.3a — register background bash companion tools
-                registry.register(feature_coding_bash::tools::coding_task_list::CodingTaskListTool);
-                registry
-                    .register(feature_coding_bash::tools::coding_task_output::CodingTaskOutputTool);
-                registry.register(feature_coding_bash::tools::coding_task_stop::CodingTaskStopTool);
-                info!("Coding tool kit registered (13 tools + 3 background bash companions)");
+                info!("Tool kit registered");
             }
             let kit_arc = Arc::new(kit);
             core.agent.runtime().set_tool_kit(Arc::clone(&kit_arc));
             core.agent.set_subagent_tool_kit(Arc::clone(&kit_arc));
-            // Sprint-A T2: stash for review_handler to build a read-only registry.
-            *core.tool_kit.lock().unwrap() = Some(Arc::clone(&kit_arc));
             if let Some(ref engine) = hook_engine {
                 core.agent.runtime().set_hook_engine(Arc::clone(engine));
                 core.agent.set_subagent_hook_engine(Arc::clone(engine));
             }
-            // Bridge subagent lifecycle events from agent crate to app-core broker.
-            // The agent uses `SubagentLifecycleEvent` while the UI broker uses
-            // `desktop_shared::coding::SubagentEvent`; they are structurally identical
-            // except for the `Cancelled` reason type (String vs enum).
-            {
-                let (tx, mut rx) = tokio::sync::broadcast::channel::<
-                    ::agent::subagent_events::SubagentLifecycleEvent,
-                >(256);
-                core.agent.set_subagent_event_sender(tx);
-                let broker = core.subagent_events.clone();
-                tokio::spawn(async move {
-                    loop {
-                        match rx.recv().await {
-                            Ok(ev) => {
-                                let mapped = match ev {
-                                    ::agent::subagent_events::SubagentLifecycleEvent::Spawned {
-                                        agent_id,
-                                        label,
-                                        profile,
-                                        parent_session_id,
-                                        spawned_at,
-                                    } => desktop_shared::coding::SubagentEvent::Spawned {
-                                        agent_id,
-                                        label,
-                                        profile,
-                                        parent_session_id,
-                                        spawned_at,
-                                    },
-                                    ::agent::subagent_events::SubagentLifecycleEvent::Progress {
-                                        agent_id,
-                                        iteration,
-                                        last_tool,
-                                    } => desktop_shared::coding::SubagentEvent::Progress {
-                                        agent_id,
-                                        iteration,
-                                        last_tool,
-                                    },
-                                    ::agent::subagent_events::SubagentLifecycleEvent::Completed {
-                                        agent_id,
-                                        success,
-                                        summary,
-                                        tokens_used,
-                                        duration_ms,
-                                    } => desktop_shared::coding::SubagentEvent::Completed {
-                                        agent_id,
-                                        success,
-                                        summary,
-                                        tokens_used,
-                                        duration_ms,
-                                    },
-                                    ::agent::subagent_events::SubagentLifecycleEvent::Cancelled {
-                                        agent_id,
-                                        reason: _,
-                                        cancelled_at,
-                                    } => desktop_shared::coding::SubagentEvent::Cancelled {
-                                        agent_id,
-                                        reason: desktop_shared::coding::SubagentCancelReason::UserRequested,
-                                        cancelled_at,
-                                    },
-                                };
-                                broker.publish(mapped);
-                            }
-                            Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
-                            Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
-                        }
-                    }
-                });
-            }
+            // Subagent event bridging removed with coding mode deletion.
         }
 
         // ── Register TemporalTool in agent's tool registry (post-init) ────
@@ -2100,26 +1628,6 @@ impl AppCore {
             let mut registry = reg.write().await;
             registry.register(tools::TemporalTool::new(temporal_service));
             info!("Temporal tool registered");
-        }
-
-        // ── Register CodingBashFeature tools in agent's tool registry (post-init) ─
-        if let Some(ref supervisor) = core.job_supervisor {
-            use tools_core::FeaturePackage;
-            let reg = core.agent.tool_registry();
-            let mut registry = reg.write().await;
-            let event_bus = core
-                .domain_event_bus
-                .clone()
-                .expect("domain_event_bus initialized before tool registration");
-            let bash_feature = feature_coding_bash::CodingBashFeature::new(
-                Arc::clone(supervisor),
-                supervisor.repo().clone(),
-                event_bus,
-            );
-            for tool in bash_feature.tools() {
-                registry.register_dyn(tool);
-            }
-            info!("Coding bash tools registered");
         }
 
         // ── Background note embedding catch-up ────────────────────────────
@@ -2196,11 +1704,6 @@ impl AppCore {
             dashboard_poll_interval_secs,
             distraction_alert_rx,
         };
-
-        coding_skills::init_coding_skills(&core)
-            .await
-            .map_err(|e| format!("init_coding_skills: {e}"))?;
-        coding_retention::init_coding_retention(&core);
 
         Ok((core, channels))
     }

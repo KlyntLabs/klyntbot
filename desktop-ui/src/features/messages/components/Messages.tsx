@@ -1,11 +1,6 @@
 import { PlanReadyFollowupMessage } from "@app/components/PlanReadyFollowupMessage";
 import { RequestUserInputMessage } from "@app/components/RequestUserInputMessage";
 import { memo, useCallback, useMemo } from "react";
-import { CostCeilingBanner } from "@/features/coding/components/CostCeilingBanner";
-import { DeadEndWarning } from "@/features/coding/components/DeadEndWarning";
-import { RecallTrayCard } from "@/features/coding/components/RecallTrayCard";
-import { useApprovalQueue } from "@/features/coding/hooks/useApprovalQueue";
-import { useFileEditEvents } from "@/features/coding/hooks/useFileEditEvents";
 import type {
   ConversationItem,
   OpenAppTarget,
@@ -17,7 +12,6 @@ import { groupBursts, type BurstGroup } from "../utils/groupBursts";
 import { parseReasoning } from "../utils/messageRenderUtils";
 import { BurstRow } from "./BurstRow";
 import {
-  ApprovalRow,
   DiffRow,
   ExploreRow,
   MessageRow,
@@ -54,10 +48,6 @@ type MessagesProps = {
   onPlanSubmitChanges?: (changes: string) => void;
   onOpenThreadLink?: (threadId: string, workspaceId?: string | null) => void;
   onQuoteMessage?: (text: string) => void;
-  onApprovalRespond?: (
-    requestId: string,
-    decision: import("@/features/coding/hooks/useApprovalQueue").ApprovalDecision,
-  ) => void;
 };
 
 export const Messages = memo(function Messages({
@@ -81,11 +71,7 @@ export const Messages = memo(function Messages({
   onPlanSubmitChanges,
   onOpenThreadLink,
   onQuoteMessage,
-  onApprovalRespond,
 }: MessagesProps) {
-  const { respond: approvalRespond } = useApprovalQueue(threadId ?? "");
-  useFileEditEvents(threadId ?? "");
-  const handleApprovalRespond = onApprovalRespond ?? approvalRespond;
   const activeUserInputRequestId =
     threadId && userInputRequests.length
       ? (userInputRequests.find(
@@ -229,27 +215,6 @@ export const Messages = memo(function Messages({
     if (item.kind === "explore") {
       return <ExploreRow item={item} />;
     }
-    if (item.kind === "approval") {
-      return <ApprovalRow item={item} onRespond={handleApprovalRespond} />;
-    }
-    if (item.kind === "recall") {
-      return (
-        <RecallTrayCard
-          memoryIds={item.memory_ids}
-          coverageScore={item.coverage_score}
-          snippets={item.snippets}
-        />
-      );
-    }
-    if (item.kind === "dead_end_warning") {
-      return (
-        <DeadEndWarning
-          approachSummary={item.approach_summary}
-          priorAttemptId={item.prior_attempt_id}
-          confidence={item.confidence}
-        />
-      );
-    }
     return null;
   };
 
@@ -286,7 +251,6 @@ export const Messages = memo(function Messages({
   return (
     <div className="messages messages-full" ref={containerRef} onScroll={updateAutoScroll}>
       <div className="messages-inner">
-        <CostCeilingBanner sessionKey={threadId ?? ""} />
         <VirtualizedMessageList
           items={grouped}
           renderItem={renderGroupedEntry}

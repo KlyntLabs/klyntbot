@@ -24,9 +24,6 @@ pub enum ContextUpdateReason {
     CommunityDiscovered,
     CommunityUpdated,
     CommunityWeakened,
-    CodingTodoChanged,
-    CodingPlanRatified,
-    CodingJobsChanged,
     Custom(String),
 }
 
@@ -42,9 +39,6 @@ impl ContextUpdateReason {
             Self::CommunityDiscovered => "community_discovered",
             Self::CommunityUpdated => "community_updated",
             Self::CommunityWeakened => "community_weakened",
-            Self::CodingTodoChanged => "coding_todo_changed",
-            Self::CodingPlanRatified => "coding_plan_ratified",
-            Self::CodingJobsChanged => "coding_jobs_changed",
             Self::Custom(s) => s,
         }
     }

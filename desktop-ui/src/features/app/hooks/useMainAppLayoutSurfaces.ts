@@ -1,5 +1,4 @@
 import type { SidebarProps } from "@app/components/Sidebar";
-import { useAppMode } from "@app/hooks/useAppMode";
 import type { useMainAppComposerWorkspaceState } from "@app/hooks/useMainAppComposerWorkspaceState";
 import type { useMainAppDisplayNodes } from "@app/hooks/useMainAppDisplayNodes";
 import type { useMainAppGitState } from "@app/hooks/useMainAppGitState";
@@ -9,7 +8,6 @@ import type { useMainAppWorktreeState } from "@app/hooks/useMainAppWorktreeState
 import { REMOTE_THREAD_POLL_INTERVAL_MS } from "@app/hooks/useRemoteThreadRefreshOnFocus";
 import type { WorkspaceLaunchScriptsState } from "@app/hooks/useWorkspaceLaunchScripts";
 import type { RefObject } from "react";
-import { useCodingSessions } from "@/features/coding/hooks/useCodingSessions";
 import type { LayoutNodesOptions } from "@/features/layout/hooks/layoutNodes/types";
 import { useLoadedContextFiles } from "@/features/prompts/hooks/useLoadedContextFiles";
 import type { ThreadState } from "@/features/threads/hooks/useThreadsReducer";
@@ -245,14 +243,11 @@ type UseMainAppLayoutSurfacesArgs = {
 
 type MainAppLayoutSurfacesContext = UseMainAppLayoutSurfacesArgs & {
   loadedContextFiles: Array<{ label: string; path: string }>;
-  codingWorkspaceIdByThread: Map<string, string>;
 };
 
 function buildPrimarySurface({
   appSettings,
   workspaces,
-  codingWorkspaceIdByThread,
-  threadsByWorkspace,
   threadStatusById,
   threadResumeLoadingById,
   activeWorkspace,
@@ -363,7 +358,6 @@ function buildPrimarySurface({
   errorToasts,
   dismissErrorToast,
   chatView,
-  promptActions,
 }: MainAppLayoutSurfacesContext): LayoutNodesOptions["primary"] {
   return {
     sidebarProps: {
@@ -376,7 +370,6 @@ function buildPrimarySurface({
       selectedSessionKey: chatView.selectedSessionKey,
       onSelectThread: chatView.onSelectThread,
       workspaces,
-      codingWorkspaceIdByThread,
     },
     chatViewProps: {
       active: chatView.appView === "chat",
@@ -559,29 +552,6 @@ function buildPrimarySurface({
         }
       },
     },
-    codeLandingProps: {
-      // Only surface main workspaces; worktrees are accessed through their parent.
-      projects: workspaces
-        .filter((ws) => (ws.kind ?? "main") === "main")
-        .map((ws) => ({
-          id: ws.id,
-          name: ws.name,
-          branch: ws.worktree?.branch ?? null,
-          sessionCount: (threadsByWorkspace[ws.id] ?? []).length,
-        })),
-      // From the "What should we build today?" landing, the click semantics
-      // are "start fresh in this project" — clear the per-workspace active
-      // thread first so the workspace home view appears (composer ready, no
-      // resumed session). Existing sessions are not deleted; they remain in
-      // the sidebar and can be reopened with a single click.
-      onSelectProject: (workspaceId: string) => {
-        threadNavigation.setActiveThreadId(null, workspaceId);
-        threadNavigation.selectWorkspace(workspaceId);
-      },
-      onAddProject: handleAddWorkspace,
-      onImportProject: openWorkspaceFromUrlPrompt,
-      onSubmitTask: activeWorkspace ? promptActions.handleSendPromptToNewAgent : undefined,
-    },
     mainHeaderProps: activeWorkspace
       ? {
           workspace: activeWorkspace,
@@ -632,7 +602,6 @@ function buildPrimarySurface({
 function buildGitSurface({
   appSettings,
   activeWorkspace,
-  activeThreadId,
   gitState,
   composerWorkspaceState,
   promptActions,
@@ -684,11 +653,6 @@ function buildGitSurface({
       onRevealGeneralPrompts: promptActions.handleRevealGeneralPrompts,
       canRevealGeneralPrompts: Boolean(activeWorkspace),
       loadedContextFiles,
-    },
-    activityPanelProps: {
-      threadId: activeThreadId,
-      filePanelMode: gitState.filePanelMode,
-      onFilePanelModeChange: gitState.setFilePanelMode,
     },
     gitDiffPanelProps: {
       workspaceId: activeWorkspace?.id ?? null,
@@ -1032,19 +996,8 @@ export function useMainAppLayoutSurfaces({
   handleDebugClick,
   chatView,
 }: UseMainAppLayoutSurfacesArgs): LayoutNodesOptions {
-  const { mode } = useAppMode();
-  const codingSessions = useCodingSessions({ enabled: mode === "code" });
-
-  const sidebarThreads = mode === "code" ? codingSessions.threads : chatView.chatThreads;
+  const sidebarThreads = chatView.chatThreads;
   const onSelectThread = (sessionKey: string) => {
-    if (mode === "code") {
-      const workspaceId = codingSessions.workspaceIdBySessionKey.get(sessionKey);
-      if (workspaceId) {
-        threadNavigation.selectWorkspace(workspaceId);
-        threadNavigation.setActiveThreadId(sessionKey, workspaceId);
-      }
-      return;
-    }
     chatView.onSelectThread(sessionKey);
   };
 
@@ -1055,7 +1008,6 @@ export function useMainAppLayoutSurfaces({
 
   const context: MainAppLayoutSurfacesContext = {
     loadedContextFiles,
-    codingWorkspaceIdByThread: codingSessions.workspaceIdBySessionKey,
     appSettings,
     workspaces,
     groupedWorkspaces,

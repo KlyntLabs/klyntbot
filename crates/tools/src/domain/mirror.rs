@@ -8,7 +8,6 @@ use std::sync::Arc;
 use common::Result;
 use tools_core::{tool_actions, ActionParams, RoutingContext};
 
-use coding_memory::mirror::coding_alerts_query::{CodingAlertFilter, CodingAlertsQuery};
 use cognitive::mirror::MirrorFacade;
 
 // ---------------------------------------------------------------------------
@@ -36,38 +35,17 @@ pub struct GetBrainVersionsParams {}
 #[derive(Debug, ActionParams)]
 pub struct GetMetaRulesParams {}
 
-#[derive(Debug, ActionParams)]
-pub struct GetCodingAlertsParams {
-    /// Filter by `CodingMirrorAlertKind` string form.
-    pub kind: Option<String>,
-    /// Filter by `MirrorAlertSeverity` string form.
-    pub severity: Option<String>,
-    /// Filter by repo id (matched against payload).
-    pub repo: Option<String>,
-    /// Max rows (default: 50).
-    pub limit: Option<i64>,
-}
-
 // ---------------------------------------------------------------------------
 // MirrorTool
 // ---------------------------------------------------------------------------
 
 pub struct MirrorTool {
     facade: Arc<MirrorFacade>,
-    coding_alerts: Option<CodingAlertsQuery>,
 }
 
 impl MirrorTool {
     pub fn new(facade: Arc<MirrorFacade>) -> Self {
-        Self {
-            facade,
-            coding_alerts: None,
-        }
-    }
-
-    pub fn with_coding_alerts(mut self, query: CodingAlertsQuery) -> Self {
-        self.coding_alerts = Some(query);
-        self
+        Self { facade }
     }
 }
 
@@ -134,32 +112,6 @@ impl MirrorTool {
         serde_json::to_string_pretty(&versions).map_err(|e| {
             common::KlyntbotError::Tool(common::ToolError::ExecutionFailed(format!(
                 "Failed to serialize brain versions: {e}"
-            )))
-        })
-    }
-
-    /// Return Phase-5 coding mirror alerts (problem-class refactor cues,
-    /// stale-memory candidates, project-skill drift, etc.) optionally filtered
-    /// by kind, severity, or repo id.
-    #[action(name = "get_coding_alerts")]
-    async fn get_coding_alerts(
-        &self,
-        params: GetCodingAlertsParams,
-        _ctx: &RoutingContext,
-    ) -> Result<String> {
-        let Some(query) = self.coding_alerts.as_ref() else {
-            return Ok("[]".to_string());
-        };
-        let filter = CodingAlertFilter {
-            kind: params.kind,
-            severity: params.severity,
-            repo: params.repo,
-            limit: params.limit.unwrap_or(50).max(0) as u32,
-        };
-        let rows = query.query(&filter).await?;
-        serde_json::to_string_pretty(&rows).map_err(|e| {
-            common::KlyntbotError::Tool(common::ToolError::ExecutionFailed(format!(
-                "Failed to serialize coding alerts: {e}"
             )))
         })
     }

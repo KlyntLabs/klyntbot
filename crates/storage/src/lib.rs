@@ -71,9 +71,6 @@ pub use repos::{
     FinanceTransactionRepo,
 };
 
-// ── Background jobs ─────────────────────────────────────────────────
-pub use repos::{BashJobRepo, BashJobRow};
-
 // ── Row structs ─────────────────────────────────────────────────────
 pub use rows::agent_task::AgentTaskRow;
 pub use rows::area::AreaRow;

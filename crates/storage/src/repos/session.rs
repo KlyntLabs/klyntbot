@@ -1,6 +1,5 @@
 //! Session repository — sessions + session_messages tables.
 
-use sqlx::Row;
 use sqlx::SqlitePool;
 
 use crate::error::{OptionExt, StorageError};
@@ -777,41 +776,6 @@ impl SessionRepo {
         let anchor_uuid = uuid::Uuid::parse_str(anchor_id)
             .map_err(|e| StorageError::NotFound(format!("invalid anchor uuid: {e}")))?;
 
-        // Restore ghost snapshots recorded after the anchor message.
-        // We only need the earliest snapshot per repo (MIN id) because each
-        // ghost commit captures the full tree state; later ghosts for the same
-        // repo would overwrite earlier ones.
-        let ghost_rows = sqlx::query(
-            "SELECT ghost_commit_sha, ghost_repo_root, ghost_preexisting_untracked_json \
-             FROM coding_snapshots \
-             WHERE session_key = ? AND ghost_commit_sha IS NOT NULL \
-             AND id > COALESCE( \
-               (SELECT MAX(id) FROM coding_snapshots WHERE session_key = ? AND message_id = ?), 0 \
-             ) GROUP BY ghost_repo_root ORDER BY MIN(id) ASC",
-        )
-        .bind(session_key)
-        .bind(session_key)
-        .bind(anchor_id)
-        .fetch_all(&self.pool)
-        .await?;
-
-        for row in ghost_rows {
-            let sha: String = row.try_get("ghost_commit_sha")?;
-            let root: String = row.try_get("ghost_repo_root")?;
-            let preexisting_json: Option<String> =
-                row.try_get("ghost_preexisting_untracked_json")?;
-            let preexisting: Vec<std::path::PathBuf> = preexisting_json
-                .and_then(|j| serde_json::from_str(&j).ok())
-                .unwrap_or_default();
-            let ghost =
-                klynt_git_utils::GhostCommit::new(sha.clone(), None, preexisting, Vec::new());
-            if let Err(e) =
-                klynt_git_utils::restore_ghost_commit(std::path::Path::new(&root), &ghost).await
-            {
-                tracing::error!(?e, ghost_sha = %sha, "ghost restore failed");
-            }
-        }
-
         let res = sqlx::query(
             "DELETE FROM session_messages WHERE session_key = ? AND id IN ( \
                 SELECT id FROM session_messages WHERE session_key = ? \
@@ -1074,17 +1038,16 @@ impl SessionRepo {
         &self,
         session_key: &str,
         parent_session_id: &str,
-        workspace_path: &str,
+        _workspace_path: &str,
     ) -> Result<(), StorageError> {
         sqlx::query(
             r#"
-            INSERT INTO sessions (key, mode, parent_session_id, cwd)
-            VALUES (?1, 'subagent', ?2, ?3)
+            INSERT INTO sessions (key, mode, parent_session_id)
+            VALUES (?1, 'subagent', ?2)
             "#,
         )
         .bind(session_key)
         .bind(parent_session_id)
-        .bind(workspace_path)
         .execute(&self.pool)
         .await?;
         Ok(())
@@ -1117,23 +1080,6 @@ pub struct SessionMessageWithParts {
 mod tests {
 
     #[tokio::test]
-    async fn upsert_session_with_mode_persists_coding() {
-        let pool = crate::StoragePool::connect_in_memory().await.unwrap();
-        let repos = crate::Repos::from_pool(&pool);
-        let row = repos
-            .sessions
-            .upsert_session_with_mode(
-                "coding:abc",
-                common::SessionMode::Coding,
-                &serde_json::json!({}),
-            )
-            .await
-            .unwrap();
-        assert_eq!(row.mode, "coding");
-        assert_eq!(row.session_mode(), common::SessionMode::Coding);
-    }
-
-    #[tokio::test]
     async fn upsert_session_defaults_to_assistant() {
         let pool = crate::StoragePool::connect_in_memory().await.unwrap();
         let repos = crate::Repos::from_pool(&pool);
@@ -1152,22 +1098,22 @@ mod tests {
         repos
             .sessions
             .upsert_session_with_mode(
-                "coding:k",
-                common::SessionMode::Coding,
+                "sub:k",
+                common::SessionMode::Subagent,
                 &serde_json::json!({"v": 1}),
             )
             .await
             .unwrap();
-        // Re-upsert with assistant mode — mode column must stay "coding".
+        // Re-upsert with assistant mode — mode column must stay "subagent".
         let row = repos
             .sessions
             .upsert_session_with_mode(
-                "coding:k",
+                "sub:k",
                 common::SessionMode::Assistant,
                 &serde_json::json!({"v": 2}),
             )
             .await
             .unwrap();
-        assert_eq!(row.mode, "coding");
+        assert_eq!(row.mode, "subagent");
     }
 }

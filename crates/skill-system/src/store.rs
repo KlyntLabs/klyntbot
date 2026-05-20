@@ -36,10 +36,6 @@ const DEFAULT_SKILLS: &[(&str, &str)] = &[
         "learning.md",
         include_str!("../../../skills/learning/SKILL.md"),
     ),
-    (
-        "coding-orchestrator.md",
-        include_str!("../../../skills/coding-orchestrator/SKILL.md"),
-    ),
 ];
 
 // ── Types ────────────────────────────────────────────────────

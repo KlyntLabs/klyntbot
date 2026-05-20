@@ -14,15 +14,6 @@ pub struct ActivationConfig {
     pub max_active_skills: usize,
 }
 
-impl ActivationConfig {
-    pub fn from_coding_config(c: &config::schema::CodingSkillsConfig) -> Self {
-        Self {
-            always_activate: c.always_activate.clone(),
-            never_activate: c.never_activate.clone(),
-            max_active_skills: c.max_active_skills.try_into().unwrap_or(30),
-        }
-    }
-}
 
 pub(crate) struct ConditionalSkill {
     pub name: String,

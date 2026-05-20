@@ -126,7 +126,7 @@ CREATE INDEX idx_task_groups_project_id ON task_groups(project_id);
 CREATE TABLE sessions (
     key        TEXT PRIMARY KEY,
     mode       TEXT NOT NULL DEFAULT 'assistant'
-                 CHECK (mode IN ('assistant', 'coding', 'subagent')),
+                 CHECK (mode IN ('assistant', 'subagent')),
     metadata   TEXT NOT NULL DEFAULT '{}',
     created_at INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
     updated_at INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
@@ -136,11 +136,6 @@ CREATE TABLE sessions (
     compressed_prefix      TEXT,
     compressed_through_idx INTEGER,
     compressed_at          INTEGER,
-    -- Coding-in-chat columns (added 2026-04-29 per spec 2026-04-29-klynt-coding-in-chat-design.md §11)
-    cwd                    TEXT,
-    repo_id                TEXT,
-    repo_branch            TEXT,
-    tool_profile           TEXT,
     approval_mode          TEXT NOT NULL DEFAULT 'default',
     total_cost_usd         REAL NOT NULL DEFAULT 0,
     total_tokens           INTEGER NOT NULL DEFAULT 0,
@@ -877,27 +872,6 @@ CREATE TABLE IF NOT EXISTS approval_grants (
 CREATE INDEX IF NOT EXISTS idx_approval_grants_lookup
     ON approval_grants(tool_name, action, class, resource_key, session_id);
 
--- Phase 2: file snapshots for /sessions rewind
-CREATE TABLE IF NOT EXISTS coding_snapshots (
-    id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    session_key     TEXT NOT NULL,
-    message_id      TEXT,                    -- which assistant turn produced the edit (nullable)
-    file_path       TEXT NOT NULL,
-    content_before  BLOB NOT NULL,           -- raw bytes pre-edit; '' if file did not exist OR ghost-mode
-    file_existed    INTEGER NOT NULL DEFAULT 1,  -- 0 means restoring should delete the file
-    content_hash    TEXT NOT NULL,           -- blake3 of content_before; sha "ghost" when ghost_commit_sha is set
-    ghost_commit_sha TEXT NULL,              -- when set, restore via klynt_git_utils::restore_ghost_commit instead of BLOB
-    ghost_repo_root  TEXT NULL,              -- absolute path of the git repo at snapshot time
-    ghost_preexisting_untracked_json TEXT NULL,  -- JSON array of preexisting untracked file paths at snapshot time
-    created_at      INTEGER NOT NULL DEFAULT (cast(strftime('%s','now') as integer))
-);
-
-CREATE INDEX IF NOT EXISTS idx_coding_snapshots_session
-  ON coding_snapshots(session_key, created_at);
-
-CREATE INDEX IF NOT EXISTS idx_coding_snapshots_ghost
-  ON coding_snapshots(session_key, ghost_commit_sha) WHERE ghost_commit_sha IS NOT NULL;
-
 -- ============================================================
 -- Workspaces (code editor workspace lifecycle, Cursor/Codex-style)
 -- ============================================================
@@ -921,25 +895,6 @@ CREATE TABLE IF NOT EXISTS workspaces (
 CREATE INDEX IF NOT EXISTS idx_workspaces_path ON workspaces(path);
 CREATE INDEX IF NOT EXISTS idx_workspaces_project_id ON workspaces(project_id);
 CREATE INDEX IF NOT EXISTS idx_workspaces_parent_id ON workspaces(parent_id);
-
--- Phase 2: Mirror-learned approval cache (Layer 3)
--- Append-only log of every ApprovalResolved event keyed by (tool, args_hash, repo_id).
-CREATE TABLE IF NOT EXISTS coding_approval_history (
-    id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    tool            TEXT NOT NULL,
-    args_hash       TEXT NOT NULL,
-    repo_id         TEXT NOT NULL DEFAULT '',
-    decision        TEXT NOT NULL,           -- 'allow' | 'deny'
-    decided_by      TEXT NOT NULL,           -- 'user' | 'auto_allow' | 'auto_deny' | 'timeout' | 'cancelled'
-    layer           TEXT NOT NULL,           -- which layer fired
-    created_at      INTEGER NOT NULL DEFAULT (cast(strftime('%s','now') as integer))
-);
-
-CREATE INDEX IF NOT EXISTS idx_coding_approval_history_key
-  ON coding_approval_history(tool, args_hash, repo_id);
-
-CREATE INDEX IF NOT EXISTS idx_coding_approval_history_clear
-  ON coding_approval_history(tool, repo_id);
 
 -- Phase 2: Mirror path-based approval pattern history
 CREATE TABLE IF NOT EXISTS approval_pattern_history (

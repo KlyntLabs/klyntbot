@@ -109,12 +109,10 @@ pub fn derive(input: TokenStream) -> TokenStream {
 
     let allowed_channels_impl = if let Some(channels) = allowed_channels {
         let mask_expr = match channels.as_str() {
-            "coding_only"   => quote! { ::common::ChannelMask::CODING_ONLY },
             "desktop_only"  => quote! { ::common::ChannelMask::DESKTOP_ONLY },
-            "non_coding"    => quote! { ::common::ChannelMask::NON_CODING },
             "all"           => quote! { ::common::ChannelMask::ALL },
             other => panic!(
-                "#[tool(allowed_channels = \"{}\")] is invalid. Use \"all\", \"coding_only\", \"desktop_only\", or \"non_coding\"",
+                "#[tool(allowed_channels = \"{}\")] is invalid. Use \"all\" or \"desktop_only\"",
                 other
             ),
         };

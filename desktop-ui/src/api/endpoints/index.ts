@@ -1,6 +1,5 @@
 export * from "./agents";
 export * from "./apps";
-export * as codingMemory from "./codingMemory";
 export * from "./collaboration";
 export * as cost from "./cost";
 export * from "./dashboard";

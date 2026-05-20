@@ -1027,7 +1027,6 @@ async fn test_reforge_cycle_end_to_end() {
         None, // no community repo
         None, // no co_activation repo for split
         None, // no domain event bus
-        None, // no coding phase runner
         None, // no cross-cli runner
         None, // no skill discovery runner
     )
@@ -1219,7 +1218,6 @@ async fn test_reforge_phase6_with_autotuner_bridge() {
         None, // no community repo
         None, // no co_activation repo for split
         None, // no domain event bus
-        None, // no coding phase runner
         None, // no cross-cli runner
         None, // no skill discovery runner
     )
@@ -1389,7 +1387,6 @@ async fn test_reforge_with_feedback_signals() {
         None, // no community repo
         None, // no co_activation repo for split
         None, // no domain event bus
-        None, // no coding phase runner
         None, // no cross-cli runner
         None, // no skill discovery runner
     )

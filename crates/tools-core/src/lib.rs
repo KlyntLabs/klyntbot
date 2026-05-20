@@ -107,7 +107,6 @@ pub trait Tool: Send + Sync {
     }
 
     /// Channels in which this tool is visible to the LLM. Default = ALL.
-    /// Override to restrict — tools that need approval UI return CODING_ONLY.
     fn allowed_channels(&self) -> common::ChannelMask {
         common::ChannelMask::ALL
     }

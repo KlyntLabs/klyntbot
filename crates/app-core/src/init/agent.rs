@@ -39,13 +39,8 @@ pub(super) async fn init_agent(
     hot_config: Arc<RwLock<config::HotConfig>>,
     context_update_queue: Option<Arc<bus::ContextUpdateQueue>>,
     embedding_engine: Option<Arc<tools::EmbeddingEngine>>,
-    coding_recall: Option<Arc<coding_memory::recall::CodingRecallService>>,
     approval_channel: Option<Arc<dyn approval::ApprovalChannel>>,
-    coding_policies: Option<
-        Arc<dashmap::DashMap<String, Arc<parking_lot::RwLock<approval::CodingApprovalPolicy>>>>,
-    >,
     injector_registry: Option<bus::InjectorRegistry>,
-    job_supervisor: Option<tools_core::DynJobSupervisor>,
 ) -> Result<AgentResult, String> {
     // Run activity-log migrations (unified activity log).
     StoragePool::run_feature_migrations(
@@ -102,19 +97,11 @@ pub(super) async fn init_agent(
         builder = builder.with_context_update_queue(queue);
     }
 
-    builder = builder.with_coding_recall_service(coding_recall);
-
     if let Some(channel) = approval_channel {
         builder = builder.with_approval_channel(channel);
     }
-    if let Some(policies) = coding_policies {
-        builder = builder.with_coding_policies(policies);
-    }
     if let Some(registry) = injector_registry {
         builder = builder.with_injector_registry(registry);
-    }
-    if let Some(supervisor) = job_supervisor {
-        builder = builder.with_job_supervisor(supervisor);
     }
 
     let mut agent_loop_raw = builder

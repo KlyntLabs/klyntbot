@@ -2,7 +2,6 @@ import { ApprovalToasts } from "@app/components/ApprovalToasts";
 import { MainHeader } from "@app/components/MainHeader";
 import { SidebarChatLayout } from "@app/components/SidebarChatLayout";
 import ArrowLeft from "lucide-react/dist/esm/icons/arrow-left";
-import { CodeLanding } from "@/features/coding/components/CodeLanding";
 import { Composer } from "@/features/composer/components/Composer";
 import { Home } from "@/features/home/components/Home";
 import { Messages } from "@/features/messages/components/Messages";
@@ -21,7 +20,6 @@ type PrimaryLayoutNodes = Pick<
   | "updateToastNode"
   | "errorToastsNode"
   | "homeNode"
-  | "codeLandingNode"
   | "mainHeaderNode"
   | "desktopTopbarLeftNode"
 >;
@@ -37,8 +35,6 @@ export function buildPrimaryNodes(options: PrimaryLayoutNodesOptions): PrimaryLa
       threads={options.sidebarProps.threads}
       selectedSessionKey={options.sidebarProps.selectedSessionKey}
       onSelectThread={options.sidebarProps.onSelectThread}
-      workspaces={options.sidebarProps.workspaces}
-      codingWorkspaceIdByThread={options.sidebarProps.codingWorkspaceIdByThread}
     />
   );
 
@@ -50,7 +46,6 @@ export function buildPrimaryNodes(options: PrimaryLayoutNodesOptions): PrimaryLa
   const updateToastNode = <UpdateToast {...options.updateToastProps} />;
   const errorToastsNode = <ErrorToasts {...options.errorToastsProps} />;
   const homeNode = <Home {...options.homeProps} />;
-  const codeLandingNode = <CodeLanding {...options.codeLandingProps} />;
   const mainHeaderNode = options.mainHeaderProps ? (
     <MainHeader {...options.mainHeaderProps} />
   ) : null;
@@ -79,7 +74,6 @@ export function buildPrimaryNodes(options: PrimaryLayoutNodesOptions): PrimaryLa
     updateToastNode,
     errorToastsNode,
     homeNode,
-    codeLandingNode,
     mainHeaderNode,
     desktopTopbarLeftNode,
   };

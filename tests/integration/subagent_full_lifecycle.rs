@@ -24,7 +24,6 @@ async fn full_lifecycle_spawn_list_resume_kill() {
         model: "test".to_string(),
         tool_kit: None,
         hook_engine: None,
-        coding_policies: None,
         job_supervisor: None,
         event_tx: std::sync::Arc::new(std::sync::Mutex::new(None)),
     };
@@ -100,7 +99,6 @@ async fn spawn_with_parent_agent_id_filters_correctly() {
         model: "test".to_string(),
         tool_kit: None,
         hook_engine: None,
-        coding_policies: None,
         job_supervisor: None,
         event_tx: std::sync::Arc::new(std::sync::Mutex::new(None)),
     };

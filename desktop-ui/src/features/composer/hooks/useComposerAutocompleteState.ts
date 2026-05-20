@@ -7,7 +7,6 @@ import {
 import { isComposingEvent } from "@utils/keys";
 import { useCallback, useMemo } from "react";
 import { connectorMentionSlug } from "@/features/apps/utils/appMentions";
-import { FLAT_CATALOG } from "@/features/coding/slash/registry";
 import type { AppOption, CustomPromptOption } from "@/types";
 import type { AutocompleteItem } from "./useComposerAutocomplete";
 import { useComposerAutocomplete } from "./useComposerAutocomplete";
@@ -219,27 +218,7 @@ export function useComposerAutocompleteState({
         group: "Slash",
       });
     }
-    // Derived from FLAT_CATALOG so new registry entries surface automatically.
-    const coding: AutocompleteItem[] = FLAT_CATALOG.map((entry) => {
-      const stripped = entry.command.replace(/^\//, "");
-      const insert = entry.argHint ? `${stripped} ${entry.argHint}` : stripped;
-      return {
-        id: stripped,
-        label: stripped,
-        description: entry.description,
-        insertText: insert,
-        cursorOffset: entry.argHint ? stripped.length + 1 : undefined,
-        group: "Slash" as const,
-      };
-    });
-    const seen = new Set<string>();
-    const merged: AutocompleteItem[] = [];
-    for (const item of [...generic, ...coding]) {
-      if (seen.has(item.id)) continue;
-      seen.add(item.id);
-      merged.push(item);
-    }
-    return merged.sort((a, b) => a.label.localeCompare(b.label));
+    return generic.sort((a, b) => a.label.localeCompare(b.label));
   }, [appsEnabled]);
 
   const slashItems = useMemo<AutocompleteItem[]>(

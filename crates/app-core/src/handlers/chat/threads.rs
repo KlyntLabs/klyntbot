@@ -212,18 +212,6 @@ impl AppCore {
 
     #[tracing::instrument(skip(self), err)]
     pub async fn chat_delete_thread(&self, session_key: String) -> Result<(), ApiError> {
-        // Phase 2.3a — reap any live background bash jobs before deleting the thread
-        if let Some(ref supervisor) = self.job_supervisor {
-            match supervisor.reap_session(&session_key).await {
-                Ok(n) if n > 0 => {
-                    tracing::info!(session = %session_key, count = n, "reaped background jobs on thread delete")
-                }
-                Ok(_) => {}
-                Err(e) => {
-                    tracing::warn!(session = %session_key, "failed to reap background jobs: {e}")
-                }
-            }
-        }
         chat_delete_thread(
             &self.repos,
             &self.active_streams,

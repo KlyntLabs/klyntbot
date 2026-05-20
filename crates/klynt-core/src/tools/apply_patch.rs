@@ -38,7 +38,7 @@ pub struct ApplyPatchArgs {
     category = "FileSystem",
     cost = "Free",
     tags = "fs,patch,coding",
-    allowed_channels = "coding_only",
+    allowed_channels = "all",
     approval_class = "destructive",
     approval_scope = "path"
 )]
@@ -49,7 +49,6 @@ pub struct ApplyPatchTool {
     bus: Arc<DomainEventBus>,
     non_ui_policy: common::tool_channel::NonUiPolicy,
     pub snapshot_repo: Option<std::sync::Arc<crate::snapshots::SnapshotRepo>>,
-    pub history_repo: Option<std::sync::Arc<storage::repos::CodingApprovalHistoryRepo>>,
     pub mirror_learning_enabled: bool,
     pub mirror_min_approvals: u32,
     pub mirror_cooldown_seconds: i64,
@@ -71,7 +70,6 @@ impl ApplyPatchTool {
             bus,
             non_ui_policy,
             snapshot_repo: None,
-            history_repo: None,
             mirror_learning_enabled: false,
             mirror_min_approvals: 5,
             mirror_cooldown_seconds: 86400,
@@ -102,7 +100,6 @@ impl ToolExecute for ApplyPatchTool {
             ctx.hook_engine.clone(),
             session_id,
             self.snapshot_repo.clone(),
-            self.history_repo.clone(),
             self.mirror_learning_enabled,
             self.mirror_min_approvals,
             self.mirror_cooldown_seconds,
@@ -127,7 +124,6 @@ pub async fn run_for_test(
     hook_engine: Option<Arc<klynt_hooks::HookEngine>>,
     session_id: String,
     snapshot_repo: Option<std::sync::Arc<crate::snapshots::SnapshotRepo>>,
-    _history_repo: Option<std::sync::Arc<storage::repos::CodingApprovalHistoryRepo>>,
     _mirror_learning_enabled: bool,
     _mirror_min_approvals: u32,
     _mirror_cooldown_seconds: i64,
@@ -232,7 +228,6 @@ pub async fn run_for_test(
                 bytes: final_content.len() as u64,
                 diff_full: args.patch.clone(),
             },
-            None,
         )
         .await;
         Ok(format!(
