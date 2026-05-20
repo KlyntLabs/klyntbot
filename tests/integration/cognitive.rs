@@ -521,7 +521,6 @@ async fn test_cognitive_context_source_with_facts() {
         channel: "test".into(),
         chat_id: "c1".into(),
         message: None,
-        intent_summary: None,
         project_id: None,
         session_mode: common::SessionMode::Assistant,
     };
@@ -545,7 +544,6 @@ async fn test_cognitive_context_source_empty_returns_none() {
         channel: "test".into(),
         chat_id: "c1".into(),
         message: None,
-        intent_summary: None,
         project_id: None,
         session_mode: common::SessionMode::Assistant,
     };

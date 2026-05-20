@@ -43,6 +43,9 @@ async fn k4_sandbox_event_emitted_before_exec() {
             run_in_background: None,
             description: None,
             silent_completion: None,
+            tty: None,
+            tty_rows: None,
+            tty_cols: None,
         },
         &routing_ctx,
     )

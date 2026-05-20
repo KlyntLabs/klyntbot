@@ -35,6 +35,9 @@ async fn bash_happy_path() {
             run_in_background: None,
             description: None,
             silent_completion: None,
+            tty: None,
+            tty_rows: None,
+            tty_cols: None,
         },
         &routing_ctx,
     )

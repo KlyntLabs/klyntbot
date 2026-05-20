@@ -219,8 +219,8 @@ mod tests {
             "Should have at least some registered tools"
         );
         assert!(
-            names.iter().any(|n| n.contains("spawn") || n == "spawn"),
-            "Should include spawn tool, got: {:?}",
+            names.iter().any(|n| n == "subagents"),
+            "Should include subagents tool (which exposes the spawn action), got: {:?}",
             names
         );
     }
