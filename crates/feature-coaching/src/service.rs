@@ -382,7 +382,7 @@ mod tests {
         // Send a budget alert AiSignal through the channel
         let budget_signal = ai_core::AiSignal {
             domain: ai_core::RecallDomain::Productivity,
-            event_kind: "FocusAlert",
+            event_kind: "BudgetAlert",
             importance: 0.9,
             salience: ai_core::SalienceVerdict::Extract,
             content: "food budget at 90%".into(),

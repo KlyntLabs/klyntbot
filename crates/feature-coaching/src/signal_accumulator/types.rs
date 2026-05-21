@@ -80,6 +80,7 @@ pub(super) fn default_conditions() -> Vec<TriggerCondition> {
         TriggerCondition::new("deadline_approaching", 3600), // 1h cooldown
         TriggerCondition::new("focus_quality_declining", 1800),
         TriggerCondition::new("budget_warning", 3600),
+        TriggerCondition::new("focus_warning", 3600),
         TriggerCondition::new("task_avoidance", 1800),
     ]
 }

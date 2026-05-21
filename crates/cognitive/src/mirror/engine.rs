@@ -125,7 +125,7 @@ mod tests {
         let built = MirrorEngine::start(repo, None, None, None, None, None, None);
         assert_eq!(
             built.consumers.len(),
-            7,
+            6,
             "routing + meta_rule + config_archiver + trial + task_focus + cost_ceiling"
         );
         for h in built.flush_handles.iter() {

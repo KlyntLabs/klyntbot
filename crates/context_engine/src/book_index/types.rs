@@ -81,7 +81,6 @@ mod tests {
             SourceType::Note,
             SourceType::Task,
             SourceType::Skill,
-            SourceType::Finance,
             SourceType::Productivity,
             SourceType::Okr,
             SourceType::Learning,

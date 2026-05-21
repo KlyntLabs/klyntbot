@@ -14,7 +14,6 @@ fn every_default_skill_filename_corresponds_to_registered_feature_skill() {
     // The skill-name is the filename minus ".md".
     let default_skill_names: Vec<&str> = vec![
         "task-management",
-        "finance-management",
         "automation",
         "notebook",
         "learning",

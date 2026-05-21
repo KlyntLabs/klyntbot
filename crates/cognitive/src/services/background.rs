@@ -1306,6 +1306,7 @@ mod tests {
         let entity_repo = crate::repos::EntityRepo::new(pool.clone());
 
         upsert_domain_entity(&entity_repo, "Groceries", "finance_category", "groceries").await;
+        upsert_domain_entity(&entity_repo, "Groceries", "finance_category", "groceries").await;
 
         let found = entity_repo.find_by_name("Groceries").await.unwrap();
         assert_eq!(found.len(), 1);

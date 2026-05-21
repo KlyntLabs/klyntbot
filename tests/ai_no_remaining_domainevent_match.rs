@@ -15,7 +15,6 @@ const ALLOWED_FILES: &[&str] = &[
     "crates/app-core/src/init/ai_pipeline.rs",
     // feature From<FeatureEvent> adapters (one per feature)
     "crates/feature-tasks/src/events.rs",
-    "crates/feature-finance/src/events.rs",
     "crates/feature-coaching/src/events.rs",
     "crates/feature-productivity/src/events.rs",
     "crates/feature-notes/src/events.rs",

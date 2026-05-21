@@ -212,9 +212,9 @@ mod tests {
         .unwrap();
         repo.insert(
             "f",
-            RecallDomain::Finance,
+            RecallDomain::Productivity,
             "X",
-            "finance content",
+            "productivity content",
             0.5,
             "extract",
             None,
@@ -228,14 +228,14 @@ mod tests {
             .recent_by_domain(RecallDomain::Tasks, 10)
             .await
             .unwrap();
-        let finance = repo
-            .recent_by_domain(RecallDomain::Finance, 10)
+        let productivity = repo
+            .recent_by_domain(RecallDomain::Productivity, 10)
             .await
             .unwrap();
         assert_eq!(tasks.len(), 1);
-        assert_eq!(finance.len(), 1);
+        assert_eq!(productivity.len(), 1);
         assert_eq!(tasks[0].id, "t");
-        assert_eq!(finance[0].id, "f");
+        assert_eq!(productivity[0].id, "f");
     }
 
     #[tokio::test]

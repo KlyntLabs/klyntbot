@@ -105,7 +105,7 @@ async fn high_importance_creates_episodic_memory() {
     );
 
     let sig = AiSignal {
-        domain: RecallDomain::Finance,
+        domain: RecallDomain::Productivity,
         event_kind: "Overspent",
         importance: 0.9,
         salience: SalienceVerdict::Accumulate,
@@ -123,7 +123,7 @@ async fn high_importance_creates_episodic_memory() {
 
     let episodic = episodic_repo.list_recent(10).await.unwrap();
     assert_eq!(episodic.len(), 1);
-    assert_eq!(episodic[0].domain, "finance");
+    assert_eq!(episodic[0].domain, "productivity");
     assert!((episodic[0].importance - 0.9).abs() < f64::EPSILON);
 }
 

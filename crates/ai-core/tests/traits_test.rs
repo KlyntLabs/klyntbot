@@ -56,7 +56,7 @@ impl RecallProvider for FakeProvider {
 fn registry_iterates_providers() {
     let reg = RecallProviderRegistry::new()
         .with(FakeProvider(RecallDomain::Tasks, 0.9))
-        .with(FakeProvider(RecallDomain::Finance, 0.4));
+        .with(FakeProvider(RecallDomain::Productivity, 0.4));
     let q = RecallQuery {
         message: "deadline".into(),
     };

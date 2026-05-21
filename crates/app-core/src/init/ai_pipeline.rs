@@ -185,6 +185,24 @@ fn translate_system_event(event: &DomainEvent) -> Option<AiSignal> {
             },
             ..base
         }),
+        DomainEvent::CoachingFeedback {
+            intervention_id,
+            response,
+        } => Some(AiSignal {
+            event_kind: "CoachingFeedback",
+            importance: 0.5,
+            content: intervention_id.clone(),
+            coaching_signal: true,
+            metrics: AiMetrics {
+                category: Some(match response {
+                    bus::FeedbackResponse::Helpful => "thumbs_up",
+                    bus::FeedbackResponse::Dismissed => "thumbs_down",
+                    bus::FeedbackResponse::StopSuggesting => "stop_suggesting",
+                }.into()),
+                ..AiMetrics::default()
+            },
+            ..base
+        }),
         _ => None,
     }
 }
@@ -311,6 +329,18 @@ mod translate_mirror_tests {
         let sig = translate(&ev).expect("should translate");
         assert_eq!(sig.event_kind, "AutotunerDecision");
     }
+
+    #[test]
+    fn coaching_feedback_translates() {
+        let ev = bus::DomainEvent::CoachingFeedback {
+            intervention_id: "i1".into(),
+            response: bus::FeedbackResponse::Helpful,
+        };
+        let sig = translate(&ev).expect("should translate");
+        assert_eq!(sig.event_kind, "CoachingFeedback");
+        assert!(sig.coaching_signal);
+        assert_eq!(sig.metrics.category.as_deref(), Some("thumbs_up"));
+    }
 }
 
 #[cfg(test)]
@@ -323,7 +353,6 @@ mod registry_build_test {
         let reg = build_feature_registry();
         for d in [
             RecallDomain::Tasks,
-            RecallDomain::Finance,
             RecallDomain::Productivity,
             RecallDomain::Notes,
             RecallDomain::Learning,

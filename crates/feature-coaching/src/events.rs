@@ -113,17 +113,6 @@ pub fn try_from_domain_event(e: &bus::DomainEvent) -> Option<CoachingEvent> {
             pattern_name: pattern_name.clone(),
             severity: *confidence,
         }),
-        DomainEvent::CoachingFeedback {
-            intervention_id,
-            response,
-        } => Some(CoachingEvent::FeedbackReceived {
-            strategy_id: intervention_id.clone(),
-            response: match response {
-                bus::FeedbackResponse::Helpful => "accept".to_string(),
-                bus::FeedbackResponse::Dismissed => "dismiss".to_string(),
-                bus::FeedbackResponse::StopSuggesting => "stop".to_string(),
-            },
-        }),
         _ => None,
     }
 }

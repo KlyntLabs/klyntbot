@@ -197,11 +197,6 @@ pub fn build_tooltip(source: &EntityRef, target: &EntityRef) -> String {
     use EntityDomain::*;
 
     match (&source.domain, &target.domain) {
-        // Task → Finance: spending angle
-        (Task, Finance) => format!(
-            "Your \"{}\" connects to {} — want me to pull the numbers?",
-            source.title, target.title
-        ),
         // Task → Note: research angle
         (Task, Note) => format!(
             "You wrote about this topic in a note — want me to pull \"{}\"?",
@@ -212,20 +207,6 @@ pub fn build_tooltip(source: &EntityRef, target: &EntityRef) -> String {
             "Last time you had a similar task you slipped — want me to block focus time?"
                 .to_string()
         }
-        // Finance → Note: insight angle
-        (Finance, Note) => {
-            "Your notes reference this expense category — want the full history?".to_string()
-        }
-        // Note → Finance: trend prediction
-        (Note, Finance) => {
-            "Your note predicted this spending pattern — want me to log it as an insight?"
-                .to_string()
-        }
-        // Finance → Task: numbers-ready angle
-        (Finance, Task) => format!(
-            "Your \"{}\" has fresh numbers ready — want me to prep a summary?",
-            target.title
-        ),
         // Default fallback
         _ => format!(
             "I noticed a connection between \"{}\" and \"{}\"",
@@ -289,11 +270,19 @@ mod tests {
         }
     }
 
+    fn productivity_ref(id: &str, title: &str) -> EntityRef {
+        EntityRef {
+            domain: EntityDomain::Productivity,
+            id: id.to_string(),
+            title: title.to_string(),
+        }
+    }
+
     // Test 1: semantic + temporal layers match → returns dot
     #[test]
     fn cross_domain_two_layers_returns_dot() {
         let source = task_ref("t1", "Q1 budget review");
-        let target = finance_ref("f1", "AWS invoice March");
+        let target = note_ref("n1", "AWS invoice March");
 
         let input = HeuristicInput {
             source: source.clone(),
@@ -321,7 +310,7 @@ mod tests {
     #[test]
     fn cross_domain_one_layer_returns_none() {
         let source = task_ref("t1", "Q1 budget review");
-        let target = finance_ref("f1", "AWS invoice March");
+        let target = note_ref("n1", "AWS invoice March");
 
         let input = HeuristicInput {
             source: source.clone(),
@@ -339,7 +328,7 @@ mod tests {
     #[test]
     fn cross_domain_low_cosine_returns_none() {
         let source = task_ref("t1", "Q1 budget review");
-        let target = finance_ref("f1", "AWS invoice March");
+        let target = note_ref("n1", "AWS invoice March");
 
         let input = HeuristicInput {
             source: source.clone(),
@@ -357,7 +346,7 @@ mod tests {
     #[test]
     fn cross_domain_no_content_returns_none() {
         let source = task_ref("t1", "");
-        let target = finance_ref("f1", "AWS invoice March");
+        let target = note_ref("n1", "AWS invoice March");
 
         let input = HeuristicInput {
             source: source.clone(),
@@ -375,13 +364,13 @@ mod tests {
     #[test]
     fn cross_domain_three_layers_returns_dot() {
         let source = task_ref("t1", "Q1 budget review");
-        let target = finance_ref("f1", "AWS invoice March");
+        let target = note_ref("n1", "AWS invoice March");
 
         let input = HeuristicInput {
             source: source.clone(),
             source_created: utc(2026, 3, 1),
             vector_hits: vec![(target.clone(), 0.88, utc(2026, 3, 3))], // 2 days
-            frequency_data: vec![("f1".to_string(), 3, 2)],             // meets thresholds
+            frequency_data: vec![("n1".to_string(), 3, 2)],             // meets thresholds
             source_has_content: true,
         };
 
@@ -397,20 +386,16 @@ mod tests {
         assert!(dot.confidence > 0.88 + 0.05);
     }
 
-    // Test 6: tooltip template for task → finance
+    // Test 6: tooltip template for task → note
     #[test]
-    fn cross_domain_tooltip_task_finance() {
+    fn cross_domain_tooltip_task_note() {
         let source = task_ref("t1", "Q1 budget review");
-        let target = finance_ref("f1", "AWS invoice March");
+        let target = note_ref("n1", "AWS invoice March");
 
         let tooltip = build_tooltip(&source, &target);
         assert!(
-            tooltip.contains("Q1 budget review"),
-            "tooltip should mention source task title"
-        );
-        assert!(
-            tooltip.contains("pull the numbers"),
-            "tooltip should use task→finance template"
+            tooltip.contains("pull \"AWS invoice March\""),
+            "tooltip should use task→note template"
         );
     }
 
@@ -418,7 +403,7 @@ mod tests {
     #[test]
     fn cross_domain_returns_best_hit() {
         let source = task_ref("t1", "Q1 budget review");
-        let target_a = finance_ref("f1", "AWS invoice");
+        let target_a = productivity_ref("p1", "AWS invoice");
         let target_b = note_ref("n1", "Budget notes");
 
         let input = HeuristicInput {

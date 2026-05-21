@@ -35,8 +35,8 @@ fn signal_carries_metrics_and_coaching_flags() {
         category: Some("food".into()),
     };
     let sig = AiSignal {
-        domain: RecallDomain::Finance,
-        event_kind: "BudgetAlert",
+        domain: RecallDomain::Productivity,
+        event_kind: "FocusSessionStarted",
         importance: 0.9,
         salience: SalienceVerdict::Extract,
         content: "alert".into(),

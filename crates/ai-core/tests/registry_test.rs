@@ -29,14 +29,14 @@ fn registry_iteration_is_stable_in_insertion_order() {
         entity_kind: Some("task"),
     });
     reg.register(FeatureRecord {
-        domain: RecallDomain::Finance,
-        skill: "finance-management",
-        tool_name: Some("finance"),
-        entity_kind: Some("finance_transaction"),
+        domain: RecallDomain::Productivity,
+        skill: "productivity-management",
+        tool_name: Some("productivity"),
+        entity_kind: Some("productivity_session"),
     });
 
     let names: Vec<&'static str> = reg.iter().filter_map(|r| r.tool_name).collect();
-    assert_eq!(names, vec!["tasks", "finance"]);
+    assert_eq!(names, vec!["tasks", "productivity"]);
 }
 
 #[test]

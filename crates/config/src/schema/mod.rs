@@ -464,15 +464,6 @@ mod tests {
     }
 
     #[test]
-    fn test_fire_config_deserializes_from_empty() {
-        // Existing config without FIRE section should deserialize fine
-        let json = r#"{"finance": {}}"#;
-        let config: Config = serde_json::from_str(json).unwrap();
-        assert!(!config.finance.fire.enabled);
-        assert_eq!(config.finance.fire.fire_type, "regular");
-    }
-
-    #[test]
     fn test_shortcuts_config_default() {
         let config = Config::default();
         assert_eq!(config.shortcuts.launcher, "alt+space");

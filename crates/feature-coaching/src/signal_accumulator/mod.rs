@@ -130,6 +130,18 @@ impl SignalAccumulator {
                 }
             }
             "budget_warning" => {
+                let budget_alerts = self.count_events("BudgetAlert");
+                if budget_alerts >= 1 {
+                    Some(TriggerFired {
+                        condition_name: "budget_warning".into(),
+                        confidence: 0.9,
+                        context: format!("{budget_alerts} budget alert(s)"),
+                    })
+                } else {
+                    None
+                }
+            }
+            "focus_warning" => {
                 let focus_alerts = self.count_events("FocusAlert");
                 if focus_alerts >= 1 {
                     Some(TriggerFired {
@@ -256,7 +268,7 @@ mod tests {
         acc.push_event(&sig);
         assert_eq!(acc.window_size(), 1);
         let front = acc.signals().front().unwrap();
-        assert_eq!(front.event_type, "BudgetAlert");
+        assert_eq!(front.event_type, "FocusAlert");
         assert_eq!(front.metadata.category.as_deref(), Some("food"));
         assert_eq!(front.metadata.amount, Some(450.0));
     }
