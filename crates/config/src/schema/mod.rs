@@ -45,6 +45,7 @@ mod scenario;
 mod shortcuts;
 mod todo;
 mod tools;
+mod ui;
 mod user;
 mod voice;
 mod work_context;
@@ -78,6 +79,7 @@ pub use self::scenario::*;
 pub use self::shortcuts::*;
 pub use self::todo::*;
 pub use self::tools::*;
+pub use self::ui::*;
 pub use self::user::*;
 pub use self::voice::*;
 pub use self::work_context::*;
@@ -487,5 +489,46 @@ mod tests {
         let json = r#"{}"#;
         let config: Config = serde_json::from_str(json).unwrap();
         assert_eq!(config.shortcuts.launcher, "alt+space");
+    }
+
+    #[test]
+    fn test_ui_config_default() {
+        let config = Config::default();
+        assert_eq!(config.ui.theme, "system");
+        assert!((config.ui.ui_scale - 1.0).abs() < f64::EPSILON);
+        assert_eq!(config.ui.ui_font_family, "Inter");
+        assert_eq!(config.ui.code_font_family, "JetBrains Mono");
+        assert_eq!(config.ui.code_font_size, 11);
+        assert!(config.ui.notification_sounds_enabled);
+        assert!(config.ui.system_notifications_enabled);
+        assert!(config.ui.subagent_system_notifications_enabled);
+        assert!(!config.ui.thread_title_autogeneration_enabled);
+        assert!(config.ui.automatic_app_update_checks_enabled);
+        assert_eq!(config.ui.chat_history_scrollback_items, Some(100));
+        assert!(config.ui.show_message_file_path);
+        assert!(!config.ui.split_chat_diff_view);
+        assert!(!config.ui.usage_show_remaining);
+    }
+
+    #[test]
+    fn test_ui_config_serde_roundtrip() {
+        let json = r#"{"ui": {"theme": "dark", "uiScale": 1.25, "notificationSoundsEnabled": false}}"#;
+        let config: Config = serde_json::from_str(json).unwrap();
+        assert_eq!(config.ui.theme, "dark");
+        assert!((config.ui.ui_scale - 1.25).abs() < f64::EPSILON);
+        assert!(!config.ui.notification_sounds_enabled);
+        assert!(config.ui.system_notifications_enabled); // default
+
+        let serialized = serde_json::to_string(&config).unwrap();
+        let loaded: Config = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(loaded.ui.theme, "dark");
+    }
+
+    #[test]
+    fn test_config_without_ui_deserializes() {
+        let json = r#"{"agents": {"defaults": {"workspace": "~/.klyntbot/workspace", "model": "anthropic/claude-opus-4-5", "maxTokens": 8192, "temperature": 0.7, "maxToolIterations": 20}}}"#;
+        let config: Config = serde_json::from_str(json).unwrap();
+        assert_eq!(config.ui.theme, "system");
+        assert_eq!(config.ui.code_font_size, 11);
     }
 }

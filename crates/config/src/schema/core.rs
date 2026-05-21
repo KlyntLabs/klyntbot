@@ -31,6 +31,7 @@ use super::scenario::ScenarioConfig;
 use super::shortcuts::ShortcutsConfig;
 use super::todo::TodoConfig;
 use super::tools::ToolsConfig;
+use super::ui::UiConfig;
 use super::user::UserConfig;
 use super::voice::VoiceConfig;
 use super::work_context::WorkContextConfig;
@@ -217,6 +218,10 @@ pub struct Config {
     /// Voice input/output configuration.
     #[serde(default)]
     pub voice: VoiceConfig,
+
+    /// UI appearance and behaviour settings.
+    #[serde(default)]
+    pub ui: UiConfig,
 
     /// Language learning engine configuration (pronunciation feedback, FSRS).
     #[serde(default)]

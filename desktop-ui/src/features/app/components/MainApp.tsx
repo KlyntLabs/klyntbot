@@ -92,6 +92,15 @@ const SettingsView = lazy(() =>
   })),
 );
 
+const SettingsShellModal = lazy(() =>
+  import("@settings/components/SettingsShellModal").then((module) => ({
+    default: module.SettingsShellModal,
+  })),
+);
+
+const showNewSettings =
+  typeof window !== "undefined" && window.localStorage.getItem("klynt-new-settings") === "1";
+
 export default function MainApp() {
   const {
     appSettings,
@@ -1076,7 +1085,7 @@ export default function MainApp() {
   });
 
   const { appModalsProps, modalActions } = useMainAppModals({
-    settingsViewComponent: SettingsView,
+    settingsViewComponent: showNewSettings ? SettingsShellModal : SettingsView,
     workspaces,
     workspaceGroups,
     groupedWorkspaces,
