@@ -59,7 +59,11 @@ impl AppCorePlugin for AiPipelinePlugin {
         .with_fact_repo(::cognitive::SemanticFactRepo::new(
             ctx.deps.storage_pool.inner().clone(),
         ));
-        if let Some(ref emb) = ctx.deps.cognitive_fact_embedder {
+        let cognitive_fact_embedder = ctx
+            .host
+            .get::<crate::plugins::cognitive::CognitiveInitResult>()
+            .and_then(|r| r.cognitive_fact_embedder.clone());
+        if let Some(ref emb) = cognitive_fact_embedder {
             ingestion_inner = ingestion_inner.with_embedder(Arc::clone(emb));
         }
         if let Some(resolver) = audd_resolver {

@@ -207,40 +207,13 @@ impl AppCore {
             tools::embedding_engine::EmbeddingEngine::with_provider(embedding_provider)
                 .with_openai_model(config.cognitive.openai_embedding_model.clone()),
         );
-        let note_embedding_handler: Option<
-            Arc<dyn feature_notes::handlers::embedding::NoteEmbeddingHandler>,
-        > = if let Some(ref vs) = vector_store {
-            Some(Arc::new(
-                ::agent::adapters::note_embedding::NoteEmbeddingAdapter::new(
-                    Arc::clone(&embedding_engine),
-                    vs.clone(),
-                ),
-            ))
-        } else {
-            None
-        };
         // Keep a clone of embedding_engine and vector_store for AppCore fields
         // (used by flashcard embedding and compute_answer_similarity).
         let appcore_embedding_engine = Some(Arc::clone(&embedding_engine));
         let appcore_vector_store = vector_store.clone();
 
-        // Cognitive fact embedder for IngestionConsumer. Without this,
-        // `semantic_facts` would be SQLite-only and produce zero vector
-        // hits during chat ingest (the only other embed path is nightly
-        // reforge consolidation). Always install when LanceDB is
-        // available — `retrieval.rs::retrieve_relevant_facts` runs hybrid
-        // RRF merge (vector + FTS-anchored paths combined via reciprocal
-        // rank fusion) so vector availability no longer demotes FTS.
-        let cognitive_fact_embedder: Option<Arc<dyn ::cognitive::SemanticFactEmbedder>> =
-            vector_store.as_ref().map(|vs| {
-                Arc::new(::agent::adapters::cognitive_embedder::SemanticFactEmbedderImpl::new(
-                    Arc::clone(&embedding_engine),
-                    vs.clone(),
-                )) as Arc<dyn ::cognitive::SemanticFactEmbedder>
-            });
-
-        // Insight infrastructure (embedder, searcher, accessor, scope resolver,
-        // and the InsightService itself) is initialized by InsightsPlugin.
+        // Insight infrastructure, note embedding handler, cognitive fact embedder,
+        // and cognitive repos are all initialized by their respective plugins.
 
         // ── Phase 3: Agent ───────────────────────────────────────────────
         let agent::AgentResult {
@@ -330,7 +303,6 @@ impl AppCore {
             autotuner: autotuner.clone(),
             event_emitter: event_emitter.clone(),
             notification_sender: notification_sender.clone(),
-            cognitive_fact_embedder: cognitive_fact_embedder.clone(),
             pipeline_broadcast: Some(pipeline_broadcast_tx.clone()),
             shutdown_token: shutdown_token.clone(),
         };
@@ -431,11 +403,17 @@ impl AppCore {
             coaching_service: None,
             cognitive_provider: cognitive_provider.clone(),
             pipeline_broadcast: Some(pipeline_broadcast_tx.clone()),
-            event_log_repo: Some(::cognitive::EventLogRepo::new(storage_pool.inner().clone())),
+            event_log_repo: host_result
+                .host
+                .get::<crate::plugins::cognitive::CognitiveInitResult>()
+                .and_then(|r| r.event_log_repo.clone()),
             consecutive_coaching_ignores: Arc::new(std::sync::atomic::AtomicI32::new(0)),
             activity_ingestion_service: Some(Arc::clone(&activity_svc)),
             event_emitter: event_emitter.clone().unwrap_or_else(|| Arc::new(NoopEmitter)),
-            note_embedding_handler,
+            note_embedding_handler: host_result
+                .host
+                .get::<crate::plugins::notes::NotesInitResult>()
+                .and_then(|r| r.note_embedding_handler.clone()),
             embedding_engine: appcore_embedding_engine,
             vector_store: appcore_vector_store,
             launcher_engine: host_result
@@ -444,18 +422,22 @@ impl AppCore {
             insight_service: host_result
                 .host
                 .get::<feature_insights::InsightService>(),
-            flashcard_repo: Some(::cognitive::FlashcardRepo::new(
-                storage_pool.inner().clone(),
-            )),
-            knowledge_atom_repo: Some(::cognitive::KnowledgeAtomRepo::new(
-                storage_pool.inner().clone(),
-            )),
-            review_session_repo: Some(::cognitive::ReviewSessionRepo::new(
-                storage_pool.inner().clone(),
-            )),
-            deck_preference_repo: Some(::cognitive::DeckPreferenceRepo::new(
-                storage_pool.inner().clone(),
-            )),
+            flashcard_repo: host_result
+                .host
+                .get::<crate::plugins::cognitive::CognitiveInitResult>()
+                .and_then(|r| r.flashcard_repo.clone()),
+            knowledge_atom_repo: host_result
+                .host
+                .get::<crate::plugins::cognitive::CognitiveInitResult>()
+                .and_then(|r| r.knowledge_atom_repo.clone()),
+            review_session_repo: host_result
+                .host
+                .get::<crate::plugins::cognitive::CognitiveInitResult>()
+                .and_then(|r| r.review_session_repo.clone()),
+            deck_preference_repo: host_result
+                .host
+                .get::<crate::plugins::cognitive::CognitiveInitResult>()
+                .and_then(|r| r.deck_preference_repo.clone()),
             autotuner: autotuner.clone(),
             temporal_scheduler: host_result
                 .host

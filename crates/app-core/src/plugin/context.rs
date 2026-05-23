@@ -35,7 +35,6 @@ pub struct PluginDeps {
     pub autotuner: Option<Arc<agent::autotuner::AutoTunerOrchestrator>>,
     pub event_emitter: Option<Arc<dyn crate::events::AppEventEmitter>>,
     pub notification_sender: Option<Arc<dyn common::NotificationSender>>,
-    pub cognitive_fact_embedder: Option<Arc<dyn ::cognitive::SemanticFactEmbedder>>,
     pub pipeline_broadcast: Option<tokio::sync::broadcast::Sender<::cognitive::PipelineEvent>>,
     pub shutdown_token: CancellationToken,
 }

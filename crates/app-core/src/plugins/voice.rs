@@ -161,7 +161,11 @@ impl AppCorePlugin for VoicePlugin {
                 .with_co_activation_repo(::cognitive::CoActivationRepo::new(
                     ctx.deps.storage_pool.inner().clone(),
                 ))
-                .with_embedder_opt(ctx.deps.cognitive_fact_embedder.clone());
+                .with_embedder_opt(
+                    ctx.host
+                        .get::<crate::plugins::cognitive::CognitiveInitResult>()
+                        .and_then(|r| r.cognitive_fact_embedder.clone()),
+                );
             Some(Arc::new(retriever) as Arc<dyn context_engine::MemoryRetriever>)
         };
 

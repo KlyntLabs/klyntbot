@@ -6,6 +6,16 @@ use crate::plugin::context::PluginContext;
 use crate::plugin::AppCorePlugin;
 use crate::state::AppCore;
 
+/// Bundle of all cognitive initialization results for FeatureHost storage.
+pub struct CognitiveInitResult {
+    pub flashcard_repo: Option<::cognitive::FlashcardRepo>,
+    pub knowledge_atom_repo: Option<::cognitive::KnowledgeAtomRepo>,
+    pub review_session_repo: Option<::cognitive::ReviewSessionRepo>,
+    pub deck_preference_repo: Option<::cognitive::DeckPreferenceRepo>,
+    pub event_log_repo: Option<::cognitive::EventLogRepo>,
+    pub cognitive_fact_embedder: Option<Arc<dyn ::cognitive::SemanticFactEmbedder>>,
+}
+
 /// Plugin wrapper for the `cognitive` crate.
 pub struct CognitivePlugin;
 
@@ -44,6 +54,31 @@ impl AppCorePlugin for CognitivePlugin {
             tracing::warn!("Pending memory migration failed: {e}");
         }
         ctx.insert_handle(Arc::new(repo));
+
+        let pool = ctx.deps.storage_pool.inner().clone();
+
+        let cognitive_fact_embedder: Option<Arc<dyn ::cognitive::SemanticFactEmbedder>> =
+            if let (Some(ref engine), Some(ref vs)) =
+                (&ctx.deps.embedding_engine, &ctx.deps.vector_store)
+            {
+                Some(Arc::new(
+                    ::agent::adapters::cognitive_embedder::SemanticFactEmbedderImpl::new(
+                        Arc::clone(engine),
+                        vs.clone(),
+                    ),
+                ) as Arc<dyn ::cognitive::SemanticFactEmbedder>)
+            } else {
+                None
+            };
+
+        ctx.insert_handle(Arc::new(CognitiveInitResult {
+            flashcard_repo: Some(::cognitive::FlashcardRepo::new(pool.clone())),
+            knowledge_atom_repo: Some(::cognitive::KnowledgeAtomRepo::new(pool.clone())),
+            review_session_repo: Some(::cognitive::ReviewSessionRepo::new(pool.clone())),
+            deck_preference_repo: Some(::cognitive::DeckPreferenceRepo::new(pool.clone())),
+            event_log_repo: Some(::cognitive::EventLogRepo::new(pool.clone())),
+            cognitive_fact_embedder,
+        }));
         Ok(())
     }
 

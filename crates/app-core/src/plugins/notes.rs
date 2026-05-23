@@ -6,6 +6,12 @@ use crate::plugin::context::PluginContext;
 use crate::plugin::AppCorePlugin;
 use crate::state::AppCore;
 
+/// Bundle of all notes initialization results for FeatureHost storage.
+pub struct NotesInitResult {
+    pub note_embedding_handler:
+        Option<Arc<dyn feature_notes::handlers::embedding::NoteEmbeddingHandler>>,
+}
+
 /// Plugin wrapper for the `feature-notes` crate.
 pub struct NotesPlugin;
 
@@ -25,6 +31,24 @@ impl AppCorePlugin for NotesPlugin {
             feature_notes::events::try_from_domain_event,
             ai_core::RecallDomain::Notes,
         );
+
+        let note_embedding_handler =
+            if let (Some(ref engine), Some(ref vs)) =
+                (&ctx.deps.embedding_engine, &ctx.deps.vector_store)
+            {
+                Some(Arc::new(
+                    ::agent::adapters::note_embedding::NoteEmbeddingAdapter::new(
+                        Arc::clone(engine),
+                        vs.clone(),
+                    ),
+                ) as Arc<dyn feature_notes::handlers::embedding::NoteEmbeddingHandler>)
+            } else {
+                None
+            };
+
+        ctx.insert_handle(Arc::new(NotesInitResult {
+            note_embedding_handler,
+        }));
         Ok(())
     }
 
