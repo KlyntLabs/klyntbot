@@ -1,8 +1,8 @@
 //! Agent loop construction: tool registration, handler wiring, pipeline assembly.
 
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
-use std::time::Duration;
+
 use tokio::sync::RwLock;
 use tokio_util::sync::CancellationToken;
 use tracing::{info, warn};
@@ -15,7 +15,6 @@ use providers::DynProvider;
 use session::SessionManager;
 use tools::{
     cron_tool::CronTool,
-    learning_tool::{LearningHandler, LearningTool},
     okr_tool::OkrTool,
     registry::ToolRegistry,
     subagents::SubagentsTool,
@@ -1089,81 +1088,17 @@ impl AgentLoopBuilder {
         let recurring_task_spawner = Some(Arc::new(RwLock::new(recurring_spawner)));
 
         // ── Learning service ──────────────────────────────────────────────
-        let learning_service = if let Some(ref store) = outcome_store {
-            let adaptive = Arc::new(RwLock::new(
-                crate::learning::adaptive::AdaptiveThresholds::new(
-                    repos.learning_state.clone(),
-                    config.confidence.threshold,
-                    config.learning.min_threshold,
-                    config.learning.max_threshold,
-                    config.learning.min_outcomes_for_adaptation,
-                )
-                .await,
-            ));
-
-            // Register LearningTool
-            let learning_handler = Arc::new(super::super::LearningHandlerImpl::new(
-                repos.strategies.clone(),
-                Arc::clone(&adaptive),
-            ));
-            tool_registry.register(LearningTool::new(Some(
-                learning_handler as Arc<dyn LearningHandler>,
-            )));
-
-            // Event bus: subscriber updates cognitive confidence threshold
-            let event_bus = Arc::new(bus::LearningEventBus::new(16));
-
-            let threshold_for_subscriber = Arc::clone(&confidence_bits);
-            let mut event_rx = event_bus.subscribe();
-            tokio::spawn(async move {
-                while let Ok(event) = event_rx.recv().await {
-                    if let bus::LearningEvent::ThresholdChanged { new_threshold, .. } = event {
-                        threshold_for_subscriber.store(new_threshold.to_bits(), Ordering::Relaxed);
-                        info!(
-                            "Confidence threshold updated by LearningService: {:.3}",
-                            new_threshold
-                        );
-                    }
-                }
-            });
-
-            let mut service = crate::learning::LearningService::new(
-                Arc::clone(store),
-                adaptive,
-                None, // No confidence evaluator in flat architecture
-                Duration::from_secs(config.learning.analysis_interval_secs),
-            )
-            .with_event_bus(event_bus);
-            if let Some(ref domain_bus) = self.domain_event_bus {
-                service = service.with_pattern_analyzer(crate::learning::PatternAnalyzer::new(
-                    repos.interaction_log.clone(),
-                    Arc::clone(domain_bus),
-                ));
-            }
-            service.start();
-            let svc_arc = Arc::new(RwLock::new(service));
-
-            // Register cron handler so the learning analysis shows in the Automations page.
-            // The handler triggers the existing background loop rather than running inline.
-            if let Some((ref executor, _)) = self.cron_executor {
-                let svc_for_cron = Arc::clone(&svc_arc);
-                executor.register(
-                    "__klyntbot_learning_analysis",
-                    Arc::new(move |_job: &scheduling::CronJob| {
-                        let svc = Arc::clone(&svc_for_cron);
-                        // Trigger the analysis via the existing Notify mechanism
-                        if let Ok(guard) = svc.try_read() {
-                            guard.trigger_analysis();
-                        }
-                        Ok(Some("Learning analysis triggered".to_string()))
-                    }),
-                );
-            }
-
-            Some(svc_arc)
-        } else {
-            None
-        };
+        let learning_result = super::builders::learning::build_learning_service(
+            &config,
+            &repos,
+            &mut tool_registry,
+            &outcome_store,
+            &confidence_bits,
+            &self.domain_event_bus,
+            &self.cron_executor,
+        )
+        .await;
+        let learning_service = learning_result.learning_service;
 
         // ── Bus receiver ──────────────────────────────────────────────────
         let inbound_rx = bus
