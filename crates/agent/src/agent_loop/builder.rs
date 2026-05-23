@@ -987,105 +987,26 @@ impl AgentLoopBuilder {
                 ) as Arc<dyn tools::ConversationRecallHandler>
             });
 
-        // ── Memory tool ───────────────────────────────────────────────────
-        if config.conversation.search.enabled {
-            if let Some(ref handler) = conversation_recall_handler {
-                let mut memory_tool = tools::MemoryTool::new()
-                    .with_conversation_handler(Arc::clone(handler))
-                    .with_todo_repo(repos.tasks.clone())
-                    .with_threshold(config.conversation.search.semantic_threshold)
-                    .with_rrf_k(config.todo.search.rrf_k);
-
-                if let (Some(ref h), Some(ref vs)) = (&todo_embedding_handler, &self.vector_store) {
-                    memory_tool = memory_tool
-                        .with_todo_embedding_handler(Arc::clone(h))
-                        .with_embedding_store(vs.clone());
-                }
-
-                if let Some(ref domain_bus) = self.domain_event_bus {
-                    memory_tool = memory_tool.with_domain_bus(Arc::clone(domain_bus));
-                }
-
-                memory_tool =
-                    memory_tool.with_enhancement_trace_store(Arc::clone(&latest_enhancement_trace));
-
-                tool_registry.register(memory_tool);
-            }
-        }
-
-        // ── Productivity tool (reuses prod_repos from context source block) ──
-        if let Some(prod_repos) = prod_repos {
-            if let Some(pool) = &self.pool {
-                // Run feature migrations (idempotent — skips already-applied)
-                storage::StoragePool::run_feature_migrations(
-                    pool,
-                    &feature_productivity::productivity_migrations(),
-                )
-                .await
-                .map_err(|e| {
-                    common::KlyntbotError::Config(common::ConfigError::Invalid(format!(
-                        "Failed to run productivity migrations: {}",
-                        e
-                    )))
-                })?;
-            }
-
-            let focus_mgr = Arc::new(feature_productivity::FocusManager::new(
-                prod_repos.clone(),
-                config.productivity.focus.clone(),
-            ));
-            let prod_handler =
-                Arc::new(crate::adapters::productivity::ProductivityHandlerImpl::new(
-                    provider.clone(),
-                    config.agents.defaults.model.clone(),
-                ));
-            let mut daily_agg = feature_productivity::DailyAggregator::new(prod_repos.clone())
-                .with_handler(prod_handler);
-            if let Some(ref domain_bus) = self.domain_event_bus {
-                daily_agg = daily_agg.with_domain_bus(Arc::clone(domain_bus));
-            }
-            let aggregator = Arc::new(daily_agg);
-            let productivity_tool =
-                feature_productivity::ProductivityTool::new(prod_repos, focus_mgr, aggregator);
-            tool_registry.register(productivity_tool);
-        }
-
-        // ── MCP tools (Model Context Protocol) ──────────────────────────
-        let mcp_manager = if config.mcp.has_active_servers() {
-            // connect_all logs startup progress internally via tracing
-            let manager =
-                mcp::McpManager::connect_all(&config.mcp, None, mcp::McpClientOptions::default())
-                    .await;
-            let mcp_tools = manager.tools();
-            let tool_count = mcp_tools.len();
-            for tool in mcp_tools {
-                tool_registry.register_dyn(tool as tools_core::DynTool);
-            }
-            if tool_count > 0 {
-                info!(
-                    servers = manager.connected_count(),
-                    tools = tool_count,
-                    "MCP tools registered"
-                );
-            }
-            Some(manager)
-        } else {
-            None
-        };
-
-        // ── Skill reference tool (progressive loading) ───────────────────
-        tool_registry.register(tools::SkillReferenceTool::new(Arc::clone(
-            &skill_reference_index,
-        )));
-
-        // ── Recurring task spawner ────────────────────────────────────────
-        let mut recurring_spawner = super::super::RecurringTaskSpawner::new(
-            repos.tasks.clone(),
-            config.timezone.clone(),
-            std::time::Duration::from_secs(60),
-        );
-        recurring_spawner.start();
-        let recurring_task_spawner = Some(Arc::new(RwLock::new(recurring_spawner)));
+        // ── Feature tools (memory, productivity, MCP, skill reference, recurring spawner) ──
+        let tools_result = super::builders::tools::build_feature_tools(
+            super::builders::tools::ToolsBuildInput {
+                config: &config,
+                tool_registry: &mut tool_registry,
+                conversation_recall_handler: &conversation_recall_handler,
+                todo_embedding_handler: &todo_embedding_handler,
+                repos: &repos,
+                prod_repos,
+                vector_store: &self.vector_store,
+                domain_event_bus: &self.domain_event_bus,
+                latest_enhancement_trace: &latest_enhancement_trace,
+                pool: &self.pool,
+                provider: &provider,
+                skill_reference_index: &skill_reference_index,
+            },
+        )
+        .await?;
+        let mcp_manager = tools_result.mcp_manager;
+        let recurring_task_spawner = tools_result.recurring_task_spawner;
 
         // ── Learning service ──────────────────────────────────────────────
         let learning_result = super::builders::learning::build_learning_service(
