@@ -1,6 +1,7 @@
 //! Agent loop: the core processing engine.
 
 mod builder;
+mod builders;
 
 #[cfg(test)]
 mod refactor_tests;

@@ -10,7 +10,7 @@ use tracing::{info, warn};
 use bus::MessageBus;
 use common::Result;
 use config::Config;
-use context_engine::ContextSource;
+
 use providers::DynProvider;
 use session::SessionManager;
 use tools::{
@@ -22,10 +22,7 @@ use tools::{
 };
 use tools_core::FeaturePackage;
 
-use super::super::context_sources::{
-    AreaSource, BootstrapSource, IdentitySource, PageContextSource, ProductivityContextSource,
-    ProjectContextSource, SessionContextSource, SessionMemoryContextSource,
-};
+
 use super::super::{CronHandlerAdapter, SubagentManager};
 use super::{AgentLoop, LastActiveChannel};
 
@@ -299,311 +296,31 @@ impl AgentLoopBuilder {
         });
 
         // ── Context sources ───────────────────────────────────────────────
-        let confidence_bits = Arc::new(std::sync::atomic::AtomicU32::new(
-            config.confidence.threshold.to_bits(),
-        ));
-
-        // Soul context source (KLYNTBOT.md)
-        let soul_source = skill_system::SoulContextSource::load(&data_dir_path)?;
-        // Skill listing source (frontmatter listing of all skills)
-        let skill_listing_source = skill_system::SkillListingSource::new(Arc::clone(&skill_store));
-
-        let mut sources: Vec<Box<dyn ContextSource>> = vec![
-            Box::new(soul_source),
-            Box::new(skill_listing_source),
-            Box::new(IdentitySource::new(
-                workspace.clone(),
-                config.timezone.clone(),
-            )),
-            Box::new(BootstrapSource::new(workspace.clone())),
-            Box::new(SessionContextSource::new(repos.clone())),
-            Box::new(SessionMemoryContextSource::new(
-                storage::SessionMemoryRepo::new(storage_pool.inner().clone()),
-            )),
-            Box::new(AreaSource::new(repos.areas.clone())),
-            Box::new(PageContextSource::new(repos.clone())),
-        ];
-
-        // Cognitive context source (optional — requires real pool).
-        // These are hoisted so UnifiedMemoryService can use them outside the block.
-        let mut cognitive_fact_repo: Option<cognitive::SemanticFactRepo> = None;
-        let mut cognitive_embedder: Option<Arc<dyn cognitive::SemanticFactEmbedder>> = None;
-        let mut cognitive_retrieval_config: Option<cognitive::CognitiveRetrievalConfig> = None;
-
-        let cognitive_bg_service: Option<cognitive::background::BackgroundConsolidationService> =
-            if let Some(ref pool) = self.pool {
-                // Run cognitive feature migrations (idempotent)
-                storage::StoragePool::run_feature_migrations(
-                    pool,
-                    &cognitive::cognitive_migrations(),
-                )
-                .await
-                .map_err(|e| {
-                    common::KlyntbotError::Config(common::ConfigError::Invalid(format!(
-                        "Failed to run cognitive migrations: {}",
-                        e
-                    )))
-                })?;
-
-                let fact_repo = cognitive::SemanticFactRepo::new(pool.clone());
-                let rule_repo = cognitive::ProceduralRuleRepo::new(pool.clone());
-
-                // Create SemanticFactEmbedder if embedding engine + vector store available
-                let cognitive_embedder_local: Option<Arc<dyn cognitive::SemanticFactEmbedder>> =
-                    if let Some(ref vs) = self.vector_store {
-                        Some(Arc::new(
-                            crate::adapters::cognitive_embedder::SemanticFactEmbedderImpl::new(
-                                Arc::clone(&embedding_engine),
-                                vs.clone(),
-                            ),
-                        ))
-                    } else {
-                        None
-                    };
-
-                // Build retrieval config from app config
-                let retrieval_config = cognitive::CognitiveRetrievalConfig {
-                    dynamic_facts_enabled: config.cognitive.dynamic_facts_enabled,
-                    static_fact_limit: config.cognitive.static_fact_limit,
-                    dynamic_fact_limit: config.cognitive.dynamic_fact_limit,
-                    vector_top_k: config.cognitive.vector_top_k,
-                    min_similarity: config.cognitive.min_similarity,
-                    max_stability: config.cognitive.max_stability,
-                    relevance_weight_semantic: config.cognitive.relevance_weight_semantic,
-                    relevance_weight_retrievability: config
-                        .cognitive
-                        .relevance_weight_retrievability,
-                    relevance_weight_importance: config.cognitive.relevance_weight_importance,
-                    relevance_weight_frequency: config.cognitive.relevance_weight_frequency,
-                    relevance_weight_situation: config.cognitive.relevance_weight_situation,
-                    relevance_weight_temporal: config.cognitive.relevance_weight_temporal,
-                    relevance_weight_hierarchy: 0.10,
-                    relevance_weight_path_coherence: 0.05,
-                    relevance_weight_community: 0.15,
-                    relevance_weight_cross_note: 0.10,
-                    relevance_weight_recall_support: config
-                        .cognitive
-                        .relevance_weight_recall_support,
-                    relevance_weight_graph_path_boost: config
-                        .cognitive
-                        .relevance_weight_graph_path_boost,
-                };
-
-                // Hoist for UnifiedMemoryService wiring below
-                cognitive_fact_repo = Some(fact_repo.clone());
-                cognitive_embedder = cognitive_embedder_local.clone();
-                cognitive_retrieval_config = Some(retrieval_config);
-
-                let recall_registry = ai_core::RecallProviderRegistry::new()
-                    .with(feature_tasks::TasksFeature::default());
-                let cog_source =
-                    cognitive::CognitiveContextSource::new(fact_repo.clone(), rule_repo)
-                        .with_static_fact_limit(config.cognitive.static_fact_limit)
-                        .with_confidence_threshold(Arc::clone(&confidence_bits))
-                        .with_recall_registry(recall_registry);
-                sources.push(Box::new(cog_source));
-
-                // Project context source — injects project instructions, role, and memories.
-                sources.push(Box::new(ProjectContextSource::new(
-                    repos.clone(),
-                    fact_repo.clone(),
-                )));
-
-                // Annotation context source — injects critical annotations into prompt.
-                let annotation_repo = cognitive::AnnotationRepo::new(pool.clone());
-                sources.push(Box::new(
-                    crate::context_sources::AnnotationContextSource::new(annotation_repo.clone()),
-                ));
-
-                // Start background consolidation service if we have a DomainEventBus
-                if let Some(ref domain_bus) = self.domain_event_bus {
-                    let event_rx = domain_bus.subscribe();
-                    let (extraction, consolidation): (
-                        Arc<dyn cognitive::ExtractionHandler>,
-                        Arc<dyn cognitive::ConsolidationHandler>,
-                    ) = if let Some(ref cp) = self.cognitive_provider {
-                        let params = providers::cognitive_chat_params(&config, 1024);
-                        (
-                            Arc::new(
-                                crate::adapters::cognitive_handlers::LlmExtractionHandler::new(
-                                    cp.clone(),
-                                    params.clone(),
-                                ),
-                            ),
-                            Arc::new(
-                                crate::adapters::cognitive_handlers::LlmConsolidationHandler::new(
-                                    cp.clone(),
-                                    params,
-                                ),
-                            ),
-                        )
-                    } else {
-                        (
-                            Arc::new(
-                                crate::adapters::cognitive_handlers::HeuristicExtractionHandler,
-                            ),
-                            Arc::new(
-                                crate::adapters::cognitive_handlers::HeuristicConsolidationHandler,
-                            ),
-                        )
-                    };
-                    let episodic_repo = cognitive::EpisodicMemoryRepo::new(pool.clone());
-                    let failed_obs_repo = cognitive::FailedObservationRepo::new(pool.clone());
-                    let cancel = CancellationToken::new();
-                    let (signal_tx, signal_rx) = cognitive::pipeline::signal_queue(256);
-                    let bg_service = cognitive::background::BackgroundConsolidationService::start(
-                        cognitive::background::BackgroundServiceConfig {
-                            event_rx,
-                            extraction,
-                            consolidation,
-                            repo: fact_repo,
-                            episodic_repo: Some(episodic_repo),
-                            embedder: cognitive_embedder_local,
-                            cancel: cancel.clone(),
-                            pipeline_tx: self.pipeline_tx.take(),
-                            failed_obs_repo: Some(failed_obs_repo),
-                            domain_bus: self.domain_event_bus.clone(),
-                            context_update_queue: self.context_update_queue.clone(),
-                            session_repo: Some(storage::SessionRepo::new(pool.clone())),
-                            rule_repo: Some(cognitive::repos::ProceduralRuleRepo::new(
-                                pool.clone(),
-                            )),
-                            signal_tx: Some(signal_tx),
-                            signal_rx: Some(signal_rx),
-                            session_memory_repo: Some(storage::SessionMemoryRepo::new(
-                                pool.clone(),
-                            )),
-                            intelligence_mode: config.cognitive.intelligence_mode,
-                            density_repo: Some(cognitive::ConversationDensityRepo::new(pool.clone())),
-                            pending_repo: Some(cognitive::repos::PendingMemoryRepo::new(pool.clone())),
-                            deep_handler: self.cognitive_provider.as_ref().map(|cp| {
-                                let params = providers::cognitive_chat_params(&config, 4096);
-                                Arc::new(
-                                    crate::adapters::cognitive_handlers::LlmDeepConsolidationHandler::new(
-                                        cp.clone(),
-                                        params,
-                                    ),
-                                )
-                                    as Arc<dyn cognitive::pipeline::DeepConsolidationHandler>
-                            }),
-                            graph_link_handler: self.cognitive_provider.as_ref().map(|cp| {
-                                let model = config.cognitive.graph_linker_model.clone()
-                                    .unwrap_or_else(|| config.cognitive.model.clone().unwrap_or_else(|| "default".into()));
-                                let params = providers::ChatParams::new(&model)
-                                    .with_max_tokens(2048)
-                                    .with_temperature(0.1)
-                                    .with_response_format(providers::ResponseFormat::JsonObject);
-                                Arc::new(
-                                    crate::adapters::cognitive_handlers::LlmGraphLinkHandler::new(
-                                        cp.clone(),
-                                        params,
-                                    ),
-                                )
-                                    as Arc<dyn cognitive::services::graph_linker::GraphLinkHandler>
-                            }),
-                            critic_handler: self.cognitive_provider.as_ref().map(|cp| {
-                                let model = config.cognitive.critic_model.clone()
-                                    .unwrap_or_else(|| config.cognitive.model.clone().unwrap_or_else(|| config.agents.defaults.model.clone()));
-                                let params = providers::ChatParams::new(model)
-                                    .with_max_tokens(1024)
-                                    .with_temperature(0.0)
-                                    .with_response_format(providers::ResponseFormat::JsonObject);
-                                Arc::new(
-                                    crate::adapters::cognitive_handlers::LlmExtractionCriticHandler::new(
-                                        cp.clone(),
-                                        params,
-                                    ),
-                                )
-                                    as Arc<dyn cognitive::services::extraction_critic::ExtractionCriticHandler>
-                            }),
-                            critic_log_repo: Some(cognitive::repos::ExtractionCriticLogRepo::new(
-                                storage::StoragePool::from_existing(pool.clone()),
-                            )),
-                        },
-                    );
-                    info!("Cognitive background consolidation service started");
-                    Some(bg_service)
-                } else {
-                    None
-                }
-            } else {
-                None
-            };
-
-        // ── Session memory service (per-session scratchpad maintenance) ─────
-        let session_memory_service: Option<cognitive::SessionMemoryService> =
-            if let (Some(ref pool), Some(ref domain_bus)) = (&self.pool, &self.domain_event_bus) {
-                let cancel = CancellationToken::new();
-                let svc = cognitive::SessionMemoryService::start(cognitive::SessionMemoryConfig {
-                    event_rx: domain_bus.subscribe(),
-                    session_repo: storage::SessionRepo::new(pool.clone()),
-                    memory_repo: storage::SessionMemoryRepo::new(pool.clone()),
-                    provider: self.cognitive_provider.clone(),
-                    cancel,
-                });
-                info!("Session memory service started");
-                Some(svc)
-            } else {
-                None
-            };
-
-        // Productivity context source (optional — requires real pool + enabled).
-        // prod_repos is stored for reuse by the tool registration block below.
-        let prod_repos = if config.productivity.enabled {
-            self.pool
-                .as_ref()
-                .map(|pool| feature_productivity::repos::ProductivityRepos::new(pool.clone()))
-        } else {
-            None
-        };
-        if let Some(ref repos) = prod_repos {
-            sources.push(Box::new(ProductivityContextSource::new(repos.clone())));
-        }
-
-        // Work context source (optional — requires real pool + enabled config).
-        let _inference_loop_token: Option<CancellationToken> = if config.work_context.enabled {
-            if let Some(ref _pool) = self.pool {
-                sources.push(Box::new(activity_log::WorkContextSource::new(
-                    storage_pool.clone(),
-                )));
-
-                // Start inference engine + background loop
-                let text_embedder =
-                    Arc::new(crate::adapters::cognitive_embedder::TextEmbedderImpl::new(
-                        Arc::clone(&embedding_engine),
-                    ));
-                let inference_config =
-                    activity_log::inference::ContextInferenceConfig::from_work_context_config(
-                        &config.work_context,
-                    );
-                let engine = Arc::new(activity_log::inference::ContextInferenceEngine::new(
-                    storage_pool.clone(),
-                    text_embedder,
-                    self.vector_store.clone(),
-                    inference_config,
-                ));
-
-                let token = CancellationToken::new();
-                let dormancy_days = config.work_context.max_dormancy_days as i64;
-                let _handle = activity_log::inference_loop::ContextInferenceLoop::start(
-                    Arc::clone(&engine),
-                    storage_pool.clone(),
-                    config.work_context.inference_interval_mins,
-                    dormancy_days,
-                    token.clone(),
-                );
-                info!("Work context inference loop started");
-
-                Some(token)
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-
-        // Sort by priority (descending) — ensures correct ordering in prompt
-        sources.sort_by_key(|s| std::cmp::Reverse(s.priority()));
+        let ctx_sources = super::builders::context_sources::build_context_sources(
+            &config,
+            &self.pool,
+            &self.vector_store,
+            &self.domain_event_bus,
+            &self.cognitive_provider,
+            &mut self.pipeline_tx,
+            &self.context_update_queue,
+            &data_dir_path,
+            &workspace,
+            &repos,
+            &storage_pool,
+            &embedding_engine,
+            &skill_store,
+        )
+        .await?;
+        let sources = ctx_sources.sources;
+        let cognitive_fact_repo = ctx_sources.cognitive_fact_repo;
+        let cognitive_embedder = ctx_sources.cognitive_embedder;
+        let cognitive_retrieval_config = ctx_sources.cognitive_retrieval_config;
+        let cognitive_bg_service = ctx_sources.cognitive_bg_service;
+        let session_memory_service = ctx_sources.session_memory_service;
+        let prod_repos = ctx_sources.prod_repos;
+        let confidence_bits = ctx_sources.confidence_bits;
+        let _inference_loop_token = ctx_sources.inference_loop_token;
 
         // Determine summarization model: config override or default
         let summary_model = config
@@ -1029,14 +746,14 @@ impl AgentLoopBuilder {
                                 // Delay to let the app finish starting
                                 tokio::time::sleep(std::time::Duration::from_secs(10)).await;
                                 if let Err(e) =
-                                    backfill_tree_nodes(&backfill_note_repo, &backfill_builder)
+                                    super::builders::backfill::backfill_tree_nodes(&backfill_note_repo, &backfill_builder)
                                         .await
                                 {
                                     warn!("Note tree backfill error: {e}");
                                 }
                                 // Backfill task trees for existing projects
                                 if let Err(e) =
-                                    backfill_task_trees(&backfill_task_tree_builder).await
+                                    super::builders::backfill::backfill_task_trees(&backfill_task_tree_builder).await
                                 {
                                     warn!("Task tree backfill error: {e}");
                                 }
@@ -1062,7 +779,7 @@ impl AgentLoopBuilder {
                                 }
                                 // After tree nodes exist, link entities to them
                                 tokio::time::sleep(std::time::Duration::from_secs(3)).await;
-                                backfill_entity_links(&backfill_linker).await;
+                                super::builders::backfill::backfill_entity_links(&backfill_linker).await;
                                 // After entity links exist, run community detection
                                 if let Err(e) =
                                     backfill_community_builder.rebuild_communities().await
@@ -1153,124 +870,14 @@ impl AgentLoopBuilder {
             Arc::new(context_engine::enhancement::LatestEnhancementTrace::new());
 
         // Build the query enhancement pipeline.
-        let qe = &config.cognitive.query_enhancement;
-        let context_engine = if qe.enabled {
-            let rewriter_provider = self.cognitive_provider.clone();
-            let rewriter_model = config.agents.rewriter_model.clone();
-
-            // Stage 1: Signal Enrichment — wraps ContextualQueryRewriter for
-            // heuristic signal-based query enrichment. Autotuner champion
-            // overrides are wired onto this rewriter so A/B trials apply.
-            let mut signal_rewriter = crate::adapters::query_rewriter::ContextualQueryRewriter::new(
-                rewriter_provider.clone(),
-                rewriter_model.clone(),
-                800, // 800ms hard cap per spec
-            );
-            if let Some(ref orchestrator) = self.autotuner {
-                if let Some(sink) = orchestrator.memory_param_sink() {
-                    signal_rewriter = signal_rewriter.with_champion_overrides(sink);
-                }
-            }
-            let signal_stage =
-                crate::adapters::signal_enrichment::SignalEnrichmentStage::new(signal_rewriter);
-
-            let mut query_stages: Vec<Arc<dyn context_engine::enhancement::QueryStage>> =
-                vec![Arc::new(signal_stage)];
-
-            let memory_param_sink = self
-                .autotuner
-                .as_ref()
-                .and_then(|orch| orch.memory_param_sink());
-
-            // Stage 2: PRF (needs memory retriever — only if available)
-            if qe.prf.enabled {
-                if let Some(ref retriever) = memory_retriever_for_prf {
-                    let prf_config = context_engine::enhancement::prf::PrfConfig {
-                        initial_fetch_limit: qe.prf.initial_fetch_limit,
-                        min_score_threshold: qe.prf.min_score_threshold,
-                        max_expansion_terms: qe.prf.max_expansion_terms,
-                    };
-                    let mut prf_stage = context_engine::enhancement::prf::PrfStage::new(
-                        Arc::clone(retriever),
-                        prf_config,
-                    );
-                    if let Some(ref sink) = memory_param_sink {
-                        prf_stage = prf_stage.with_champion_overrides(Arc::clone(sink));
-                    }
-                    query_stages.push(Arc::new(prf_stage));
-                } else {
-                    tracing::debug!(
-                        "PRF stage enabled but no memory retriever available — skipping"
-                    );
-                }
-            }
-
-            // Stage 3: Multi-Query (LLM, Deep+ only — budget gates at runtime)
-            if qe.multi_query.enabled {
-                let mq_model = qe
-                    .multi_query
-                    .model
-                    .clone()
-                    .or_else(|| rewriter_model.clone());
-                let mut multi_query = crate::adapters::multi_query::MultiQueryStage::new(
-                    rewriter_provider.clone(),
-                    mq_model,
-                    qe.multi_query.max_variants,
-                );
-                if let Some(ref sink) = memory_param_sink {
-                    multi_query = multi_query.with_champion_overrides(Arc::clone(sink));
-                }
-                query_stages.push(Arc::new(multi_query));
-            }
-
-            let query_pipeline = Arc::new(
-                context_engine::enhancement::QueryPipeline::new(query_stages)
-                    .with_latest_trace_store(Arc::clone(&latest_enhancement_trace)),
-            );
-
-            // Ranking stages
-            let mut ranking_stages: Vec<Arc<dyn context_engine::enhancement::RankingStage>> =
-                vec![];
-
-            if qe.reranking.enabled {
-                let mut heuristic = context_engine::enhancement::heuristic_rerank::HeuristicRerankStage::new(
-                    context_engine::enhancement::heuristic_rerank::HeuristicRerankConfig::default(),
-                );
-                if let Some(ref sink) = memory_param_sink {
-                    heuristic = heuristic.with_champion_overrides(Arc::clone(sink));
-                }
-                ranking_stages.push(Arc::new(heuristic));
-
-                let llm_model = qe
-                    .reranking
-                    .llm_rerank_model
-                    .clone()
-                    .or_else(|| rewriter_model.clone());
-                let llm_rerank = crate::adapters::llm_rerank::LlmRerankStage::new(
-                    rewriter_provider.clone(),
-                    llm_model,
-                    qe.reranking.llm_rerank_top_n,
-                );
-                ranking_stages.push(Arc::new(llm_rerank));
-            }
-
-            let ranking_pipeline = Arc::new(context_engine::enhancement::RankingPipeline::new(
-                ranking_stages,
-            ));
-
-            tracing::info!(
-                prf = qe.prf.enabled && memory_retriever_for_prf.is_some(),
-                multi_query = qe.multi_query.enabled,
-                reranking = qe.reranking.enabled,
-                "Query enhancement pipeline wired"
-            );
-
-            context_engine
-                .with_query_pipeline(query_pipeline)
-                .with_ranking_pipeline(ranking_pipeline)
-        } else {
-            context_engine
-        };
+        let context_engine = super::builders::query_enhancement::build_query_enhancement(
+            &config,
+            context_engine,
+            &self.cognitive_provider,
+            &self.autotuner,
+            &memory_retriever_for_prf,
+            &latest_enhancement_trace,
+        );
 
         let context_engine = Arc::new(context_engine);
 
@@ -1855,113 +1462,4 @@ impl AgentLoop {
     }
 }
 
-/// Backfill tree nodes for all existing notes that may not have been indexed yet.
-///
-/// Iterates through all non-archived notes in batches, calling
-/// `NoteTreeBuilder::handle_note_changed` for each. The builder is idempotent
-/// (deletes old nodes before inserting), so re-processing already-indexed notes
-/// is safe but wasteful — a cheap cost for correctness during the migration
-/// window.
-async fn backfill_tree_nodes(
-    note_repo: &feature_notes::repo::NoteRepo,
-    tree_builder: &crate::adapters::note_tree_builder::NoteTreeBuilder,
-) -> common::Result<()> {
-    let batch_size: i64 = 50;
-    let mut offset: i64 = 0;
-    let mut processed: usize = 0;
 
-    loop {
-        let notes = note_repo
-            .list_all_notes_paginated(batch_size, offset)
-            .await?;
-
-        if notes.is_empty() {
-            break;
-        }
-
-        for note in &notes {
-            if note.body.is_empty() && note.body_json.is_none() {
-                continue;
-            }
-            // Prefer body_json (Tiptap) for richer tree parsing; fall back to body (markdown).
-            let content = note.body_json.as_deref().unwrap_or(&note.body);
-            if let Err(e) = tree_builder.handle_note_changed(&note.id, content).await {
-                warn!(
-                    note_id = %note.id,
-                    "Tree backfill failed for note: {e}"
-                );
-            }
-            tokio::task::yield_now().await;
-        }
-
-        processed += notes.len();
-        offset += batch_size;
-        tracing::debug!("Tree backfill progress: {processed} notes");
-    }
-
-    if processed > 0 {
-        info!("Note tree backfill complete: {processed} notes processed");
-    }
-    Ok(())
-}
-
-/// Backfill entity-tree links for all sources that have tree nodes.
-/// Runs after tree node backfill to ensure tree nodes exist first.
-async fn backfill_entity_links(linker: &crate::adapters::entity_tree_linker::EntityTreeLinker) {
-    let pool = linker.pool();
-    let source_rows: Vec<(String, String)> = match sqlx::query_as(
-        "SELECT DISTINCT source_type, source_id FROM book_tree_nodes WHERE source_type IN ('note', 'task')",
-    )
-    .fetch_all(pool)
-    .await
-    {
-        Ok(rows) => rows,
-        Err(e) => {
-            warn!("Entity link backfill: failed to query source IDs: {e}");
-            return;
-        }
-    };
-
-    let mut linked = 0usize;
-    for (source_type, source_id) in &source_rows {
-        if let Err(e) = linker
-            .link_entities_for_source(source_type, source_id)
-            .await
-        {
-            warn!(source_type = %source_type, source_id = %source_id, "Entity link backfill failed: {e}");
-        } else {
-            linked += 1;
-        }
-        tokio::task::yield_now().await;
-    }
-
-    if linked > 0 {
-        info!("Entity link backfill complete: {linked} sources processed");
-    }
-}
-
-/// Backfill task trees for all existing projects.
-async fn backfill_task_trees(
-    builder: &crate::adapters::task_tree_builder::TaskTreeBuilder,
-) -> common::Result<()> {
-    let pool = builder.pool();
-    let project_ids: Vec<(String,)> = sqlx::query_as("SELECT DISTINCT id FROM projects")
-        .fetch_all(pool)
-        .await
-        .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
-
-    let mut processed = 0usize;
-    for (project_id,) in &project_ids {
-        if let Err(e) = builder.handle_project_changed(project_id).await {
-            warn!(project_id = %project_id, "Task tree backfill failed: {e}");
-        } else {
-            processed += 1;
-        }
-        tokio::task::yield_now().await;
-    }
-
-    if processed > 0 {
-        info!("Task tree backfill complete: {processed} projects processed");
-    }
-    Ok(())
-}
