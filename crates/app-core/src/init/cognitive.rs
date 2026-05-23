@@ -10,7 +10,7 @@ use crate::state::AppCore;
 /// Initialize cognitive event log, pipeline, domain bus wiring, and ActivityIngestionService.
 ///
 /// Also handles capture config (ingestion token, file watcher) and work context inference.
-pub(super) async fn init_cognitive(
+pub(crate) async fn init_cognitive(
     config: &mut config::Config,
     storage_pool: &StoragePool,
     activity_svc: &Arc<activity_log::ActivityIngestionService>,
@@ -121,7 +121,7 @@ pub(super) async fn init_cognitive(
 }
 
 /// Spawn post-core background services: activity subscriber, analytics retention, event log persistence.
-pub(super) fn spawn_post_core_services(
+pub fn spawn_post_core_services(
     core: &AppCore,
     domain_event_bus: &Arc<DomainEventBus>,
     _activity_svc: Arc<activity_log::ActivityIngestionService>,

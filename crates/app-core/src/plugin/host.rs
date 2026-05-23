@@ -1,0 +1,162 @@
+use std::any::{Any, TypeId};
+use std::sync::Arc;
+
+use dashmap::DashMap;
+use tracing::info;
+
+use super::context::{PluginContext, PluginDeps};
+use super::AppCorePlugin;
+
+/// A type-map of plugin handles.
+///
+/// Plugins insert typed handles during `init()`; callers retrieve them by type.
+/// This replaces the 70-field `AppCore` god object with a dynamic but type-safe
+/// lookup surface.
+#[derive(Default, Clone)]
+pub struct FeatureHost {
+    handles: DashMap<TypeId, Arc<dyn Any + Send + Sync>>,
+}
+
+impl FeatureHost {
+    pub fn new() -> Self {
+        Self {
+            handles: DashMap::new(),
+        }
+    }
+
+    /// Insert a typed handle. If a handle of the same type already exists, it is overwritten.
+    pub fn insert<T: Send + Sync + 'static>(&self, handle: Arc<T>) {
+        self.handles.insert(TypeId::of::<T>(), handle);
+    }
+
+    /// Retrieve a typed handle.
+    pub fn get<T: Send + Sync + 'static>(&self) -> Option<Arc<T>> {
+        self.handles
+            .get(&TypeId::of::<T>())
+            .and_then(|entry| entry.clone().downcast::<T>().ok())
+    }
+
+    /// Check whether a handle of the given type exists.
+    pub fn has<T: Send + Sync + 'static>(&self) -> bool {
+        self.handles.contains_key(&TypeId::of::<T>())
+    }
+}
+
+/// Result of building a feature host.
+pub struct FeatureHostResult {
+    pub host: FeatureHost,
+    pub tools: tools_core::registry::ToolRegistry,
+    pub context_sources: Vec<Box<dyn context_engine::ContextSource>>,
+    pub signal_consumers: Vec<Arc<dyn ai_core::SignalConsumer>>,
+    pub event_translators: Vec<super::context::EventTranslator>,
+    pub cron_handlers: Vec<(String, scheduling::temporal::cron_executor::CronHandler)>,
+    pub background_spawns: Vec<tokio::task::JoinHandle<()>>,
+    plugins: Vec<Box<dyn super::AppCorePlugin>>,
+}
+
+impl FeatureHostResult {
+    /// Run post-init for all plugins. Call this after AppCore is fully assembled.
+    pub async fn run_post_init(&self, app: &crate::state::AppCore) -> common::Result<()> {
+        for plugin in &self.plugins {
+            tracing::info!(plugin = plugin.name(), "running post-init");
+            plugin.post_init(app).await?;
+        }
+        Ok(())
+    }
+}
+
+/// Orchestrates plugin initialization.
+///
+/// 1. Collects migrations from all plugins and runs them.
+/// 2. Calls `plugin.init(ctx)` for each plugin in registration order.
+/// 3. Returns the assembled host and all registered contributions.
+pub struct FeatureHostBuilder {
+    plugins: Vec<Box<dyn AppCorePlugin>>,
+}
+
+impl FeatureHostBuilder {
+    pub fn new() -> Self {
+        Self { plugins: vec![] }
+    }
+
+    /// Add a plugin to the host.
+    pub fn plugin(mut self, plugin: impl AppCorePlugin) -> Self {
+        self.plugins.push(Box::new(plugin));
+        self
+    }
+
+    /// Build the host: run migrations, initialize all plugins, and return contributions.
+    pub async fn build(self, deps: &PluginDeps) -> common::Result<FeatureHostResult> {
+        // Phase 1: collect and run migrations
+        let mut all_migrations = Vec::new();
+        for plugin in &self.plugins {
+            let mut migs = plugin.migrations();
+            for m in &mut migs {
+                // Sanity check: migration feature name should match plugin name
+                if m.feature_name != plugin.name() {
+                    tracing::warn!(
+                        plugin = plugin.name(),
+                        migration_feature = %m.feature_name,
+                        "migration feature name does not match plugin name"
+                    );
+                }
+            }
+            all_migrations.extend(migs);
+        }
+
+        if !all_migrations.is_empty() {
+            storage::StoragePool::run_feature_migrations(deps.storage_pool.inner(), &all_migrations)
+                .await
+                .map_err(|e| {
+                    common::KlyntbotError::Storage(format!(
+                        "feature host migrations failed: {e}"
+                    ))
+                })?;
+            info!(count = all_migrations.len(), "plugin migrations complete");
+        }
+
+        // Phase 2: initialize plugins in order
+        let mut tools = tools_core::registry::ToolRegistry::new();
+        let mut context_sources = Vec::new();
+        let mut signal_consumers = Vec::new();
+        let mut event_translators = Vec::new();
+        let mut cron_handlers = Vec::new();
+        let mut background_spawns = Vec::new();
+        let mut host = FeatureHost::new();
+
+        for plugin in &self.plugins {
+            let mut ctx = PluginContext::new(
+                deps,
+                &mut tools,
+                &mut context_sources,
+                &mut signal_consumers,
+                &mut event_translators,
+                &mut cron_handlers,
+                &mut background_spawns,
+                &mut host,
+            );
+
+            info!(plugin = plugin.name(), "initializing plugin");
+            plugin.init(&mut ctx).await?;
+        }
+
+        info!(
+            plugins = self.plugins.len(),
+            tools = tools.len(),
+            context_sources = context_sources.len(),
+            signal_consumers = signal_consumers.len(),
+            "feature host built"
+        );
+
+        Ok(FeatureHostResult {
+            host,
+            tools,
+            context_sources,
+            signal_consumers,
+            event_translators,
+            cron_handlers,
+            background_spawns,
+            plugins: self.plugins,
+        })
+    }
+}

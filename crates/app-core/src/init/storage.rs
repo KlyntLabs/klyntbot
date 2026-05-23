@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use feature_notes::repo::NoteRepo;
 use storage::{Repos, StoragePool, VectorStore};
-use tools_core::FeaturePackage;
 use tracing::{info, warn};
 
 /// Results from the storage initialization phase.
@@ -92,59 +91,9 @@ pub(super) async fn init_storage(
     }
     info!("storage connected");
 
-    macro_rules! run_migration {
-        ($name:expr, $migrations:expr) => {
-            StoragePool::run_feature_migrations(storage_pool.inner(), &$migrations)
-                .await
-                .map_err(|e| format!(concat!($name, " migration failed: {}"), e))?
-        };
-    }
-
-    // Run notes feature migrations and create repo.
-    let notes_pool = storage_pool.inner().clone();
-    run_migration!("notes", feature_notes::notes_migrations());
-    let note_repo = NoteRepo::new(notes_pool);
-
-    // Run tasks feature migrations.
-    let tasks_feature = feature_tasks::TasksFeature::new();
-    run_migration!("tasks", tasks_feature.migrations());
-
-    // Run scheduling feature migrations (Phase 2: scheduled_fires table).
-    run_migration!(
-        "scheduling",
-        [tools_core::FeatureMigration {
-            feature_name: "scheduling".to_string(),
-            version: 1,
-            description: "Create scheduled_fires table".to_string(),
-            sql: include_str!("../../../scheduling/migrations/001_scheduled_fires.sql").to_string(),
-        }]
-    );
-
-    // Run language-learning feature migrations.
-    run_migration!(
-        "language-learning",
-        feature_language_learning::language_learning_migrations()
-    );
-
-    // Run focus feature migrations (DND sessions).
-    run_migration!(
-        "focus",
-        <feature_focus::FocusFeature as tools_core::FeaturePackage>::migrations(
-            &feature_focus::FocusFeature,
-        )
-    );
-
-    // Run learning feature migrations (placeholder in v3; tables live in cognitive).
-    run_migration!(
-        "learning",
-        <feature_learning::LearningFeature as tools_core::FeaturePackage>::migrations(
-            &feature_learning::LearningFeature::default(),
-        )
-    );
-
-    // Run cognitive migrations up-front so downstream crates can
-    // also invokes them later without conflict.
-    run_migration!("cognitive", cognitive::cognitive_migrations());
+    // Note repo creation — migrations for notes (and all other features)
+    // are now owned by their respective AppCorePlugins and run by FeatureHostBuilder.
+    let note_repo = NoteRepo::new(storage_pool.inner().clone());
 
     // 3. Create LLM provider (graceful — falls back to noop for setup wizard).
     // Use the "full" variant to get the inner ProviderManager (when a fallback is configured)

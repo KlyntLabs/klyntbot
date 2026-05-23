@@ -1,0 +1,7 @@
+# FeatureHost: extract plugin initialization from app-core and agent monoliths
+
+The application startup was split between `app-core/src/init/mod.rs` (1,750 lines) and `agent/src/agent_loop/builder.rs` (2,000 lines), both manually constructing the entire object graph. Adding any feature required editing four separate files. We decided to extract a `FeatureHost` that orchestrates feature initialization through an `AppCorePlugin` trait. Each feature crate owns its own wiring; the host resolves dependencies and builds the graph.
+
+We chose an **active plugin** model (`plugin.init(ctx)` calls `ctx.register_tool(...)`) over a passive model because it lets plugins conditionally register based on config without the host knowing the conditions. We chose a **new `AppCorePlugin` trait** instead of extending the existing `FeaturePackage` because `FeaturePackage` lives in `tools-core` and is consumed by the tool registry system — coupling it to AppCore lifecycle would create an unhealthy cross-crate dependency. We chose a **type-map `FeatureHost`** for plugin handles because it eliminates the 70-field `AppCore` god object without requiring a massive command-layer refactor in one change.
+
+Migration is incremental: features move to the host one at a time, starting with the simplest (`feature-focus`) and ending with the most complex (`agent` builder). During transition, `AppCore` keeps thin accessor methods that delegate to `FeatureHost` so the command layer doesn't break.

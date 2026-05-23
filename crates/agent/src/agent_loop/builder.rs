@@ -14,11 +14,9 @@ use context_engine::ContextSource;
 use providers::DynProvider;
 use session::SessionManager;
 use tools::{
-    area_tool::AreaTool,
     cron_tool::CronTool,
     learning_tool::{LearningHandler, LearningTool},
     okr_tool::OkrTool,
-    project_tool::ProjectTool,
     registry::ToolRegistry,
     subagents::SubagentsTool,
 };
@@ -90,6 +88,7 @@ pub struct AgentLoopBuilder {
     approval_suggester: Option<Arc<dyn approval::ApprovalSuggester>>,
     injector_registry: Option<bus::InjectorRegistry>,
     job_supervisor: Option<tools_core::DynJobSupervisor>,
+    pre_registered_tools: Vec<tools_core::DynTool>,
 }
 
 impl AgentLoopBuilder {
@@ -117,6 +116,7 @@ impl AgentLoopBuilder {
             approval_suggester: None,
             injector_registry: None,
             job_supervisor: None,
+            pre_registered_tools: vec![],
         }
     }
 
@@ -137,6 +137,10 @@ impl AgentLoopBuilder {
     }
     pub fn with_job_supervisor(mut self, supervisor: tools_core::DynJobSupervisor) -> Self {
         self.job_supervisor = Some(supervisor);
+        self
+    }
+    pub fn with_pre_registered_tools(mut self, tools: Vec<tools_core::DynTool>) -> Self {
+        self.pre_registered_tools = tools;
         self
     }
     pub fn with_embedding_engine(mut self, engine: Arc<tools::EmbeddingEngine>) -> Self {
@@ -644,23 +648,15 @@ impl AgentLoopBuilder {
         // ── Tool registry ─────────────────────────────────────────────────
         let mut tool_registry = ToolRegistry::new();
 
+        // Pre-registered tools (from app-core plugins)
+        for tool in self.pre_registered_tools {
+            tool_registry.register_dyn(tool);
+        }
+
         // Subagents tool
         tool_registry.register(SubagentsTool::with_handler(
             Arc::clone(&subagent_manager) as Arc<dyn tools::subagents::SubagentsHandler>
         ));
-
-        // Standalone AlarmTool (free-floating reminders, spec §8.2/§8.4).
-        {
-            let fire_store = Arc::new(scheduling::temporal::fire_store::FireStore::new(
-                repos.scheduled_fires.clone(),
-            ));
-            let mut alarm_tool =
-                feature_alarms::AlarmTool::new(fire_store, repos.scheduled_fires.clone());
-            if let Some(ref domain_bus) = self.domain_event_bus {
-                alarm_tool = alarm_tool.with_domain_bus(Arc::clone(domain_bus));
-            }
-            tool_registry.register(alarm_tool);
-        }
 
         // Cron tool (optional)
         if let Some((ref executor, ref repo)) = self.cron_executor {
@@ -1370,14 +1366,6 @@ impl AgentLoopBuilder {
             ));
         }
 
-        // ── Area tool ───────────────────────────────────────────────────
-        tool_registry.register(AreaTool::new(repos.areas.clone()));
-
-        // ── Project tool ────────────────────────────────────────────────
-        tool_registry.register(ProjectTool::new(
-            repos.projects.clone(),
-            repos.tasks.clone(),
-        ));
         // ── Annotate tool ──────────────────────────────────────────────────
         tool_registry.register(tools::AnnotateTool::new(cognitive::AnnotationRepo::new(
             storage_pool.inner().clone(),
@@ -1417,31 +1405,6 @@ impl AgentLoopBuilder {
 
                 tool_registry.register(memory_tool);
             }
-        }
-
-        // ── Notes tool (requires real pool) ──────────────────────────────────
-        // Notes migrations are already run by AppCore::init() — skip here to avoid
-        // redundant SQL queries on boot (~50ms savings).
-        if let Some(pool) = &self.pool {
-            let note_repo = feature_notes::repo::NoteRepo::new(pool.clone());
-            let mut notes_tool = feature_notes::tool::NotesTool::new(note_repo);
-            if let Some(ref bus) = self.domain_event_bus {
-                notes_tool = notes_tool.with_domain_bus(bus.clone());
-            }
-            tool_registry.register(notes_tool);
-            info!("Notes tool registered");
-        }
-
-        // ── Language learning tool ─────────────────────────────────────
-        if config.language_learning.enabled {
-            tool_registry
-                .register(feature_language_learning::practice_tool::LanguagePracticeTool::new());
-            info!("Language practice tool registered");
-        }
-
-        // ── Work context tool (requires real pool + enabled) ─────────────
-        if config.work_context.enabled && self.pool.is_some() {
-            tool_registry.register(activity_log::WorkContextTool::new(storage_pool.clone()));
         }
 
         // ── Productivity tool (reuses prod_repos from context source block) ──

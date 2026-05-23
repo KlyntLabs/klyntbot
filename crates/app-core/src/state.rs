@@ -67,7 +67,7 @@ pub struct AppCore {
     pub note_repo: NoteRepo,
     /// Practice session repo (always available — backed by the same DB as notes).
     pub practice_repo: PracticeSessionRepo,
-    pub productivity_repos: Option<ProductivityRepos>,
+    pub productivity_repos: Option<Arc<feature_productivity::repos::ProductivityRepos>>,
     /// Productivity (Pomodoro) focus manager — distinct from DND sessions.
     pub focus_manager: Option<Arc<FocusManager>>,
     /// DND session manager — controls timed Do-Not-Disturb sessions.
@@ -85,7 +85,7 @@ pub struct AppCore {
     pub pattern_detector: Option<Arc<Mutex<PatternDetector>>>,
     pub intervention_router: Option<Arc<Mutex<InterventionRouter>>>,
     pub feedback_tracker: Option<Arc<Mutex<FeedbackTracker>>>,
-    pub coaching_intervention_log_repo: Option<storage::CoachingInterventionLogRepo>,
+    pub coaching_intervention_log_repo: Option<Arc<storage::CoachingInterventionLogRepo>>,
     pub user_situation: Option<Arc<Mutex<UserSituation>>>,
     /// Shared active desktop view for query rewriting context.
     pub active_view: Option<Arc<RwLock<Option<context_engine::ActiveView>>>>,
@@ -159,22 +159,25 @@ pub struct AppCore {
     /// Background task handle for the voice conversation loop.
     pub voice_loop_handle: Option<tokio::task::JoinHandle<()>>,
     /// BrainVoice signal router (None when domain event bus is unavailable).
-    pub brain_voice: Option<crate::brain_voice::BrainVoice>,
+    pub brain_voice: Option<Arc<crate::brain_voice::BrainVoice>>,
     /// Onboarding journey milestone tracker.
     pub journey_tracker: Option<crate::journey::JourneyTracker>,
     /// AI pipeline SignalRouter — keeps the router alive for the app lifetime.
-    pub _ai_pipeline_router: Option<ai_core::SignalRouter>,
+    pub _ai_pipeline_router: Option<Arc<ai_core::SignalRouter>>,
     /// Registry of all AiFeature-derived features in the workspace.
     pub feature_registry: Arc<ai_core::AiFeatureRegistry>,
     pub tracing_registry: std::sync::Arc<crate::tracing::TracingRegistry>,
+    /// Feature host — holds plugin handles and provides typed lookup.
+    pub host: crate::plugin::host::FeatureHost,
 }
 
 impl AppCore {
     /// Return productivity repos or a "feature disabled" error.
     #[tracing::instrument(skip(self), err)]
-    pub fn productivity_repos(&self) -> Result<&ProductivityRepos, ApiError> {
+    pub fn productivity_repos(&self) -> Result<&feature_productivity::repos::ProductivityRepos, ApiError> {
         self.productivity_repos
             .as_ref()
+            .map(|arc| arc.as_ref())
             .ok_or_else(|| ApiError::new("FEATURE_DISABLED", "productivity feature is not enabled"))
     }
 
@@ -245,6 +248,7 @@ impl AppCore {
     pub fn coaching_log_repo(&self) -> Result<&storage::CoachingInterventionLogRepo, ApiError> {
         self.coaching_intervention_log_repo
             .as_ref()
+            .map(|arc| arc.as_ref())
             .ok_or_else(|| ApiError::new("FEATURE_DISABLED", "coaching engine is not available"))
     }
 

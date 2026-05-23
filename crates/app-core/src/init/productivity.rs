@@ -10,7 +10,7 @@ use tokio_util::sync::CancellationToken;
 use tracing::{error, info, warn};
 
 /// Results from the productivity initialization phase.
-pub(super) struct ProductivityResult {
+pub struct ProductivityResult {
     pub dashboard_poll_interval_secs: u64,
     pub productivity_repos: Option<ProductivityRepos>,
     pub focus_manager: Option<Arc<FocusManager>>,
@@ -27,7 +27,7 @@ pub(super) struct ProductivityResult {
 }
 
 /// Initialize productivity feature (optional — requires enabled config).
-pub(super) async fn init_productivity(
+pub async fn init_productivity(
     config: &config::Config,
     storage_pool: &StoragePool,
     domain_event_bus: &Arc<DomainEventBus>,

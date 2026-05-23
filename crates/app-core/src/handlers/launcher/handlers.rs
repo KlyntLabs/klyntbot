@@ -40,7 +40,11 @@ impl AppCore {
     /// Build dashboard data for the launcher.
     #[tracing::instrument(skip(self), err)]
     pub async fn launcher_dashboard(&self) -> Result<DashboardData, ApiError> {
-        super::dashboard::build_dashboard_data(&self.repos, self.productivity_repos.as_ref()).await
+        super::dashboard::build_dashboard_data(
+            &self.repos,
+            self.productivity_repos.as_ref().map(|arc| arc.as_ref()),
+        )
+        .await
     }
 
     /// Paste clipboard entry (retrieve content).

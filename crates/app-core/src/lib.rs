@@ -8,6 +8,8 @@ pub mod handlers;
 pub mod infrastructure;
 pub mod init;
 pub mod journey;
+pub mod plugin;
+pub mod plugins;
 pub mod runtime;
 pub mod state;
 pub mod tracing;

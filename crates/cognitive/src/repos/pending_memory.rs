@@ -2,6 +2,7 @@
 
 use sqlx::SqlitePool;
 
+#[derive(Clone)]
 pub struct PendingMemoryRepo {
     pool: SqlitePool,
 }

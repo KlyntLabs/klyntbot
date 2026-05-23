@@ -394,6 +394,7 @@ dependencies = [
  "dashmap",
  "desktop-shared",
  "dirs",
+ "feature-alarms",
  "feature-coaching",
  "feature-focus",
  "feature-insights",

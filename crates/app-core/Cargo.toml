@@ -22,6 +22,7 @@ common = { workspace = true }
 config = { workspace = true }
 context_engine = { workspace = true }
 feature-coaching = { workspace = true }
+feature-alarms = { workspace = true }
 feature-focus = { path = "../feature-focus" }
 feature-insights = { workspace = true }
 feature-learning = { workspace = true }

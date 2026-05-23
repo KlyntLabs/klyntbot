@@ -10,7 +10,7 @@ use voice_engine::VoiceServiceConfig;
 
 use crate::state::AppCore;
 
-pub(crate) fn privacy_level(mode: config::schema::VoicePrivacyMode) -> voice_engine::PrivacyLevel {
+pub fn privacy_level(mode: config::schema::VoicePrivacyMode) -> voice_engine::PrivacyLevel {
     match mode {
         config::schema::VoicePrivacyMode::Standard => voice_engine::PrivacyLevel::Standard,
         config::schema::VoicePrivacyMode::Strict => voice_engine::PrivacyLevel::Strict,

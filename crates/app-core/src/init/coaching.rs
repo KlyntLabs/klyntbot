@@ -9,7 +9,7 @@ use tokio_util::sync::CancellationToken;
 use tracing::{debug, info};
 
 /// Results from the coaching initialization phase.
-pub(super) struct CoachingResult {
+pub struct CoachingResult {
     pub intervention_rx: mpsc::Receiver<feature_coaching::router::DeliveredIntervention>,
     pub signal_accumulator: Option<Arc<Mutex<SignalAccumulator>>>,
     pub pattern_detector: Option<Arc<Mutex<PatternDetector>>>,
@@ -23,7 +23,7 @@ pub(super) struct CoachingResult {
 /// `CoachingService` itself is started after the `SignalRouter` exists, since
 /// it consumes `AiSignal`s from `CoachingSignalConsumer`.
 #[allow(clippy::too_many_arguments)]
-pub(super) async fn init_coaching(
+pub async fn init_coaching(
     mode: common::AppMode,
     _config: &config::Config,
     storage_pool: &storage::StoragePool,
@@ -234,8 +234,8 @@ pub(super) async fn build_situation_inputs(
 }
 
 /// Spawn a periodic task that recomputes UserSituation from real data every 2 minutes.
-pub(super) fn spawn_situation_recompute(
-    prod_repos: Option<ProductivityRepos>,
+pub fn spawn_situation_recompute(
+    prod_repos: Option<Arc<feature_productivity::repos::ProductivityRepos>>,
     repos: Repos,
     router: Option<Arc<Mutex<InterventionRouter>>>,
     situation: Option<Arc<Mutex<UserSituation>>>,
@@ -256,7 +256,7 @@ pub(super) fn spawn_situation_recompute(
             tokio::select! {
                 _ = interval.tick() => {
                     let new_sit = build_situation_inputs(
-                        prod_repos.as_ref(),
+                        prod_repos.as_ref().map(|arc| arc.as_ref()),
                         &repos,
                         router.as_ref(),
                     ).await;
