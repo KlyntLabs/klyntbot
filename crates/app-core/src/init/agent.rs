@@ -38,6 +38,7 @@ pub(super) async fn init_agent(
     approval_channel: Option<Arc<dyn approval::ApprovalChannel>>,
     injector_registry: Option<bus::InjectorRegistry>,
     tool_registry: tools_core::registry::ToolRegistry,
+    context_sources: Vec<Box<dyn context_engine::ContextSource>>,
     user_situation: Arc<Mutex<UserSituation>>,
     active_view: Arc<tokio::sync::RwLock<Option<context_engine::ActiveView>>>,
     activity_svc: Arc<activity_log::ActivityIngestionService>,
@@ -48,6 +49,7 @@ pub(super) async fn init_agent(
         .with_pool(storage_pool.inner().clone())
         .with_cron_executor(Arc::clone(cron_executor), cron_repo.clone())
         .with_tool_registry(tool_registry)
+        .with_context_sources(context_sources)
         .with_user_situation(user_situation.clone())
         .with_activity_service(Arc::clone(&activity_svc))
         .with_active_view(active_view.clone())

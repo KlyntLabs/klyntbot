@@ -40,6 +40,7 @@ pub(crate) async fn build_context_sources(
     storage_pool: &storage::StoragePool,
     embedding_engine: &Arc<tools::EmbeddingEngine>,
     skill_store: &Arc<tokio::sync::RwLock<skill_system::SkillStore>>,
+    mut pre_registered_sources: Vec<Box<dyn ContextSource>>,
 ) -> common::Result<ContextSourcesResult> {
     let confidence_bits = Arc::new(std::sync::atomic::AtomicU32::new(
         config.confidence.threshold.to_bits(),
@@ -341,6 +342,9 @@ pub(crate) async fn build_context_sources(
             inference_loop_token = Some(token);
         }
     }
+
+    // Append plugin-registered sources
+    sources.append(&mut pre_registered_sources);
 
     // Sort by priority (descending) — ensures correct ordering in prompt
     sources.sort_by_key(|s| std::cmp::Reverse(s.priority()));

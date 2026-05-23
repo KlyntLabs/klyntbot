@@ -96,6 +96,14 @@ impl AppCorePlugin for ProductivityPlugin {
         if let Some(ref interceptor) = bundle.distraction_interceptor {
             ctx.insert_handle(Arc::clone(interceptor));
         }
+
+        // Register productivity context source
+        if let Some(ref prod_repos) = bundle.productivity_repos {
+            ctx.add_context_source(Box::new(
+                ::agent::context_sources::ProductivityContextSource::new((**prod_repos).clone()),
+            ));
+        }
+
         ctx.insert_handle(Arc::new(bundle));
         tracing::info!("productivity plugin initialized");
         Ok(())

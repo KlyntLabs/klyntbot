@@ -284,7 +284,7 @@ impl AppCore {
             shutdown_token: shutdown_token.clone(),
         };
 
-        let host_result = crate::plugin::host::FeatureHostBuilder::new()
+        let mut host_result = crate::plugin::host::FeatureHostBuilder::new()
             .plugin(crate::plugins::focus::FocusPlugin)
             .plugin(crate::plugins::notes::NotesPlugin)
             .plugin(crate::plugins::tasks::TasksPlugin)
@@ -334,6 +334,7 @@ impl AppCore {
             None,
             None,
             host_result.tools.clone(),
+            host_result.context_sources.take().unwrap_or_default(),
             Arc::clone(&user_situation),
             Arc::clone(&active_view),
             Arc::clone(&activity_svc),

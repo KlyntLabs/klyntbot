@@ -81,6 +81,7 @@ pub struct AgentLoopBuilder {
     job_supervisor: Option<tools_core::DynJobSupervisor>,
     pre_registered_tools: Vec<tools_core::DynTool>,
     tool_registry: Option<tools_core::registry::ToolRegistry>,
+    context_sources: Vec<Box<dyn context_engine::ContextSource>>,
 }
 
 impl AgentLoopBuilder {
@@ -110,6 +111,7 @@ impl AgentLoopBuilder {
             job_supervisor: None,
             pre_registered_tools: vec![],
             tool_registry: None,
+            context_sources: vec![],
         }
     }
 
@@ -138,6 +140,10 @@ impl AgentLoopBuilder {
     }
     pub fn with_tool_registry(mut self, registry: tools_core::registry::ToolRegistry) -> Self {
         self.tool_registry = Some(registry);
+        self
+    }
+    pub fn with_context_sources(mut self, sources: Vec<Box<dyn context_engine::ContextSource>>) -> Self {
+        self.context_sources = sources;
         self
     }
     pub fn with_embedding_engine(mut self, engine: Arc<tools::EmbeddingEngine>) -> Self {
@@ -310,6 +316,7 @@ impl AgentLoopBuilder {
             &storage_pool,
             &embedding_engine,
             &skill_store,
+            self.context_sources,
         )
         .await?;
         let sources = ctx_sources.sources;

@@ -47,7 +47,7 @@ impl FeatureHost {
 pub struct FeatureHostResult {
     pub host: FeatureHost,
     pub tools: tools_core::registry::ToolRegistry,
-    pub context_sources: Vec<Box<dyn context_engine::ContextSource>>,
+    pub context_sources: Option<Vec<Box<dyn context_engine::ContextSource>>>,
     pub signal_consumers: Vec<Arc<dyn ai_core::SignalConsumer>>,
     pub event_translators: Vec<super::context::EventTranslator>,
     pub ai_feature_registrations: Vec<AiFeatureRegistration>,
@@ -183,7 +183,7 @@ impl FeatureHostBuilder {
         Ok(FeatureHostResult {
             host,
             tools,
-            context_sources,
+            context_sources: Some(context_sources),
             signal_consumers,
             event_translators,
             ai_feature_registrations,
