@@ -1,59 +1,9 @@
-use ai_core::{
-    AiEventMeta, AiMetrics, AiSignal, RecallDomain, SalienceVerdict, SignalConsumer, SignalRouter,
-};
-use bus::{DomainEvent, DomainEventBus};
+use ai_core::{AiEventMeta, AiMetrics, AiSignal, RecallDomain, SalienceVerdict};
+use bus::DomainEvent;
 use jiff::Timestamp;
-use std::sync::Arc;
 
-/// Translator: DomainEvent -> Option<AiSignal>. Returns None when the event
-/// has no pipeline registration (e.g. transient infra events). Each feature
-/// crate owns its own `try_from_domain_event` translator; this function is a
-/// pure dispatch shim. Domain is set by the feature's `#[derive(AiEvent)]`
-/// enum-level `#[ai(domain = ...)]`.
-pub fn translate(event: &DomainEvent) -> Option<AiSignal> {
-    fn with_domain<E: AiEventMeta>(ev: E, domain: RecallDomain) -> AiSignal {
-        let mut sig = ev.to_signal();
-        sig.domain = domain;
-        sig
-    }
-
-    if let Some(e) = feature_tasks::events::try_from_domain_event(event) {
-        return Some(with_domain(e, RecallDomain::Tasks));
-    }
-    if let Some(e) = feature_coaching::events::try_from_domain_event(event) {
-        return Some(with_domain(e, RecallDomain::Coaching));
-    }
-    if let Some(e) = feature_productivity::events::try_from_domain_event(event) {
-        return Some(with_domain(e, RecallDomain::Productivity));
-    }
-    if let Some(e) = feature_notes::events::try_from_domain_event(event) {
-        return Some(with_domain(e, RecallDomain::Notes));
-    }
-    if let Some(e) = feature_learning::try_from_domain_event(event) {
-        return Some(with_domain(e, RecallDomain::Learning));
-    }
-    if let Some(e) = feature_language_learning::try_from_domain_event(event) {
-        return Some(with_domain(e, RecallDomain::LanguageLearning));
-    }
-    if let Some(s) = translate_bash_job(event) {
-        return Some(s);
-    }
-    if let Some(e) =
-        cognitive::services::community_intelligence::events::try_from_domain_event(event)
-    {
-        return Some(with_domain(e, RecallDomain::General));
-    }
-    if let Some(e) =
-        cognitive::services::community_intelligence::co_activation_events::try_from_domain_event(
-            event,
-        )
-    {
-        return Some(with_domain(e, RecallDomain::General));
-    }
-    translate_system_event(event)
-}
-
-fn translate_bash_job(event: &bus::DomainEvent) -> Option<AiSignal> {
+/// Translator: BashJob events -> AiSignal.
+pub fn translate_bash_job(event: &bus::DomainEvent) -> Option<AiSignal> {
     let bus::DomainEvent::BashJob(inner) = event else {
         return None;
     };
@@ -102,7 +52,12 @@ fn importance_for_bash_event(e: &bus::BashJobEvent) -> f64 {
     }
 }
 
-fn translate_system_event(event: &DomainEvent) -> Option<AiSignal> {
+/// Translator: System-level domain events -> AiSignal.
+///
+/// Handles events that are not owned by any specific feature crate
+/// (ChatTurnCompleted, SessionEnded, SkillRouted, UserCorrectedAI,
+/// AutotunerDecision, CoachingFeedback).
+pub fn translate_system_event(event: &DomainEvent) -> Option<AiSignal> {
     let now = Timestamp::now();
     let base = AiSignal {
         domain: RecallDomain::General,
@@ -147,9 +102,8 @@ fn translate_system_event(event: &DomainEvent) -> Option<AiSignal> {
             ..base
         }),
         // DistractionDetected, FocusSessionStarted, FocusSessionEnded, ActivitySessionCompleted,
-        // and ProductivityScoreComputed are now handled by try_into_productivity_event →
-        // ProductivityEvent::From → AiSignal via the macro-generated to_signal().
-        // AtomReinforced is now handled by try_into_learning_event.
+        // and ProductivityScoreComputed are now handled by feature translators.
+        // AtomReinforced is now handled by the learning feature translator.
         DomainEvent::SkillRouted {
             skill_name,
             confidence,
@@ -210,6 +164,8 @@ fn translate_system_event(event: &DomainEvent) -> Option<AiSignal> {
 /// Build the workspace `AiFeatureRegistry`. Every feature crate that derives
 /// `AiFeature` must be listed here; new features are added in v3+ as a single
 /// line per crate.
+///
+/// Deprecated: use `FeatureHostResult::build_feature_registry()` instead.
 pub fn build_feature_registry() -> ai_core::AiFeatureRegistry {
     let mut reg = ai_core::AiFeatureRegistry::new();
     feature_tasks::TasksFeature::register(&mut reg);
@@ -219,26 +175,6 @@ pub fn build_feature_registry() -> ai_core::AiFeatureRegistry {
     feature_language_learning::LanguageLearningFeature::register(&mut reg);
     feature_coaching::CoachingFeature::register(&mut reg);
     reg
-}
-
-/// Build a workspace-global MetricRegistry populated from every registered AiFeature's
-/// event enum `FEATURE_METRICS` const. Called exactly once at startup.
-pub fn build_metric_registry() -> ai_core::MetricRegistry {
-    let mut reg = ai_core::MetricRegistry::new();
-    reg.register_all(feature_tasks::TaskEvent::FEATURE_METRICS);
-    reg.register_all(feature_coaching::events::CoachingEvent::FEATURE_METRICS);
-    reg.register_all(feature_productivity::events::ProductivityEvent::FEATURE_METRICS);
-    reg.register_all(feature_language_learning::LanguageLearningEvent::FEATURE_METRICS);
-    reg.register_all(feature_learning::LearningEvent::FEATURE_METRICS);
-    reg.register_all(
-        cognitive::services::community_intelligence::events::CommunityEvent::FEATURE_METRICS,
-    );
-    reg.register_all(cognitive::services::community_intelligence::co_activation_events::CoActivationEvent::FEATURE_METRICS);
-    reg
-}
-
-pub fn start(bus: Arc<DomainEventBus>, consumers: Vec<Arc<dyn SignalConsumer>>) -> SignalRouter {
-    SignalRouter::start(bus, consumers, translate)
 }
 
 #[cfg(test)]
@@ -288,7 +224,7 @@ mod bash_job_translate_tests {
 }
 
 #[cfg(test)]
-mod translate_mirror_tests {
+mod translate_system_event_tests {
     use super::*;
 
     #[test]
@@ -300,7 +236,7 @@ mod translate_mirror_tests {
             trigger_phrases: vec!["hi".into()],
             session_key: "s".into(),
         };
-        let sig = translate(&ev).expect("should translate");
+        let sig = translate_system_event(&ev).expect("should translate");
         assert_eq!(sig.event_kind, "SkillRouted");
     }
 
@@ -314,7 +250,7 @@ mod translate_mirror_tests {
             session_key: "s".into(),
             active_skill: Some("general".into()),
         };
-        let sig = translate(&ev).expect("should translate");
+        let sig = translate_system_event(&ev).expect("should translate");
         assert_eq!(sig.event_kind, "UserCorrectedAI");
     }
 
@@ -326,7 +262,7 @@ mod translate_mirror_tests {
             improvement_pct: 0.0,
             affected_params: vec!["x".into()],
         };
-        let sig = translate(&ev).expect("should translate");
+        let sig = translate_system_event(&ev).expect("should translate");
         assert_eq!(sig.event_kind, "AutotunerDecision");
     }
 
@@ -336,7 +272,7 @@ mod translate_mirror_tests {
             intervention_id: "i1".into(),
             response: bus::FeedbackResponse::Helpful,
         };
-        let sig = translate(&ev).expect("should translate");
+        let sig = translate_system_event(&ev).expect("should translate");
         assert_eq!(sig.event_kind, "CoachingFeedback");
         assert!(sig.coaching_signal);
         assert_eq!(sig.metrics.category.as_deref(), Some("thumbs_up"));

@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use ai_core::AiEventMeta;
 use std::sync::Arc;
 
 use crate::plugin::context::PluginContext;
@@ -19,6 +20,25 @@ impl AppCorePlugin for CognitivePlugin {
     }
 
     async fn init(&self, ctx: &mut PluginContext) -> common::Result<()> {
+        ctx.add_feature_translator(
+            cognitive::services::community_intelligence::events::try_from_domain_event,
+            ai_core::RecallDomain::General,
+        );
+        ctx.add_feature_translator(
+            cognitive::services::community_intelligence::co_activation_events::try_from_domain_event,
+            ai_core::RecallDomain::General,
+        );
+        ctx.register_metrics(|reg| {
+            reg.register_all(
+                cognitive::services::community_intelligence::events::CommunityEvent::FEATURE_METRICS,
+            )
+        });
+        ctx.register_metrics(|reg| {
+            reg.register_all(
+                cognitive::services::community_intelligence::co_activation_events::CoActivationEvent::FEATURE_METRICS,
+            )
+        });
+
         let repo = ::cognitive::repos::PendingMemoryRepo::new(ctx.deps.storage_pool.inner().clone());
         if let Err(e) = repo.migrate().await {
             tracing::warn!("Pending memory migration failed: {e}");

@@ -15,7 +15,8 @@ impl AppCorePlugin for BashToolkitPlugin {
         "bash-toolkit"
     }
 
-    async fn init(&self, _ctx: &mut PluginContext) -> common::Result<()> {
+    async fn init(&self, ctx: &mut PluginContext) -> common::Result<()> {
+        ctx.add_event_translator(crate::init::ai_pipeline::translate_bash_job);
         Ok(())
     }
 

@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use ai_core::AiEventMeta;
 use std::sync::Arc;
 
 use crate::plugin::context::PluginContext;
@@ -36,6 +37,15 @@ impl AppCorePlugin for ProductivityPlugin {
     }
 
     async fn init(&self, ctx: &mut PluginContext) -> common::Result<()> {
+        ctx.register_ai_feature(|reg| feature_productivity::ProductivityFeature::register(reg));
+        ctx.register_metrics(|reg| {
+            reg.register_all(feature_productivity::events::ProductivityEvent::FEATURE_METRICS)
+        });
+        ctx.add_feature_translator(
+            feature_productivity::events::try_from_domain_event,
+            ai_core::RecallDomain::Productivity,
+        );
+
         let result = {
             let config = ctx.deps.config.read().await;
             crate::init::productivity::init_productivity(

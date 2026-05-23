@@ -20,6 +20,13 @@ impl AppCorePlugin for TasksPlugin {
     }
 
     async fn init(&self, ctx: &mut PluginContext) -> common::Result<()> {
+        ctx.register_ai_feature(|reg| feature_tasks::TasksFeature::register(reg));
+        ctx.register_metrics(|reg| reg.register_all(feature_tasks::TaskEvent::FEATURE_METRICS));
+        ctx.add_feature_translator(
+            feature_tasks::events::try_from_domain_event,
+            ai_core::RecallDomain::Tasks,
+        );
+
         let Some(ref domain_bus) = ctx.deps.domain_event_bus else {
             tracing::warn!("tasks plugin: no domain event bus, skipping background spawns");
             return Ok(());

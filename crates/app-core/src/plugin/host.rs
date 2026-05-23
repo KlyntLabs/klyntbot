@@ -1,10 +1,11 @@
 use std::any::{Any, TypeId};
 use std::sync::Arc;
 
+use bus::DomainEvent;
 use dashmap::DashMap;
 use tracing::info;
 
-use super::context::{PluginContext, PluginDeps};
+use super::context::{AiFeatureRegistration, MetricRegistration, PluginContext, PluginDeps};
 use super::AppCorePlugin;
 
 /// A type-map of plugin handles.
@@ -49,9 +50,36 @@ pub struct FeatureHostResult {
     pub context_sources: Vec<Box<dyn context_engine::ContextSource>>,
     pub signal_consumers: Vec<Arc<dyn ai_core::SignalConsumer>>,
     pub event_translators: Vec<super::context::EventTranslator>,
+    pub ai_feature_registrations: Vec<AiFeatureRegistration>,
+    pub metric_registrations: Vec<MetricRegistration>,
     pub cron_handlers: Vec<(String, scheduling::temporal::cron_executor::CronHandler)>,
     pub background_spawns: Vec<tokio::task::JoinHandle<()>>,
     plugins: Vec<Box<dyn super::AppCorePlugin>>,
+}
+
+impl FeatureHostResult {
+    /// Build the workspace `AiFeatureRegistry` from all plugin registrations.
+    pub fn build_feature_registry(&self) -> ai_core::AiFeatureRegistry {
+        let mut reg = ai_core::AiFeatureRegistry::new();
+        for f in &self.ai_feature_registrations {
+            f(&mut reg);
+        }
+        reg
+    }
+
+    /// Build the workspace `MetricRegistry` from all plugin registrations.
+    pub fn build_metric_registry(&self) -> ai_core::MetricRegistry {
+        let mut reg = ai_core::MetricRegistry::new();
+        for f in &self.metric_registrations {
+            f(&mut reg);
+        }
+        reg
+    }
+
+    /// Translate a domain event using all registered plugin translators.
+    pub fn translate_event(&self, event: &DomainEvent) -> Option<ai_core::AiSignal> {
+        super::context::PluginContext::run_translators(&self.event_translators, event)
+    }
 }
 
 impl FeatureHostResult {
@@ -120,6 +148,8 @@ impl FeatureHostBuilder {
         let mut context_sources = Vec::new();
         let mut signal_consumers = Vec::new();
         let mut event_translators = Vec::new();
+        let mut ai_feature_registrations = Vec::new();
+        let mut metric_registrations = Vec::new();
         let mut cron_handlers = Vec::new();
         let mut background_spawns = Vec::new();
         let mut host = FeatureHost::new();
@@ -131,6 +161,8 @@ impl FeatureHostBuilder {
                 &mut context_sources,
                 &mut signal_consumers,
                 &mut event_translators,
+                &mut ai_feature_registrations,
+                &mut metric_registrations,
                 &mut cron_handlers,
                 &mut background_spawns,
                 &mut host,
@@ -154,6 +186,8 @@ impl FeatureHostBuilder {
             context_sources,
             signal_consumers,
             event_translators,
+            ai_feature_registrations,
+            metric_registrations,
             cron_handlers,
             background_spawns,
             plugins: self.plugins,

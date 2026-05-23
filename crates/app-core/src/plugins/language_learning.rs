@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use ai_core::AiEventMeta;
 
 use crate::plugin::context::PluginContext;
 use crate::plugin::AppCorePlugin;
@@ -17,7 +18,17 @@ impl AppCorePlugin for LanguageLearningPlugin {
         feature_language_learning::language_learning_migrations()
     }
 
-    async fn init(&self, _ctx: &mut PluginContext) -> common::Result<()> {
+    async fn init(&self, ctx: &mut PluginContext) -> common::Result<()> {
+        ctx.register_ai_feature(|reg| {
+            feature_language_learning::LanguageLearningFeature::register(reg)
+        });
+        ctx.register_metrics(|reg| {
+            reg.register_all(feature_language_learning::LanguageLearningEvent::FEATURE_METRICS)
+        });
+        ctx.add_feature_translator(
+            feature_language_learning::try_from_domain_event,
+            ai_core::RecallDomain::LanguageLearning,
+        );
         Ok(())
     }
 

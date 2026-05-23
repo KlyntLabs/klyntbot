@@ -41,7 +41,10 @@ pub struct PluginDeps {
 }
 
 /// Event translator: converts a `DomainEvent` into an optional `AiSignal`.
-pub type EventTranslator = Box<dyn Fn(&DomainEvent) -> Option<ai_core::AiSignal> + Send + Sync>;
+pub type EventTranslator = Arc<dyn Fn(&DomainEvent) -> Option<ai_core::AiSignal> + Send + Sync>;
+
+pub type AiFeatureRegistration = Box<dyn Fn(&mut ai_core::AiFeatureRegistry) + Send + Sync>;
+pub type MetricRegistration = Box<dyn Fn(&mut ai_core::MetricRegistry) + Send + Sync>;
 
 /// The registration surface passed to `AppCorePlugin::init()`.
 ///
@@ -53,6 +56,8 @@ pub struct PluginContext<'a> {
     pub context_sources: &'a mut Vec<Box<dyn ContextSource>>,
     pub signal_consumers: &'a mut Vec<Arc<dyn SignalConsumer>>,
     pub event_translators: &'a mut Vec<EventTranslator>,
+    pub ai_feature_registrations: &'a mut Vec<AiFeatureRegistration>,
+    pub metric_registrations: &'a mut Vec<MetricRegistration>,
     pub cron_handlers: &'a mut Vec<(String, CronHandler)>,
     pub background_spawns: &'a mut Vec<tokio::task::JoinHandle<()>>,
     pub host: &'a mut FeatureHost,
@@ -65,6 +70,8 @@ impl<'a> PluginContext<'a> {
         context_sources: &'a mut Vec<Box<dyn ContextSource>>,
         signal_consumers: &'a mut Vec<Arc<dyn SignalConsumer>>,
         event_translators: &'a mut Vec<EventTranslator>,
+        ai_feature_registrations: &'a mut Vec<AiFeatureRegistration>,
+        metric_registrations: &'a mut Vec<MetricRegistration>,
         cron_handlers: &'a mut Vec<(String, CronHandler)>,
         background_spawns: &'a mut Vec<tokio::task::JoinHandle<()>>,
         host: &'a mut FeatureHost,
@@ -75,6 +82,8 @@ impl<'a> PluginContext<'a> {
             context_sources,
             signal_consumers,
             event_translators,
+            ai_feature_registrations,
+            metric_registrations,
             cron_handlers,
             background_spawns,
             host,
@@ -102,8 +111,47 @@ impl<'a> PluginContext<'a> {
     }
 
     /// Add an event translator for `DomainEvent → AiSignal` conversion.
-    pub fn add_event_translator(&mut self, translator: EventTranslator) {
-        self.event_translators.push(translator);
+    pub fn add_event_translator(&mut self, translator: impl Fn(&DomainEvent) -> Option<ai_core::AiSignal> + Send + Sync + 'static) {
+        self.event_translators.push(Arc::new(translator));
+    }
+
+    /// Convenience: register a feature's `try_from_domain_event` translator that
+    /// automatically sets the `AiSignal` domain.
+    pub fn add_feature_translator<E: ai_core::AiEventMeta>(
+        &mut self,
+        try_from: impl Fn(&DomainEvent) -> Option<E> + Send + Sync + 'static,
+        domain: ai_core::RecallDomain,
+    ) {
+        self.add_event_translator(move |event| {
+            try_from(event).map(|e| {
+                let mut sig = e.to_signal();
+                sig.domain = domain;
+                sig
+            })
+        });
+    }
+
+    /// Register an AI feature in the workspace registry.
+    pub fn register_ai_feature(&mut self, f: impl Fn(&mut ai_core::AiFeatureRegistry) + Send + Sync + 'static) {
+        self.ai_feature_registrations.push(Box::new(f));
+    }
+
+    /// Register metrics in the workspace metric registry.
+    pub fn register_metrics(&mut self, f: impl Fn(&mut ai_core::MetricRegistry) + Send + Sync + 'static) {
+        self.metric_registrations.push(Box::new(f));
+    }
+
+    /// Run a slice of translators against an event and return the first match.
+    pub fn run_translators(
+        translators: &[EventTranslator],
+        event: &DomainEvent,
+    ) -> Option<ai_core::AiSignal> {
+        for t in translators {
+            if let Some(sig) = t(event) {
+                return Some(sig);
+            }
+        }
+        None
     }
 
     /// Register a cron handler.

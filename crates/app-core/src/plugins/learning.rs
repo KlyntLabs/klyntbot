@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use ai_core::AiEventMeta;
 use tools_core::FeaturePackage;
 
 use crate::plugin::context::PluginContext;
@@ -19,7 +20,15 @@ impl AppCorePlugin for LearningPlugin {
         )
     }
 
-    async fn init(&self, _ctx: &mut PluginContext) -> common::Result<()> {
+    async fn init(&self, ctx: &mut PluginContext) -> common::Result<()> {
+        ctx.register_ai_feature(|reg| feature_learning::LearningFeature::register(reg));
+        ctx.register_metrics(|reg| {
+            reg.register_all(feature_learning::LearningEvent::FEATURE_METRICS)
+        });
+        ctx.add_feature_translator(
+            feature_learning::try_from_domain_event,
+            ai_core::RecallDomain::Learning,
+        );
         Ok(())
     }
 }

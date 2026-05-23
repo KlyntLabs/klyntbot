@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use ai_core::AiEventMeta;
 use std::sync::Arc;
 
 use crate::plugin::context::PluginContext;
@@ -27,6 +28,15 @@ impl AppCorePlugin for CoachingPlugin {
     }
 
     async fn init(&self, ctx: &mut PluginContext) -> common::Result<()> {
+        ctx.register_ai_feature(|reg| feature_coaching::CoachingFeature::register(reg));
+        ctx.register_metrics(|reg| {
+            reg.register_all(feature_coaching::events::CoachingEvent::FEATURE_METRICS)
+        });
+        ctx.add_feature_translator(
+            feature_coaching::events::try_from_domain_event,
+            ai_core::RecallDomain::Coaching,
+        );
+
         let prod_repos = ctx
             .host
             .get::<feature_productivity::repos::ProductivityRepos>();

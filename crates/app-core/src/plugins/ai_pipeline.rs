@@ -128,10 +128,18 @@ impl AppCorePlugin for AiPipelinePlugin {
         ];
         consumers.extend(mirror_consumers.iter().cloned());
 
-        let router = crate::init::ai_pipeline::start(
-            Arc::clone(ctx.deps.domain_event_bus.as_ref().expect("domain event bus available")),
-            consumers,
-        );
+        // Add system event translator (must be last so feature translators get priority).
+        ctx.add_event_translator(crate::init::ai_pipeline::translate_system_event);
+
+        // Build composite translate from all plugin-registered translators.
+        let translators = ctx.event_translators.clone();
+        let translate = move |event: &bus::DomainEvent| -> Option<ai_core::AiSignal> {
+            PluginContext::run_translators(&translators, event)
+        };
+
+        let domain_event_bus =
+            Arc::clone(ctx.deps.domain_event_bus.as_ref().expect("domain event bus available"));
+        let router = ai_core::SignalRouter::start(domain_event_bus, consumers, translate);
         tracing::info!(
             "AI pipeline SignalRouter started with {} consumers (10 base + {} mirror)",
             10 + mirror_consumers.len(),

@@ -323,7 +323,7 @@ impl AppCore {
         let mut config = config;
         let plugin_config = Arc::new(RwLock::new(config.clone()));
         let tracing_registry = Arc::new(crate::tracing::TracingRegistry::new());
-        let feature_registry = Arc::new(ai_pipeline::build_feature_registry());
+
 
         // Idle-unload for the ONNX embedding model — check every 60s.
         // The model auto-unloads after 15s idle; this timer just ensures
@@ -394,14 +394,16 @@ impl AppCore {
             .plugin(crate::plugins::briefing::BriefingPlugin)
             .plugin(crate::plugins::lifecycle::LifecyclePlugin)
             .plugin(crate::plugins::notifications::NotificationPlugin)
-            .plugin(crate::plugins::ai_pipeline::AiPipelinePlugin)
             .plugin(crate::plugins::bash_toolkit::BashToolkitPlugin)
             .plugin(crate::plugins::temporal::TemporalPlugin)
+            .plugin(crate::plugins::ai_pipeline::AiPipelinePlugin)
             .build(&plugin_deps)
             .await
             .map_err(|e| e.to_string())?;
 
-        info!("FeatureHost built with legacy plugin scaffold");
+        info!("FeatureHost built");
+
+        let feature_registry = Arc::new(host_result.build_feature_registry());
 
         // Wrap a clone of config for shared ownership in AppCore.
         // Mutations after this point are synced back to core.config manually.

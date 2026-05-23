@@ -1,5 +1,5 @@
-use ai_core::RecallDomain;
-use app_core::init::ai_pipeline::translate;
+use ai_core::{AiEventMeta, RecallDomain};
+use app_core::init::ai_pipeline::{translate_bash_job, translate_system_event};
 use bus::DomainEvent;
 
 #[test]
@@ -8,7 +8,7 @@ fn chat_turn_completed_translates_to_general_signal() {
         session_key: "s1".into(),
         user_message: Some("hi".into()),
     };
-    let sig = translate(&e).expect("should translate");
+    let sig = translate_system_event(&e).expect("should translate");
     assert_eq!(sig.domain, RecallDomain::General);
     assert_eq!(sig.event_kind, "ChatTurnCompleted");
 }
@@ -22,7 +22,7 @@ fn session_ended_translates() {
         quality_score: Some(0.8),
         category_purity: 0.9,
     };
-    let sig = translate(&e).expect("should translate");
+    let sig = translate_system_event(&e).expect("should translate");
     assert_eq!(sig.event_kind, "SessionEnded");
 }
 
@@ -36,7 +36,9 @@ fn coaching_pattern_translates() {
         signal_count: 3,
         rule_text: "Schedule demanding tasks in the morning".into(),
     };
-    let sig = translate(&e).expect("should translate");
+    let coaching_event = feature_coaching::events::try_from_domain_event(&e)
+        .expect("should parse coaching event");
+    let sig = coaching_event.to_signal();
     assert_eq!(sig.event_kind, "PatternDetected");
     assert_eq!(
         sig.content,
@@ -54,6 +56,22 @@ fn atom_reinforced_translates() {
         domain: "learning".into(),
         reinforcement_count: 3,
     };
-    let sig = translate(&e).expect("should translate");
+    let learning_event = feature_learning::try_from_domain_event(&e)
+        .expect("should parse learning event");
+    let sig = learning_event.to_signal();
     assert_eq!(sig.event_kind, "AtomReinforced");
+}
+
+#[test]
+fn bash_job_failed_translates() {
+    let e = DomainEvent::BashJob(bus::BashJobEvent::Failed {
+        job_id: "bash-x".into(),
+        thread_id: "t".into(),
+        agent_id: "a".into(),
+        exit_code: Some(1),
+        failure_kind: "TestFailure".into(),
+        failure_detail: "...".into(),
+    });
+    let sig = translate_bash_job(&e).expect("should translate");
+    assert_eq!(sig.event_kind, "BashJob.Failed");
 }
