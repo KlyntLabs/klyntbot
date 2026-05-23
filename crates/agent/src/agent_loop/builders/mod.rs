@@ -6,6 +6,7 @@
 pub(crate) mod backfill;
 pub(crate) mod cognitive;
 pub(crate) mod context_sources;
+pub(crate) mod infrastructure;
 pub(crate) mod learning;
 pub(crate) mod query_enhancement;
 pub(crate) mod runtime;

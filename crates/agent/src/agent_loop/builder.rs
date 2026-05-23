@@ -12,17 +12,12 @@ use common::Result;
 use config::Config;
 
 use providers::DynProvider;
-use session::SessionManager;
-use tools::{
-    cron_tool::CronTool,
-    okr_tool::OkrTool,
-    registry::ToolRegistry,
-    subagents::SubagentsTool,
-};
+
+use tools::okr_tool::OkrTool;
 use tools_core::FeaturePackage;
 
 
-use super::super::{CronHandlerAdapter, SubagentManager};
+
 use super::{AgentLoop, LastActiveChannel};
 
 /// Builder for constructing an [`AgentLoop`] with all its dependencies.
@@ -339,85 +334,26 @@ impl AgentLoopBuilder {
                 .with_token_counter(Arc::clone(&token_counter))
                 .with_summary_provider(summary_provider);
 
-        // ── Session manager (SQL-backed) ──────────────────────────────────
-        let session_manager = SessionManager::from_repo(
-            storage::SessionRepo::new(storage_pool.inner().clone()),
-            config.conversation.session.max_cache_size,
+        // ── Infrastructure services ───────────────────────────────────────
+        let infra = super::builders::infrastructure::build_infrastructure(
+            &config,
+            &provider,
+            &bus,
+            &workspace,
+            &storage_pool,
+            &repos,
+            &embedding_engine,
+            &self.vector_store,
+            &self.cron_executor,
+            &self.job_supervisor,
+            self.pre_registered_tools,
         )
         .await;
-
-        // ── Subagent manager ──────────────────────────────────────────────
-        let _brave_api_key = (!config.tools.web.brave_api_key.is_empty())
-            .then(|| config.tools.web.brave_api_key.expose().clone());
-
-        let subagent_manager = Arc::new(
-            SubagentManager::builder(Arc::clone(&provider), workspace.clone())
-                .inbound_sender(bus.inbound_sender())
-                .model(config.agents.defaults.model.clone())
-                .max_concurrent_subagents(config.agents.defaults.max_concurrent_subagents)
-                .agent_task_repo(repos.agent_tasks.clone())
-                .job_supervisor(self.job_supervisor.clone())
-                .repos(repos.clone())
-                .build(),
-        );
-
-        // ── Tool registry ─────────────────────────────────────────────────
-        let mut tool_registry = ToolRegistry::new();
-
-        // Pre-registered tools (from app-core plugins)
-        for tool in self.pre_registered_tools {
-            tool_registry.register_dyn(tool);
-        }
-
-        // Subagents tool
-        tool_registry.register(SubagentsTool::with_handler(
-            Arc::clone(&subagent_manager) as Arc<dyn tools::subagents::SubagentsHandler>
-        ));
-
-        // Cron tool (optional)
-        if let Some((ref executor, ref repo)) = self.cron_executor {
-            let adapter: Arc<dyn tools::cron_tool::CronHandler> =
-                Arc::new(CronHandlerAdapter::new(Arc::clone(executor), repo.clone()));
-            tool_registry.register(CronTool::with_handler(adapter));
-        }
-
-        // Shared references — SqlitePool is Clone+Send+Sync via Arc internally
-
-        // Notification dispatcher removed (Phase 3): legacy agent::NotificationDispatcher
-        // is replaced by notifications::NotificationDispatcher wired in app-core.
-
-        // ── Learning: outcome store ────────────────────────────
-        let outcome_store = if config.learning.enabled {
-            Some(Arc::new(RwLock::new(crate::learning::OutcomeStore::new(
-                repos.outcomes.clone(),
-            ))))
-        } else {
-            None
-        };
-
-        // ── Create ConversationRecallService (shared by retriever + handler) ──
-        let recall_service: Option<Arc<cognitive::ConversationRecallService>> =
-            if let (true, Some(ref vs)) = (
-                config.conversation.embedding.enabled,
-                self.vector_store.clone(),
-            ) {
-                let text_embedder =
-                    Arc::new(crate::adapters::cognitive_embedder::TextEmbedderImpl::new(
-                        Arc::clone(&embedding_engine),
-                    ));
-                Some(Arc::new(cognitive::ConversationRecallService::new(
-                    vs.clone(),
-                    text_embedder,
-                    cognitive::RecallConfig {
-                        decay_half_life_days: config.conversation.memory.decay_half_life_days
-                            as f64,
-                        default_threshold: config.conversation.search.semantic_threshold as f32,
-                        ..cognitive::RecallConfig::default()
-                    },
-                )))
-            } else {
-                None
-            };
+        let session_manager = infra.session_manager;
+        let subagent_manager = infra.subagent_manager;
+        let mut tool_registry = infra.tool_registry;
+        let outcome_store = infra.outcome_store;
+        let recall_service = infra.recall_service;
 
         // ── Wire memory retrieval + InsightForge ─────────────────────
         // ── Cognitive memory system ───────────────────────────────────────
