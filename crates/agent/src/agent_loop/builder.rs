@@ -1026,13 +1026,6 @@ impl AgentLoopBuilder {
             .take_inbound_rx()
             .expect("Inbound receiver already taken");
 
-        // ── Outcome recorder (for per-tool learning) ──────────────────────
-        let outcome_recorder = outcome_store.as_ref().map(|store| {
-            Arc::new(crate::learning::recorder::OutcomeRecorder::new(Arc::clone(
-                store,
-            )))
-        });
-
         // ── MCP health check (auto-reconnect downed servers) ─────────────
         let mcp_manager_arc = Arc::new(tokio::sync::RwLock::new(mcp_manager));
         let mcp_health_check_token = {
@@ -1057,207 +1050,35 @@ impl AgentLoopBuilder {
             );
         }
 
-        let mut execution_core =
-            crate::execution::ExecutionCore::new(provider.clone(), Arc::clone(&tool_registry))
-                .with_token_counter(Arc::clone(&token_counter));
-        if let Some(ref recorder) = outcome_recorder {
-            execution_core = execution_core.with_outcome_recorder(Arc::clone(recorder));
-        }
-        if let Some(ref domain_bus) = self.domain_event_bus {
-            execution_core = execution_core.with_domain_bus(Arc::clone(domain_bus));
-        }
-
-        // Approval gate: built whenever a storage pool is available so that
-        // every tool call passes through ApprovalGate::check before execute.
-        if let Some(pool) = &self.pool {
-            let grants_repo = approval::ApprovalGrantsRepo::new(
-                storage::StoragePool::from_existing(pool.clone()),
-            );
-            let channel: Arc<dyn approval::ApprovalChannel> = self
-                .approval_channel
-                .clone()
-                .unwrap_or_else(|| Arc::new(approval::BlockingFallbackChannel::desktop_prompt()));
-            let mut gate = approval::ApprovalGate::new(grants_repo, channel);
-            if let Some(suggester) = self.approval_suggester.take() {
-                gate = gate.with_suggester(suggester);
-            }
-            execution_core = execution_core.with_approval_gate(Arc::new(gate));
-            info!("approval gate wired into ExecutionCore");
-        } else {
-            warn!("approval gate NOT wired (no storage pool) — tool calls will not be gated");
-        }
-
-        let execution_core = Arc::new(execution_core);
-
-        let cost_tracker = Arc::new(
-            crate::output::CostTracker::from_repo(storage::UsageRepo::new(
-                storage_pool.inner().clone(),
-            ))
-            .with_monthly_budget(config.agents.monthly_budget_usd),
-        );
-
-        // ── Interaction recorder ──────────────────────────────────────────
-        let interaction_recorder = if config.learning.enabled {
-            Some(crate::learning::InteractionRecorder::new(
-                repos.interaction_log.clone(),
-            ))
-        } else {
-            None
-        };
-
-        let mut runtime = crate::agent_runtime::AgentRuntime::new(
-            Arc::clone(&context_engine),
-            execution_core,
-            cost_tracker,
-            crate::agent_runtime::RuntimeConfig {
-                execution_model: config.agents.defaults.model.clone(),
-                provider_name: provider.name().to_string(),
-                context_window: provider.context_window(),
-                max_response_tokens: config.agents.defaults.max_tokens as usize,
-                cache_enabled: config.providers.cache.enabled,
+        // ── Agent Runtime ─────────────────────────────────────────────────
+        let runtime = Arc::new(super::builders::runtime::build_runtime(
+            super::builders::runtime::RuntimeBuildInput {
+                config: config.clone(),
+                provider: provider.clone(),
+                context_engine: Arc::clone(&context_engine),
+                tool_registry: Arc::clone(&tool_registry),
+                token_counter: Arc::clone(&token_counter),
+                outcome_recorder: outcome_store.as_ref().map(|store| {
+                    Arc::new(crate::learning::recorder::OutcomeRecorder::new(Arc::clone(store)))
+                }),
+                domain_event_bus: self.domain_event_bus.clone(),
+                pool: self.pool.clone(),
+                approval_channel: self.approval_channel.clone(),
+                approval_suggester: self.approval_suggester.clone(),
+                hot_config: Arc::clone(&hot_config),
+                autotuner: self.autotuner.clone(),
+                predictive_cache: predictive_cache.clone(),
+                cognitive_provider: self.cognitive_provider.clone(),
+                user_situation: self.user_situation.clone(),
+                task_repo: repos.tasks.clone(),
+                interaction_log_repo: repos.interaction_log.clone(),
+                active_view: self.active_view.clone(),
+                memory_service_for_shadow: memory_service_for_shadow.clone(),
+                context_update_queue: self.context_update_queue.clone(),
+                injector_registry: self.injector_registry.clone(),
+                storage_pool: storage_pool.clone(),
             },
-            Arc::clone(&hot_config),
-        )
-        .with_tool_registry(Arc::clone(&tool_registry))
-        .with_enhancement_budget_overrides(
-            config.cognitive.query_enhancement.budget_overrides.clone(),
-        );
-
-        if let Some(ref bus) = self.domain_event_bus {
-            runtime = runtime.with_domain_event_bus(Arc::clone(bus));
-        }
-
-        if let Some(ref orchestrator) = self.autotuner {
-            if let Some(sink) = orchestrator.memory_param_sink() {
-                runtime = runtime.with_enhancement_param_sink(sink);
-            }
-        }
-
-        if let Some(recorder) = interaction_recorder {
-            runtime = runtime.with_interaction_recorder(recorder);
-        }
-
-        // Inject procedural rule repo for transparency (L5 cognitive rules)
-        let rule_repo = cognitive::ProceduralRuleRepo::new(storage_pool.inner().clone());
-        runtime = runtime.with_procedural_rule_repo(rule_repo);
-
-        // KCA Track 4: micro-Reforge turn counter.
-        let micro_reforge_svc = Arc::new(
-            cognitive::services::micro_reforge::MicroReforgeService::new(
-                storage_pool.clone(),
-                config.cognitive.micro_reforge.clone(),
-            ),
-        );
-        runtime = runtime.with_micro_reforge(micro_reforge_svc);
-
-        // KCA Track 7: wire predictive cache + query predictor into runtime.
-        if let Some(ref pc) = predictive_cache {
-            runtime = runtime
-                .with_predictive_cache(pc.clone())
-                .with_predictions_per_turn(config.cognitive.predictive_cache.predictions_per_turn);
-        }
-        if let Some(ref cp) = self.cognitive_provider {
-            if config.cognitive.predictive_cache.enabled {
-                let model = config
-                    .cognitive
-                    .predictive_cache
-                    .model
-                    .clone()
-                    .unwrap_or_else(|| {
-                        config
-                            .cognitive
-                            .model
-                            .clone()
-                            .unwrap_or_else(|| config.agents.defaults.model.clone())
-                    });
-                let predictor = Arc::new(
-                    crate::adapters::cognitive_handlers::LlmQueryPredictorHandler::new(
-                        cp.clone(),
-                        providers::ChatParams::new(&model)
-                            .with_max_tokens(256)
-                            .with_temperature(0.5)
-                            .with_response_format(providers::ResponseFormat::JsonObject),
-                    ),
-                );
-                runtime = runtime.with_query_predictor(predictor);
-            }
-        }
-
-        // Inject user situation for RetrievalContext
-        if let Some(ref sit) = self.user_situation {
-            runtime = runtime.with_user_situation(Arc::clone(sit));
-        }
-
-        // Wire task repo for active task context in query rewriting
-        runtime = runtime.with_task_repo(repos.tasks.clone());
-
-        // Inject active view for RetrievalContext
-        if let Some(ref view) = self.active_view {
-            runtime = runtime.with_active_view(Arc::clone(view));
-        }
-
-        // Inject autotuner shadow hook
-        if let Some(ref orchestrator) = self.autotuner {
-            // Build the concrete AutoTunerHook for shadow classification
-            if let Some(ref pool) = self.pool {
-                let trial_repo = storage::TrialRepo::new(pool.clone());
-                let mut hook = crate::autotuner::hooks::AutoTunerHookImpl::new(
-                    Arc::clone(orchestrator),
-                    trial_repo,
-                );
-
-                // Wire Phase 2 shadow retriever if memory service is available
-                if let Some(ref mem_svc) = memory_service_for_shadow {
-                    let config_defaults = [
-                        config.cognitive.relevance_weight_semantic,
-                        config.cognitive.relevance_weight_retrievability,
-                        config.cognitive.relevance_weight_importance,
-                        config.cognitive.relevance_weight_frequency,
-                        config.cognitive.relevance_weight_situation,
-                        config.cognitive.relevance_weight_temporal,
-                        0.10_f64, // relevance_weight_hierarchy
-                        0.05_f64, // relevance_weight_path_coherence
-                        0.15_f64, // relevance_weight_community
-                        0.10_f64, // relevance_weight_cross_note
-                        config.cognitive.relevance_weight_recall_support, // recall_support
-                        config.cognitive.relevance_weight_graph_path_boost, // graph_path_boost
-                    ];
-                    let shadow_retriever = Arc::new(
-                        crate::autotuner::shadow_retriever::AgentShadowRetriever::new(
-                            Arc::clone(mem_svc),
-                            config_defaults,
-                        ),
-                    );
-                    hook = hook.with_shadow_retriever(
-                        shadow_retriever as Arc<dyn autotuner::ShadowRetriever>,
-                    );
-                }
-
-                runtime = runtime.with_autotuner_hook(Arc::new(hook));
-            }
-        }
-
-        // Inject context update queue for live context refresher
-        if let Some(ref queue) = self.context_update_queue {
-            runtime = runtime.with_context_update_queue(Arc::clone(queue));
-        }
-        if let Some(ref registry) = self.injector_registry {
-            runtime = runtime.with_injector_registry(registry.clone());
-        }
-
-        // Wire retrieval feedback recording
-        if let Some(ref mem_svc) = memory_service_for_shadow {
-            runtime = runtime.with_memory_service(Arc::clone(mem_svc));
-        }
-        if let Some(ref pool) = self.pool {
-            runtime = runtime.with_feedback_repo(storage::RetrievalFeedbackRepo::new(pool.clone()));
-            runtime = runtime.with_strategy_repo(storage::StrategyRepo::new(pool.clone()));
-            runtime = runtime.with_warning_repo(storage::ResponseWarningRepo::new(pool.clone()));
-        }
-
-        let runtime = Arc::new(runtime);
-
-        info!("Agent runtime initialized");
+        ));
 
         // Session cleanup and memory maintenance are handled by CronService
         // (registered in app-core/init/cron.rs as __klyntbot_session_cleanup
