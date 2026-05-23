@@ -70,66 +70,60 @@ impl AppCorePlugin for AiPipelinePlugin {
             ingestion_inner = ingestion_inner.with_conflict_resolver(resolver);
         }
         let ingestion: Arc<dyn ai_core::SignalConsumer> = Arc::new(ingestion_inner);
+        ctx.add_signal_consumer(ingestion);
 
         // 5 cognitive collectors
         let (cognitive_tx, cognitive_rx): (
             ::cognitive::pipeline::SignalSender,
             ::cognitive::pipeline::SignalReceiver,
         ) = ::cognitive::pipeline::signal_queue(128);
-        let chat_turn: Arc<dyn ai_core::SignalConsumer> =
-            Arc::new(::cognitive::pipeline::ChatTurnCollector::new(cognitive_tx.clone()));
-        let recall: Arc<dyn ai_core::SignalConsumer> =
-            Arc::new(::cognitive::pipeline::RecallCollector::new(cognitive_tx.clone()));
-        let session: Arc<dyn ai_core::SignalConsumer> = Arc::new(
+        ctx.add_signal_consumer(Arc::new(::cognitive::pipeline::ChatTurnCollector::new(
+            cognitive_tx.clone(),
+        )));
+        ctx.add_signal_consumer(Arc::new(::cognitive::pipeline::RecallCollector::new(
+            cognitive_tx.clone(),
+        )));
+        ctx.add_signal_consumer(Arc::new(
             ::cognitive::pipeline::SessionCollector::new(
                 cognitive_tx.clone(),
                 ctx.deps.repos.session_memory.clone(),
             ),
-        );
-        let atom: Arc<dyn ai_core::SignalConsumer> =
-            Arc::new(::cognitive::pipeline::AtomCollector::new(cognitive_tx.clone()));
-        let coaching_collector: Arc<dyn ai_core::SignalConsumer> =
-            Arc::new(::cognitive::pipeline::CoachingCollector::new(cognitive_tx.clone()));
+        ));
+        ctx.add_signal_consumer(Arc::new(::cognitive::pipeline::AtomCollector::new(
+            cognitive_tx.clone(),
+        )));
+        ctx.add_signal_consumer(Arc::new(::cognitive::pipeline::CoachingCollector::new(
+            cognitive_tx.clone(),
+        )));
 
         // Coaching signal consumer
         let (coaching_signal_tx, coaching_signal_rx) = tokio::sync::mpsc::channel(256);
-        let coaching_consumer: Arc<dyn ai_core::SignalConsumer> = Arc::new(
+        ctx.add_signal_consumer(Arc::new(
             feature_coaching::CoachingSignalConsumer::new(coaching_signal_tx),
-        );
+        ));
 
         // Metric harvest consumer
         let metric_repo = ::cognitive::MetricRepo::new(ctx.deps.storage_pool.inner().clone());
-        let metric_harvest: Arc<dyn ai_core::SignalConsumer> = Arc::new(
+        ctx.add_signal_consumer(Arc::new(
             ::cognitive::consumers::MetricHarvestConsumer::new(metric_repo),
-        );
+        ));
 
         // Activity-log normalizer consumer
-        let activity_normalizer: Arc<dyn ai_core::SignalConsumer> = Arc::new(
+        ctx.add_signal_consumer(Arc::new(
             activity_log::NormalizerSignalConsumer::new(Arc::clone(
                 ctx.deps.activity_svc.as_ref().expect("activity svc available"),
             )),
-        );
+        ));
 
         // Retrieval indexer
         let signal_index_repo =
             ::cognitive::AiSignalIndexRepo::new(ctx.deps.storage_pool.inner().clone());
-        let retrieval_indexer: Arc<dyn ai_core::SignalConsumer> = Arc::new(
+        ctx.add_signal_consumer(Arc::new(
             ::cognitive::consumers::RetrievalIndexer::new(signal_index_repo),
-        );
+        ));
 
-        // Build consumer list: 10 base + mirror consumers
-        let mut consumers: Vec<Arc<dyn ai_core::SignalConsumer>> = vec![
-            ingestion,
-            chat_turn,
-            recall,
-            session,
-            atom,
-            coaching_collector,
-            coaching_consumer,
-            metric_harvest,
-            activity_normalizer,
-            retrieval_indexer,
-        ];
+        // Build consumer list: plugin-registered + mirror consumers
+        let mut consumers = ctx.signal_consumers.clone();
         consumers.extend(mirror_consumers.iter().cloned());
 
         // Add system event translator (must be last so feature translators get priority).
@@ -143,10 +137,12 @@ impl AppCorePlugin for AiPipelinePlugin {
 
         let domain_event_bus =
             Arc::clone(ctx.deps.domain_event_bus.as_ref().expect("domain event bus available"));
+        let base_count = ctx.signal_consumers.len();
         let router = ai_core::SignalRouter::start(domain_event_bus, consumers, translate);
         tracing::info!(
-            "AI pipeline SignalRouter started with {} consumers (10 base + {} mirror)",
-            10 + mirror_consumers.len(),
+            "AI pipeline SignalRouter started with {} consumers ({} base + {} mirror)",
+            base_count + mirror_consumers.len(),
+            base_count,
             mirror_consumers.len()
         );
 
