@@ -36,7 +36,8 @@ impl AppCore {
 
     #[tracing::instrument(skip(self), err)]
     pub async fn coaching_signals(&self) -> Result<SignalWindowResponse, ApiError> {
-        let acc = self.signal_accumulator()?.lock().await;
+        let acc = self.signal_accumulator()?;
+        let acc = acc.lock().await;
         let last_fired = acc.last_fired();
         let signals: Vec<SignalResponse> = acc
             .signals()
@@ -79,7 +80,8 @@ impl AppCore {
 
     #[tracing::instrument(skip(self), err)]
     pub async fn coaching_patterns(&self) -> Result<Vec<DetectedPatternResponse>, ApiError> {
-        let detector = self.pattern_detector()?.lock().await;
+        let detector = self.pattern_detector()?;
+        let detector = detector.lock().await;
         let patterns = detector.detect_patterns();
 
         Ok(patterns
@@ -201,7 +203,8 @@ impl AppCore {
 
     #[tracing::instrument(skip(self), err)]
     pub async fn coaching_clear_signals(&self) -> Result<bool, ApiError> {
-        let mut acc = self.signal_accumulator()?.lock().await;
+        let acc = self.signal_accumulator()?;
+        let mut acc = acc.lock().await;
         *acc = feature_coaching::SignalAccumulator::new();
         Ok(true)
     }
@@ -209,7 +212,8 @@ impl AppCore {
     /// Seed test trigger data into the pattern detector for debugging.
     #[tracing::instrument(skip(self), err)]
     pub async fn coaching_seed_patterns(&self) -> Result<bool, ApiError> {
-        let mut detector = self.pattern_detector()?.lock().await;
+        let detector = self.pattern_detector()?;
+        let mut detector = detector.lock().await;
         detector.seed_test_triggers("distraction_streak", 5);
         detector.seed_test_triggers("task_avoidance", 4);
         detector.seed_test_triggers("budget_warning", 3);

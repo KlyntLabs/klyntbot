@@ -68,21 +68,10 @@ pub struct AppCore {
     /// Practice session repo (always available — backed by the same DB as notes).
     pub practice_repo: PracticeSessionRepo,
     pub productivity_repos: Option<Arc<feature_productivity::repos::ProductivityRepos>>,
-    /// Productivity (Pomodoro) focus manager — distinct from DND sessions.
-    pub focus_manager: Option<Arc<FocusManager>>,
-    /// DND session manager — controls timed Do-Not-Disturb sessions.
-    pub dnd_manager: Option<Arc<DndManager>>,
-    /// Background task that auto-deactivates DND sessions when the scheduled alarm fires.
-    pub _dnd_end_subscriber_handle: Option<tokio::task::JoinHandle<()>>,
     pub productivity_engine: Option<Arc<Mutex<ProductivityEngine>>>,
-    pub aggregator: Option<Arc<DailyAggregator>>,
     pub nudge_service: Option<Arc<Mutex<NudgeService>>>,
-    pub distraction_interceptor:
-        Option<Arc<Mutex<feature_productivity::distraction::DistractionInterceptor>>>,
     /// Cognitive domain event bus.
     pub domain_event_bus: Option<Arc<DomainEventBus>>,
-    pub signal_accumulator: Option<Arc<Mutex<SignalAccumulator>>>,
-    pub pattern_detector: Option<Arc<Mutex<PatternDetector>>>,
     pub intervention_router: Option<Arc<Mutex<InterventionRouter>>>,
     pub feedback_tracker: Option<Arc<Mutex<FeedbackTracker>>>,
     pub coaching_intervention_log_repo: Option<Arc<storage::CoachingInterventionLogRepo>>,
@@ -120,50 +109,25 @@ pub struct AppCore {
     pub flashcard_repo: Option<cognitive::FlashcardRepo>,
     /// Knowledge atom repo (None when cognitive feature unavailable).
     pub knowledge_atom_repo: Option<cognitive::KnowledgeAtomRepo>,
-    /// Review session repo for active recall sessions (None when cognitive feature unavailable).
-    pub review_session_repo: Option<cognitive::ReviewSessionRepo>,
-    /// Deck preference repo for per-deck answer mode settings (None when cognitive feature unavailable).
-    pub deck_preference_repo: Option<cognitive::DeckPreferenceRepo>,
     /// AutoTuner orchestrator (None when autotuner is disabled).
     pub autotuner: Option<Arc<agent::autotuner::AutoTunerOrchestrator>>,
     /// Unified TemporalScheduler — sole firing source post-4.4c.
     pub temporal_scheduler: Option<scheduling::temporal::TemporalScheduler>,
-    /// Join handle for the TemporalScheduler background loop.
-    pub _temporal_scheduler_handle: Option<tokio::task::JoinHandle<()>>,
-    /// Join handle for the SystemDidWake → scheduler.wake() subscriber.
-    pub _temporal_wake_subscriber: Option<tokio::task::JoinHandle<()>>,
     /// Mirror self-reflection facade (None when cognitive provider is unavailable).
     pub mirror_facade: Option<Arc<cognitive::mirror::MirrorFacade>>,
     /// Pending memory repo for user-confirmable facts (None when cognitive unavailable).
     pub pending_memory_repo: Option<cognitive::repos::PendingMemoryRepo>,
-    /// Join handles for MirrorEngine background subscribers — kept alive for app lifetime.
-    pub _mirror_handles: Option<Vec<tokio::task::JoinHandle<()>>>,
-    /// Cancellation token for the MirrorEngine background subscribers.
-    pub _mirror_shutdown: Option<CancellationToken>,
     /// Phase-3 NotificationDispatcher handle (kept alive for app lifetime).
     pub notification_dispatcher_handle: Option<notifications::NotificationDispatcherHandle>,
-    /// Cancellation token for the config file watcher background service.
-    pub _config_watcher_token: Option<CancellationToken>,
-    /// Phase 4 polling fallback. Held forever so the watcher runs for the
-    /// process lifetime; cancelled implicitly on `AppCore` drop.
-    pub _data_version_watcher_token: Option<CancellationToken>,
-    /// Lifecycle monitor handle (macOS sleep/wake + idle detection).
-    pub _lifecycle_monitor: Option<platform_macos::lifecycle::LifecycleMonitor>,
-    /// Wake orchestrator background task handle.
-    pub _wake_orchestrator_handle: Option<tokio::task::JoinHandle<()>>,
     /// Voice capture service (None when voice feature is disabled).
     pub voice_service: Option<Arc<VoiceService>>,
     /// Voice conversation manager (None when voice feature is disabled).
     pub voice_conversation_manager:
         Option<Arc<crate::handlers::voice_conversation::VoiceConversationManager>>,
-    /// Background task handle for the voice conversation loop.
-    pub voice_loop_handle: Option<tokio::task::JoinHandle<()>>,
     /// BrainVoice signal router (None when domain event bus is unavailable).
     pub brain_voice: Option<Arc<crate::brain_voice::BrainVoice>>,
     /// Onboarding journey milestone tracker.
     pub journey_tracker: Option<crate::journey::JourneyTracker>,
-    /// AI pipeline SignalRouter — keeps the router alive for the app lifetime.
-    pub _ai_pipeline_router: Option<Arc<ai_core::SignalRouter>>,
     /// Registry of all AiFeature-derived features in the workspace.
     pub feature_registry: Arc<ai_core::AiFeatureRegistry>,
     pub tracing_registry: std::sync::Arc<crate::tracing::TracingRegistry>,
@@ -183,25 +147,25 @@ impl AppCore {
 
     /// Return focus manager or a "feature disabled" error.
     #[tracing::instrument(skip(self), err)]
-    pub fn focus_manager(&self) -> Result<&Arc<FocusManager>, ApiError> {
-        self.focus_manager
-            .as_ref()
+    pub fn focus_manager(&self) -> Result<Arc<FocusManager>, ApiError> {
+        self.host
+            .get::<feature_productivity::FocusManager>()
             .ok_or_else(|| ApiError::new("FEATURE_DISABLED", "productivity feature is not enabled"))
     }
 
     /// Return DND manager or a "feature disabled" error.
     #[tracing::instrument(skip(self), err)]
-    pub fn dnd_manager(&self) -> Result<&Arc<DndManager>, ApiError> {
-        self.dnd_manager
-            .as_ref()
+    pub fn dnd_manager(&self) -> Result<Arc<DndManager>, ApiError> {
+        self.host
+            .get::<feature_focus::DndManager>()
             .ok_or_else(|| ApiError::new("FEATURE_DISABLED", "focus (DND) feature is not enabled"))
     }
 
     /// Return daily aggregator or a "feature disabled" error.
     #[tracing::instrument(skip(self), err)]
-    pub fn aggregator(&self) -> Result<&Arc<DailyAggregator>, ApiError> {
-        self.aggregator
-            .as_ref()
+    pub fn aggregator(&self) -> Result<Arc<DailyAggregator>, ApiError> {
+        self.host
+            .get::<feature_productivity::DailyAggregator>()
             .ok_or_else(|| ApiError::new("FEATURE_DISABLED", "productivity feature is not enabled"))
     }
 
@@ -209,24 +173,25 @@ impl AppCore {
     #[tracing::instrument(skip(self), err)]
     pub fn distraction_interceptor(
         &self,
-    ) -> Result<&Arc<Mutex<feature_productivity::distraction::DistractionInterceptor>>, ApiError>
+    ) -> Result<Arc<Mutex<feature_productivity::distraction::DistractionInterceptor>>, ApiError>
     {
-        self.distraction_interceptor.as_ref().ok_or_else(|| {
-            ApiError::new("NOT_AVAILABLE", "Distraction interceptor not initialized")
-        })
+        self.host
+            .get::<Arc<Mutex<feature_productivity::distraction::DistractionInterceptor>>>()
+            .map(|arc| (*arc).clone())
+            .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "Distraction interceptor not initialized"))
     }
 
     #[tracing::instrument(skip(self), err)]
-    pub fn signal_accumulator(&self) -> Result<&Arc<Mutex<SignalAccumulator>>, ApiError> {
-        self.signal_accumulator
-            .as_ref()
+    pub fn signal_accumulator(&self) -> Result<Arc<Mutex<SignalAccumulator>>, ApiError> {
+        self.host
+            .get::<Mutex<SignalAccumulator>>()
             .ok_or_else(|| ApiError::new("FEATURE_DISABLED", "coaching engine is not available"))
     }
 
     #[tracing::instrument(skip(self), err)]
-    pub fn pattern_detector(&self) -> Result<&Arc<Mutex<PatternDetector>>, ApiError> {
-        self.pattern_detector
-            .as_ref()
+    pub fn pattern_detector(&self) -> Result<Arc<Mutex<PatternDetector>>, ApiError> {
+        self.host
+            .get::<Mutex<PatternDetector>>()
             .ok_or_else(|| ApiError::new("FEATURE_DISABLED", "coaching engine is not available"))
     }
 
@@ -290,17 +255,19 @@ impl AppCore {
 
     /// Return review session repo or a "not available" error.
     #[tracing::instrument(skip(self), err)]
-    pub fn review_session_repo(&self) -> Result<&cognitive::ReviewSessionRepo, ApiError> {
-        self.review_session_repo
-            .as_ref()
+    pub fn review_session_repo(&self) -> Result<cognitive::ReviewSessionRepo, ApiError> {
+        self.host
+            .get::<crate::plugins::cognitive::CognitiveInitResult>()
+            .and_then(|r| r.review_session_repo.clone())
             .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "Review session repo not available"))
     }
 
     /// Return deck preference repo or a "not available" error.
     #[tracing::instrument(skip(self), err)]
-    pub fn deck_preference_repo(&self) -> Result<&cognitive::DeckPreferenceRepo, ApiError> {
-        self.deck_preference_repo
-            .as_ref()
+    pub fn deck_preference_repo(&self) -> Result<cognitive::DeckPreferenceRepo, ApiError> {
+        self.host
+            .get::<crate::plugins::cognitive::CognitiveInitResult>()
+            .and_then(|r| r.deck_preference_repo.clone())
             .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "Deck preference repo not available"))
     }
 
@@ -471,7 +438,7 @@ impl AppCore {
         }
         // Cancel mirror subscribers before the main shutdown token
         // so they stop consuming domain events immediately.
-        if let Some(ref token) = self._mirror_shutdown {
+        if let Some(token) = self.host.get::<tokio_util::sync::CancellationToken>() {
             token.cancel();
         }
         // Stop the NotificationDispatcher select loop.
@@ -479,8 +446,10 @@ impl AppCore {
             handle.shutdown.cancel();
         }
         // Abort the voice conversation loop if still running.
-        if let Some(ref handle) = self.voice_loop_handle {
-            handle.abort();
+        if let Some(result) = self.host.get::<crate::plugins::voice::VoiceInitResult>() {
+            if let Some(handle) = result.voice_loop_handle.lock().unwrap().take() {
+                handle.abort();
+            }
         }
         self.shutdown_token.cancel();
         if let Err(e) = self.storage_pool.optimize().await {

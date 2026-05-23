@@ -380,28 +380,15 @@ impl AppCore {
             productivity_repos: host_result
                 .host
                 .get::<feature_productivity::repos::ProductivityRepos>(),
-            focus_manager: host_result.host.get::<feature_productivity::FocusManager>(),
-            dnd_manager: host_result.host.get::<feature_focus::DndManager>(),
             productivity_engine: host_result
                 .host
                 .get::<Arc<tokio::sync::Mutex<feature_productivity::ProductivityEngine>>>()
                 .map(|arc| (*arc).clone()),
-            aggregator: host_result.host.get::<feature_productivity::DailyAggregator>(),
             nudge_service: host_result
                 .host
                 .get::<Arc<tokio::sync::Mutex<feature_productivity::NudgeService>>>()
                 .map(|arc| (*arc).clone()),
-            distraction_interceptor: host_result
-                .host
-                .get::<Arc<tokio::sync::Mutex<feature_productivity::distraction::DistractionInterceptor>>>()
-                .map(|arc| (*arc).clone()),
             domain_event_bus: Some(Arc::clone(&domain_event_bus)),
-            signal_accumulator: host_result
-                .host
-                .get::<tokio::sync::Mutex<feature_coaching::SignalAccumulator>>(),
-            pattern_detector: host_result
-                .host
-                .get::<tokio::sync::Mutex<feature_coaching::PatternDetector>>(),
             intervention_router: host_result
                 .host
                 .get::<tokio::sync::Mutex<feature_coaching::InterventionRouter>>(),
@@ -443,47 +430,22 @@ impl AppCore {
                 .host
                 .get::<crate::plugins::cognitive::CognitiveInitResult>()
                 .and_then(|r| r.knowledge_atom_repo.clone()),
-            review_session_repo: host_result
-                .host
-                .get::<crate::plugins::cognitive::CognitiveInitResult>()
-                .and_then(|r| r.review_session_repo.clone()),
-            deck_preference_repo: host_result
-                .host
-                .get::<crate::plugins::cognitive::CognitiveInitResult>()
-                .and_then(|r| r.deck_preference_repo.clone()),
             autotuner: autotuner.clone(),
             temporal_scheduler: host_result
                 .host
                 .get::<crate::plugins::temporal::TemporalInitResult>()
                 .as_ref()
                 .map(|r| r.scheduler.clone()),
-            _temporal_scheduler_handle: host_result
-                .host
-                .get::<crate::plugins::temporal::TemporalInitResult>()
-                .and_then(|r| r.scheduler_handle.lock().unwrap().take()),
-            _temporal_wake_subscriber: host_result
-                .host
-                .get::<crate::plugins::temporal::TemporalInitResult>()
-                .and_then(|r| r.wake_subscriber.lock().unwrap().take()),
-            _dnd_end_subscriber_handle: None,
             mirror_facade: None,
             pending_memory_repo: host_result
                 .host
                 .get::<::cognitive::repos::PendingMemoryRepo>()
                 .map(|arc| (*arc).clone()),
-            _mirror_handles: None,
-            _mirror_shutdown: None,
             notification_dispatcher_handle: None,
-            _config_watcher_token: None,
-            _data_version_watcher_token: None,
-            _lifecycle_monitor: None,
-            _wake_orchestrator_handle: None,
             voice_service: None,
             voice_conversation_manager: None,
-            voice_loop_handle: None,
             brain_voice: None,
             journey_tracker: None,
-            _ai_pipeline_router: None,
             feature_registry: feature_registry.clone(),
             tracing_registry,
             host: host_result.host.clone(),
@@ -512,8 +474,10 @@ impl AppCore {
             .map(|r| r.shutdown.clone());
 
         core.mirror_facade = mirror_facade.clone();
-        core._mirror_handles = mirror_flush_handles;
-        core._mirror_shutdown = mirror_shutdown;
+        // Store mirror shutdown token in FeatureHost for shutdown() to find.
+        if let Some(token) = mirror_shutdown {
+            core.host.insert(Arc::new(token));
+        }
 
         // Retrieve journey tracker and BrainVoice from FeatureHost.
         let journey_tracker = host_result
@@ -547,25 +511,10 @@ impl AppCore {
             "ai feature registry built"
         );
 
-        // ── Phase 9: AI Pipeline (populated by AiPipelinePlugin) ───────────
-        let ai_pipeline_router = host_result
-            .host
-            .get::<crate::plugins::ai_pipeline::AiPipelineInitResult>()
-            .map(|r| Arc::clone(&r.router));
-        core._ai_pipeline_router = ai_pipeline_router;
-
         // ── Voice service (populated by VoicePlugin) ────────────────────
         if let Some(voice_result) = host_result.host.get::<crate::plugins::voice::VoiceInitResult>() {
             core.voice_service = voice_result.voice_service.clone();
             core.voice_conversation_manager = voice_result.voice_conversation_manager.clone();
-            core.voice_loop_handle = voice_result.voice_loop_handle.lock().unwrap().take();
-        }
-
-        // ── Lifecycle (populated by LifecyclePlugin) ──────────────────────
-        if let Some(lifecycle_result) = host_result.host.get::<crate::plugins::lifecycle::LifecycleInitResult>() {
-            core._config_watcher_token = lifecycle_result.config_watcher_token.clone();
-            core._lifecycle_monitor = lifecycle_result.lifecycle_monitor.lock().unwrap().take();
-            core._wake_orchestrator_handle = lifecycle_result.wake_orchestrator_handle.lock().unwrap().take();
         }
 
         // Spawn background services (agent loop + channel manager).
