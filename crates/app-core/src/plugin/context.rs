@@ -31,7 +31,6 @@ pub struct PluginDeps {
     pub activity_svc: Option<Arc<activity_log::ActivityIngestionService>>,
     pub user_situation: Option<Arc<tokio::sync::Mutex<cognitive::situation::UserSituation>>>,
     pub active_view: Option<Arc<tokio::sync::RwLock<Option<context_engine::ActiveView>>>>,
-    pub agent: Option<Arc<agent::AgentLoop>>,
     pub autotuner: Option<Arc<agent::autotuner::AutoTunerOrchestrator>>,
     pub event_emitter: Option<Arc<dyn crate::events::AppEventEmitter>>,
     pub notification_sender: Option<Arc<dyn common::NotificationSender>>,

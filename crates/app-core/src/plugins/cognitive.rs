@@ -71,6 +71,11 @@ impl AppCorePlugin for CognitivePlugin {
                 None
             };
 
+        // Register annotate tool
+        ctx.register_tool(tools::AnnotateTool::new(::cognitive::AnnotationRepo::new(
+            pool.clone(),
+        )));
+
         ctx.insert_handle(Arc::new(CognitiveInitResult {
             flashcard_repo: Some(::cognitive::FlashcardRepo::new(pool.clone())),
             knowledge_atom_repo: Some(::cognitive::KnowledgeAtomRepo::new(pool.clone())),

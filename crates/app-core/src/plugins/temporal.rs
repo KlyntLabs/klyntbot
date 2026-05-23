@@ -105,6 +105,16 @@ impl AppCorePlugin for TemporalPlugin {
         let scheduler_handle = scheduler.clone().start_background();
         info!("TemporalScheduler started (side-by-side with CronExecutor)");
 
+        // Register temporal tool
+        let temporal_service = ::cognitive::TemporalService::new(
+            ::cognitive::SemanticFactRepo::new(ctx.deps.storage_pool.inner().clone()),
+        )
+        .with_changelog(::cognitive::FactChangelogRepo::new(
+            ctx.deps.storage_pool.inner().clone(),
+        ));
+        ctx.register_tool(tools::TemporalTool::new(temporal_service));
+        tracing::info!("Temporal tool registered");
+
         ctx.insert_handle(Arc::new(TemporalInitResult {
             scheduler,
             cron_bridge: bridge_for_appcore,
@@ -115,17 +125,7 @@ impl AppCorePlugin for TemporalPlugin {
         Ok(())
     }
 
-    async fn post_init(&self, app: &AppCore) -> common::Result<()> {
-        let temporal_service = ::cognitive::TemporalService::new(
-            ::cognitive::SemanticFactRepo::new(app.storage_pool.inner().clone()),
-        )
-        .with_changelog(::cognitive::FactChangelogRepo::new(
-            app.storage_pool.inner().clone(),
-        ));
-        let reg = app.agent.tool_registry();
-        let mut registry = reg.write().await;
-        registry.register(tools::TemporalTool::new(temporal_service));
-        tracing::info!("Temporal tool registered");
+    async fn post_init(&self, _app: &AppCore) -> common::Result<()> {
         Ok(())
     }
 }

@@ -14,6 +14,7 @@ pub struct VoiceInitResult {
     pub voice_conversation_manager:
         Option<Arc<crate::handlers::voice_conversation::VoiceConversationManager>>,
     pub voice_loop_handle: std::sync::Mutex<Option<tokio::task::JoinHandle<()>>>,
+    pub echo_provider: Option<Arc<dyn voice_engine::MemoryEchoProvider>>,
 }
 
 /// Plugin that initializes the voice service, conversation manager,
@@ -34,6 +35,7 @@ impl AppCorePlugin for VoicePlugin {
                 voice_service: None,
                 voice_conversation_manager: None,
                 voice_loop_handle: std::sync::Mutex::new(None),
+                echo_provider: None,
             }));
             return Ok(());
         }
@@ -204,30 +206,6 @@ impl AppCorePlugin for VoicePlugin {
 
         let service = Arc::new(service);
 
-        // Voice conversation manager
-        let voice_config_arc = Arc::new(RwLock::new(voice_config.clone()));
-        let voice_conv_manager = Arc::new(
-            crate::handlers::voice_conversation::VoiceConversationManager::new(
-                Arc::clone(&service),
-                ctx.deps.repos.clone(),
-                Arc::clone(
-                    ctx.deps
-                        .agent
-                        .as_ref()
-                        .expect("agent should be initialized before voice plugin"),
-                ),
-                Arc::clone(
-                    ctx.deps
-                        .event_emitter
-                        .as_ref()
-                        .expect("event_emitter should be available"),
-                ),
-                echo_provider,
-                voice_config_arc,
-            ),
-        );
-        let loop_handle = voice_conv_manager.spawn_supervised_loop().await;
-
         // Idle unload timers
         {
             let svc = Arc::clone(&service);
@@ -338,14 +316,60 @@ impl AppCorePlugin for VoicePlugin {
 
         ctx.insert_handle(Arc::new(VoiceInitResult {
             voice_service: Some(service),
-            voice_conversation_manager: Some(voice_conv_manager),
-            voice_loop_handle: std::sync::Mutex::new(Some(loop_handle)),
+            voice_conversation_manager: None,
+            voice_loop_handle: std::sync::Mutex::new(None),
+            echo_provider: Some(echo_provider),
         }));
 
         Ok(())
     }
 
-    async fn post_init(&self, _app: &AppCore) -> common::Result<()> {
+    async fn post_init(&self, app: &AppCore) -> common::Result<()> {
+        let config_guard = app.config.read().await;
+        let voice_config = config_guard.voice.clone();
+        drop(config_guard);
+        if !voice_config.enabled {
+            return Ok(());
+        }
+
+        let voice_result = app
+            .host
+            .get::<VoiceInitResult>()
+            .ok_or_else(|| common::KlyntbotError::Config(common::ConfigError::Invalid(
+                "VoiceInitResult not found in host".to_string(),
+            )))?;
+        let service = match voice_result.voice_service {
+            Some(ref svc) => Arc::clone(svc),
+            None => return Ok(()),
+        };
+
+        let voice_config_arc = Arc::new(RwLock::new(voice_config));
+        let echo_provider = voice_result
+            .echo_provider
+            .clone()
+            .ok_or_else(|| common::KlyntbotError::Config(common::ConfigError::Invalid(
+                "Voice echo provider not found in host".to_string(),
+            )))?;
+        let voice_conv_manager = Arc::new(
+            crate::handlers::voice_conversation::VoiceConversationManager::new(
+                service,
+                app.repos.clone(),
+                Arc::clone(&app.agent),
+                Arc::clone(&app.event_emitter),
+                echo_provider,
+                voice_config_arc,
+            ),
+        );
+        let loop_handle = voice_conv_manager.spawn_supervised_loop().await;
+
+        // Re-insert updated VoiceInitResult with conversation manager.
+        app.host.insert(Arc::new(VoiceInitResult {
+            voice_service: voice_result.voice_service.clone(),
+            voice_conversation_manager: Some(voice_conv_manager),
+            voice_loop_handle: std::sync::Mutex::new(Some(loop_handle)),
+            echo_provider: voice_result.echo_provider.clone(),
+        }));
+
         Ok(())
     }
 }

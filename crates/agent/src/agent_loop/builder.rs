@@ -80,6 +80,7 @@ pub struct AgentLoopBuilder {
     injector_registry: Option<bus::InjectorRegistry>,
     job_supervisor: Option<tools_core::DynJobSupervisor>,
     pre_registered_tools: Vec<tools_core::DynTool>,
+    tool_registry: Option<tools_core::registry::ToolRegistry>,
 }
 
 impl AgentLoopBuilder {
@@ -108,6 +109,7 @@ impl AgentLoopBuilder {
             injector_registry: None,
             job_supervisor: None,
             pre_registered_tools: vec![],
+            tool_registry: None,
         }
     }
 
@@ -132,6 +134,10 @@ impl AgentLoopBuilder {
     }
     pub fn with_pre_registered_tools(mut self, tools: Vec<tools_core::DynTool>) -> Self {
         self.pre_registered_tools = tools;
+        self
+    }
+    pub fn with_tool_registry(mut self, registry: tools_core::registry::ToolRegistry) -> Self {
+        self.tool_registry = Some(registry);
         self
     }
     pub fn with_embedding_engine(mut self, engine: Arc<tools::EmbeddingEngine>) -> Self {
@@ -335,6 +341,19 @@ impl AgentLoopBuilder {
                 .with_summary_provider(summary_provider);
 
         // ── Infrastructure services ───────────────────────────────────────
+        // If pre_registered_tools was set (legacy API), fold them into a registry.
+        let tool_registry = self.tool_registry.or_else(|| {
+            if self.pre_registered_tools.is_empty() {
+                None
+            } else {
+                let mut reg = tools_core::registry::ToolRegistry::new();
+                for tool in self.pre_registered_tools {
+                    reg.register_dyn(tool);
+                }
+                Some(reg)
+            }
+        });
+
         let infra = super::builders::infrastructure::build_infrastructure(
             &config,
             &provider,
@@ -346,7 +365,7 @@ impl AgentLoopBuilder {
             &self.vector_store,
             &self.cron_executor,
             &self.job_supervisor,
-            self.pre_registered_tools,
+            tool_registry,
         )
         .await;
         let session_manager = infra.session_manager;
@@ -410,102 +429,16 @@ impl AgentLoopBuilder {
 
         let context_engine = Arc::new(context_engine);
 
-        // Outputs for MemoryTool — populated inside the pool block if embedding is enabled
-        let todo_embedding_handler: Option<Arc<dyn tools::EmbeddingHandler>>;
-
-        // ── Feature-tasks tool (via FeaturePackage) ───────────────────────
-        if self.pool.is_some() {
-            let pool_ref = storage_pool.inner();
-            let task_repo = storage::TaskRepo::new(pool_ref.clone());
-            let area_repo = storage::AreaRepo::new(pool_ref.clone());
-            let mut task_tool = feature_tasks::TaskTool::new(
-                task_repo,
-                config.todo.focus.max_slots,
-                config.todo.focus.deadline_hours,
-                config.timezone.clone(),
-            )
-            .with_area_repo(area_repo);
-
-            // Task embedding (semantic search)
+        // Embedding handler for MemoryTool todo search (shared across agent).
+        let todo_embedding_handler: Option<Arc<dyn tools::EmbeddingHandler>> =
             if let (true, Some(vs)) = (config.todo.search.enabled, self.vector_store.clone()) {
-                let task_embed_impl =
-                    Arc::new(crate::adapters::task_embedding::TaskEmbeddingAdapter::new(
-                        Arc::clone(&embedding_engine),
-                        vs.clone(),
-                    ));
-
-                let memory_embed_impl = Arc::new(tools::EmbeddingEngineImpl::new(
+                Some(Arc::new(tools::EmbeddingEngineImpl::new(
                     Arc::clone(&embedding_engine),
-                    vs.clone(),
-                ));
-
-                task_tool = task_tool
-                    .with_embedding_handler(
-                        Arc::clone(&task_embed_impl) as Arc<dyn feature_tasks::EmbeddingHandler>
-                    )
-                    .with_embedding_store(vs)
-                    .with_search_config(
-                        config.todo.search.semantic_threshold,
-                        config.todo.search.rrf_k,
-                    );
-
-                todo_embedding_handler =
-                    Some(Arc::clone(&memory_embed_impl) as Arc<dyn tools::EmbeddingHandler>);
+                    vs,
+                )) as Arc<dyn tools::EmbeddingHandler>)
             } else {
-                todo_embedding_handler = None;
-            }
-
-            // Inject progress handler for KR→Objective cascade
-            let progress_handler: Arc<dyn tools_core::ProgressHandler> =
-                Arc::new(crate::adapters::progress::ProgressHandlerImpl::new(
-                    repos.key_results.clone(),
-                    repos.objectives.clone(),
-                    repos.tasks.clone(),
-                ));
-            task_tool = task_tool.with_progress_handler(Arc::clone(&progress_handler));
-
-            // Wire DomainEventBus for task lifecycle events
-            if let Some(ref domain_bus) = self.domain_event_bus {
-                task_tool = task_tool.with_domain_bus(Arc::clone(domain_bus));
-            }
-
-            // Wire alarm writer (task_alarms repo + FireStore) so the `alarms`
-            // param on TaskTool create/update materializes into scheduled_fires.
-            // Spec §3 (rule model), §8.1 (TaskTool subfields).
-            {
-                let fire_store = Arc::new(scheduling::temporal::fire_store::FireStore::new(
-                    repos.scheduled_fires.clone(),
-                ));
-                task_tool = task_tool.with_alarm_writer(repos.task_alarms.clone(), fire_store);
-            }
-
-            // Register via FeaturePackage
-            let tasks_feature =
-                feature_tasks::TasksFeature::new().with_task_tool(Arc::new(task_tool));
-            for tool in tasks_feature.tools() {
-                tool_registry.register_dyn(tool);
-            }
-
-            // ── OKR tool (needs same progress handler) ────────────────────
-            tool_registry.register(
-                OkrTool::new(repos.objectives.clone(), repos.key_results.clone())
-                    .with_progress_handler(Arc::clone(&progress_handler)),
-            );
-        } else {
-            // No pool available (e.g., test environment)
-            todo_embedding_handler = None;
-
-            // OKR tool without progress handler
-            tool_registry.register(OkrTool::new(
-                repos.objectives.clone(),
-                repos.key_results.clone(),
-            ));
-        }
-
-        // ── Annotate tool ──────────────────────────────────────────────────
-        tool_registry.register(tools::AnnotateTool::new(cognitive::AnnotationRepo::new(
-            storage_pool.inner().clone(),
-        )));
+                None
+            };
 
         // ── Conversation recall handler ──────────────────────────────────
         let conversation_recall_handler: Option<Arc<dyn tools::ConversationRecallHandler>> =

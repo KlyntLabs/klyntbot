@@ -29,19 +29,18 @@ impl AppCorePlugin for LanguageLearningPlugin {
             feature_language_learning::try_from_domain_event,
             ai_core::RecallDomain::LanguageLearning,
         );
-        Ok(())
-    }
 
-    async fn post_init(&self, app: &AppCore) -> common::Result<()> {
-        let config = app.config.read().await;
+        let config = ctx.deps.config.read().await;
         if config.language_learning.enabled {
-            let reg = app.agent.tool_registry();
-            let mut registry = reg.write().await;
-            registry.register(
+            ctx.register_tool(
                 feature_language_learning::practice_tool::LanguagePracticeTool::new(),
             );
             tracing::info!("Language practice tool registered");
         }
+        Ok(())
+    }
+
+    async fn post_init(&self, _app: &AppCore) -> common::Result<()> {
         Ok(())
     }
 }

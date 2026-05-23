@@ -13,10 +13,6 @@ pub(super) struct AgentResult {
     pub cognitive_provider: Option<providers::DynProvider>,
     pub agent: Arc<AgentLoop>,
     pub inbound_rx: mpsc::Receiver<bus::InboundMessage>,
-    pub pipeline_broadcast_tx: tokio::sync::broadcast::Sender<cognitive::PipelineEvent>,
-    pub user_situation: Arc<Mutex<UserSituation>>,
-    pub active_view: Arc<tokio::sync::RwLock<Option<context_engine::ActiveView>>>,
-    pub activity_svc: Arc<activity_log::ActivityIngestionService>,
 }
 
 /// Initialize persona manager, activity log, and agent loop.
@@ -41,36 +37,21 @@ pub(super) async fn init_agent(
     embedding_engine: Option<Arc<tools::EmbeddingEngine>>,
     approval_channel: Option<Arc<dyn approval::ApprovalChannel>>,
     injector_registry: Option<bus::InjectorRegistry>,
+    tool_registry: tools_core::registry::ToolRegistry,
+    user_situation: Arc<Mutex<UserSituation>>,
+    active_view: Arc<tokio::sync::RwLock<Option<context_engine::ActiveView>>>,
+    activity_svc: Arc<activity_log::ActivityIngestionService>,
+    pipeline_broadcast_tx: tokio::sync::broadcast::Sender<cognitive::PipelineEvent>,
 ) -> Result<AgentResult, String> {
-    // Run activity-log migrations (unified activity log).
-    StoragePool::run_feature_migrations(
-        storage_pool.inner(),
-        &activity_log::activity_log_migrations(),
-    )
-    .await
-    .map_err(|e| format!("activity-log migration failed: {e}"))?;
-    let activity_svc = Arc::new(activity_log::ActivityIngestionService::new(
-        storage_pool.clone(),
-        activity_log::PrivacyFilter::default(),
-    ));
-
-    // Pre-create user situation (defaults now, recomputed with real data below
-    // and every 2 min afterwards). Shared with CognitiveContextSource for
-    // situational_boost in memory retrieval.
-    let user_situation = Arc::new(Mutex::new(UserSituation::default()));
-
-    // Pre-create active view (None until frontend pushes a view).
-    // Shared with AgentRuntime for RetrievalContext.active_view.
-    let active_view: Arc<tokio::sync::RwLock<Option<context_engine::ActiveView>>> =
-        Arc::new(tokio::sync::RwLock::new(None));
-
-    // 8. Build AgentLoop
-    let (pipeline_broadcast_tx, _) =
-        tokio::sync::broadcast::channel::<cognitive::PipelineEvent>(64);
     let pipeline_tx = pipeline_broadcast_tx.clone();
     let mut builder = AgentLoop::builder(bus.clone(), provider, config.clone())
         .with_pool(storage_pool.inner().clone())
-        .with_cron_executor(Arc::clone(cron_executor), cron_repo.clone());
+        .with_cron_executor(Arc::clone(cron_executor), cron_repo.clone())
+        .with_tool_registry(tool_registry)
+        .with_user_situation(user_situation.clone())
+        .with_activity_service(Arc::clone(&activity_svc))
+        .with_active_view(active_view.clone())
+        .with_hot_config(hot_config);
 
     if let Some(engine) = embedding_engine {
         builder = builder.with_embedding_engine(engine);
@@ -79,11 +60,7 @@ pub(super) async fn init_agent(
     let mut builder = builder
         .with_domain_bus(Arc::clone(domain_event_bus))
         .with_cognitive_provider(cognitive_provider.clone())
-        .with_pipeline_tx(pipeline_tx)
-        .with_user_situation(user_situation.clone())
-        .with_activity_service(Arc::clone(&activity_svc))
-        .with_active_view(active_view.clone())
-        .with_hot_config(hot_config);
+        .with_pipeline_tx(pipeline_tx);
 
     if let Some(vs) = vector_store {
         builder = builder.with_vector_store(vs);
@@ -118,9 +95,5 @@ pub(super) async fn init_agent(
         cognitive_provider,
         agent,
         inbound_rx,
-        pipeline_broadcast_tx,
-        user_situation,
-        active_view,
-        activity_svc,
     })
 }

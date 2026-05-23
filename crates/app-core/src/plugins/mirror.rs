@@ -110,6 +110,10 @@ impl AppCorePlugin for MirrorPlugin {
 
         let facade = Arc::new(facade);
 
+        // Register mirror tool
+        ctx.register_tool(tools::MirrorTool::new(Arc::clone(&facade)));
+        tracing::info!("Mirror tool registered");
+
         ctx.insert_handle(Arc::new(MirrorInitResult {
             facade: Arc::clone(&facade),
             consumers: started.consumers,
@@ -123,11 +127,6 @@ impl AppCorePlugin for MirrorPlugin {
 
     async fn post_init(&self, app: &AppCore) -> common::Result<()> {
         if let Some(ref facade) = app.mirror_facade {
-            let reg = app.agent.tool_registry();
-            let mut registry = reg.write().await;
-            registry.register(tools::MirrorTool::new(Arc::clone(facade)));
-            tracing::info!("Mirror tool registered");
-
             // Wire the Mirror facade as the approval gate's suggester via bridge adapter.
             let suggester = Arc::new(
                 crate::adapters::approval_suggester::MirrorApprovalSuggester::new(Arc::clone(facade)),

@@ -215,51 +215,30 @@ impl AppCore {
         // Insight infrastructure, note embedding handler, cognitive fact embedder,
         // and cognitive repos are all initialized by their respective plugins.
 
-        // ── Phase 3: Agent ───────────────────────────────────────────────
-        let agent::AgentResult {
-            cognitive_provider,
-            agent,
-            inbound_rx,
-            pipeline_broadcast_tx,
-            user_situation,
-            active_view,
-            activity_svc,
-        } = agent::init_agent(
-            &config,
-            &storage_pool,
-            &repos,
-            provider,
-            vector_store,
-            &bus,
-            cognitive_provider.clone(),
-            &domain_event_bus,
-            &cron_executor,
-            &repos.cron,
-            autotuner.as_ref(),
-            Arc::clone(&hot_config),
-            Some(Arc::clone(&context_update_queue)),
-            appcore_embedding_engine.clone(),
-            None,
-            None,
+        // ── Phase 3: Shared services (needed by plugins + agent) ─────────
+        // Run activity-log migrations before plugins need the service.
+        ::storage::StoragePool::run_feature_migrations(
+            storage_pool.inner(),
+            &activity_log::activity_log_migrations(),
         )
-        .await?;
-
-        // ── Phase 4: Channel manager ─────────────────────────────────────
-        let channel_manager = channels::init_channels(&config, &bus)?;
+        .await
+        .map_err(|e| format!("activity-log migration failed: {e}"))?;
+        let activity_svc = Arc::new(activity_log::ActivityIngestionService::new(
+            storage_pool.clone(),
+            activity_log::PrivacyFilter::default(),
+        ));
+        let user_situation = Arc::new(tokio::sync::Mutex::new(::cognitive::situation::UserSituation::default()));
+        let active_view: Arc<tokio::sync::RwLock<Option<context_engine::ActiveView>>> =
+            Arc::new(tokio::sync::RwLock::new(None));
+        let (pipeline_broadcast_tx, _) =
+            tokio::sync::broadcast::channel::<::cognitive::PipelineEvent>(64);
 
         let shutdown_token = CancellationToken::new();
-
-        // Keep a clone for later mutations; the Arc-wrapped version is created
-        // just before AppCore assembly so it captures all mutations.
         let mut config = config;
         let plugin_config = Arc::new(RwLock::new(config.clone()));
         let tracing_registry = Arc::new(crate::tracing::TracingRegistry::new());
 
-
         // Idle-unload for the ONNX embedding model — check every 60s.
-        // The model auto-unloads after 15s idle; this timer just ensures
-        // the check happens. 60s keeps wakeups low while still reclaiming
-        // the ~420MB model within ~75s of last use.
         {
             let engine = Arc::clone(&embedding_engine);
             spawn_periodic_timer(&shutdown_token, 60, move || {
@@ -267,8 +246,7 @@ impl AppCore {
             });
         }
 
-        // Periodic LanceDB compaction — merge fragment files every 30 minutes
-        // to prevent unbounded RSS growth from copy-on-write fragment accumulation.
+        // Periodic LanceDB compaction — merge fragment files every 30 minutes.
         if let Some(vs) = &appcore_vector_store {
             let vs_compact = vs.clone();
             spawn_periodic_timer(&shutdown_token, 1800, move || {
@@ -282,7 +260,7 @@ impl AppCore {
             });
         }
 
-        // ── Build FeatureHost (plugin scaffold) ──────────────────────────
+        // ── Phase 4: Build FeatureHost (plugins run BEFORE agent) ─────────
         let plugin_deps = crate::plugin::context::PluginDeps {
             mode,
             config: Arc::clone(&plugin_config),
@@ -299,7 +277,6 @@ impl AppCore {
             activity_svc: Some(Arc::clone(&activity_svc)),
             user_situation: Some(Arc::clone(&user_situation)),
             active_view: Some(Arc::clone(&active_view)),
-            agent: Some(Arc::clone(&agent)),
             autotuner: autotuner.clone(),
             event_emitter: event_emitter.clone(),
             notification_sender: notification_sender.clone(),
@@ -331,6 +308,41 @@ impl AppCore {
             .build(&plugin_deps)
             .await
             .map_err(|e| e.to_string())?;
+
+        info!("FeatureHost built");
+
+        // ── Phase 5: Agent (consumes plugin-built tool registry) ──────────
+        let agent::AgentResult {
+            cognitive_provider,
+            agent,
+            inbound_rx,
+        } = agent::init_agent(
+            &config,
+            &storage_pool,
+            &repos,
+            provider,
+            vector_store,
+            &bus,
+            cognitive_provider.clone(),
+            &domain_event_bus,
+            &cron_executor,
+            &repos.cron,
+            autotuner.as_ref(),
+            Arc::clone(&hot_config),
+            Some(Arc::clone(&context_update_queue)),
+            appcore_embedding_engine.clone(),
+            None,
+            None,
+            host_result.tools.clone(),
+            Arc::clone(&user_situation),
+            Arc::clone(&active_view),
+            Arc::clone(&activity_svc),
+            pipeline_broadcast_tx.clone(),
+        )
+        .await?;
+
+        // ── Phase 6: Channel manager ─────────────────────────────────────
+        let channel_manager = channels::init_channels(&config, &bus)?;
 
         info!("FeatureHost built");
 

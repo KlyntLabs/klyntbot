@@ -42,7 +42,7 @@ pub(crate) async fn build_infrastructure(
         storage::repos::cron::CronRepo,
     )>,
     job_supervisor: &Option<tools_core::DynJobSupervisor>,
-    pre_registered_tools: Vec<tools_core::DynTool>,
+    tool_registry: Option<tools_core::registry::ToolRegistry>,
 ) -> InfrastructureResult {
     // ── Session manager (SQL-backed) ──────────────────────────────────
     let session_manager = SessionManager::from_repo(
@@ -67,12 +67,7 @@ pub(crate) async fn build_infrastructure(
     );
 
     // ── Tool registry ─────────────────────────────────────────────────
-    let mut tool_registry = ToolRegistry::new();
-
-    // Pre-registered tools (from app-core plugins)
-    for tool in pre_registered_tools {
-        tool_registry.register_dyn(tool);
-    }
+    let mut tool_registry = tool_registry.unwrap_or_else(ToolRegistry::new);
 
     // Subagents tool
     tool_registry.register(SubagentsTool::with_handler(

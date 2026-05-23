@@ -46,6 +46,15 @@ impl AppCorePlugin for NotesPlugin {
                 None
             };
 
+        // Register notes tool into the plugin-built registry
+        let note_repo = feature_notes::repo::NoteRepo::new(ctx.deps.storage_pool.inner().clone());
+        let mut notes_tool = feature_notes::tool::NotesTool::new(note_repo);
+        if let Some(ref bus) = ctx.deps.domain_event_bus {
+            notes_tool = notes_tool.with_domain_bus(Arc::clone(bus));
+        }
+        ctx.register_tool(notes_tool);
+        tracing::info!("Notes tool registered");
+
         ctx.insert_handle(Arc::new(NotesInitResult {
             note_embedding_handler,
         }));
@@ -53,15 +62,6 @@ impl AppCorePlugin for NotesPlugin {
     }
 
     async fn post_init(&self, app: &AppCore) -> common::Result<()> {
-        let mut notes_tool = feature_notes::tool::NotesTool::new(app.note_repo.clone());
-        if let Some(ref bus) = app.domain_event_bus {
-            notes_tool = notes_tool.with_domain_bus(Arc::clone(bus));
-        }
-        let reg = app.agent.tool_registry();
-        let mut registry = reg.write().await;
-        registry.register(notes_tool);
-        tracing::info!("Notes tool registered");
-
         // ── Background note embedding catch-up ────────────────────────────
         if let Some(ref handler) = app.note_embedding_handler {
             let handler = Arc::clone(handler);

@@ -15,22 +15,15 @@ impl AppCorePlugin for AgentToolsPlugin {
         "agent-tools"
     }
 
-    async fn init(&self, _ctx: &mut PluginContext) -> common::Result<()> {
-        Ok(())
-    }
-
-    async fn post_init(&self, app: &AppCore) -> common::Result<()> {
-        let work_context_enabled = app.config.read().await.work_context.enabled;
-        let repos = &app.repos;
-
-        let reg = app.agent.tool_registry();
-        let mut registry = reg.write().await;
+    async fn init(&self, ctx: &mut PluginContext) -> common::Result<()> {
+        let work_context_enabled = ctx.deps.config.read().await.work_context.enabled;
+        let repos = &ctx.deps.repos;
 
         // Area tool
-        registry.register(tools::area_tool::AreaTool::new(repos.areas.clone()));
+        ctx.register_tool(tools::area_tool::AreaTool::new(repos.areas.clone()));
 
         // Project tool
-        registry.register(tools::project_tool::ProjectTool::new(
+        ctx.register_tool(tools::project_tool::ProjectTool::new(
             repos.projects.clone(),
             repos.tasks.clone(),
         ));
@@ -42,18 +35,24 @@ impl AppCorePlugin for AgentToolsPlugin {
             ));
             let mut alarm_tool =
                 feature_alarms::AlarmTool::new(fire_store, repos.scheduled_fires.clone());
-            if let Some(ref domain_bus) = app.domain_event_bus {
+            if let Some(ref domain_bus) = ctx.deps.domain_event_bus {
                 alarm_tool = alarm_tool.with_domain_bus(Arc::clone(domain_bus));
             }
-            registry.register(alarm_tool);
+            ctx.register_tool(alarm_tool);
         }
 
         // Work context tool
         if work_context_enabled {
-            registry.register(activity_log::WorkContextTool::new(app.storage_pool.clone()));
+            ctx.register_tool(activity_log::WorkContextTool::new(
+                ctx.deps.storage_pool.clone(),
+            ));
         }
 
         tracing::info!("Agent domain tools registered");
+        Ok(())
+    }
+
+    async fn post_init(&self, _app: &AppCore) -> common::Result<()> {
         Ok(())
     }
 }
