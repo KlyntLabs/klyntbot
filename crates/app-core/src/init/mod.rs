@@ -239,50 +239,8 @@ impl AppCore {
                 )) as Arc<dyn ::cognitive::SemanticFactEmbedder>
             });
 
-        // ── Insight embedder (reuses the same EmbeddingEngine) ──
-        let insight_embedder: Arc<dyn feature_insights::InsightEmbedder> =
-            if let Some(ref vs) = vector_store {
-                Arc::new(crate::adapters::insight_embedder::InsightEmbedderImpl::new(
-                    Arc::clone(&embedding_engine),
-                    vs.clone(),
-                ))
-            } else {
-                Arc::new(feature_insights::NoopInsightEmbedder)
-            };
-
-        // ── Cross-domain searcher (LanceDB vector search across domains) ──
-        let cross_domain_searcher: Arc<dyn feature_insights::CrossDomainSearcher> =
-            if let Some(ref vs) = vector_store {
-                Arc::new(
-                    crate::adapters::cross_domain_searcher::CrossDomainSearcherImpl::new(
-                        vs.clone(),
-                        Arc::clone(&embedding_engine),
-                        repos.tasks.clone(),
-                        note_repo.clone(),
-                        storage_pool.inner().clone(),
-                    ),
-                )
-            } else {
-                Arc::new(feature_insights::NoopCrossDomainSearcher)
-            };
-
-        // ── Cognitive accessor for insight context injection ──
-        let cognitive_accessor: Arc<dyn feature_insights::CognitiveAccessor> = Arc::new(
-            crate::adapters::cognitive_accessor::CognitiveAccessorImpl::new(
-                ::cognitive::SemanticFactRepo::new(storage_pool.inner().clone()),
-                ::cognitive::EpisodicMemoryRepo::new(storage_pool.inner().clone()),
-                ::cognitive::ProceduralRuleRepo::new(storage_pool.inner().clone()),
-                ::cognitive::repos::EntityRepo::new(storage_pool.inner().clone()),
-                ::cognitive::KnowledgeAtomRepo::new(storage_pool.inner().clone()),
-            ),
-        );
-
-        // ── Scope resolver for insight context ──
-        let scope_resolver: Arc<dyn feature_insights::ScopeResolver> =
-            Arc::new(crate::adapters::scope_resolver::ScopeResolverImpl::new(
-                note_repo.clone(),
-                vector_store.clone(),
-            ));
+        // Insight infrastructure (embedder, searcher, accessor, scope resolver,
+        // and the InsightService itself) is initialized by InsightsPlugin.
 
         // ── Phase 3: Agent ───────────────────────────────────────────────
         let agent::AgentResult {
@@ -383,6 +341,7 @@ impl AppCore {
             .plugin(crate::plugins::tasks::TasksPlugin)
             .plugin(crate::plugins::language_learning::LanguageLearningPlugin)
             .plugin(crate::plugins::learning::LearningPlugin)
+            .plugin(crate::plugins::insights::InsightsPlugin)
             .plugin(crate::plugins::cognitive::CognitivePlugin)
             .plugin(crate::plugins::agent_tools::AgentToolsPlugin)
             .plugin(crate::plugins::productivity::ProductivityPlugin)
@@ -482,26 +441,9 @@ impl AppCore {
             launcher_engine: host_result
                 .host
                 .get::<crate::handlers::launcher::LauncherSearchEngine>(),
-            insight_service: {
-                let insight_repo =
-                    feature_insights::InsightReviewRepo::new(storage_pool.inner().clone());
-                Some(Arc::new(feature_insights::InsightService::new(
-                    insight_repo.clone(),
-                    feature_insights::InsightProgressRepo::new(storage_pool.inner().clone()),
-                    scope_resolver,
-                    feature_insights::SmartMergeEngine::new(insight_repo),
-                    feature_insights::PromptBuilder::new(Arc::clone(&cognitive_accessor)),
-                    Arc::new(
-                        crate::adapters::flashcard_accessor::FlashcardAccessorImpl::new(
-                            storage_pool.inner().clone(),
-                        ),
-                    ),
-                    insight_embedder,
-                    cross_domain_searcher,
-                    feature_insights::ProgressWeights::default(),
-                    Some(Arc::clone(&domain_event_bus)),
-                )))
-            },
+            insight_service: host_result
+                .host
+                .get::<feature_insights::InsightService>(),
             flashcard_repo: Some(::cognitive::FlashcardRepo::new(
                 storage_pool.inner().clone(),
             )),

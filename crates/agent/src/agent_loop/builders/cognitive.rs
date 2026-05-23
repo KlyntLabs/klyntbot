@@ -5,7 +5,7 @@
 
 use std::sync::Arc;
 use tokio_util::sync::CancellationToken;
-use tracing::{info, warn};
+use tracing::info;
 
 use bus::DomainEventBus;
 use config::Config;
@@ -340,72 +340,7 @@ pub(crate) async fn build_cognitive_system(
                 });
                 info!("LearningTreeBuilder subscriber started");
 
-                // Background tree node backfill
-                if std::env::var("KLYNTBOT_BACKFILL").is_ok_and(|v| v == "1" || v == "true") {
-                    let backfill_builder = Arc::clone(&note_tree_builder);
-                    let backfill_task_tree_builder = Arc::clone(&task_tree_builder);
-                    let backfill_learning_tree_builder = Arc::clone(&learning_tree_builder);
-                    let backfill_productivity_tree_builder =
-                        Arc::clone(&productivity_tree_builder);
-                    let backfill_note_repo =
-                        feature_notes::repo::NoteRepo::new(storage_pool.inner().clone());
-                    let backfill_linker = Arc::clone(&entity_linker);
-                    let backfill_community_builder = Arc::clone(&community_builder);
-                    let backfill_entity_embedder =
-                        crate::adapters::entity_embedder::EntityEmbedder::new(
-                            Arc::new(vs.clone()),
-                            text_embedder.clone(),
-                        );
-                    let backfill_pool = storage_pool.inner().clone();
-                    tokio::spawn(async move {
-                        tokio::time::sleep(std::time::Duration::from_secs(10)).await;
-                        if let Err(e) =
-                            super::backfill::backfill_tree_nodes(&backfill_note_repo, &backfill_builder)
-                                .await
-                        {
-                            warn!("Note tree backfill error: {e}");
-                        }
-                        if let Err(e) =
-                            super::backfill::backfill_task_trees(&backfill_task_tree_builder).await
-                        {
-                            warn!("Task tree backfill error: {e}");
-                        }
-                        match backfill_learning_tree_builder
-                            .backfill_from_atoms(&backfill_pool)
-                            .await
-                        {
-                            Ok(0) => {}
-                            Ok(n) => info!("Learning tree backfill: {n} atoms indexed"),
-                            Err(e) => warn!("Learning tree backfill error: {e}"),
-                        }
-                        match backfill_productivity_tree_builder
-                            .backfill_from_summaries(&backfill_pool)
-                            .await
-                        {
-                            Ok(0) => {}
-                            Ok(n) => {
-                                info!("Productivity tree backfill: {n} summaries indexed")
-                            }
-                            Err(e) => warn!("Productivity tree backfill error: {e}"),
-                        }
-                        tokio::time::sleep(std::time::Duration::from_secs(3)).await;
-                        super::backfill::backfill_entity_links(&backfill_linker).await;
-                        if let Err(e) = backfill_community_builder.rebuild_communities().await {
-                            warn!("Community backfill error: {e}");
-                        }
-                        match backfill_entity_embedder.backfill_all(&backfill_pool).await {
-                            Ok(0) => {}
-                            Ok(n) => {
-                                info!("Entity embedding backfill: {n} entities embedded")
-                            }
-                            Err(e) => warn!("Entity embedding backfill error: {e}"),
-                        }
-                    });
-                } else {
-                    info!(
-                        "Tree node backfill skipped. Set KLYNTBOT_BACKFILL=1 to re-index all data on startup."
-                    );
-                }
+                // NOTE: Backfills removed (pre-production — no legacy data to migrate).
             }
 
             // Build skill trees at startup (non-blocking)
@@ -427,26 +362,6 @@ pub(crate) async fn build_cognitive_system(
             });
         }
     }
-
-    // One-time entity backfill from pre-existing SPO facts (non-blocking)
-    let entity_repo = cognitive::repos::EntityRepo::new(storage_pool.inner().clone());
-    tokio::spawn(async move {
-        match entity_repo.backfill_from_facts().await {
-            Ok(0) => {}
-            Ok(n) => tracing::info!("Backfilled {n} entities from SPO facts"),
-            Err(e) => tracing::debug!("Entity backfill error (non-fatal): {e}"),
-        }
-    });
-
-    // One-time entity backfill from note_entity_mentions (non-blocking)
-    let entity_repo2 = cognitive::repos::EntityRepo::new(storage_pool.inner().clone());
-    tokio::spawn(async move {
-        match entity_repo2.backfill_from_note_mentions().await {
-            Ok(0) => {}
-            Ok(n) => tracing::info!("Backfilled {n} entities from note mentions"),
-            Err(e) => tracing::debug!("Note mention backfill error (non-fatal): {e}"),
-        }
-    });
 
     // Capture retriever clone for PRF pipeline stage
     let memory_retriever_for_prf = Some(Arc::clone(&retriever));

@@ -6,6 +6,7 @@ pub mod briefing;
 pub mod coaching;
 pub mod cognitive;
 pub mod focus;
+pub mod insights;
 pub mod language_learning;
 pub mod launcher;
 pub mod learning;
