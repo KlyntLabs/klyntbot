@@ -28,8 +28,9 @@ pub struct EchoTool {
 #[async_trait]
 impl ToolExecute for EchoTool {
     type Params = EchoParams;
+    type Ctx<'a> = ();
 
-    async fn execute(&self, params: EchoParams, _ctx: &RoutingContext) -> common::Result<String> {
+    async fn execute<'c>(&self, params: EchoParams, _ctx: ()) -> common::Result<String> {
         let repeat = params.repeat.unwrap_or(1);
         let output: Vec<_> = (0..repeat)
             .map(|_| format!("{}{}", self.prefix, params.text))
@@ -50,8 +51,9 @@ pub struct NoopTool;
 #[async_trait]
 impl ToolExecute for NoopTool {
     type Params = NoParams;
+    type Ctx<'a> = ();
 
-    async fn execute(&self, _params: NoParams, _ctx: &RoutingContext) -> common::Result<String> {
+    async fn execute<'c>(&self, _params: NoParams, _ctx: ()) -> common::Result<String> {
         Ok("done".to_string())
     }
 }
@@ -72,8 +74,9 @@ pub struct SearchFilesTool;
 #[async_trait]
 impl ToolExecute for SearchFilesTool {
     type Params = NoParams;
+    type Ctx<'a> = ();
 
-    async fn execute(&self, _params: NoParams, _ctx: &RoutingContext) -> common::Result<String> {
+    async fn execute<'c>(&self, _params: NoParams, _ctx: ()) -> common::Result<String> {
         Ok("found".to_string())
     }
 }

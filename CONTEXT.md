@@ -24,6 +24,22 @@ _Avoid_: Plugin deps (too narrow — context is the registration surface, not ju
 The bundle of shared infrastructure (storage pool, providers, config, buses, tokens) available to every plugin during initialization.
 _Avoid_: Service locator (implies global mutable access), DI container (too framework-y)
 
+**RoutingContext**:
+The full bundle of channel/chat identity and optional per-call wiring (hooks, streaming channels, cancellation, interaction channels, job supervisor) threaded through every tool execution. It is the *transport-side* surface — the untyped `Tool::execute` boundary always receives the whole thing.
+_Avoid_: Tool args (that's the JSON params), Tool deps (too narrow — it carries identity and runtime wiring, not just dependencies)
+
+**Context view**:
+A borrowed, zero-copy projection of `RoutingContext` exposing only the slice of fields a tool declares it needs (e.g. `HookCtx`, `IoCtx`). A tool's `ToolExecute::Ctx<'a>` associated type names its view; the `#[derive(Tool)]` bridge constructs it from the `RoutingContext` via `FromRoutingContext`.
+_Avoid_: Sub-context (vague), Tool context (collides with the full `RoutingContext`)
+
+**Context projection**:
+The act of building a `Context view` from a `RoutingContext`, performed by the `Tool` bridge (`FromRoutingContext::project`). The seam that lets the wide transport struct serve narrow tool interfaces.
+_Avoid_: Context conversion (implies ownership transfer; projection borrows)
+
+**View ladder**:
+The fixed superset chain of context views — `() ⊂ HookCtx ⊂ IoCtx ⊂ FullCtx`. A tool picks the smallest rung that fits; `FullCtx` (a `Deref` wrapper over `&RoutingContext`) is the escape hatch for the few genuinely-wide tools and the transitional view during migration.
+_Avoid_: Context hierarchy (implies inheritance/nesting of values), context levels (ambiguous with delegation depth)
+
 ## Flagged ambiguities
 
 - **"Feature"** is overloaded: it can mean a `feature-*` crate, a `FeaturePackage` impl, an `AiFeature` derive, or a user-facing capability. In this context, "feature" means the crate-level module; "plugin" means its participation in the host.

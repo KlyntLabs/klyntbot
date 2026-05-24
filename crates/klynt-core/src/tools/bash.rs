@@ -2,15 +2,15 @@ use crate::privacy::PrivacyGuard;
 use crate::tools::shared::file_edit_event::fan_out_tool_event;
 use crate::tools::shared::fs_resolve::resolve_path;
 use crate::tools::shared::hook_emit::{fire_post_tool_use, fire_pre_tool_use};
-use async_trait::async_trait;
 use bus::DomainEventBus;
 use klynt_execpolicy::Policy;
 use klynt_sandbox::SandboxRunner;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
+use async_trait::async_trait;
 use tools_core::events::ToolEvent;
-use tools_core::{RoutingContext, ToolExecute, ToolParams};
+use tools_core::{FullCtx, RoutingContext, ToolExecute, ToolParams};
 
 #[derive(Debug, Clone, serde::Serialize, ToolParams)]
 pub struct BashArgs {
@@ -101,8 +101,9 @@ impl BashTool {
 #[async_trait]
 impl ToolExecute for BashTool {
     type Params = BashArgs;
+    type Ctx<'a> = FullCtx<'a>;
 
-    async fn execute(&self, args: BashArgs, ctx: &RoutingContext) -> common::Result<String> {
+    async fn execute<'c>(&self, args: BashArgs, ctx: FullCtx<'c>) -> common::Result<String> {
         let session_id = ctx
             .session_key
             .clone()
@@ -132,9 +133,9 @@ impl ToolExecute for BashTool {
                 ));
             }
             if args.run_in_background.unwrap_or(false) {
-                return self.execute_background(args, ctx).await;
+                return self.execute_background(args, ctx.0).await;
             }
-            self.execute_foreground(args, ctx).await
+            self.execute_foreground(args, ctx.0).await
         })
         .await;
         fire_post_tool_use(

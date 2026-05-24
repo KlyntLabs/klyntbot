@@ -6,12 +6,12 @@
 use crate::privacy::PrivacyGuard;
 use crate::tools::shared::fs_resolve::resolve_under_cwd;
 use crate::tools::shared::hook_emit::{fire_post_tool_use, fire_pre_tool_use};
-use async_trait::async_trait;
 use common::{KlyntbotError, Result, ToolError};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::Arc;
-use tools_core::{RoutingContext, ToolExecute};
+use async_trait::async_trait;
+use tools_core::{FullCtx, ToolExecute};
 use tools_core_macros::{Tool as ToolDerive, ToolParams as ToolParamsDerive};
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToolParamsDerive)]
@@ -46,8 +46,9 @@ impl ListDirTool {
 #[async_trait]
 impl ToolExecute for ListDirTool {
     type Params = ListDirArgs;
+    type Ctx<'a> = FullCtx<'a>;
 
-    async fn execute(&self, args: ListDirArgs, ctx: &RoutingContext) -> Result<String> {
+    async fn execute<'c>(&self, args: ListDirArgs, ctx: FullCtx<'c>) -> Result<String> {
         let session_id = ctx
             .session_key
             .clone()

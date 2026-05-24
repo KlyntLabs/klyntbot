@@ -203,3 +203,46 @@ impl bus::InjectorContext for RoutingContext {
         &self.agent_chain
     }
 }
+
+// ============================================================================
+// Tool context projection (ADR-0002)
+//
+// `RoutingContext` is the wide transport struct passed at the untyped
+// `Tool::execute` boundary. A tool declares the narrow slice it actually needs
+// via `ToolExecute::Ctx<'a>`; the `#[derive(Tool)]` bridge projects the full
+// context into that view. See docs/architecture/deep-dive-02-tool-context-projection.md.
+// ============================================================================
+
+/// Builds a narrow context view from the full [`RoutingContext`].
+///
+/// Implemented by each rung of the view ladder (`()`, `FullCtx`, and — as tools
+/// are narrowed — `HookCtx`, `IoCtx`). The projection borrows from the context;
+/// it never clones or takes ownership.
+pub trait FromRoutingContext<'a> {
+    fn project(rc: &'a RoutingContext) -> Self;
+}
+
+/// The "needs nothing" rung. A tool with `type Ctx<'a> = ()` provably reads no
+/// routing context at all.
+impl<'a> FromRoutingContext<'a> for () {
+    fn project(_rc: &'a RoutingContext) -> Self {}
+}
+
+/// Escape-hatch rung: the full context, for the few genuinely-wide tools
+/// (e.g. `bash`) and as the transitional view during migration. `Deref` means
+/// tool bodies access fields exactly as before (`ctx.hook_engine`, …).
+#[derive(Clone, Copy)]
+pub struct FullCtx<'a>(pub &'a RoutingContext);
+
+impl<'a> FromRoutingContext<'a> for FullCtx<'a> {
+    fn project(rc: &'a RoutingContext) -> Self {
+        FullCtx(rc)
+    }
+}
+
+impl std::ops::Deref for FullCtx<'_> {
+    type Target = RoutingContext;
+    fn deref(&self) -> &RoutingContext {
+        self.0
+    }
+}

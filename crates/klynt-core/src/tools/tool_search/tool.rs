@@ -1,8 +1,8 @@
 use crate::tools::shared::hook_emit::{fire_post_tool_use, fire_pre_tool_use};
-use async_trait::async_trait;
 use common::{KlyntbotError, Result, ToolError};
 use serde::{Deserialize, Serialize};
-use tools_core::{RoutingContext, ToolExecute};
+use async_trait::async_trait;
+use tools_core::{FullCtx, ToolExecute};
 use tools_core_macros::{Tool as ToolDerive, ToolParams as ToolParamsDerive};
 
 static CURATED_META: std::sync::OnceLock<Vec<super::ToolMeta>> = std::sync::OnceLock::new();
@@ -119,7 +119,8 @@ impl ToolSearchTool {
 #[async_trait]
 impl ToolExecute for ToolSearchTool {
     type Params = ToolSearchArgs;
-    async fn execute(&self, args: ToolSearchArgs, ctx: &RoutingContext) -> Result<String> {
+    type Ctx<'a> = FullCtx<'a>;
+    async fn execute<'c>(&self, args: ToolSearchArgs, ctx: FullCtx<'c>) -> Result<String> {
         let session_id = ctx
             .session_key
             .clone()

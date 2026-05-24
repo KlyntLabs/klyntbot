@@ -191,7 +191,11 @@ pub fn derive(input: TokenStream) -> TokenStream {
                 ctx: &::tools_core::RoutingContext,
             ) -> ::common::Result<String> {
                 let params = <#params_type as ::tools_core::ToolParams>::from_args(args)?;
-                <Self as ::tools_core::ToolExecute>::execute(self, params, ctx).await
+                // Project the full RoutingContext into the narrow view this tool
+                // declared via `ToolExecute::Ctx` (ADR-0002).
+                let view = <<Self as ::tools_core::ToolExecute>::Ctx<'_>
+                    as ::tools_core::FromRoutingContext>::project(ctx);
+                <Self as ::tools_core::ToolExecute>::execute(self, params, view).await
             }
 
             #metadata_impl

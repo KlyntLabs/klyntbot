@@ -1,6 +1,5 @@
 use crate::privacy::PrivacyGuard;
 use crate::tools::shared::hook_emit::{fire_post_tool_use, fire_pre_tool_use};
-use async_trait::async_trait;
 use bus::DomainEventBus;
 use common::{KlyntbotError, Result, ToolError};
 use klynt_execpolicy::Policy;
@@ -8,8 +7,9 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
+use async_trait::async_trait;
 use tools_core::events::ToolEvent;
-use tools_core::{RoutingContext, ToolExecute};
+use tools_core::{FullCtx, ToolExecute};
 use tools_core_macros::{Tool as ToolDerive, ToolParams as ToolParamsDerive};
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToolParamsDerive)]
@@ -77,7 +77,8 @@ impl WebFetchTool {
 #[async_trait]
 impl ToolExecute for WebFetchTool {
     type Params = WebFetchArgs;
-    async fn execute(&self, args: WebFetchArgs, ctx: &RoutingContext) -> Result<String> {
+    type Ctx<'a> = FullCtx<'a>;
+    async fn execute<'c>(&self, args: WebFetchArgs, ctx: FullCtx<'c>) -> Result<String> {
         let session_id = ctx
             .session_key
             .clone()

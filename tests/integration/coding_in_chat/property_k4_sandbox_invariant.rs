@@ -6,7 +6,7 @@ use klynt_execpolicy::Policy;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use tools_core::events::ToolEvent;
-use tools_core::ToolExecute;
+use tools_core::{FullCtx, ToolExecute};
 
 #[tokio::test]
 async fn k4_sandbox_event_emitted_before_exec() {
@@ -47,7 +47,7 @@ async fn k4_sandbox_event_emitted_before_exec() {
             tty_rows: None,
             tty_cols: None,
         },
-        &routing_ctx,
+        FullCtx(&routing_ctx),
     )
     .await
     .unwrap();

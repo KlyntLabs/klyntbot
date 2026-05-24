@@ -39,7 +39,10 @@ pub use metadata::{CostHint, ToolCategory, ToolMetadata, ToolSource};
 pub use pagination::Page;
 pub use params::ParamExtractor;
 pub use registry::ToolRegistry;
-pub use routing::{InteractionBundle, InteractionChannel, ProgressHandler, RoutingContext};
+pub use routing::{
+    FromRoutingContext, FullCtx, InteractionBundle, InteractionChannel, ProgressHandler,
+    RoutingContext,
+};
 pub use search::{rrf_merge, rrf_merge_triple, Searchable};
 
 // ── Core traits ─────────────────────────────────────────────────────────
@@ -64,13 +67,28 @@ pub trait ToolParams: Sized {
 
 /// Typed tool execution — implement this for your tool's business logic,
 /// then use `#[derive(Tool)]` to generate the untyped `Tool` trait bridge.
+///
+/// `Ctx<'a>` is the narrow [`FromRoutingContext`] view this tool needs; the
+/// `#[derive(Tool)]` bridge projects the full [`RoutingContext`] into it before
+/// calling `execute`. See ADR-0002.
+///
+/// Each `impl` must be annotated `#[async_trait]`. Native async-fn-in-trait /
+/// RPITIT does not yet accept a GAT-projected borrowed argument
+/// (`Self::Ctx<'c>`) in the returned future — it fails with E0195 — so this
+/// trait keeps `#[async_trait]`, which boxes the future and elaborates the
+/// lifetimes. The per-call box alloc is negligible for tool dispatch.
 #[async_trait]
 pub trait ToolExecute: Send + Sync {
     /// The typed parameter struct (must implement `ToolParams`).
     type Params: ToolParams;
 
-    /// Execute the tool with typed parameters.
-    async fn execute(&self, params: Self::Params, ctx: &RoutingContext) -> common::Result<String>;
+    /// The slice of routing context this tool requires. Must be `Send`: the
+    /// `#[async_trait]` future captures the projected `Ctx` value.
+    type Ctx<'a>: FromRoutingContext<'a> + Send;
+
+    /// Execute the tool with typed parameters and its projected context view.
+    async fn execute<'c>(&self, params: Self::Params, ctx: Self::Ctx<'c>)
+        -> common::Result<String>;
 }
 
 /// Trait for agent tools.

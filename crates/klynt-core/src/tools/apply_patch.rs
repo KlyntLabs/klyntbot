@@ -4,7 +4,6 @@ use crate::tools::shared::fs_resolve::resolve_under_cwd;
 use crate::tools::shared::hook_emit::{
     fire_post_file_edit, fire_post_tool_use, fire_pre_file_edit, fire_pre_tool_use,
 };
-use async_trait::async_trait;
 use bus::DomainEventBus;
 use common::{KlyntbotError, Result, ToolError};
 use klynt_execpolicy::Policy;
@@ -13,8 +12,9 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
+use async_trait::async_trait;
 use tools_core::events::ToolEvent;
-use tools_core::{RoutingContext, ToolExecute};
+use tools_core::{FullCtx, ToolExecute};
 use tools_core_macros::{Tool as ToolDerive, ToolParams as ToolParamsDerive};
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToolParamsDerive)]
@@ -81,7 +81,8 @@ impl ApplyPatchTool {
 #[async_trait]
 impl ToolExecute for ApplyPatchTool {
     type Params = ApplyPatchArgs;
-    async fn execute(&self, args: ApplyPatchArgs, ctx: &RoutingContext) -> Result<String> {
+    type Ctx<'a> = FullCtx<'a>;
+    async fn execute<'c>(&self, args: ApplyPatchArgs, ctx: FullCtx<'c>) -> Result<String> {
         let session_id = ctx
             .session_key
             .clone()
