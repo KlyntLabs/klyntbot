@@ -132,6 +132,20 @@ Transform vague tasks into verifiable goals — "fix the bug" → "write a test 
 
 **Subagents for repeatable work:** Use subagents for PR-shaped tasks: "simplify this diff", "verify all tests pass", "check clippy across workspace". Keep the main agent's context clean for architectural decisions.
 
+## Agent skills
+
+### Issue tracker
+
+Issues and PRDs live as GitHub issues in `KlyntLabs/klyntbot` (use the `gh` CLI). See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Canonical triage vocabulary (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: root `CONTEXT.md` + `docs/adr/`. See `docs/agents/domain.md`.
+
 ## Conventions
 
 - Errors: `common::Result<T>` (alias for `Result<T, KlyntBotError>`). Domain errors auto-convert via `From`.
