@@ -29,12 +29,12 @@ The full bundle of channel/chat identity and optional per-call wiring (hooks, st
 _Avoid_: Tool args (that's the JSON params), Tool deps (too narrow — it carries identity and runtime wiring, not just dependencies)
 
 **Context view**:
-A borrowed, zero-copy projection of `RoutingContext` exposing only the slice of fields a tool declares it needs (e.g. `HookCtx`, `IoCtx`). A tool's `ToolExecute::Ctx<'a>` associated type names its view; the `#[derive(Tool)]` bridge constructs it from the `RoutingContext` via `FromRoutingContext`.
+A narrow projection of `RoutingContext` exposing only the slice of fields a tool declares it needs (e.g. `HookCtx`, `IoCtx`). A tool's `ToolExecute::Ctx<'a>` associated type names its view; the `#[derive(Tool)]` bridge constructs it from the `RoutingContext` via `FromRoutingContext`. Views own cheap clones of the fields (an `Arc` refcount bump and small values), not borrows, so tool bodies access fields exactly as on the full context.
 _Avoid_: Sub-context (vague), Tool context (collides with the full `RoutingContext`)
 
 **Context projection**:
 The act of building a `Context view` from a `RoutingContext`, performed by the `Tool` bridge (`FromRoutingContext::project`). The seam that lets the wide transport struct serve narrow tool interfaces.
-_Avoid_: Context conversion (implies ownership transfer; projection borrows)
+_Avoid_: Context narrowing (ambiguous with the LLM tool-gating sense of "narrow")
 
 **View ladder**:
 The fixed superset chain of context views — `() ⊂ HookCtx ⊂ IoCtx ⊂ FullCtx`. A tool picks the smallest rung that fits; `FullCtx` (a `Deref` wrapper over `&RoutingContext`) is the escape hatch for the few genuinely-wide tools and the transitional view during migration.

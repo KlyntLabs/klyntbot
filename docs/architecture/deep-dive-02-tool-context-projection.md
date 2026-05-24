@@ -1,6 +1,6 @@
 # Deep Dive: Project `RoutingContext` into narrow per-tool context views
 
-> Status: **Phase A implemented** (2026-05-24, branch `refactor/tool-context-projection`). Design recorded in ADR-0002; vocabulary in CONTEXT.md.
+> Status: **Phases A–D implemented** (2026-05-24, branch `refactor/tool-context-projection`) — the full ladder is live for the derive path: 5 tools on `HookCtx`, 6 on `IoCtx`, `bash` on `FullCtx`. Design recorded in ADR-0002; vocabulary in CONTEXT.md.
 > Architecture candidate #1 of the 2026-05-24 review.
 >
 > **Scope correction (post-exploration):** the seam covers the **12 `ToolExecute` (derive-path) tools** in `klynt-core/src/tools/`, not the ~42 figure from the review (which counted every `Tool::execute` impl). Hand-written `impl Tool` tools and `#[tool_actions]` tools implement the untyped `Tool` directly, keep `&RoutingContext`, and are out of scope (a separate follow-up).
@@ -106,24 +106,26 @@ There are no associated-type defaults on stable Rust, so every impl states its `
 // Rung 0 — nothing.
 impl<'a> FromRoutingContext<'a> for () { fn project(_: &'a RoutingContext) {} }
 
-// Rung 1
-pub struct HookCtx<'a> {
-    pub hook_engine: Option<&'a Arc<klynt_hooks::HookEngine>>,
-    pub session_key: Option<&'a SessionKey>,
-    pub message_id:  Option<&'a str>,
+// Rung 1 — owns cheap clones (field TYPES mirror RoutingContext, so tool
+// bodies use them unchanged). No lifetime param.
+pub struct HookCtx {
+    pub hook_engine: Option<Arc<klynt_hooks::HookEngine>>,
+    pub session_key: Option<SessionKey>,
 }
 
-// Rung 2 (⊃ HookCtx)
-pub struct IoCtx<'a> {
-    pub hooks: HookCtx<'a>,
-    pub channel:      &'a ChannelName,
-    pub chat_id:      &'a ChatId,
-    pub event_tx:     Option<&'a mpsc::Sender<ToolEvent>>,
-    pub entity_tx:    Option<&'a mpsc::Sender<common::EntityCard>>,
-    pub cancel_token: Option<&'a CancellationToken>,
+// Rung 2 (⊃ HookCtx) — fields the write/edit/web/plan tools actually use.
+// (No entity_tx: none of the migrated tools read it.)
+pub struct IoCtx {
+    pub hook_engine:  Option<Arc<klynt_hooks::HookEngine>>,
+    pub session_key:  Option<SessionKey>,
+    pub channel:      ChannelName,
+    pub chat_id:      ChatId,
+    pub event_tx:     Option<mpsc::Sender<ToolEvent>>,
+    pub cancel_token: Option<CancellationToken>,
+    pub message_id:   Option<String>,
 }
 
-// Rung 3 — escape hatch + transitional view.
+// Rung 3 — escape hatch + transitional view (borrows).
 pub struct FullCtx<'a>(pub &'a RoutingContext);
 impl<'a> std::ops::Deref for FullCtx<'a> {
     type Target = RoutingContext;
@@ -131,7 +133,7 @@ impl<'a> std::ops::Deref for FullCtx<'a> {
 }
 ```
 
-Each rung gets a `FromRoutingContext<'a>` impl that borrows (zero-copy) the relevant fields. `FullCtx` projects to `FullCtx(rc)`, so tool bodies that move to `FullCtx` need no edits (field access flows through `Deref`).
+`HookCtx`/`IoCtx` own cheap clones (an `Arc` refcount bump + small values), so the `type Ctx<'a> = HookCtx` GAT carries no lifetime and tool bodies stay byte-for-byte identical (`ctx.hook_engine.as_ref()`, `ctx.session_key.clone()`, `ctx.channel.as_str()` all keep working). The trait method's `'c` is still declared (FullCtx needs it) and is consumed by `#[async_trait]`'s lifetime elaboration, so no unused-lifetime lint fires. `FullCtx` projects to `FullCtx(rc)` via `Deref`.
 
 ### 4. The bridge change (both macros)
 
@@ -181,9 +183,9 @@ Each phase is a standalone, always-green PR.
 | Phase | Scope | Status |
 |-------|-------|--------|
 | **A — machinery + mechanical sweep** | Add `FromRoutingContext`, `FullCtx`, `impl … for ()`. Add GAT `type Ctx<'a>` to `ToolExecute` (kept `#[async_trait]`). Update `tool_derive.rs` bridge to project. Set `type Ctx<'a> = FullCtx<'a>` on all 12 derive-path impls. | **Done.** Workspace builds; 142 tools-core+klynt-core tests pass. Behavior identical (`FullCtx` derefs). |
-| **B — filesystem reads → `HookCtx`** | `read, glob, grep, list_dir, tool_search` (use only `hook_engine`). Add `HookCtx { hook_engine, session_key }`. | Pending. 5 tools → 2-field view. |
-| **C — write/edit/web/plan → `IoCtx`** | `write, edit, apply_patch, notebook_edit, web_fetch, plan_mode`. Add `IoCtx` (⊃ `HookCtx` + channel, chat_id, event_tx, entity_tx, cancel_token, message_id). | Pending. 6 tools → IoCtx rung. |
-| **D — `bash` stays `FullCtx`** | Verified honest (uses `job_supervisor`, `agent_chain`, …). | Ladder complete for the derive path. |
+| **B — filesystem reads → `HookCtx`** | `read, glob, grep, list_dir, tool_search`. Add `HookCtx { hook_engine, session_key }`. | **Done.** 5 tools narrowed to a 2-field view; bodies unchanged; 142 tests pass, clippy clean. |
+| **C — write/edit/web/plan → `IoCtx`** | `write, edit, apply_patch, notebook_edit, web_fetch, plan_mode`. Add `IoCtx { hook_engine, session_key, channel, chat_id, event_tx, cancel_token, message_id }` (no `entity_tx` — unused by these). | **Done.** 6 tools narrowed; bodies unchanged. |
+| **D — `bash` stays `FullCtx`** | Verified honest (uses `job_supervisor`, `agent_chain`, …). | **Done.** Ladder complete for the derive path. |
 
 Only `tool_derive.rs` needed changing (not `tool_actions.rs` — that path doesn't use `ToolExecute`). `bus::InjectorContext` stays implemented on `RoutingContext`; the bus injection layer is unchanged. Each per-tool narrowing in B/C is independently revertible.
 
@@ -200,7 +202,7 @@ With views:
 #[tokio::test]
 async fn read_uses_no_hooks() {
     let out = ReadTool::default()
-        .execute(params, HookCtx { hook_engine: None, session_key: None, message_id: None })
+        .execute(params, HookCtx { hook_engine: None, session_key: None })
         .await.unwrap();
     // …
 }

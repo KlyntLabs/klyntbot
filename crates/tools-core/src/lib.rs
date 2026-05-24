@@ -40,8 +40,8 @@ pub use pagination::Page;
 pub use params::ParamExtractor;
 pub use registry::ToolRegistry;
 pub use routing::{
-    FromRoutingContext, FullCtx, InteractionBundle, InteractionChannel, ProgressHandler,
-    RoutingContext,
+    FromRoutingContext, FullCtx, HookCtx, InteractionBundle, InteractionChannel, IoCtx,
+    ProgressHandler, RoutingContext,
 };
 pub use search::{rrf_merge, rrf_merge_triple, Searchable};
 

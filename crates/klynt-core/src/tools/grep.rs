@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::Arc;
 use async_trait::async_trait;
-use tools_core::{FullCtx, ToolExecute};
+use tools_core::{HookCtx, ToolExecute};
 use tools_core_macros::{Tool as ToolDerive, ToolParams as ToolParamsDerive};
 use walkdir::WalkDir;
 
@@ -51,9 +51,9 @@ impl GrepTool {
 #[async_trait]
 impl ToolExecute for GrepTool {
     type Params = GrepArgs;
-    type Ctx<'a> = FullCtx<'a>;
+    type Ctx<'a> = HookCtx;
 
-    async fn execute<'c>(&self, args: GrepArgs, ctx: FullCtx<'c>) -> Result<String> {
+    async fn execute<'c>(&self, args: GrepArgs, ctx: HookCtx) -> Result<String> {
         let session_id = ctx
             .session_key
             .clone()

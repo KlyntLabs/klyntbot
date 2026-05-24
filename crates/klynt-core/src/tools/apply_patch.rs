@@ -14,7 +14,7 @@ use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 use async_trait::async_trait;
 use tools_core::events::ToolEvent;
-use tools_core::{FullCtx, ToolExecute};
+use tools_core::{IoCtx, ToolExecute};
 use tools_core_macros::{Tool as ToolDerive, ToolParams as ToolParamsDerive};
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToolParamsDerive)]
@@ -81,8 +81,8 @@ impl ApplyPatchTool {
 #[async_trait]
 impl ToolExecute for ApplyPatchTool {
     type Params = ApplyPatchArgs;
-    type Ctx<'a> = FullCtx<'a>;
-    async fn execute<'c>(&self, args: ApplyPatchArgs, ctx: FullCtx<'c>) -> Result<String> {
+    type Ctx<'a> = IoCtx;
+    async fn execute<'c>(&self, args: ApplyPatchArgs, ctx: IoCtx) -> Result<String> {
         let session_id = ctx
             .session_key
             .clone()

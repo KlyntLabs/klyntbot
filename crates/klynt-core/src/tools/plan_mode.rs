@@ -8,7 +8,7 @@ use storage::Repos;
 use tokio::sync::mpsc;
 use async_trait::async_trait;
 use tools_core::events::ToolEvent;
-use tools_core::{FullCtx, ToolExecute};
+use tools_core::{IoCtx, ToolExecute};
 use tools_core_macros::{Tool as ToolDerive, ToolParams as ToolParamsDerive};
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToolParamsDerive)]
@@ -70,8 +70,8 @@ impl ExitPlanModeTool {
 #[async_trait]
 impl ToolExecute for EnterPlanModeTool {
     type Params = EnterPlanModeArgs;
-    type Ctx<'a> = FullCtx<'a>;
-    async fn execute<'c>(&self, args: EnterPlanModeArgs, ctx: FullCtx<'c>) -> Result<String> {
+    type Ctx<'a> = IoCtx;
+    async fn execute<'c>(&self, args: EnterPlanModeArgs, ctx: IoCtx) -> Result<String> {
         let session_id = ctx
             .session_key
             .clone()
@@ -106,8 +106,8 @@ impl ToolExecute for EnterPlanModeTool {
 #[async_trait]
 impl ToolExecute for ExitPlanModeTool {
     type Params = ExitPlanModeArgs;
-    type Ctx<'a> = FullCtx<'a>;
-    async fn execute<'c>(&self, args: ExitPlanModeArgs, ctx: FullCtx<'c>) -> Result<String> {
+    type Ctx<'a> = IoCtx;
+    async fn execute<'c>(&self, args: ExitPlanModeArgs, ctx: IoCtx) -> Result<String> {
         let session_id = ctx
             .session_key
             .clone()

@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::Arc;
 use async_trait::async_trait;
-use tools_core::{FullCtx, ToolExecute};
+use tools_core::{HookCtx, ToolExecute};
 use tools_core_macros::{Tool as ToolDerive, ToolParams as ToolParamsDerive};
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToolParamsDerive)]
@@ -47,9 +47,9 @@ impl ReadTool {
 #[async_trait]
 impl ToolExecute for ReadTool {
     type Params = ReadArgs;
-    type Ctx<'a> = FullCtx<'a>;
+    type Ctx<'a> = HookCtx;
 
-    async fn execute<'c>(&self, args: ReadArgs, ctx: FullCtx<'c>) -> Result<String> {
+    async fn execute<'c>(&self, args: ReadArgs, ctx: HookCtx) -> Result<String> {
         let session_id = ctx
             .session_key
             .clone()

@@ -215,9 +215,9 @@ impl bus::InjectorContext for RoutingContext {
 
 /// Builds a narrow context view from the full [`RoutingContext`].
 ///
-/// Implemented by each rung of the view ladder (`()`, `FullCtx`, and — as tools
-/// are narrowed — `HookCtx`, `IoCtx`). The projection borrows from the context;
-/// it never clones or takes ownership.
+/// Implemented by each rung of the view ladder: `()`, `FullCtx` (borrows),
+/// and `HookCtx` / `IoCtx` (own cheap clones — `Arc` refcount bumps and small
+/// values — so tool bodies use the fields exactly as on `RoutingContext`).
 pub trait FromRoutingContext<'a> {
     fn project(rc: &'a RoutingContext) -> Self;
 }
@@ -244,5 +244,54 @@ impl std::ops::Deref for FullCtx<'_> {
     type Target = RoutingContext;
     fn deref(&self) -> &RoutingContext {
         self.0
+    }
+}
+
+/// Rung 1 — hooks only. For read-only tools (`read`, `glob`, `grep`,
+/// `list_dir`, `tool_search`) that fire pre/post-tool-use hooks and need
+/// nothing else. Fields mirror `RoutingContext`'s types so tool bodies use them
+/// unchanged; `project` clones cheap handles (an `Arc` refcount bump and a small
+/// `SessionKey`), not the whole context.
+#[derive(Clone)]
+pub struct HookCtx {
+    pub hook_engine: Option<Arc<klynt_hooks::HookEngine>>,
+    pub session_key: Option<SessionKey>,
+}
+
+impl<'a> FromRoutingContext<'a> for HookCtx {
+    fn project(rc: &'a RoutingContext) -> Self {
+        HookCtx {
+            hook_engine: rc.hook_engine.clone(),
+            session_key: rc.session_key.clone(),
+        }
+    }
+}
+
+/// Rung 2 (⊃ [`HookCtx`]) — hooks plus channel identity, streaming, and
+/// cancellation. For tools that mutate or fetch and emit events (`write`,
+/// `edit`, `apply_patch`, `notebook_edit`, `web_fetch`, `plan_mode`). Fields
+/// mirror `RoutingContext`'s types; `project` clones cheap handles only.
+#[derive(Clone)]
+pub struct IoCtx {
+    pub hook_engine: Option<Arc<klynt_hooks::HookEngine>>,
+    pub session_key: Option<SessionKey>,
+    pub channel: ChannelName,
+    pub chat_id: ChatId,
+    pub event_tx: Option<mpsc::Sender<ToolEvent>>,
+    pub cancel_token: Option<CancellationToken>,
+    pub message_id: Option<String>,
+}
+
+impl<'a> FromRoutingContext<'a> for IoCtx {
+    fn project(rc: &'a RoutingContext) -> Self {
+        IoCtx {
+            hook_engine: rc.hook_engine.clone(),
+            session_key: rc.session_key.clone(),
+            channel: rc.channel.clone(),
+            chat_id: rc.chat_id.clone(),
+            event_tx: rc.event_tx.clone(),
+            cancel_token: rc.cancel_token.clone(),
+            message_id: rc.message_id.clone(),
+        }
     }
 }
