@@ -22,10 +22,7 @@ impl AppCore {
             .into_activity_log_entry()
             .map_err(|e| ApiError::new("VALIDATION", e))?;
 
-        let activity_svc = self
-            .activity_ingestion_service
-            .as_ref()
-            .ok_or_else(|| ApiError::new("FEATURE_DISABLED", "Activity log not initialized"))?;
+        let activity_svc = self.activity_ingestion_service()?;
 
         match activity_svc.ingest(entry).await {
             Ok(Some(id)) => Ok(IngestResponse {
@@ -59,10 +56,7 @@ impl AppCore {
             }
         }
 
-        let activity_svc = self
-            .activity_ingestion_service
-            .as_ref()
-            .ok_or_else(|| ApiError::new("FEATURE_DISABLED", "Activity log not initialized"))?;
+        let activity_svc = self.activity_ingestion_service()?;
 
         match activity_svc.ingest_batch(entries).await {
             Ok(count) => Ok(desktop_shared::commands::BatchIngestResponse {

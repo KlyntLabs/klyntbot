@@ -263,7 +263,7 @@ impl AppCore {
 
     /// Push voice config changes to the live VoiceService and VoiceConversationManager.
     pub(crate) fn propagate_voice_config(&self, voice: &config::schema::VoiceConfig) {
-        if let Some(svc) = self.voice_service.as_ref() {
+        if let Ok(svc) = self.voice_service() {
             let new_config = VoiceServiceConfig {
                 capture: CaptureConfig {
                     silence_threshold: 0.01,
@@ -281,7 +281,7 @@ impl AppCore {
             };
             svc.update_config(new_config);
         }
-        if let Some(ref mgr) = self.voice_conversation_manager {
+        if let Ok(mgr) = self.voice_conversation_manager() {
             if let Ok(mut cfg) = mgr.config.try_write() {
                 *cfg = voice.clone();
             }

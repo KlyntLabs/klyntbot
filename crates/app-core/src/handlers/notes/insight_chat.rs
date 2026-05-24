@@ -170,7 +170,7 @@ impl AppCore {
             .ok_or_else(|| ApiError::new("NOT_FOUND", "Note not found"))?;
 
         // Resolve tab content from the latest insight (best-effort).
-        let tab_content: String = if let Some(ref service) = self.insight_service {
+        let tab_content: String = if let Some(service) = self.insight_service() {
             if let Ok(Some(row)) = service.get_latest(&params.note_id).await {
                 let content: feature_insights::InsightContent =
                     serde_json::from_str(&row.content).unwrap_or_default();

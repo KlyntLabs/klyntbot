@@ -42,6 +42,7 @@ pub(crate) async fn build_cognitive_system(
     cognitive_provider: &Option<DynProvider>,
     storage_pool: &storage::StoragePool,
     repos: &storage::Repos,
+    shared_entity_repo: Option<cognitive::EntityRepo>,
 ) -> CognitiveBuildResult {
     let mut retriever = cognitive::UnifiedMemoryService::new(fact_repo)
         .with_recall_opt(recall_service.clone())
@@ -67,14 +68,14 @@ pub(crate) async fn build_cognitive_system(
         retriever = retriever
             .with_co_activation_repo(cognitive::CoActivationRepo::new(p.clone()));
     }
-    // Wire entity graph for graph-aware retrieval boost
-    if let Some(ref p) = pool {
-        retriever = retriever.with_entity_repo(cognitive::EntityRepo::new(p.clone()));
+    // Wire entity graph for graph-aware retrieval boost (uses plugin-provided repo only)
+    if let Some(ref entity_repo) = shared_entity_repo {
+        retriever = retriever.with_entity_repo(entity_repo.clone());
     }
-    // KCA Track 6: PPR cache
-    if let Some(ref p) = pool {
+    // KCA Track 6: PPR cache (uses plugin-provided repo only)
+    if let Some(entity_repo) = shared_entity_repo {
         let ppr_cache = Arc::new(cognitive::services::ppr_retrieval::CachedPprGraph::new(
-            cognitive::EntityRepo::new(p.clone()),
+            entity_repo,
             std::time::Duration::from_secs(300),
         ));
         retriever = retriever.with_ppr_cache(ppr_cache);
@@ -196,149 +197,64 @@ pub(crate) async fn build_cognitive_system(
             let tree_builder_parent_token = CancellationToken::new();
             tree_builder_token = Some(tree_builder_parent_token.clone());
 
-            // NoteTreeBuilder subscriber (event-driven tree rebuild + LanceDB embed)
+            // Spawn tree-builder subscribers (event-driven rebuilds)
             if let Some(ref domain_bus) = domain_event_bus {
+                macro_rules! spawn_subscriber {
+                    ($name:literal, $builder:expr) => {{
+                        let rx = domain_bus.subscribe();
+                        let shutdown = tree_builder_parent_token.child_token();
+                        let builder = Arc::new($builder);
+                        tokio::spawn(async move {
+                            builder.run(rx, shutdown).await;
+                        });
+                        info!(concat!($name, " subscriber started"));
+                    }};
+                }
+
                 let note_tree_note_repo =
                     feature_notes::repo::NoteRepo::new(storage_pool.inner().clone());
-                let note_tree_builder =
-                    Arc::new(crate::adapters::note_tree_builder::NoteTreeBuilder::new(
-                        tree_repo.clone(),
-                        Arc::new(vs.clone()),
-                        text_embedder.clone(),
-                        context_update_queue.clone(),
-                        domain_event_bus.clone(),
-                        note_tree_note_repo,
+                spawn_subscriber!("NoteTreeBuilder",
+                    crate::adapters::note_tree_builder::NoteTreeBuilder::new(
+                        tree_repo.clone(), Arc::new(vs.clone()), text_embedder.clone(),
+                        context_update_queue.clone(), domain_event_bus.clone(), note_tree_note_repo,
                     ));
-                let tree_builder_rx = domain_bus.subscribe();
-                let tree_builder_shutdown = tree_builder_parent_token.child_token();
-                let _tree_builder_handle = tokio::spawn({
-                    let builder = Arc::clone(&note_tree_builder);
-                    let shutdown = tree_builder_shutdown.clone();
-                    async move {
-                        builder.run(tree_builder_rx, shutdown).await;
-                    }
-                });
-                info!("NoteTreeBuilder subscriber started");
 
-                // TaskTreeBuilder subscriber (event-driven task tree rebuild + LanceDB embed)
-                let task_tree_builder =
-                    Arc::new(crate::adapters::task_tree_builder::TaskTreeBuilder::new(
-                        tree_repo.clone(),
-                        Arc::new(vs.clone()),
-                        text_embedder.clone(),
-                        context_update_queue.clone(),
-                        domain_event_bus.clone(),
+                spawn_subscriber!("TaskTreeBuilder",
+                    crate::adapters::task_tree_builder::TaskTreeBuilder::new(
+                        tree_repo.clone(), Arc::new(vs.clone()), text_embedder.clone(),
+                        context_update_queue.clone(), domain_event_bus.clone(), storage_pool.inner().clone(),
+                    ));
+
+                spawn_subscriber!("EntityTreeLinker",
+                    crate::adapters::entity_tree_linker::EntityTreeLinker::new(
                         storage_pool.inner().clone(),
                     ));
-                let task_tree_rx = domain_bus.subscribe();
-                let task_tree_shutdown = tree_builder_parent_token.child_token();
-                let _task_tree_handle = tokio::spawn({
-                    let builder = Arc::clone(&task_tree_builder);
-                    let shutdown = task_tree_shutdown.clone();
-                    async move {
-                        builder.run(task_tree_rx, shutdown).await;
-                    }
-                });
-                info!("TaskTreeBuilder subscriber started");
 
-                // EntityTreeLinker subscriber (links entities ↔ tree nodes)
-                let entity_linker =
-                    Arc::new(crate::adapters::entity_tree_linker::EntityTreeLinker::new(
-                        storage_pool.inner().clone(),
-                    ));
-                let linker_rx = domain_bus.subscribe();
-                let linker_shutdown = tree_builder_parent_token.child_token();
-                let _linker_handle = tokio::spawn({
-                    let linker = Arc::clone(&entity_linker);
-                    let shutdown = linker_shutdown.clone();
-                    async move {
-                        linker.run(linker_rx, shutdown).await;
-                    }
-                });
-                info!("EntityTreeLinker subscriber started");
-
-                // CommunityBuilder subscriber (Louvain detection)
                 let community_repo_for_builder =
                     cognitive::repos::CommunityRepo::new(storage_pool.inner().clone());
-                let community_builder =
-                    Arc::new(crate::adapters::community_builder::CommunityBuilder::new(
-                        community_repo_for_builder,
-                        Arc::new(vs.clone()),
-                        text_embedder.clone(),
-                        tree_repo.clone(),
-                        context_update_queue.clone(),
+                spawn_subscriber!("CommunityBuilder",
+                    crate::adapters::community_builder::CommunityBuilder::new(
+                        community_repo_for_builder, Arc::new(vs.clone()), text_embedder.clone(),
+                        tree_repo.clone(), context_update_queue.clone(),
                     ));
-                let comm_builder_rx = domain_bus.subscribe();
-                let comm_builder_shutdown = tree_builder_parent_token.child_token();
-                let _comm_builder_handle = tokio::spawn({
-                    let builder = Arc::clone(&community_builder);
-                    let shutdown = comm_builder_shutdown.clone();
-                    async move {
-                        builder.run(comm_builder_rx, shutdown).await;
-                    }
-                });
-                info!("CommunityBuilder subscriber started");
 
-                // ProductivityTreeBuilder subscriber
-                let productivity_tree_builder =
-                    Arc::new(crate::adapters::productivity_tree_builder::ProductivityTreeBuilder::new(
-                        tree_repo.clone(),
-                        Arc::new(vs.clone()),
-                        text_embedder.clone(),
-                        context_update_queue.clone(),
-                        domain_event_bus.clone(),
+                spawn_subscriber!("ProductivityTreeBuilder",
+                    crate::adapters::productivity_tree_builder::ProductivityTreeBuilder::new(
+                        tree_repo.clone(), Arc::new(vs.clone()), text_embedder.clone(),
+                        context_update_queue.clone(), domain_event_bus.clone(),
                     ));
-                let productivity_tree_rx = domain_bus.subscribe();
-                let productivity_tree_shutdown = tree_builder_parent_token.child_token();
-                let _productivity_tree_handle = tokio::spawn({
-                    let builder = Arc::clone(&productivity_tree_builder);
-                    let shutdown = productivity_tree_shutdown.clone();
-                    async move {
-                        builder.run(productivity_tree_rx, shutdown).await;
-                    }
-                });
-                info!("ProductivityTreeBuilder subscriber started");
 
-                // OkrTreeBuilder subscriber
-                let okr_tree_builder =
-                    Arc::new(crate::adapters::okr_tree_builder::OkrTreeBuilder::new(
-                        tree_repo.clone(),
-                        Arc::new(vs.clone()),
-                        text_embedder.clone(),
-                        context_update_queue.clone(),
-                        domain_event_bus.clone(),
+                spawn_subscriber!("OkrTreeBuilder",
+                    crate::adapters::okr_tree_builder::OkrTreeBuilder::new(
+                        tree_repo.clone(), Arc::new(vs.clone()), text_embedder.clone(),
+                        context_update_queue.clone(), domain_event_bus.clone(),
                     ));
-                let okr_tree_rx = domain_bus.subscribe();
-                let okr_tree_shutdown = tree_builder_parent_token.child_token();
-                let _okr_tree_handle = tokio::spawn({
-                    let builder = Arc::clone(&okr_tree_builder);
-                    let shutdown = okr_tree_shutdown.clone();
-                    async move {
-                        builder.run(okr_tree_rx, shutdown).await;
-                    }
-                });
-                info!("OkrTreeBuilder subscriber started");
 
-                // LearningTreeBuilder subscriber
-                let learning_tree_builder = Arc::new(
+                spawn_subscriber!("LearningTreeBuilder",
                     crate::adapters::learning_tree_builder::LearningTreeBuilder::new(
-                        tree_repo.clone(),
-                        Arc::new(vs.clone()),
-                        text_embedder.clone(),
-                        context_update_queue.clone(),
-                        domain_event_bus.clone(),
-                    ),
-                );
-                let learning_tree_rx = domain_bus.subscribe();
-                let learning_tree_shutdown = tree_builder_parent_token.child_token();
-                let _learning_tree_handle = tokio::spawn({
-                    let builder = Arc::clone(&learning_tree_builder);
-                    let shutdown = learning_tree_shutdown.clone();
-                    async move {
-                        builder.run(learning_tree_rx, shutdown).await;
-                    }
-                });
-                info!("LearningTreeBuilder subscriber started");
+                        tree_repo.clone(), Arc::new(vs.clone()), text_embedder.clone(),
+                        context_update_queue.clone(), domain_event_bus.clone(),
+                    ));
 
                 // NOTE: Backfills removed (pre-production — no legacy data to migrate).
             }

@@ -27,6 +27,13 @@ impl AppCorePlugin for VoicePlugin {
         "voice"
     }
 
+    /// Voice reads `MirrorInitResult` from the host to wire its echo provider,
+    /// so MirrorPlugin must run first. Declared explicitly rather than relying
+    /// on registration order.
+    fn dependencies(&self) -> &[&str] {
+        &["mirror"]
+    }
+
     async fn init(&self, ctx: &mut PluginContext) -> common::Result<()> {
         let config_guard = ctx.deps.config.read().await;
         let voice_config = config_guard.voice.clone();

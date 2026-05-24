@@ -87,7 +87,7 @@ impl AppCore {
         };
 
         // Resolve scope once — used for both hash computation and context building
-        let scope_note_ids = if let Some(ref service) = self.insight_service {
+        let scope_note_ids = if let Some(service) = self.insight_service() {
             service.resolve_scope(note_id, &scope).await
         } else {
             self.get_related_note_ids(note_id).await
@@ -99,7 +99,7 @@ impl AppCore {
             &scope_note_ids,
         );
 
-        if let Some(ref service) = self.insight_service {
+        if let Some(service) = self.insight_service() {
             if let Ok(Some(cached)) = service.check_cache(note_id, &content_hash).await {
                 return Ok(InsightReviewStarted {
                     insight_review_id: cached.id,
@@ -118,10 +118,8 @@ impl AppCore {
                 .unwrap_or("0000")
         );
 
-        let provider = self
-            .cognitive_provider
-            .clone()
-            .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "LLM provider not configured"))?;
+        let provider = self.cognitive_provider()
+            .ok_or_else(|| ApiError::not_available("LLM provider not configured"))?;
 
         // NoteRow doesn't carry tags — fetch them separately
         let tags = self.note_repo.get_tags(note_id).await.unwrap_or_default();
@@ -130,7 +128,7 @@ impl AppCore {
 
         // Build context via InsightService pipeline (merge check + cognitive injection)
         let (context_text, note_title, parent_insight_id) =
-            if let Some(ref service) = self.insight_service {
+            if let Some(service) = self.insight_service() {
                 // Fetch related notes for the resolved scope
                 let related_notes = self
                     .note_repo
@@ -175,7 +173,7 @@ impl AppCore {
         let emitter = emitter_override.unwrap_or_else(|| Arc::clone(&self.event_emitter));
 
         // Fire "What's Changed" summary if a previous version exists
-        if let Some(ref service) = self.insight_service {
+        if let Some(service) = self.insight_service() {
             if let Ok(Some(prev)) = service.get_latest(note_id).await {
                 let prev_content: feature_insights::InsightContent =
                     serde_json::from_str(&prev.content).unwrap_or_default();
@@ -215,12 +213,12 @@ impl AppCore {
             }
         }
 
-        let insight_service = self.insight_service.clone();
+        let insight_service = self.insight_service();
         let note_id_owned = note_id.to_string();
         let content_hash_clone = content_hash.clone();
 
         let pipeline_pool = self.storage_pool.inner().clone();
-        let pipeline_bus = self.domain_event_bus.clone();
+        let pipeline_bus = self.domain_event_bus().ok();
         tokio::spawn(async move {
             run_insight_pipeline(InsightPipelineArgs {
                 provider,
@@ -253,7 +251,7 @@ impl AppCore {
         &self,
         note_id: &str,
     ) -> Result<Option<InsightReviewResponse>, ApiError> {
-        let service = match &self.insight_service {
+        let service = match self.insight_service() {
             Some(s) => s,
             None => return Ok(None),
         };
@@ -306,7 +304,7 @@ impl AppCore {
         &self,
         note_id: &str,
     ) -> Result<Option<ChangesSummaryResponse>, ApiError> {
-        let service = match &self.insight_service {
+        let service = match self.insight_service() {
             Some(s) => s,
             None => return Ok(None),
         };
@@ -337,10 +335,8 @@ impl AppCore {
         let related_notes = self.fetch_related_notes(note_id).await;
         let ctx = insight_context::assemble_context(&note, &related_notes, None);
 
-        let provider = self
-            .cognitive_provider
-            .clone()
-            .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "LLM provider not configured"))?;
+        let provider = self.cognitive_provider()
+            .ok_or_else(|| ApiError::not_available("LLM provider not configured"))?;
 
         let config = self.config.read().await;
         let params = providers::cognitive_chat_params(&config, 512);
@@ -380,10 +376,7 @@ impl AppCore {
         &self,
         params: InsightSaveFlashcardsParams,
     ) -> Result<Vec<FlashcardResponse>, ApiError> {
-        let repo = self
-            .flashcard_repo
-            .as_ref()
-            .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "Flashcard repo not available"))?;
+        let repo = self.flashcard_repo()?;
 
         let atom_repo = cognitive::KnowledgeAtomRepo::new(self.storage_pool.inner().clone());
         let active_atoms = atom_repo
@@ -451,9 +444,8 @@ impl AppCore {
         params: &InsightQuizSubmitParams,
     ) -> Result<(), ApiError> {
         let service = self
-            .insight_service
-            .as_ref()
-            .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "Insight service not available"))?;
+            .insight_service()
+            .ok_or_else(|| ApiError::not_available("Insight service not available"))?;
 
         let insight = service
             .get_version(&params.insight_review_id)
@@ -474,7 +466,7 @@ impl AppCore {
             .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))?;
 
         // Emit AtomInteracted for active atoms on this note (quiz engagement signal)
-        if let Some(bus) = &self.domain_event_bus {
+        if let Ok(bus) = self.domain_event_bus() {
             let pool = self.storage_pool.inner();
             // Batch-update all active atoms' last_interaction_ts in one query
             let now = jiff::Timestamp::now().to_string();
@@ -508,10 +500,8 @@ impl AppCore {
         &self,
         note_id: &str,
     ) -> Result<ScenarioChallengeResponse, ApiError> {
-        let provider = self
-            .cognitive_provider
-            .clone()
-            .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "LLM provider not configured"))?;
+        let provider = self.cognitive_provider()
+            .ok_or_else(|| ApiError::not_available("LLM provider not configured"))?;
 
         let note = self
             .note_repo
@@ -524,7 +514,7 @@ impl AppCore {
         let entity_repo = cognitive::repos::EntityRepo::new(self.storage_pool.inner().clone());
         let note_domains = insight_context::extract_note_domains(&tags, Some(&entity_repo)).await;
 
-        let ctx_text = if let Some(ref service) = self.insight_service {
+        let ctx_text = if let Some(service) = self.insight_service() {
             let scope: feature_insights::ScopeConfig = service
                 .get_latest(note_id)
                 .await
@@ -593,10 +583,8 @@ impl AppCore {
         note_id: &str,
         tab: &str,
     ) -> Result<TabContent, ApiError> {
-        let provider = self
-            .cognitive_provider
-            .clone()
-            .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "LLM provider not configured"))?;
+        let provider = self.cognitive_provider()
+            .ok_or_else(|| ApiError::not_available("LLM provider not configured"))?;
 
         let note = self
             .note_repo
@@ -612,13 +600,13 @@ impl AppCore {
         let note_domains = insight_context::extract_note_domains(&tags, Some(&entity_repo)).await;
 
         // Cache latest insight for both scope config and tab update
-        let latest_insight = if let Some(ref service) = self.insight_service {
+        let latest_insight = if let Some(service) = self.insight_service() {
             service.get_latest(note_id).await.ok().flatten()
         } else {
             None
         };
 
-        let (ctx_text, ctx_note_title) = if let Some(ref service) = self.insight_service {
+        let (ctx_text, ctx_note_title) = if let Some(service) = self.insight_service() {
             let scope: feature_insights::ScopeConfig = latest_insight
                 .as_ref()
                 .and_then(|l| serde_json::from_str(&l.scope_config).ok())
@@ -690,7 +678,7 @@ impl AppCore {
             }
         };
 
-        if let Some(ref service) = self.insight_service {
+        if let Some(service) = self.insight_service() {
             if let Some(ref latest) = latest_insight {
                 // Update existing insight record
                 if let Err(e) = service.update_tab(&latest.id, tab, &content).await {
@@ -741,9 +729,8 @@ impl AppCore {
         note_id: &str,
     ) -> Result<InsightEvolutionResponse, ApiError> {
         let service = self
-            .insight_service
-            .as_ref()
-            .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "Insight service not available"))?;
+            .insight_service()
+            .ok_or_else(|| ApiError::not_available("Insight service not available"))?;
 
         let note_title = self
             .note_repo
@@ -798,9 +785,8 @@ impl AppCore {
         insight_id: &str,
     ) -> Result<InsightReviewResponse, ApiError> {
         let service = self
-            .insight_service
-            .as_ref()
-            .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "Insight service not available"))?;
+            .insight_service()
+            .ok_or_else(|| ApiError::not_available("Insight service not available"))?;
 
         let row = service
             .get_version(insight_id)
@@ -817,9 +803,8 @@ impl AppCore {
         note_id: &str,
     ) -> Result<Vec<InsightVersionResponse>, ApiError> {
         let service = self
-            .insight_service
-            .as_ref()
-            .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "Insight service not available"))?;
+            .insight_service()
+            .ok_or_else(|| ApiError::not_available("Insight service not available"))?;
         let versions = service
             .list_versions(note_id)
             .await
@@ -854,7 +839,7 @@ impl AppCore {
             };
         }
 
-        let note_ids = if let Some(ref service) = self.insight_service {
+        let note_ids = if let Some(service) = self.insight_service() {
             service.resolve_scope(&params.note_id, &scope_config).await
         } else {
             self.get_related_note_ids(&params.note_id).await
@@ -928,7 +913,7 @@ impl AppCore {
             .unwrap_or_default();
 
         let (facts_count, memories_count) = if include_cognitive {
-            if let Some(ref service) = self.insight_service {
+            if let Some(service) = self.insight_service() {
                 service.cognitive_counts(&note_title, &params.note_id).await
             } else {
                 (0, 0)
@@ -939,7 +924,7 @@ impl AppCore {
 
         // Compute entity connections when deep dive is enabled
         let entity_count = if deep_dive {
-            if let Some(ref service) = self.insight_service {
+            if let Some(service) = self.insight_service() {
                 service.entity_count(&params.note_id).await
             } else {
                 0

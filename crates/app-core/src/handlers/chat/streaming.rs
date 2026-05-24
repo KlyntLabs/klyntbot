@@ -1486,8 +1486,8 @@ impl AppCore {
         let repos = self.repos.clone();
         let active_streams = Arc::clone(&self.active_streams);
         let pending_interactions = Arc::clone(&self.pending_interactions);
-        let journey_tracker = self.journey_tracker.clone();
-        let domain_event_bus = self.domain_event_bus.clone();
+        let journey_tracker = self.journey_tracker();
+        let domain_event_bus = self.domain_event_bus().ok();
         let hook_engine = self.agent.runtime().hook_engine();
 
         tokio::spawn(
@@ -1550,7 +1550,7 @@ impl AppCore {
 
         // We don't have an emitter here — emit via the domain bus if available,
         // otherwise the caller must handle UI-level reset.
-        if let Some(ref bus) = self.domain_event_bus {
+        if let Ok(bus) = self.domain_event_bus() {
             bus.publish(bus::DomainEvent::Generic {
                 kind: "thread:event".to_string(),
                 payload,

@@ -15,9 +15,7 @@ impl AppCorePlugin for LearningPlugin {
     }
 
     fn migrations(&self) -> Vec<tools_core::FeatureMigration> {
-        <feature_learning::LearningFeature as FeaturePackage>::migrations(
-            &feature_learning::LearningFeature::default(),
-        )
+        feature_learning::LearningFeature::default().migrations()
     }
 
     async fn init(&self, ctx: &mut PluginContext) -> common::Result<()> {

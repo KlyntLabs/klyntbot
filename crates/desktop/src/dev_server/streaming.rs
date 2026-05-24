@@ -252,15 +252,14 @@ pub(super) async fn cognitive_sse_handler(
     // Subscribe to domain events
     let domain_rx = state
         .core
-        .domain_event_bus
-        .as_ref()
+        .domain_event_bus()
+        .ok()
         .map(|bus| bus.subscribe());
 
     // Subscribe to pipeline events
     let pipeline_rx = state
         .core
-        .pipeline_broadcast
-        .as_ref()
+        .pipeline_broadcast()
         .map(|tx| tx.subscribe());
 
     let init = CognitiveSseState {

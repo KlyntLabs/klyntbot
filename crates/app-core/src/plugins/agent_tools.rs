@@ -3,7 +3,6 @@ use std::sync::Arc;
 
 use crate::plugin::context::PluginContext;
 use crate::plugin::AppCorePlugin;
-use crate::state::AppCore;
 
 /// Plugin that registers simple domain tools that don't depend on agent-internal
 /// services (subagent manager, conversation recall, memory retrievers, etc.).
@@ -52,7 +51,4 @@ impl AppCorePlugin for AgentToolsPlugin {
         Ok(())
     }
 
-    async fn post_init(&self, _app: &AppCore) -> common::Result<()> {
-        Ok(())
-    }
 }

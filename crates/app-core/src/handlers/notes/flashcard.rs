@@ -41,9 +41,9 @@ pub(crate) fn flashcard_to_response(r: cognitive::FlashcardRow) -> FlashcardResp
 impl AppCore {
     /// Fire-and-forget: embed flashcard rows in the background for semantic search.
     fn spawn_embed_if_available(&self, rows: Vec<cognitive::FlashcardRow>) {
-        if let (Some(engine), Some(vs)) = (self.embedding_engine.clone(), self.vector_store.clone())
+        if let (Some(engine), Some(vs)) = (self.embedding_engine(), self.vector_store())
         {
-            let repo_opt = self.flashcard_repo.clone();
+            let repo_opt = self.flashcard_repo().ok();
             tokio::spawn(async move {
                 embed_flashcard_batch(engine, &vs, &rows, repo_opt.as_ref()).await;
             });
@@ -110,7 +110,7 @@ impl AppCore {
             // Use 0.9 (desired retention) as a conservative estimate for the stored metric.
             let retention_pct = 0.9_f64;
 
-            if let Some(bus) = &self.domain_event_bus {
+            if let Ok(bus) = self.domain_event_bus() {
                 bus.publish(
                     feature_learning::LearningEvent::FlashcardReviewed {
                         atom_id: atom_id.clone(),
@@ -127,7 +127,7 @@ impl AppCore {
                 // Not meaningful here since retention_pct is a static 0.9 estimate.
             }
             // Update atom retention + touch last_interaction_ts in one DB call
-            if let Some(atom_repo) = &self.knowledge_atom_repo {
+            if let Ok(atom_repo) = self.knowledge_atom_repo() {
                 let _ = atom_repo
                     .update_retention(atom_id, retention_pct, card.stability, card.difficulty)
                     .await;
@@ -339,7 +339,7 @@ impl AppCore {
     /// - Embedding the user answer fails
     #[tracing::instrument(skip(self))]
     pub async fn compute_answer_similarity(&self, card_id: &str, user_answer: &str) -> f64 {
-        let (Some(engine), Some(vs)) = (self.embedding_engine.clone(), self.vector_store.clone())
+        let (Some(engine), Some(vs)) = (self.embedding_engine(), self.vector_store())
         else {
             return 0.0;
         };

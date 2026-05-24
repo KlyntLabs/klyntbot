@@ -178,8 +178,8 @@ impl AppCore {
         }
 
         // Fire-and-forget embedding for the new note
-        if let Some(ref handler) = self.note_embedding_handler {
-            let handler = Arc::clone(handler);
+        if let Some(handler) = self.note_embedding_handler() {
+            let handler = Arc::clone(&handler);
             let note_row = created.clone();
             let repo = self.note_repo.clone();
             tokio::spawn(async move {
@@ -252,8 +252,8 @@ impl AppCore {
         }
 
         // Fire-and-forget embedding for the updated note
-        if let Some(ref handler) = self.note_embedding_handler {
-            let handler = Arc::clone(handler);
+        if let Some(handler) = self.note_embedding_handler() {
+            let handler = Arc::clone(&handler);
             let note_row = updated.clone();
             let repo = self.note_repo.clone();
             tokio::spawn(async move {
@@ -416,7 +416,7 @@ impl AppCore {
         let keyword_notes = notes_with_tags_batch(self, &keyword_results).await?;
 
         // 2. Semantic search (only if embedding handler available)
-        let semantic_notes = if let Some(ref handler) = self.note_embedding_handler {
+        let semantic_notes = if let Some(handler) = self.note_embedding_handler() {
             match handler.embed_query(query).await {
                 Ok(query_vec) => match handler.search_similar(&query_vec, 10, 0.35).await {
                     Ok(results) => {
@@ -455,9 +455,8 @@ impl AppCore {
         use super::converters::note_row_to_list_item;
 
         let handler = self
-            .note_embedding_handler
-            .as_ref()
-            .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "semantic search not available"))?;
+            .note_embedding_handler()
+            .ok_or_else(|| ApiError::not_available("semantic search not available"))?;
 
         let query_vec = handler
             .embed_query(query)

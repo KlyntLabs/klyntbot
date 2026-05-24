@@ -315,7 +315,7 @@ impl AppCore {
         // Create KnowledgeAtom + SemanticFact only for weak units (grade ≤ A-)
         let is_weak = !is_strong_grade(&params.overall_grade);
         if is_weak {
-            if let Some(atom_repo) = &self.knowledge_atom_repo {
+            if let Ok(atom_repo) = self.knowledge_atom_repo() {
                 let domain = format!("language:{}-{}", session.source_lang, session.target_lang);
                 let topic = atom_repo
                     .get_or_create_topic(
@@ -369,7 +369,7 @@ impl AppCore {
                     let _ = sf_repo.upsert(&fact).await;
 
                     // Emit KnowledgeAtomCreated events
-                    if let Some(bus) = &self.domain_event_bus {
+                    if let Some(bus) = self.domain_event_bus().ok() {
                         for atom in &created_atom {
                             bus.publish(bus::DomainEvent::KnowledgeAtomCreated {
                                 atom_id: atom.id.clone(),
@@ -390,7 +390,7 @@ impl AppCore {
         } // end if is_weak
 
         // Emit PracticeUnitCompleted event
-        if let Some(bus) = &self.domain_event_bus {
+        if let Some(bus) = self.domain_event_bus().ok() {
             bus.publish(
                 NoteEvent::PracticeUnitCompleted {
                     session_id: session.id.clone(),
@@ -513,7 +513,7 @@ impl AppCore {
             .map_err(map_cognitive_err)?;
 
         // Emit PracticeSessionCompleted event
-        if let Some(bus) = &self.domain_event_bus {
+        if let Some(bus) = self.domain_event_bus().ok() {
             bus.publish(
                 NoteEvent::PracticeSessionCompleted {
                     session_id: session.id.clone(),
@@ -531,7 +531,7 @@ impl AppCore {
         // If save_to_sr: create flashcards for weak units (independent of bus)
         let mut flashcards_created = 0u32;
         if params.save_to_sr {
-            if let Some(flashcard_repo) = &self.flashcard_repo {
+            if let Ok(flashcard_repo) = self.flashcard_repo() {
                 let segments_vec: Vec<desktop_shared::commands::PracticeSegment> =
                     serde_json::from_str(&session.segments).unwrap_or_default();
 

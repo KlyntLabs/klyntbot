@@ -17,5 +17,5 @@ pub mod tracing_handlers;
 pub mod wake_orchestrator;
 
 pub use events::AppEventEmitter;
-pub use init::EventChannels;
+pub use init::event_channels::EventChannels;
 pub use state::{AppCore, EntityUpdate, HandlerResult};

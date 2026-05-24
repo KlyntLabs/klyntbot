@@ -25,7 +25,7 @@ impl AppCore {
         let result = engine.execute(&item_id, &kind).await?;
 
         // Best-effort publish; non-fatal if bus is absent
-        if let Some(bus) = self.domain_event_bus.as_ref() {
+        if let Some(bus) = self.domain_event_bus().ok() {
             let event = bus::DomainEvent::LauncherItemExecuted {
                 item_id,
                 kind,
@@ -42,7 +42,7 @@ impl AppCore {
     pub async fn launcher_dashboard(&self) -> Result<DashboardData, ApiError> {
         super::dashboard::build_dashboard_data(
             &self.repos,
-            self.productivity_repos.as_ref().map(|arc| arc.as_ref()),
+            self.productivity_repos().ok().as_deref(),
         )
         .await
     }

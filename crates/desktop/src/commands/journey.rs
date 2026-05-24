@@ -7,8 +7,7 @@ use crate::app_core::AppCore;
 #[klynt_command]
 pub async fn journey_milestones() -> Vec<String> {
     let tracker = state
-        .journey_tracker
-        .as_ref()
+        .journey_tracker()
         .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "Journey tracker not available"))?;
     Ok(tracker.completed_names().await)
 }
@@ -16,8 +15,7 @@ pub async fn journey_milestones() -> Vec<String> {
 #[klynt_command]
 pub async fn journey_mark_complete(milestone: String) -> () {
     let tracker = state
-        .journey_tracker
-        .as_ref()
+        .journey_tracker()
         .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "Journey tracker not available"))?;
     let m = Milestone::from_name(&milestone)
         .ok_or_else(|| ApiError::new("VALIDATION", format!("unknown milestone: {milestone}")))?;
@@ -27,7 +25,7 @@ pub async fn journey_mark_complete(milestone: String) -> () {
 
 #[klynt_command]
 pub async fn journey_item_count() -> i64 {
-    if let Some(ref tracker) = state.journey_tracker {
+    if let Some(tracker) = state.journey_tracker() {
         Ok(tracker.total_item_count().await)
     } else {
         Ok(0)
@@ -45,7 +43,7 @@ pub(crate) async fn dispatch_dev(
     use super::dev_helpers::{self as dev, try_field};
     use app_core::journey::Milestone;
 
-    let tracker = match core.journey_tracker.as_ref() {
+    let tracker = match core.journey_tracker() {
         Some(t) => t,
         None => {
             return Some(Err(ApiError::new(

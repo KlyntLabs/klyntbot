@@ -43,6 +43,9 @@ pub(super) async fn init_agent(
     active_view: Arc<tokio::sync::RwLock<Option<context_engine::ActiveView>>>,
     activity_svc: Arc<activity_log::ActivityIngestionService>,
     pipeline_broadcast_tx: tokio::sync::broadcast::Sender<cognitive::PipelineEvent>,
+    cognitive_fact_repo: Option<cognitive::SemanticFactRepo>,
+    cognitive_entity_repo: Option<cognitive::EntityRepo>,
+    cognitive_embedder: Option<Arc<dyn cognitive::SemanticFactEmbedder>>,
 ) -> Result<AgentResult, String> {
     let pipeline_tx = pipeline_broadcast_tx.clone();
     let mut builder = AgentLoop::builder(bus.clone(), provider, config.clone())
@@ -54,6 +57,15 @@ pub(super) async fn init_agent(
         .with_activity_service(Arc::clone(&activity_svc))
         .with_active_view(active_view.clone())
         .with_hot_config(hot_config);
+    if let Some(repo) = cognitive_fact_repo {
+        builder = builder.with_cognitive_fact_repo(repo);
+    }
+    if let Some(repo) = cognitive_entity_repo {
+        builder = builder.with_cognitive_entity_repo(repo);
+    }
+    if let Some(embedder) = cognitive_embedder {
+        builder = builder.with_cognitive_embedder(embedder);
+    }
 
     if let Some(engine) = embedding_engine {
         builder = builder.with_embedding_engine(engine);

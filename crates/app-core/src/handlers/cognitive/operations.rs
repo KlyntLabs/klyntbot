@@ -41,10 +41,8 @@ impl AppCore {
         &self,
         limit: Option<i64>,
     ) -> Result<Vec<cognitive::DomainEventRow>, ApiError> {
-        let repo = self
-            .event_log_repo
-            .as_ref()
-            .ok_or_else(|| ApiError::new("FEATURE_DISABLED", "event log not available"))?;
+        let repo = self.event_log_repo()
+            .ok_or_else(|| ApiError::feature_disabled("event log not available"))?;
         repo.list_recent_domain_events(limit.unwrap_or(100).min(500))
             .await
             .map_err(map_cognitive_err)
@@ -56,10 +54,8 @@ impl AppCore {
         &self,
         limit: Option<i64>,
     ) -> Result<Vec<cognitive::PipelineEventRow>, ApiError> {
-        let repo = self
-            .event_log_repo
-            .as_ref()
-            .ok_or_else(|| ApiError::new("FEATURE_DISABLED", "event log not available"))?;
+        let repo = self.event_log_repo()
+            .ok_or_else(|| ApiError::feature_disabled("event log not available"))?;
         repo.list_recent_pipeline_events(limit.unwrap_or(100).min(500))
             .await
             .map_err(map_cognitive_err)

@@ -256,7 +256,7 @@ impl AppCore {
         let fact_repo = SemanticFactRepo::new(pool.clone());
         let model = load_user_model(&fact_repo).await;
         let active_facts = model.active_fact_count();
-        let has_llm = self.cognitive_provider.is_some();
+        let has_llm = self.cognitive_provider().is_some();
 
         let components = vec![
             ComponentStatusResponse {

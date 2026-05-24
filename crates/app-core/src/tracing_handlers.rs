@@ -9,12 +9,12 @@ impl AppCore {
         &self,
         id: &str,
     ) -> Result<Arc<dyn crate::tracing::provider::TracingProvider>, ApiError> {
-        self.tracing_registry.get(id).map_err(ApiError::from)
+        self.tracing_registry().get(id).map_err(ApiError::from)
     }
 
     #[tracing::instrument(skip(self), err)]
     pub async fn tracing_list_providers(&self) -> Result<Vec<ProviderInfo>, ApiError> {
-        self.tracing_registry
+        self.tracing_registry()
             .list_providers()
             .await
             .map_err(ApiError::from)

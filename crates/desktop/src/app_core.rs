@@ -504,7 +504,7 @@ fn wire_event_channels(
     }
 
     // Voice events → Tauri "voice:event" + global SSE broadcast
-    if let Some(ref voice_service) = core.voice_service {
+    if let Ok(voice_service) = core.voice_service() {
         if let Some(mut voice_rx) = voice_service.take_event_rx() {
             let handle = app_handle.clone();
             let global_tx = global_event_tx.clone();

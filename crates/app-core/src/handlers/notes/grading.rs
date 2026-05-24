@@ -227,7 +227,7 @@ impl AppCore {
             if score < 0.6 {
                 let mut atom_id = uuid::Uuid::new_v4().to_string();
 
-                if let Some(atom_repo) = &self.knowledge_atom_repo {
+                if let Ok(atom_repo) = self.knowledge_atom_repo() {
                     let topic_id = atom_repo
                         .get_or_create_topic(&card.deck, &card.deck)
                         .await
@@ -258,7 +258,7 @@ impl AppCore {
                     }
                 }
 
-                if let Some(bus) = &self.domain_event_bus {
+                if let Some(bus) = self.domain_event_bus().ok() {
                     bus.publish(bus::DomainEvent::KnowledgeAtomCreated {
                         atom_id,
                         atom_type: "flashcard_weak_spot".to_string(),
@@ -363,7 +363,7 @@ Be concise — 2-4 sentences max."#
         let mut atom_id_for_event = uuid::Uuid::new_v4().to_string();
         let mut persisted = false;
 
-        if let Some(atom_repo) = &self.knowledge_atom_repo {
+        if let Ok(atom_repo) = self.knowledge_atom_repo() {
             let topic_id = atom_repo
                 .get_or_create_topic(&card.deck, &card.deck)
                 .await
@@ -393,7 +393,7 @@ Be concise — 2-4 sentences max."#
 
         // Always publish bus event (preserves behavior for coaching subscribers
         // even when atom_repo is None).
-        let saved = if let Some(bus) = &self.domain_event_bus {
+        let saved = if let Some(bus) = self.domain_event_bus().ok() {
             bus.publish(bus::DomainEvent::KnowledgeAtomCreated {
                 atom_id: atom_id_for_event,
                 atom_type: "socratic_exchange".to_string(),

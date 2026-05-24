@@ -1,3 +1,4 @@
+pub mod activity_log;
 pub mod agent_tools;
 pub mod ai_pipeline;
 pub mod bash_toolkit;

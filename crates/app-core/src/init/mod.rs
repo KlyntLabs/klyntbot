@@ -1,11 +1,8 @@
 mod agent;
 pub mod ai_pipeline;
 mod channels;
-pub mod coaching;
-pub mod cognitive;
+pub mod event_channels;
 pub(crate) mod cron;
-pub mod launcher;
-pub mod productivity;
 mod storage;
 
 use std::sync::Arc;
@@ -15,10 +12,11 @@ use ::channels::ChannelManager;
 use bus::MessageBus;
 use tokio::sync::{mpsc, Mutex, RwLock};
 use tokio_util::sync::CancellationToken;
-use tracing::{info, warn};
+use tracing::info;
 
 use crate::events::{AppEventEmitter, NoopEmitter};
 use crate::state::AppCore;
+use event_channels::EventChannels;
 
 /// Spawn a periodic timer that calls `f` every `interval_secs` until `token` is cancelled.
 pub(crate) fn spawn_periodic_timer(
@@ -36,19 +34,6 @@ pub(crate) fn spawn_periodic_timer(
             }
         }
     });
-}
-
-/// Bundle of receiver channels that callers wire to their transport (Tauri, SSE, etc.).
-pub struct EventChannels {
-    pub intervention_rx: mpsc::Receiver<feature_coaching::router::DeliveredIntervention>,
-    pub domain_event_bus: Arc<bus::DomainEventBus>,
-    pub pipeline_rx: tokio::sync::broadcast::Receiver<::cognitive::PipelineEvent>,
-    pub nudge_rx: Option<mpsc::Receiver<feature_productivity::types::NudgeRecord>>,
-    pub dashboard_tick_rx:
-        Option<tokio::sync::broadcast::Receiver<feature_productivity::ActivityTick>>,
-    pub dashboard_poll_interval_secs: u64,
-    pub distraction_alert_rx:
-        Option<tokio::sync::mpsc::Receiver<feature_productivity::distraction::DistractionAlert>>,
 }
 
 impl AppCore {
@@ -171,6 +156,7 @@ impl AppCore {
         let cron::CronResult {
             cron_executor,
             autotuner,
+            metric_registry: reforge_metric_registry,
         } = cron::init_cron(
             &config,
             &repos,
@@ -216,17 +202,6 @@ impl AppCore {
         // and cognitive repos are all initialized by their respective plugins.
 
         // ── Phase 3: Shared services (needed by plugins + agent) ─────────
-        // Run activity-log migrations before plugins need the service.
-        ::storage::StoragePool::run_feature_migrations(
-            storage_pool.inner(),
-            &activity_log::activity_log_migrations(),
-        )
-        .await
-        .map_err(|e| format!("activity-log migration failed: {e}"))?;
-        let activity_svc = Arc::new(activity_log::ActivityIngestionService::new(
-            storage_pool.clone(),
-            activity_log::PrivacyFilter::default(),
-        ));
         let user_situation = Arc::new(tokio::sync::Mutex::new(::cognitive::situation::UserSituation::default()));
         let active_view: Arc<tokio::sync::RwLock<Option<context_engine::ActiveView>>> =
             Arc::new(tokio::sync::RwLock::new(None));
@@ -234,7 +209,7 @@ impl AppCore {
             tokio::sync::broadcast::channel::<::cognitive::PipelineEvent>(64);
 
         let shutdown_token = CancellationToken::new();
-        let mut config = config;
+        let config = config;
         let plugin_config = Arc::new(RwLock::new(config.clone()));
         let tracing_registry = Arc::new(crate::tracing::TracingRegistry::new());
 
@@ -274,17 +249,17 @@ impl AppCore {
             domain_event_bus: Some(Arc::clone(&domain_event_bus)),
             bus: bus.clone(),
             cron_executor: cron_executor.clone(),
-            activity_svc: Some(Arc::clone(&activity_svc)),
             user_situation: Some(Arc::clone(&user_situation)),
             active_view: Some(Arc::clone(&active_view)),
-            autotuner: autotuner.clone(),
             event_emitter: event_emitter.clone(),
             notification_sender: notification_sender.clone(),
             pipeline_broadcast: Some(pipeline_broadcast_tx.clone()),
+
             shutdown_token: shutdown_token.clone(),
         };
 
-        let mut host_result = crate::plugin::host::FeatureHostBuilder::new()
+        let mut host_builder = crate::plugin::host::FeatureHostBuilder::new()
+            .plugin(crate::plugins::activity_log::ActivityLogPlugin)
             .plugin(crate::plugins::focus::FocusPlugin)
             .plugin(crate::plugins::notes::NotesPlugin)
             .plugin(crate::plugins::tasks::TasksPlugin)
@@ -305,11 +280,56 @@ impl AppCore {
             .plugin(crate::plugins::bash_toolkit::BashToolkitPlugin)
             .plugin(crate::plugins::temporal::TemporalPlugin)
             .plugin(crate::plugins::ai_pipeline::AiPipelinePlugin)
+            .with_handle(Arc::clone(&tracing_registry))
+            .with_handle(Arc::clone(&active_view))
+            .with_handle(Arc::clone(&domain_event_bus))
+            .with_handle(Arc::new(pipeline_broadcast_tx.clone()));
+        if let Some(ref cp) = cognitive_provider {
+            host_builder = host_builder.with_handle(Arc::new(cp.clone()));
+        }
+        if let Some(ref engine) = appcore_embedding_engine {
+            host_builder = host_builder.with_handle(Arc::clone(engine));
+        }
+        if let Some(ref vs) = appcore_vector_store {
+            host_builder = host_builder.with_handle(Arc::new(vs.clone()));
+        }
+        if let Some(ref orch) = autotuner {
+            host_builder = host_builder.with_handle(Arc::clone(orch));
+        }
+        // ── Start CronExecutor subscriber loop ───────────────────────────
+        // Must start before the FeatureHost is built: TemporalPlugin starts the
+        // TemporalScheduler during build() and can publish AlarmFired events on
+        // startup reconciliation. CronExecutor::start() subscribes to a broadcast
+        // bus, which does not replay events emitted before the subscription —
+        // so subscribing late would silently drop those startup cron fires.
+        let _cron_executor_handle = cron_executor.start(shutdown_token.clone());
+        info!("CronExecutor subscriber started");
+
+        let mut host_result = host_builder
             .build(&plugin_deps)
             .await
             .map_err(|e| e.to_string())?;
 
         info!("FeatureHost built");
+
+        // Fill the reforge metric-registry slot now that plugins have registered
+        // their metrics. The nightly reforge job (registered in init_cron, above)
+        // reads this slot at fire time so its feedback collector sees feature metrics.
+        let _ = reforge_metric_registry.set(host_result.build_metric_registry());
+
+        // Extract activity service from host (created by ActivityLogPlugin).
+        let activity_svc = host_result
+            .host
+            .get::<activity_log::ActivityIngestionService>()
+            .expect("ActivityLogPlugin registered first");
+
+        // Extract cognitive repos from plugins to eliminate agent-side duplication.
+        let cog_init = host_result
+            .host
+            .get::<crate::plugins::cognitive::CognitiveInitResult>();
+        let cognitive_fact_repo = cog_init.as_ref().map(|r| r.semantic_fact_repo.clone());
+        let cognitive_entity_repo = cog_init.as_ref().map(|r| r.entity_repo.clone());
+        let cognitive_embedder = cog_init.as_ref().and_then(|r| r.cognitive_fact_embedder.clone());
 
         // ── Phase 5: Agent (consumes plugin-built tool registry) ──────────
         let agent::AgentResult {
@@ -339,6 +359,9 @@ impl AppCore {
             Arc::clone(&active_view),
             Arc::clone(&activity_svc),
             pipeline_broadcast_tx.clone(),
+            cognitive_fact_repo,
+            cognitive_entity_repo,
+            cognitive_embedder,
         )
         .await?;
 
@@ -348,6 +371,7 @@ impl AppCore {
         info!("FeatureHost built");
 
         let feature_registry = Arc::new(host_result.build_feature_registry());
+        host_result.host.insert(Arc::clone(&feature_registry));
 
         // Wrap a clone of config for shared ownership in AppCore.
         // Mutations after this point are synced back to core.config manually.
@@ -377,77 +401,15 @@ impl AppCore {
             practice_repo: feature_notes::repo::PracticeSessionRepo::new(
                 storage_pool.inner().clone(),
             ),
-            productivity_repos: host_result
-                .host
-                .get::<feature_productivity::repos::ProductivityRepos>(),
-            productivity_engine: host_result
-                .host
-                .get::<Arc<tokio::sync::Mutex<feature_productivity::ProductivityEngine>>>()
-                .map(|arc| (*arc).clone()),
-            nudge_service: host_result
-                .host
-                .get::<Arc<tokio::sync::Mutex<feature_productivity::NudgeService>>>()
-                .map(|arc| (*arc).clone()),
-            domain_event_bus: Some(Arc::clone(&domain_event_bus)),
-            intervention_router: host_result
-                .host
-                .get::<tokio::sync::Mutex<feature_coaching::InterventionRouter>>(),
-            feedback_tracker: host_result
-                .host
-                .get::<tokio::sync::Mutex<feature_coaching::FeedbackTracker>>(),
-            coaching_intervention_log_repo: host_result
-                .host
-                .get::<::storage::CoachingInterventionLogRepo>(),
+
             user_situation: Some(user_situation.clone()),
-            active_view: Some(active_view),
-            coaching_service: None,
-            cognitive_provider: cognitive_provider.clone(),
-            pipeline_broadcast: Some(pipeline_broadcast_tx.clone()),
-            event_log_repo: host_result
-                .host
-                .get::<crate::plugins::cognitive::CognitiveInitResult>()
-                .and_then(|r| r.event_log_repo.clone()),
+
             consecutive_coaching_ignores: Arc::new(std::sync::atomic::AtomicI32::new(0)),
-            activity_ingestion_service: Some(Arc::clone(&activity_svc)),
             event_emitter: event_emitter.clone().unwrap_or_else(|| Arc::new(NoopEmitter)),
-            note_embedding_handler: host_result
-                .host
-                .get::<crate::plugins::notes::NotesInitResult>()
-                .and_then(|r| r.note_embedding_handler.clone()),
-            embedding_engine: appcore_embedding_engine,
-            vector_store: appcore_vector_store,
-            launcher_engine: host_result
-                .host
-                .get::<crate::handlers::launcher::LauncherSearchEngine>(),
-            insight_service: host_result
-                .host
-                .get::<feature_insights::InsightService>(),
-            flashcard_repo: host_result
-                .host
-                .get::<crate::plugins::cognitive::CognitiveInitResult>()
-                .and_then(|r| r.flashcard_repo.clone()),
-            knowledge_atom_repo: host_result
-                .host
-                .get::<crate::plugins::cognitive::CognitiveInitResult>()
-                .and_then(|r| r.knowledge_atom_repo.clone()),
-            autotuner: autotuner.clone(),
-            temporal_scheduler: host_result
-                .host
-                .get::<crate::plugins::temporal::TemporalInitResult>()
-                .as_ref()
-                .map(|r| r.scheduler.clone()),
-            mirror_facade: None,
-            pending_memory_repo: host_result
-                .host
-                .get::<::cognitive::repos::PendingMemoryRepo>()
-                .map(|arc| (*arc).clone()),
-            notification_dispatcher_handle: None,
-            voice_service: None,
-            voice_conversation_manager: None,
-            brain_voice: None,
-            journey_tracker: None,
-            feature_registry: feature_registry.clone(),
-            tracing_registry,
+
+
+
+
             host: host_result.host.clone(),
             assistant_runtime: std::sync::OnceLock::new(),
         };
@@ -459,50 +421,16 @@ impl AppCore {
         let mirror_result = host_result
             .host
             .get::<crate::plugins::mirror::MirrorInitResult>();
-        let mirror_facade = mirror_result
-            .as_ref()
-            .map(|r| Arc::clone(&r.facade));
-        let _mirror_consumers = mirror_result
-            .as_ref()
-            .map(|r| r.consumers.clone())
-            .unwrap_or_default();
-        let mirror_flush_handles = mirror_result
-            .as_ref()
-            .and_then(|r| r.flush_handles.lock().unwrap().take());
         let mirror_shutdown = mirror_result
             .as_ref()
             .map(|r| r.shutdown.clone());
 
-        core.mirror_facade = mirror_facade.clone();
         // Store mirror shutdown token in FeatureHost for shutdown() to find.
         if let Some(token) = mirror_shutdown {
             core.host.insert(Arc::new(token));
         }
 
-        // Retrieve journey tracker and BrainVoice from FeatureHost.
-        let journey_tracker = host_result
-            .host
-            .get::<crate::journey::JourneyTracker>()
-            .map(|arc| (*arc).clone());
-        core.journey_tracker = journey_tracker;
-
-        let brain_voice = host_result
-            .host
-            .get::<crate::brain_voice::BrainVoice>();
-        core.brain_voice = brain_voice;
-
         // ── Notification Dispatcher (populated by NotificationPlugin) ─────
-        let notification_dispatcher_handle = host_result
-            .host
-            .get::<crate::plugins::notifications::NotificationInitResult>()
-            .and_then(|r| r.dispatcher_handle.lock().unwrap().take());
-        core.notification_dispatcher_handle = notification_dispatcher_handle;
-
-        // ── Start CronExecutor subscriber loop ───────────────────────────
-        // Must start before AppCore is assembled so the executor can process
-        // AlarmFired events from TemporalScheduler immediately after startup.
-        let _cron_executor_handle = cron_executor.start(shutdown_token.clone());
-        info!("CronExecutor subscriber started");
 
 
         // ── Phase 9: AI Pipeline — SignalRouter + all consumers ───────────
@@ -512,46 +440,17 @@ impl AppCore {
         );
 
         // ── Voice service (populated by VoicePlugin) ────────────────────
-        if let Some(voice_result) = host_result.host.get::<crate::plugins::voice::VoiceInitResult>() {
-            core.voice_service = voice_result.voice_service.clone();
-            core.voice_conversation_manager = voice_result.voice_conversation_manager.clone();
-        }
+
 
         // Spawn background services (agent loop + channel manager).
         spawn_background(inbound_rx, channel_manager, &agent, &shutdown_token);
 
         let pipeline_rx = core
-            .pipeline_broadcast
-            .as_ref()
+            .pipeline_broadcast()
             .expect("pipeline broadcast initialized above")
             .subscribe();
 
-        let prod_bundle = host_result
-            .host
-            .get::<crate::plugins::productivity::ProductivityInitResult>();
-
-        let channels = EventChannels {
-            intervention_rx: host_result
-                .host
-                .get::<crate::plugins::coaching::CoachingInitResult>()
-                .and_then(|b| b.intervention_rx.lock().unwrap().take())
-                .expect("coaching plugin always provides intervention_rx"),
-            domain_event_bus,
-            pipeline_rx,
-            nudge_rx: prod_bundle
-                .as_ref()
-                .and_then(|b| b.nudge_rx.lock().unwrap().take()),
-            dashboard_tick_rx: prod_bundle
-                .as_ref()
-                .and_then(|b| b.dashboard_tick_rx.lock().unwrap().take()),
-            dashboard_poll_interval_secs: prod_bundle
-                .as_ref()
-                .map(|b| b.dashboard_poll_interval_secs)
-                .unwrap_or(60),
-            distraction_alert_rx: prod_bundle
-                .as_ref()
-                .and_then(|b| b.distraction_alert_rx.lock().unwrap().take()),
-        };
+        let channels = event_channels::build(&host_result.host, domain_event_bus, pipeline_rx);
 
         Ok((core, channels))
     }

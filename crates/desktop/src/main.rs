@@ -436,7 +436,7 @@ fn run_desktop_app() {
                 });
                 tracing::info!(
                     "Voice hotkey setup: service_available={}, hotkey={voice_hotkey}",
-                    core_ref.voice_service.is_some()
+                    core_ref.voice_service().is_ok()
                 );
                 // Always register the hotkey — the handler gracefully errors if voice isn't ready.
                 {

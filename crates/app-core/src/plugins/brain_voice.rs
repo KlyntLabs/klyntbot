@@ -3,7 +3,6 @@ use std::sync::Arc;
 
 use crate::plugin::context::PluginContext;
 use crate::plugin::AppCorePlugin;
-use crate::state::AppCore;
 
 /// Plugin wrapper for the BrainVoice signal router.
 pub struct BrainVoicePlugin;
@@ -45,7 +44,4 @@ impl AppCorePlugin for BrainVoicePlugin {
         Ok(())
     }
 
-    async fn post_init(&self, _app: &AppCore) -> common::Result<()> {
-        Ok(())
-    }
 }

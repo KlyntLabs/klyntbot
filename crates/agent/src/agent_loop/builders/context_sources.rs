@@ -41,6 +41,8 @@ pub(crate) async fn build_context_sources(
     embedding_engine: &Arc<tools::EmbeddingEngine>,
     skill_store: &Arc<tokio::sync::RwLock<skill_system::SkillStore>>,
     mut pre_registered_sources: Vec<Box<dyn ContextSource>>,
+    shared_fact_repo: Option<cognitive::SemanticFactRepo>,
+    shared_embedder: Option<Arc<dyn cognitive::SemanticFactEmbedder>>,
 ) -> common::Result<ContextSourcesResult> {
     let confidence_bits = Arc::new(std::sync::atomic::AtomicU32::new(
         config.confidence.threshold.to_bits(),
@@ -81,34 +83,22 @@ pub(crate) async fn build_context_sources(
     let cognitive_bg_service: Option<
         cognitive::background::BackgroundConsolidationService,
     > = if let Some(ref pool) = pool {
-        // Run cognitive feature migrations (idempotent)
-        storage::StoragePool::run_feature_migrations(
-            pool,
-            &cognitive::cognitive_migrations(),
-        )
-        .await
-        .map_err(|e| {
-            common::KlyntbotError::Config(common::ConfigError::Invalid(format!(
-                "Failed to run cognitive migrations: {}",
-                e
-            )))
-        })?;
-
-        let fact_repo = cognitive::SemanticFactRepo::new(pool.clone());
+        // Use shared repos from app-core plugins when available (eliminates duplication).
+        let fact_repo = shared_fact_repo.unwrap_or_else(|| cognitive::SemanticFactRepo::new(pool.clone()));
         let rule_repo = cognitive::ProceduralRuleRepo::new(pool.clone());
 
-        // Create SemanticFactEmbedder if embedding engine + vector store available
+        // Use shared embedder from app-core plugins when available.
         let cognitive_embedder_local: Option<Arc<dyn cognitive::SemanticFactEmbedder>> =
-            if let Some(ref vs) = vector_store {
-                Some(Arc::new(
-                    crate::adapters::cognitive_embedder::SemanticFactEmbedderImpl::new(
-                        Arc::clone(embedding_engine),
-                        vs.clone(),
-                    ),
-                ))
-            } else {
-                None
-            };
+            shared_embedder.or_else(|| {
+                vector_store.as_ref().map(|vs| {
+                    Arc::new(
+                        crate::adapters::cognitive_embedder::SemanticFactEmbedderImpl::new(
+                            Arc::clone(embedding_engine),
+                            vs.clone(),
+                        ),
+                    ) as Arc<dyn cognitive::SemanticFactEmbedder>
+                })
+            });
 
         // Build retrieval config from app config
         let retrieval_config = cognitive::CognitiveRetrievalConfig {

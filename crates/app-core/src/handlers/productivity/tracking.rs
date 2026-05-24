@@ -277,7 +277,7 @@ impl AppCore {
     ) -> Result<Vec<InsightCardResponse>, ApiError> {
         let repos = self.productivity_repos()?;
         let date = date.unwrap_or_else(|| jiff::Timestamp::now().strftime("%Y-%m-%d").to_string());
-        let engine = feature_productivity::insights::InsightEngine::new(repos.clone());
+        let engine = feature_productivity::insights::InsightEngine::new((*repos).clone());
         // Generate any missing insights (idempotent)
         let _ = engine
             .generate_for_date(&date)
@@ -347,7 +347,7 @@ impl AppCore {
     /// Refresh the in-memory categorizer from DB so the background tracker
     /// picks up category changes immediately.
     async fn refresh_categorizer(&self, repo: &feature_productivity::repos::ActivityCategoryRepo) {
-        if let Some(ref engine) = self.productivity_engine {
+        if let Some(engine) = self.host.get::<tokio::sync::Mutex<feature_productivity::ProductivityEngine>>() {
             let engine = engine.lock().await;
             let mut categorizer = engine.categorizer().write().await;
             if let Err(e) = categorizer.refresh(repo).await {

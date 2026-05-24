@@ -14,6 +14,8 @@ pub struct CognitiveInitResult {
     pub deck_preference_repo: Option<::cognitive::DeckPreferenceRepo>,
     pub event_log_repo: Option<::cognitive::EventLogRepo>,
     pub cognitive_fact_embedder: Option<Arc<dyn ::cognitive::SemanticFactEmbedder>>,
+    pub semantic_fact_repo: ::cognitive::SemanticFactRepo,
+    pub entity_repo: ::cognitive::EntityRepo,
 }
 
 /// Plugin wrapper for the `cognitive` crate.
@@ -55,21 +57,16 @@ impl AppCorePlugin for CognitivePlugin {
         }
         ctx.insert_handle(Arc::new(repo));
 
-        let pool = ctx.deps.storage_pool.inner().clone();
+        let pool = ctx.deps.pool();
 
         let cognitive_fact_embedder: Option<Arc<dyn ::cognitive::SemanticFactEmbedder>> =
-            if let (Some(ref engine), Some(ref vs)) =
-                (&ctx.deps.embedding_engine, &ctx.deps.vector_store)
-            {
-                Some(Arc::new(
+            ctx.with_embedding(|engine, vs| {
+                Arc::new(
                     ::agent::adapters::cognitive_embedder::SemanticFactEmbedderImpl::new(
-                        Arc::clone(engine),
-                        vs.clone(),
+                        engine, vs,
                     ),
-                ) as Arc<dyn ::cognitive::SemanticFactEmbedder>)
-            } else {
-                None
-            };
+                ) as Arc<dyn ::cognitive::SemanticFactEmbedder>
+            });
 
         // Register annotate tool
         ctx.register_tool(tools::AnnotateTool::new(::cognitive::AnnotationRepo::new(
@@ -83,6 +80,8 @@ impl AppCorePlugin for CognitivePlugin {
             deck_preference_repo: Some(::cognitive::DeckPreferenceRepo::new(pool.clone())),
             event_log_repo: Some(::cognitive::EventLogRepo::new(pool.clone())),
             cognitive_fact_embedder,
+            semantic_fact_repo: ::cognitive::SemanticFactRepo::new(pool.clone()),
+            entity_repo: ::cognitive::EntityRepo::new(pool.clone()),
         }));
         Ok(())
     }
@@ -91,37 +90,38 @@ impl AppCorePlugin for CognitivePlugin {
         // Run cognitive init (skill seeding, ingestion token, file watcher, work context).
         {
             let mut config = app.config.write().await;
-            crate::init::cognitive::init_cognitive(
+            self::init::init_cognitive(
                 &mut *config,
                 &app.storage_pool,
-                app.activity_ingestion_service
-                    .as_ref()
+                &app.activity_ingestion_service()
                     .expect("activity svc available"),
                 &app.shutdown_token,
-                app.embedding_engine
-                    .as_ref()
-                    .expect("embedding engine available")
-                    .clone(),
+                app.embedding_engine().expect("embedding engine available"),
             )
             .await;
         }
 
-        let (Some(ref domain_event_bus), Some(ref activity_svc)) =
-            (&app.domain_event_bus, &app.activity_ingestion_service)
-        else {
+        let Ok(domain_event_bus) = app.domain_event_bus() else {
             tracing::warn!("cognitive plugin: missing deps for post-core services, skipping");
             return Ok(());
         };
-        crate::init::cognitive::spawn_post_core_services(
+        let activity_svc = match app.activity_ingestion_service() {
+            Ok(svc) => svc,
+            Err(_) => {
+                tracing::warn!("cognitive plugin: missing deps for post-core services, skipping");
+                return Ok(());
+            }
+        };
+        self::init::spawn_post_core_services(
             app,
-            domain_event_bus,
-            Arc::clone(activity_svc),
+            &domain_event_bus,
+            Arc::clone(&activity_svc),
             &app.shutdown_token,
         );
 
         // ── Register insight progress refresh cron ────────────────────────
-        if let Some(ref insight_svc) = app.insight_service {
-            let svc = Arc::clone(insight_svc);
+        if let Some(insight_svc) = app.insight_service() {
+            let svc = Arc::clone(&insight_svc);
             let note_repo = app.note_repo.clone();
             let rt = tokio::runtime::Handle::current();
             app.cron_executor.register(
@@ -145,7 +145,7 @@ impl AppCorePlugin for CognitivePlugin {
         // ── Register nightly cross-domain batch cron ──────────────────────
         {
             let pool = app.storage_pool.clone();
-            let nightly_provider = app.cognitive_provider.clone();
+            let nightly_provider = app.cognitive_provider();
             let nightly_model = {
                 let cfg = app.config.read().await;
                 cfg.cognitive
@@ -175,4 +175,296 @@ impl AppCorePlugin for CognitivePlugin {
 
         Ok(())
     }
+}
+
+mod init {
+use std::sync::Arc;
+
+use bus::DomainEventBus;
+use storage::StoragePool;
+use tokio_util::sync::CancellationToken;
+use tracing::{info, warn};
+
+use crate::state::AppCore;
+
+/// Initialize cognitive event log, pipeline, domain bus wiring, and ActivityIngestionService.
+///
+/// Also handles capture config (ingestion token, file watcher) and work context inference.
+pub(crate) async fn init_cognitive(
+    config: &mut config::Config,
+    storage_pool: &StoragePool,
+    activity_svc: &Arc<activity_log::ActivityIngestionService>,
+    shutdown_token: &CancellationToken,
+    embedding_engine: Arc<tools::EmbeddingEngine>,
+) {
+    // Seed compiled default skills to disk on first run (skills dir empty).
+    // Records v1 in skill_versions for each seeded file so the Reforge cycle
+    // can detect user edits against the known baseline.
+    {
+        let skills_dir = config.data_dir_path().join("skills");
+        let skill_mgr =
+            cognitive::services::reforge::skill_files::SkillFileManager::new(skills_dir);
+        let defaults = skill_system::compiled_skill_defaults();
+        match skill_mgr.seed_if_empty(&defaults) {
+            Ok(0) => {
+                // Already seeded on a previous run — nothing to do.
+            }
+            Ok(seeded) => {
+                info!("Seeded {seeded} skills to disk");
+                // Record v1 versions for all seeded files so detect_user_edits
+                // has a baseline to diff against.
+                let version_repo =
+                    storage::repos::SkillVersionRepo::new(storage_pool.inner().clone());
+                let all_files = skill_mgr.read_all();
+                for (skill_name, files) in &all_files {
+                    for file in files {
+                        let row = storage::rows::SkillVersionRow {
+                            id: uuid::Uuid::new_v4().to_string(),
+                            skill_name: skill_name.clone(),
+                            version: 1,
+                            file_path: file.file_path.clone(),
+                            content: file.content.clone(),
+                            diff: None,
+                            source: "Seed".to_string(),
+                            reason: Some("Initial skill from compiled defaults".to_string()),
+                            created_at: jiff::Timestamp::now().to_string(),
+                        };
+                        if let Err(e) = version_repo.insert(&row).await {
+                            warn!(
+                                "Failed to record seed version for {}/{}: {e}",
+                                skill_name, file.file_path
+                            );
+                        }
+                    }
+                }
+            }
+            Err(e) => {
+                warn!("Failed to seed skills to disk: {e}");
+            }
+        }
+    }
+
+    // Phase 3: Auto-generate ingestion token on first startup if missing.
+    if config.capture.ingestion_api.enabled && config.capture.ingestion_api.token.is_none() {
+        config.capture.ingestion_api.token = Some(uuid::Uuid::new_v4().to_string());
+        if let Err(e) = config::save(config).await {
+            warn!("Failed to save auto-generated ingestion token: {e}");
+        } else {
+            info!("auto-generated ingestion API token");
+        }
+    }
+
+    // Phase 3: Start file watcher if enabled.
+    if config.capture.file_watcher.enabled {
+        let dirs: Vec<std::path::PathBuf> = config
+            .capture
+            .file_watcher
+            .directories
+            .iter()
+            .map(std::path::PathBuf::from)
+            .collect();
+        if !dirs.is_empty() {
+            let fw = crate::infrastructure::file_watcher::FileWatcherService::new(
+                dirs,
+                Arc::clone(activity_svc),
+                config.capture.file_watcher.ignore_patterns.clone(),
+                config.capture.file_watcher.debounce_ms,
+            );
+            let _fw_handle = fw.start(shutdown_token.child_token());
+            info!("file watcher started");
+        }
+    }
+
+    // Phase 2: Start Work Context inference engine + loop.
+    if config.work_context.enabled {
+        let inference_cfg =
+            activity_log::inference::ContextInferenceConfig::from_work_context_config(
+                &config.work_context,
+            );
+        let text_embedder = Arc::new(agent::TextEmbedderImpl::new(embedding_engine.clone()));
+        let inference_engine = Arc::new(activity_log::inference::ContextInferenceEngine::new(
+            storage_pool.clone(),
+            text_embedder,
+            None, // VectorStore already consumed by agent builder; centroids cached in-memory
+            inference_cfg,
+        ));
+        let dormancy_days = config.work_context.max_dormancy_days as i64;
+        let _inference_loop = activity_log::inference_loop::ContextInferenceLoop::start(
+            inference_engine,
+            storage_pool.clone(),
+            config.work_context.inference_interval_mins,
+            dormancy_days,
+            shutdown_token.child_token(),
+        );
+        info!("work context inference loop started");
+    }
+}
+
+/// Spawn post-core background services: activity subscriber, analytics retention, event log persistence.
+pub fn spawn_post_core_services(
+    core: &AppCore,
+    domain_event_bus: &Arc<DomainEventBus>,
+    _activity_svc: Arc<activity_log::ActivityIngestionService>,
+    shutdown_token: &CancellationToken,
+) {
+    // Activity-log normalization is now handled by NormalizerSignalConsumer
+    // registered with the SignalRouter in init/mod.rs (Phase 9).
+    // The legacy ActivityLogSubscriber bus subscription has been removed.
+
+    // Analytics retention cleanup + semantic fact pruning is handled by CronService
+    // (registered in init/cron.rs as __klyntbot_analytics_cleanup).
+
+    // Start atom extraction service (auto-extract concepts from notes).
+    if let Some(provider) = core.cognitive_provider() {
+        // try_read() is fine here — config lock is uncontested during init
+        if let Ok(config) = core.config.try_read() {
+            let extraction_config = config.cognitive.atom_extraction.clone();
+            drop(config);
+            if extraction_config.enabled {
+                let pool = core.storage_pool.inner().clone();
+                let bus = Arc::clone(domain_event_bus);
+                let token = shutdown_token.child_token();
+                cognitive::services::atom_extraction::AtomExtractionService::start(
+                    pool,
+                    provider.clone(),
+                    bus,
+                    extraction_config,
+                    token,
+                );
+                info!("atom extraction service started");
+            }
+        }
+    }
+
+    // Spawn event log persistence — writes domain & pipeline events to DB.
+    if let Some(event_log_repo) = core.event_log_repo() {
+        spawn_event_log_persistence(
+            event_log_repo.clone(),
+            &core.domain_event_bus().expect("initialized above"),
+            &core.pipeline_broadcast().expect("initialized above"),
+            shutdown_token,
+        );
+    }
+}
+
+/// Spawn background tasks that persist domain events and pipeline events to the DB.
+fn spawn_event_log_persistence(
+    repo: cognitive::EventLogRepo,
+    domain_bus: &Arc<DomainEventBus>,
+    pipeline_tx: &tokio::sync::broadcast::Sender<cognitive::PipelineEvent>,
+    shutdown: &CancellationToken,
+) {
+    // Domain events → domain_event_log
+    {
+        let repo = repo.clone();
+        let mut rx = domain_bus.subscribe();
+        let token = shutdown.clone();
+        tokio::spawn(async move {
+            loop {
+                tokio::select! {
+                    _ = token.cancelled() => break,
+                    result = rx.recv() => {
+                        match result {
+                            Ok(event) => {
+                                let domain = event.domain();
+                                let event_type = event.variant_name().to_string();
+                                let payload = serde_json::to_string(&event)
+                                    .unwrap_or_else(|e| {
+                                        tracing::warn!(error = %e, "serialize DomainEvent for event log failed");
+                                        format!("{{\"_kind\":{:?}}}", event_type)
+                                    });
+                                let ts = jiff::Timestamp::now().to_string();
+                                let id = uuid::Uuid::new_v4().to_string();
+
+                                if let Err(e) = repo
+                                    .insert_domain_event(&id, &event_type, &domain, "extract", &payload, &ts)
+                                    .await
+                                {
+                                    warn!("failed to persist domain event: {e}");
+                                }
+                            }
+                            Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                                warn!("event log persistence lagged by {n} domain events");
+                            }
+                            Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // Pipeline events → pipeline_event_log
+    {
+        let repo = repo.clone();
+        let mut rx = pipeline_tx.subscribe();
+        let token = shutdown.clone();
+        tokio::spawn(async move {
+            loop {
+                tokio::select! {
+                    _ = token.cancelled() => break,
+                    result = rx.recv() => {
+                        match result {
+                            Ok(pe) => {
+                                let ts = jiff::Timestamp::now().to_string();
+                                let id = uuid::Uuid::new_v4().to_string();
+
+                                let result = match &pe {
+                                    cognitive::PipelineEvent::Extraction {
+                                        observation,
+                                        facts_extracted,
+                                        ..
+                                    } => {
+                                        repo.insert_pipeline_event(
+                                            &cognitive::PipelineEventRecord {
+                                                id: &id,
+                                                event_kind: "extraction",
+                                                observation: Some(observation.as_str()),
+                                                facts_extracted: Some(*facts_extracted as i64),
+                                                operation: None,
+                                                fact_triple: None,
+                                                timestamp: &ts,
+                                            },
+                                        )
+                                        .await
+                                    }
+                                    cognitive::PipelineEvent::Consolidation {
+                                        operation,
+                                        fact,
+                                        ..
+                                    } => {
+                                        repo.insert_pipeline_event(
+                                            &cognitive::PipelineEventRecord {
+                                                id: &id,
+                                                event_kind: "consolidation",
+                                                observation: None,
+                                                facts_extracted: None,
+                                                operation: Some(operation.as_str()),
+                                                fact_triple: Some(fact.as_str()),
+                                                timestamp: &ts,
+                                            },
+                                        )
+                                        .await
+                                    }
+                                    _ => {
+                                        // BatchStarted, DeadLetterQueued, DeadLetterReprocessed — log but don't persist
+                                        continue;
+                                    }
+                                };
+
+                                if let Err(e) = result {
+                                    warn!("failed to persist pipeline event: {e}");
+                                }
+                            }
+                            Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                                warn!("event log persistence lagged by {n} pipeline events");
+                            }
+                            Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+                        }
+                    }
+                }
+            }
+        });
+    }
+}
 }

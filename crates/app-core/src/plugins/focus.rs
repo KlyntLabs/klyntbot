@@ -39,15 +39,13 @@ impl AppCorePlugin for FocusPlugin {
     }
 
     fn migrations(&self) -> Vec<tools_core::FeatureMigration> {
-        <feature_focus::FocusFeature as FeaturePackage>::migrations(&feature_focus::FocusFeature)
+        feature_focus::FocusFeature.migrations()
     }
 
     async fn init(&self, ctx: &mut PluginContext) -> common::Result<()> {
-        let fire_store = scheduling::temporal::fire_store::FireStore::new(
-            ctx.deps.repos.scheduled_fires.clone(),
-        );
+        let fire_store = ctx.deps.fire_store();
         let alarm_bridge = Arc::new(feature_focus::alarm_bridge::TemporalAlarmBridge::new(
-            fire_store,
+            Arc::try_unwrap(fire_store).unwrap_or_else(|arc| (*arc).clone()),
         ));
 
         #[cfg(target_os = "macos")]
@@ -57,7 +55,7 @@ impl AppCorePlugin for FocusPlugin {
         #[cfg(not(target_os = "macos"))]
         let focus_bridge: Arc<dyn feature_focus::FocusBridge> = Arc::new(NoopFocusBridge);
 
-        let repo = feature_focus::FocusSessionRepo::new(ctx.deps.storage_pool.inner().clone());
+        let repo = feature_focus::FocusSessionRepo::new(ctx.deps.pool());
         let manager = Arc::new(feature_focus::DndManager::new(repo, alarm_bridge, focus_bridge));
 
         if let Some(ref bus) = ctx.deps.domain_event_bus {

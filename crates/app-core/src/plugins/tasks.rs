@@ -27,7 +27,7 @@ impl AppCorePlugin for TasksPlugin {
             ai_core::RecallDomain::Tasks,
         );
 
-        let pool = ctx.deps.storage_pool.inner().clone();
+        let pool = ctx.deps.pool();
         let config = ctx.deps.config.read().await;
 
         // ── Task tool ────────────────────────────────────────────────────
@@ -74,12 +74,10 @@ impl AppCorePlugin for TasksPlugin {
         }
 
         // Wire alarm writer
-        {
-            let fire_store = Arc::new(scheduling::temporal::fire_store::FireStore::new(
-                ctx.deps.repos.scheduled_fires.clone(),
-            ));
-            task_tool = task_tool.with_alarm_writer(ctx.deps.repos.task_alarms.clone(), fire_store);
-        }
+        task_tool = task_tool.with_alarm_writer(
+            ctx.deps.repos.task_alarms.clone(),
+            ctx.deps.fire_store(),
+        );
 
         ctx.register_tool(task_tool);
 
@@ -100,9 +98,7 @@ impl AppCorePlugin for TasksPlugin {
         };
 
         // Focus alarms — materializes warning + expire alarms into scheduled_fires.
-        let fire_store = Arc::new(scheduling::temporal::fire_store::FireStore::new(
-            ctx.deps.repos.scheduled_fires.clone(),
-        ));
+        let fire_store = ctx.deps.fire_store();
         let _focus_alarms_handle = feature_tasks::focus_alarms::spawn(
             Arc::clone(domain_bus),
             fire_store,

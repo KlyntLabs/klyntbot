@@ -73,7 +73,7 @@ impl AppCore {
 
             let (corrections_7d, trials_7d, promoted_7d, total_messages) = tokio::join!(
                 async {
-                    match &self.event_log_repo {
+                    match self.event_log_repo() {
                         Some(repo) => repo
                             .count_by_event_type(
                                 bus::DomainEvent::KIND_USER_CORRECTED_AI,
@@ -196,10 +196,7 @@ impl AppCore {
             orch.update_champion(prev_champion).await;
             Ok(orch.champion_summary().await)
         } else {
-            Err(ApiError::new(
-                "FEATURE_DISABLED",
-                "AutoTuner is not enabled",
-            ))
+            Err(ApiError::feature_disabled("AutoTuner is not enabled"))
         }
     }
 
@@ -215,10 +212,7 @@ impl AppCore {
             info!("autotuner paused");
             Ok(())
         } else {
-            Err(ApiError::new(
-                "FEATURE_DISABLED",
-                "AutoTuner is not enabled",
-            ))
+            Err(ApiError::feature_disabled("AutoTuner is not enabled"))
         }
     }
 
@@ -234,10 +228,7 @@ impl AppCore {
             info!("autotuner resumed");
             Ok(())
         } else {
-            Err(ApiError::new(
-                "FEATURE_DISABLED",
-                "AutoTuner is not enabled",
-            ))
+            Err(ApiError::feature_disabled("AutoTuner is not enabled"))
         }
     }
 
@@ -245,7 +236,7 @@ impl AppCore {
     pub async fn autotuner_get_toast_count(&self) -> Result<i64, ApiError> {
         let orch = self
             .autotuner_orchestrator()
-            .ok_or_else(|| ApiError::new("FEATURE_DISABLED", "AutoTuner is not enabled"))?;
+            .ok_or_else(|| ApiError::feature_disabled("AutoTuner is not enabled"))?;
         let count = match orch.learning_state_repo().get_value(TOAST_COUNT_KEY).await {
             Ok(Some(val)) => val.as_i64().unwrap_or(0),
             _ => 0,
@@ -257,7 +248,7 @@ impl AppCore {
     pub async fn autotuner_increment_toast_count(&self) -> Result<i64, ApiError> {
         let orch = self
             .autotuner_orchestrator()
-            .ok_or_else(|| ApiError::new("FEATURE_DISABLED", "AutoTuner is not enabled"))?;
+            .ok_or_else(|| ApiError::feature_disabled("AutoTuner is not enabled"))?;
         let current = match orch.learning_state_repo().get_value(TOAST_COUNT_KEY).await {
             Ok(Some(val)) => val.as_i64().unwrap_or(0),
             _ => 0,
@@ -282,7 +273,7 @@ impl AppCore {
     pub async fn autotuner_set_pace(&self, pace: &str) -> Result<(), ApiError> {
         let orch = self
             .autotuner_orchestrator()
-            .ok_or_else(|| ApiError::new("FEATURE_DISABLED", "AutoTuner is not enabled"))?;
+            .ok_or_else(|| ApiError::feature_disabled("AutoTuner is not enabled"))?;
         match pace {
             "conservative" | "balanced" | "bold" => {}
             _ => {

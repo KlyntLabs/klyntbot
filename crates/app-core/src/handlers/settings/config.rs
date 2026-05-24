@@ -99,7 +99,7 @@ impl AppCore {
         config::save(&cfg).await.map_err(map_config_save_err)?;
 
         // Wire: SetupComplete journey milestone
-        if let Some(ref tracker) = self.journey_tracker {
+        if let Some(tracker) = self.journey_tracker() {
             if !tracker
                 .is_complete(crate::journey::Milestone::SetupComplete)
                 .await

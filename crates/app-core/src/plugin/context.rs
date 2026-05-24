@@ -28,14 +28,33 @@ pub struct PluginDeps {
     pub domain_event_bus: Option<Arc<bus::DomainEventBus>>,
     pub bus: Arc<MessageBus>,
     pub cron_executor: Arc<CronExecutor>,
-    pub activity_svc: Option<Arc<activity_log::ActivityIngestionService>>,
     pub user_situation: Option<Arc<tokio::sync::Mutex<cognitive::situation::UserSituation>>>,
     pub active_view: Option<Arc<tokio::sync::RwLock<Option<context_engine::ActiveView>>>>,
-    pub autotuner: Option<Arc<agent::autotuner::AutoTunerOrchestrator>>,
     pub event_emitter: Option<Arc<dyn crate::events::AppEventEmitter>>,
     pub notification_sender: Option<Arc<dyn common::NotificationSender>>,
     pub pipeline_broadcast: Option<tokio::sync::broadcast::Sender<::cognitive::PipelineEvent>>,
     pub shutdown_token: CancellationToken,
+}
+
+impl PluginDeps {
+    /// Clone the inner SQLite pool.
+    pub fn pool(&self) -> sqlx::SqlitePool {
+        self.storage_pool.inner().clone()
+    }
+
+    /// Build a FireStore from the repos.
+    pub fn fire_store(&self) -> Arc<scheduling::temporal::fire_store::FireStore> {
+        Arc::new(scheduling::temporal::fire_store::FireStore::new(
+            self.repos.scheduled_fires.clone(),
+        ))
+    }
+
+    /// Return the event emitter, or a NoopEmitter if none is configured.
+    pub fn event_emitter_or_noop(&self) -> Arc<dyn crate::events::AppEventEmitter> {
+        self.event_emitter
+            .clone()
+            .unwrap_or_else(|| Arc::new(crate::events::NoopEmitter))
+    }
 }
 
 /// Event translator: converts a `DomainEvent` into an optional `AiSignal`.
@@ -166,5 +185,44 @@ impl<'a> PluginContext<'a> {
     /// Insert a typed handle into the host for cross-plugin retrieval.
     pub fn insert_handle<T: Send + Sync + 'static>(&mut self, handle: Arc<T>) {
         self.host.insert(handle);
+    }
+
+    /// Insert a typed handle if the Option is Some.
+    pub fn insert_handle_opt<T: Send + Sync + 'static>(&mut self, opt: &Option<Arc<T>>) {
+        if let Some(h) = opt {
+            self.host.insert(Arc::clone(h));
+        }
+    }
+
+    /// Require the domain event bus or return an error.
+    pub fn require_domain_bus(&self) -> common::Result<Arc<bus::DomainEventBus>> {
+        self.deps.domain_event_bus.clone().ok_or_else(|| {
+            common::KlyntbotError::Storage("no domain event bus".into())
+        })
+    }
+
+    /// Require the activity ingestion service or return an error.
+    pub fn require_activity_svc(&self) -> common::Result<Arc<activity_log::ActivityIngestionService>> {
+        self.host
+            .get::<activity_log::ActivityIngestionService>()
+            .ok_or_else(|| {
+                common::KlyntbotError::Storage(
+                    "activity_log plugin not registered or did not initialize".into(),
+                )
+            })
+    }
+
+    /// Require the user situation or return an error.
+    pub fn require_user_situation(&self) -> common::Result<Arc<tokio::sync::Mutex<cognitive::situation::UserSituation>>> {
+        self.deps.user_situation.clone().ok_or_else(|| {
+            common::KlyntbotError::Storage("no user situation".into())
+        })
+    }
+
+    /// Call a closure with the embedding engine and vector store if both are available.
+    pub fn with_embedding<T>(&self, f: impl Fn(Arc<EmbeddingEngine>, VectorStore) -> T) -> Option<T> {
+        let engine = self.deps.embedding_engine.as_ref()?;
+        let vs = self.deps.vector_store.as_ref()?;
+        Some(f(Arc::clone(engine), vs.clone()))
     }
 }

@@ -18,7 +18,7 @@ impl AppCore {
         let mut scores: HashMap<String, (f64, Vec<String>)> = HashMap::new();
 
         // 1. Semantic similarity (weight 0.4)
-        if let Some(ref handler) = self.note_embedding_handler {
+        if let Some(handler) = self.note_embedding_handler() {
             if let Ok(Some(note)) = self.note_repo.get_note(note_id).await {
                 let text = format!("{} {}", note.title, note.body);
                 if let Ok(query_vec) = handler.embed_query(&text).await {

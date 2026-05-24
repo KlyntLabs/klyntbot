@@ -102,8 +102,8 @@ impl AppCore {
         let manager = self.voice_conversation_manager()?;
         let state = manager.state.lock().await;
         let engine_kind = self
-            .voice_service
-            .as_ref()
+            .voice_service()
+            .ok()
             .and_then(|svc| svc.engine_kind())
             .map(|e| format!("{e:?}").to_lowercase());
 

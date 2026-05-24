@@ -76,21 +76,6 @@ pub(crate) async fn build_feature_tools(input: ToolsBuildInput<'_>) -> common::R
 
     // ── Productivity tool ─────────────────────────────────────────────
     if let Some(prod_repos) = prod_repos {
-        if let Some(ref p) = pool {
-            // Run feature migrations (idempotent — skips already-applied)
-            storage::StoragePool::run_feature_migrations(
-                p,
-                &feature_productivity::productivity_migrations(),
-            )
-            .await
-            .map_err(|e| {
-                common::KlyntbotError::Config(common::ConfigError::Invalid(format!(
-                    "Failed to run productivity migrations: {}",
-                    e
-                )))
-            })?;
-        }
-
         let focus_mgr = Arc::new(feature_productivity::FocusManager::new(
             prod_repos.clone(),
             config.productivity.focus.clone(),

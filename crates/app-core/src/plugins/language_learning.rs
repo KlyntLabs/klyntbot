@@ -3,7 +3,6 @@ use ai_core::AiEventMeta;
 
 use crate::plugin::context::PluginContext;
 use crate::plugin::AppCorePlugin;
-use crate::state::AppCore;
 
 /// Plugin wrapper for the `feature-language-learning` crate.
 pub struct LanguageLearningPlugin;
@@ -40,7 +39,4 @@ impl AppCorePlugin for LanguageLearningPlugin {
         Ok(())
     }
 
-    async fn post_init(&self, _app: &AppCore) -> common::Result<()> {
-        Ok(())
-    }
 }

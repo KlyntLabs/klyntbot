@@ -35,6 +35,12 @@ fn publish_cron_alarm(
 pub(super) struct CronResult {
     pub cron_executor: Arc<CronExecutor>,
     pub autotuner: Option<Arc<agent::autotuner::AutoTunerOrchestrator>>,
+    /// Slot for the workspace metric registry. `init_cron` runs before the
+    /// FeatureHost exists, so the reforge job captures this empty slot and the
+    /// caller fills it with `host.build_metric_registry()` after the host is
+    /// built. The nightly reforge fires long after, so the slot is always
+    /// populated by then.
+    pub metric_registry: Arc<std::sync::OnceLock<ai_core::MetricRegistry>>,
 }
 
 /// Initialize cron service, register callbacks, and ensure default jobs.
@@ -50,6 +56,11 @@ pub(super) async fn init_cron(
 ) -> Result<CronResult, String> {
     // 6. CronExecutor — handler registration only; TemporalScheduler drives firing.
     let cron_executor = CronExecutor::new(repos.cron.clone(), Arc::clone(domain_event_bus));
+
+    // Populated by the caller after the FeatureHost is built; read by the
+    // nightly reforge job so its feedback collector sees feature metrics.
+    let metric_registry: Arc<std::sync::OnceLock<ai_core::MetricRegistry>> =
+        Arc::new(std::sync::OnceLock::new());
 
     let autotuner_provider = provider.clone();
 
@@ -123,6 +134,7 @@ pub(super) async fn init_cron(
         metric_source,
         trial_repo,
         autotuner.clone(),
+        Arc::clone(&metric_registry),
     );
 
     let cron_executor = Arc::new(cron_executor);
@@ -135,6 +147,7 @@ pub(super) async fn init_cron(
     Ok(CronResult {
         cron_executor,
         autotuner,
+        metric_registry,
     })
 }
 
@@ -182,6 +195,7 @@ fn register_cron_callbacks(
     metric_source: Arc<dyn autotuner::MetricSource>,
     trial_repo: storage::TrialRepo,
     orchestrator: Option<Arc<agent::autotuner::AutoTunerOrchestrator>>,
+    metric_registry: Arc<std::sync::OnceLock<ai_core::MetricRegistry>>,
 ) {
     let rt = tokio::runtime::Handle::current();
 
@@ -464,6 +478,7 @@ fn register_cron_callbacks(
         let trial_repo_for_reforge = trial_repo;
         let orchestrator_for_reforge = orchestrator.clone();
         let domain_event_bus_for_reforge = Arc::clone(domain_event_bus);
+        let metric_registry_for_reforge = Arc::clone(&metric_registry);
         cron_executor.register(
             JOB_REFORGE_NIGHTLY,
             Arc::new(move |_job: &scheduling::CronJob| {
@@ -476,6 +491,7 @@ fn register_cron_callbacks(
                 let trial_repo = trial_repo_for_reforge.clone();
                 let orchestrator = orchestrator_for_reforge.clone();
                 let domain_event_bus = domain_event_bus_for_reforge.clone();
+                let metric_registry = Arc::clone(&metric_registry_for_reforge);
                 tokio::task::block_in_place(|| {
                     rt.block_on(async move {
                         let fact_repo = cognitive::SemanticFactRepo::new(pool.clone());
@@ -574,7 +590,6 @@ fn register_cron_callbacks(
                         let entity_repo = cognitive::EntityRepo::new(pool.clone());
                         let snapshot_repo = cognitive::KnowledgeSnapshotRepo::new(pool.clone());
                         let metric_repo = cognitive::MetricRepo::new(pool.clone());
-                        let metric_registry = ai_core::MetricRegistry::new();
                         let feedback_sources =
                             cognitive::services::reforge::collector::FeedbackSources {
                                 outcome_repo: Some(&repos_reforge.outcomes),
@@ -584,7 +599,7 @@ fn register_cron_callbacks(
                                 pool: Some(&pool),
                                 density_repo: Some(&density_repo),
                                 metric_repo: Some(&metric_repo),
-                                metric_registry: Some(&metric_registry),
+                                metric_registry: metric_registry.get(),
                             };
 
                         match cognitive::services::reforge::service::run_reforge(

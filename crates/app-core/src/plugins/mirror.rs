@@ -45,12 +45,11 @@ impl AppCorePlugin for MirrorPlugin {
                 )) as Arc<dyn ::cognitive::mirror::NarrativeHandler>
             });
         let autotuner_bridge: Option<Arc<dyn ::cognitive::mirror::AutotunerBridge>> = ctx
-            .deps
-            .autotuner
-            .as_ref()
+            .host
+            .get::<agent::autotuner::AutoTunerOrchestrator>()
             .map(|orch| {
                 Arc::new(crate::adapters::autotuner_bridge::AppAutotunerBridge::new(
-                    Arc::clone(orch),
+                    orch,
                 )) as Arc<dyn ::cognitive::mirror::AutotunerBridge>
             });
         let episodic_repo = Some(::cognitive::EpisodicMemoryRepo::new(
@@ -126,10 +125,10 @@ impl AppCorePlugin for MirrorPlugin {
     }
 
     async fn post_init(&self, app: &AppCore) -> common::Result<()> {
-        if let Some(ref facade) = app.mirror_facade {
+        if let Ok(facade) = app.mirror_facade() {
             // Wire the Mirror facade as the approval gate's suggester via bridge adapter.
             let suggester = Arc::new(
-                crate::adapters::approval_suggester::MirrorApprovalSuggester::new(Arc::clone(facade)),
+                crate::adapters::approval_suggester::MirrorApprovalSuggester::new(facade),
             );
             app.agent.set_approval_suggester(suggester);
         }

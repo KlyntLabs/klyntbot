@@ -145,8 +145,9 @@ impl AppCore {
             .map_err(|e| ApiError::new("CRON_ERROR", e.to_string()))?;
 
         // Wake the scheduler so it fires immediately instead of waiting up to 30 s.
-        if let Some(ref ts) = self.temporal_scheduler {
-            ts.wake();
+        // The scheduler is owned by TemporalInitResult in the FeatureHost, not stored bare.
+        if let Some(temporal) = self.host.get::<crate::plugins::temporal::TemporalInitResult>() {
+            temporal.scheduler.wake();
         }
 
         Ok(true)

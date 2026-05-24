@@ -31,8 +31,8 @@ impl KlyntbotServerHandler {
     pub fn new(app: Arc<AppCore>, whitelist: Vec<String>) -> Self {
         let registry = app.agent.tool_registry();
         let has_agent = whitelist.iter().any(|w| w == "agent");
-        let bridge = if let Some(ref bus) = app.domain_event_bus {
-            ToolRegistryBridge::new_with_bus(registry, whitelist, Arc::clone(bus))
+        let bridge = if let Ok(bus) = app.domain_event_bus() {
+            ToolRegistryBridge::new_with_bus(registry, whitelist, bus)
         } else {
             ToolRegistryBridge::new(registry, whitelist)
         };
@@ -360,7 +360,7 @@ fn emit_entity_update_for_tool(
     }
 
     let entity_kind = app
-        .feature_registry
+        .feature_registry()
         .iter()
         .find(|r| r.tool_name == Some(tool_name))
         .and_then(|r| r.entity_kind.and_then(EntityKind::parse))

@@ -38,7 +38,7 @@ impl AppCore {
         }
 
         // Publish domain event
-        if let Some(bus) = &self.domain_event_bus {
+        if let Some(bus) = self.domain_event_bus().ok() {
             bus.publish(bus::DomainEvent::FlashcardSessionCompleted {
                 session_id: params.session_id,
                 cards_reviewed: params.cards_reviewed as usize,

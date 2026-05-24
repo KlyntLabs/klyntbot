@@ -63,8 +63,8 @@ impl AppCorePlugin for NotesPlugin {
 
     async fn post_init(&self, app: &AppCore) -> common::Result<()> {
         // ── Background note embedding catch-up ────────────────────────────
-        if let Some(ref handler) = app.note_embedding_handler {
-            let handler = Arc::clone(handler);
+        if let Some(handler) = app.note_embedding_handler() {
+            let handler = Arc::clone(&handler);
             let repo = app.note_repo.clone();
             let token = app.shutdown_token.clone();
             tokio::spawn(async move {

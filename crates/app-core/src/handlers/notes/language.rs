@@ -60,7 +60,7 @@ impl AppCore {
 
         // Emit TranslationCompleted event
         if let Some(note_id) = &params.note_id {
-            if let Some(bus) = &self.domain_event_bus {
+            if let Ok(bus) = self.domain_event_bus() {
                 bus.publish(
                     NoteEvent::TranslationCompleted {
                         note_id: note_id.clone(),
@@ -118,10 +118,7 @@ impl AppCore {
         &self,
         params: VocabularySaveParams,
     ) -> Result<Vec<desktop_shared::commands::FlashcardResponse>, ApiError> {
-        let flashcard_repo = self
-            .flashcard_repo
-            .as_ref()
-            .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "Flashcard repo not available"))?;
+        let flashcard_repo = self.flashcard_repo()?;
         let sf_repo = SemanticFactRepo::new(self.storage_pool.inner().clone());
 
         let now = jiff::Timestamp::now().to_string();
@@ -201,7 +198,7 @@ impl AppCore {
             .map_err(map_cognitive_err)?;
 
         // Create Knowledge Atoms alongside flashcards
-        if let Some(atom_repo) = &self.knowledge_atom_repo {
+        if let Ok(atom_repo) = self.knowledge_atom_repo() {
             let target_lang = params.deck.clone();
             let domain = format!("language:{target_lang}");
             let topic = atom_repo
@@ -255,7 +252,7 @@ impl AppCore {
                 }
 
                 // Emit events (atoms are created as "active" — no separate Accepted event needed)
-                if let Some(bus) = &self.domain_event_bus {
+                if let Ok(bus) = self.domain_event_bus() {
                     for atom in &created_atoms {
                         bus.publish(bus::DomainEvent::KnowledgeAtomCreated {
                             atom_id: atom.id.clone(),
@@ -304,7 +301,7 @@ impl AppCore {
         let confusable = &similar[0];
 
         // Use LLM to explain the difference
-        let provider = match self.cognitive_provider.as_ref() {
+        let provider = match self.cognitive_provider() {
             Some(p) => p,
             None => {
                 return Ok(ConfusableResponse {

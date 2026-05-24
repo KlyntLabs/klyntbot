@@ -3,7 +3,6 @@ use std::sync::Arc;
 
 use crate::plugin::context::PluginContext;
 use crate::plugin::AppCorePlugin;
-use crate::state::AppCore;
 use tracing::info;
 
 /// Result of lifecycle plugin initialization.
@@ -114,7 +113,4 @@ impl AppCorePlugin for LifecyclePlugin {
         Ok(())
     }
 
-    async fn post_init(&self, _app: &AppCore) -> common::Result<()> {
-        Ok(())
-    }
 }

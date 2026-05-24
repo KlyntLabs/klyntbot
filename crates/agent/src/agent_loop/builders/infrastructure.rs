@@ -52,9 +52,6 @@ pub(crate) async fn build_infrastructure(
     .await;
 
     // ── Subagent manager ──────────────────────────────────────────────
-    let _brave_api_key = (!config.tools.web.brave_api_key.is_empty())
-        .then(|| config.tools.web.brave_api_key.expose().clone());
-
     let subagent_manager = Arc::new(
         SubagentManager::builder(Arc::clone(provider), workspace.to_path_buf())
             .inbound_sender(bus.inbound_sender())
@@ -92,13 +89,13 @@ pub(crate) async fn build_infrastructure(
 
     // ── Create ConversationRecallService (shared by retriever + handler) ──
     let recall_service: Option<Arc<cognitive::ConversationRecallService>> =
-        if let (true, Some(ref vs)) = (config.conversation.embedding.enabled, vector_store.clone()) {
+        if let (true, Some(vs)) = (config.conversation.embedding.enabled, vector_store.clone()) {
             let text_embedder =
                 Arc::new(crate::adapters::cognitive_embedder::TextEmbedderImpl::new(
                     Arc::clone(embedding_engine),
                 ));
             Some(Arc::new(cognitive::ConversationRecallService::new(
-                vs.clone(),
+                vs,
                 text_embedder,
                 cognitive::RecallConfig {
                     decay_half_life_days: config.conversation.memory.decay_half_life_days as f64,

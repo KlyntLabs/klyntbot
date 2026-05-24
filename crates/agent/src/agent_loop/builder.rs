@@ -14,10 +14,6 @@ use config::Config;
 use providers::DynProvider;
 
 use tools::okr_tool::OkrTool;
-use tools_core::FeaturePackage;
-
-
-
 use super::{AgentLoop, LastActiveChannel};
 
 /// Builder for constructing an [`AgentLoop`] with all its dependencies.
@@ -79,9 +75,12 @@ pub struct AgentLoopBuilder {
     approval_suggester: Option<Arc<dyn approval::ApprovalSuggester>>,
     injector_registry: Option<bus::InjectorRegistry>,
     job_supervisor: Option<tools_core::DynJobSupervisor>,
-    pre_registered_tools: Vec<tools_core::DynTool>,
     tool_registry: Option<tools_core::registry::ToolRegistry>,
     context_sources: Vec<Box<dyn context_engine::ContextSource>>,
+    /// Optional cognitive repos provided by app-core plugins (eliminates duplication).
+    cognitive_fact_repo: Option<cognitive::SemanticFactRepo>,
+    cognitive_entity_repo: Option<cognitive::EntityRepo>,
+    cognitive_embedder: Option<Arc<dyn cognitive::SemanticFactEmbedder>>,
 }
 
 impl AgentLoopBuilder {
@@ -109,9 +108,11 @@ impl AgentLoopBuilder {
             approval_suggester: None,
             injector_registry: None,
             job_supervisor: None,
-            pre_registered_tools: vec![],
             tool_registry: None,
             context_sources: vec![],
+            cognitive_fact_repo: None,
+            cognitive_entity_repo: None,
+            cognitive_embedder: None,
         }
     }
 
@@ -134,16 +135,24 @@ impl AgentLoopBuilder {
         self.job_supervisor = Some(supervisor);
         self
     }
-    pub fn with_pre_registered_tools(mut self, tools: Vec<tools_core::DynTool>) -> Self {
-        self.pre_registered_tools = tools;
-        self
-    }
     pub fn with_tool_registry(mut self, registry: tools_core::registry::ToolRegistry) -> Self {
         self.tool_registry = Some(registry);
         self
     }
     pub fn with_context_sources(mut self, sources: Vec<Box<dyn context_engine::ContextSource>>) -> Self {
         self.context_sources = sources;
+        self
+    }
+    pub fn with_cognitive_fact_repo(mut self, repo: cognitive::SemanticFactRepo) -> Self {
+        self.cognitive_fact_repo = Some(repo);
+        self
+    }
+    pub fn with_cognitive_entity_repo(mut self, repo: cognitive::EntityRepo) -> Self {
+        self.cognitive_entity_repo = Some(repo);
+        self
+    }
+    pub fn with_cognitive_embedder(mut self, embedder: Arc<dyn cognitive::SemanticFactEmbedder>) -> Self {
+        self.cognitive_embedder = Some(embedder);
         self
     }
     pub fn with_embedding_engine(mut self, engine: Arc<tools::EmbeddingEngine>) -> Self {
@@ -317,6 +326,8 @@ impl AgentLoopBuilder {
             &embedding_engine,
             &skill_store,
             self.context_sources,
+            self.cognitive_fact_repo,
+            self.cognitive_embedder,
         )
         .await?;
         let sources = ctx_sources.sources;
@@ -348,18 +359,7 @@ impl AgentLoopBuilder {
                 .with_summary_provider(summary_provider);
 
         // ── Infrastructure services ───────────────────────────────────────
-        // If pre_registered_tools was set (legacy API), fold them into a registry.
-        let tool_registry = self.tool_registry.or_else(|| {
-            if self.pre_registered_tools.is_empty() {
-                None
-            } else {
-                let mut reg = tools_core::registry::ToolRegistry::new();
-                for tool in self.pre_registered_tools {
-                    reg.register_dyn(tool);
-                }
-                Some(reg)
-            }
-        });
+        let tool_registry = self.tool_registry;
 
         let infra = super::builders::infrastructure::build_infrastructure(
             &config,
@@ -402,6 +402,7 @@ impl AgentLoopBuilder {
                 &self.cognitive_provider,
                 &storage_pool,
                 &repos,
+                self.cognitive_entity_repo,
             )
             .await
         } else {

@@ -98,7 +98,8 @@ impl AppCore {
 
     #[tracing::instrument(skip(self), err)]
     pub async fn coaching_feedback_stats(&self) -> Result<Vec<StrategyFeedbackResponse>, ApiError> {
-        let tracker = self.feedback_tracker()?.lock().await;
+        let tracker = self.feedback_tracker()?;
+        let tracker = tracker.lock().await;
 
         Ok(tracker
             .all_strategies()
@@ -117,7 +118,8 @@ impl AppCore {
 
     #[tracing::instrument(skip(self), err)]
     pub async fn coaching_router_status(&self) -> Result<RouterStatusResponse, ApiError> {
-        let router = self.intervention_router()?.lock().await;
+        let router = self.intervention_router()?;
+        let router = router.lock().await;
         let (hourly_limit, daily_limit) = router.limits();
 
         Ok(RouterStatusResponse {
@@ -145,7 +147,8 @@ impl AppCore {
             return Ok(vec![]);
         }
 
-        let tracker = self.feedback_tracker()?.lock().await;
+        let tracker = self.feedback_tracker()?;
+        let tracker = tracker.lock().await;
         let now = jiff::Timestamp::now();
         Ok(tracker
             .pending_interventions()
@@ -192,7 +195,8 @@ impl AppCore {
         &self,
         trigger_name: Option<String>,
     ) -> Result<bool, ApiError> {
-        let mut router = self.intervention_router()?.lock().await;
+        let router = self.intervention_router()?;
+        let mut router = router.lock().await;
 
         if let Some(name) = trigger_name {
             router.reset_dismissals(&name);
@@ -251,7 +255,8 @@ impl AppCore {
         // Record in FeedbackTracker (single lock scope — record_explicit removes
         // the pending entry, so we must extract trigger_name + message first)
         let (trigger_name, intervention_message) = {
-            let mut tracker = self.feedback_tracker()?.lock().await;
+            let tracker = self.feedback_tracker()?;
+            let mut tracker = tracker.lock().await;
             let pending = tracker
                 .pending_interventions()
                 .iter()
@@ -284,7 +289,8 @@ impl AppCore {
             bus::FeedbackResponse::Dismissed | bus::FeedbackResponse::StopSuggesting
         ) {
             if let Some(name) = &trigger_name {
-                let mut router = self.intervention_router()?.lock().await;
+                let router = self.intervention_router()?;
+                let mut router = router.lock().await;
                 router.record_dismissal(name);
             }
         }

@@ -109,7 +109,7 @@ impl AppCore {
 
         // 3. Domain event log (point-in-time events — may produce Task/Note/Finance/System)
         if include_point {
-            if let Some(ref repo) = self.event_log_repo {
+            if let Some(repo) = self.event_log_repo() {
                 if let Ok(events) = repo.query_domain_events_range(start, end).await {
                     let mut domain_entries: Vec<_> = events
                         .into_iter()
@@ -507,7 +507,7 @@ fn compute_summary(entries: &[TimelineEntry]) -> TimelineSummary {
     let mut tasks_completed: i64 = 0;
     let mut tasks_created: i64 = 0;
     let mut notes_touched: i64 = 0;
-    let mut transactions_count: i64 = 0;
+    let transactions_count: i64 = 0;
     let mut app_durations: HashMap<String, i64> = HashMap::new();
     let mut source_durations: HashMap<TimelineSource, (i64, i64)> = HashMap::new();
 

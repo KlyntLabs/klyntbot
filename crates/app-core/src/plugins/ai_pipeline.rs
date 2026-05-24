@@ -21,6 +21,10 @@ impl AppCorePlugin for AiPipelinePlugin {
         "ai-pipeline"
     }
 
+    fn dependencies(&self) -> &[&str] {
+        &["mirror", "coaching", "cognitive"]
+    }
+
     async fn init(&self, ctx: &mut PluginContext) -> common::Result<()> {
         let config = ctx.deps.config.read().await;
         let mirror_consumers = ctx
@@ -109,10 +113,9 @@ impl AppCorePlugin for AiPipelinePlugin {
         ));
 
         // Activity-log normalizer consumer
+        let activity_svc = ctx.require_activity_svc()?;
         ctx.add_signal_consumer(Arc::new(
-            activity_log::NormalizerSignalConsumer::new(Arc::clone(
-                ctx.deps.activity_svc.as_ref().expect("activity svc available"),
-            )),
+            activity_log::NormalizerSignalConsumer::new(Arc::clone(&activity_svc)),
         ));
 
         // Retrieval indexer
@@ -247,8 +250,11 @@ impl AppCorePlugin for AiPipelinePlugin {
         // from the registry so new features are auto-exposed without config edits.
         let mut config = app.config.write().await;
         if config.mcp.server.exposed_tools.is_empty() {
-            let mut tools: Vec<String> = app
-                .feature_registry
+            let registry = app
+                .host
+                .get::<ai_core::AiFeatureRegistry>()
+                .expect("feature registry built");
+            let mut tools: Vec<String> = registry
                 .tool_names()
                 .into_iter()
                 .map(|s| s.to_string())

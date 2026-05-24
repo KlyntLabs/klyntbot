@@ -11,7 +11,6 @@ use tracing::{info, warn};
 
 use crate::plugin::context::PluginContext;
 use crate::plugin::AppCorePlugin;
-use crate::state::AppCore;
 
 /// Default number of instances to materialise ahead per recurrence spawn cycle.
 const DEFAULT_MATERIALIZE_AHEAD: u32 = 3;
@@ -125,7 +124,4 @@ impl AppCorePlugin for TemporalPlugin {
         Ok(())
     }
 
-    async fn post_init(&self, _app: &AppCore) -> common::Result<()> {
-        Ok(())
-    }
 }

@@ -3,7 +3,6 @@ use std::sync::Arc;
 
 use crate::plugin::context::PluginContext;
 use crate::plugin::AppCorePlugin;
-use crate::state::AppCore;
 use tracing::info;
 
 /// Plugin that spawns the morning briefing: surfacing unsurfaced cross-domain
@@ -67,7 +66,4 @@ impl AppCorePlugin for BriefingPlugin {
         Ok(())
     }
 
-    async fn post_init(&self, _app: &AppCore) -> common::Result<()> {
-        Ok(())
-    }
 }

@@ -2,6 +2,56 @@ use ai_core::{AiEventMeta, AiMetrics, AiSignal, RecallDomain, SalienceVerdict};
 use bus::DomainEvent;
 use jiff::Timestamp;
 
+/// Top-level translator: DomainEvent -> Option<AiSignal>.
+///
+/// **Test helper only.** Production code uses `AiPipelinePlugin` which registers
+/// feature translators via `PluginContext::add_event_translator()`, and
+/// `FeatureHostResult::translate_event()` iterates those registered translators.
+/// This hardcoded dispatch function is kept for integration tests that need
+/// translation without booting the full plugin host.
+pub fn translate(event: &DomainEvent) -> Option<AiSignal> {
+    fn with_domain<E: AiEventMeta>(ev: E, domain: RecallDomain) -> AiSignal {
+        let mut sig = ev.to_signal();
+        sig.domain = domain;
+        sig
+    }
+
+    if let Some(e) = feature_tasks::events::try_from_domain_event(event) {
+        return Some(with_domain(e, RecallDomain::Tasks));
+    }
+    if let Some(e) = feature_coaching::events::try_from_domain_event(event) {
+        return Some(with_domain(e, RecallDomain::Coaching));
+    }
+    if let Some(e) = feature_productivity::events::try_from_domain_event(event) {
+        return Some(with_domain(e, RecallDomain::Productivity));
+    }
+    if let Some(e) = feature_notes::events::try_from_domain_event(event) {
+        return Some(with_domain(e, RecallDomain::Notes));
+    }
+    if let Some(e) = feature_learning::try_from_domain_event(event) {
+        return Some(with_domain(e, RecallDomain::Learning));
+    }
+    if let Some(e) = feature_language_learning::try_from_domain_event(event) {
+        return Some(with_domain(e, RecallDomain::LanguageLearning));
+    }
+    if let Some(s) = translate_bash_job(event) {
+        return Some(s);
+    }
+    if let Some(e) =
+        cognitive::services::community_intelligence::events::try_from_domain_event(event)
+    {
+        return Some(with_domain(e, RecallDomain::General));
+    }
+    if let Some(e) =
+        cognitive::services::community_intelligence::co_activation_events::try_from_domain_event(
+            event,
+        )
+    {
+        return Some(with_domain(e, RecallDomain::General));
+    }
+    translate_system_event(event)
+}
+
 /// Translator: BashJob events -> AiSignal.
 pub fn translate_bash_job(event: &bus::DomainEvent) -> Option<AiSignal> {
     let bus::DomainEvent::BashJob(inner) = event else {

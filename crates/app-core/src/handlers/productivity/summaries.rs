@@ -144,7 +144,7 @@ impl AppCore {
         days: Option<u32>,
     ) -> Result<ProductivityPatternsResponse, ApiError> {
         let repos = self.productivity_repos()?;
-        let analyzer = feature_productivity::ProductivityPatternAnalyzer::new(repos.clone());
+        let analyzer = feature_productivity::ProductivityPatternAnalyzer::new((*repos).clone());
         let patterns = analyzer
             .analyze(days.unwrap_or(14))
             .await

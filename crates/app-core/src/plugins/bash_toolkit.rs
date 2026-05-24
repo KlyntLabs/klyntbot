@@ -96,7 +96,7 @@ impl AppCorePlugin for BashToolkitPlugin {
         app.agent.runtime().set_tool_kit(Arc::clone(&kit_arc));
         app.agent.set_subagent_tool_kit(Arc::clone(&kit_arc));
 
-        if let Some(engine) = app.host.get::<Arc<klynt_hooks::HookEngine>>() {
+        if let Some(engine) = app.host.get::<klynt_hooks::HookEngine>() {
             app.agent.runtime().set_hook_engine(Arc::clone(&engine));
             app.agent.set_subagent_hook_engine(Arc::clone(&engine));
         }

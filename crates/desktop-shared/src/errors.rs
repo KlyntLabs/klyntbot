@@ -22,6 +22,16 @@ impl ApiError {
             message: message.into(),
         }
     }
+
+    /// Feature is disabled or not initialized.
+    pub fn feature_disabled(message: impl Into<String>) -> Self {
+        Self::new("FEATURE_DISABLED", message)
+    }
+
+    /// Resource is temporarily unavailable.
+    pub fn not_available(message: impl Into<String>) -> Self {
+        Self::new("NOT_AVAILABLE", message)
+    }
 }
 
 impl std::fmt::Display for ApiError {

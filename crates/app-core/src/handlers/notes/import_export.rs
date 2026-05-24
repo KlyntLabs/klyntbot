@@ -215,9 +215,9 @@ impl AppCore {
         }
 
         // Fire-and-forget embeddings for all imported notes
-        if let Some(ref handler) = self.note_embedding_handler {
+        if let Some(handler) = self.note_embedding_handler() {
             for (note, _) in created_notes {
-                let handler = Arc::clone(handler);
+                let handler = Arc::clone(&handler);
                 let repo = self.note_repo.clone();
                 let note_row = note;
                 tokio::spawn(async move {
@@ -232,7 +232,7 @@ impl AppCore {
 
         // Wire: FirstImport journey milestone
         if imported > 0 {
-            if let Some(ref tracker) = self.journey_tracker {
+            if let Some(tracker) = self.journey_tracker() {
                 if !tracker
                     .is_complete(crate::journey::Milestone::FirstImport)
                     .await

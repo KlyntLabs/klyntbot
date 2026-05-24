@@ -269,7 +269,7 @@ impl AppCore {
         project_id: String,
     ) -> Result<ProjectHealthMetricsResponse, ApiError> {
         // Focus quality: average quality_score from focus sessions in this project (last 30 days)
-        let focus_quality = if let Some(ref pr) = self.productivity_repos {
+        let focus_quality = if let Ok(pr) = self.productivity_repos() {
             pr.sessions
                 .avg_quality_by_project(&project_id, 30)
                 .await

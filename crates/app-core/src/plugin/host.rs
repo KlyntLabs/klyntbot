@@ -41,6 +41,15 @@ impl FeatureHost {
     pub fn has<T: Send + Sync + 'static>(&self) -> bool {
         self.handles.contains_key(&TypeId::of::<T>())
     }
+
+    /// Retrieve a cloned value from the type-map, avoiding the `map(|arc| (*arc).clone())` pattern.
+    pub fn get_cloned<T: Clone + Send + Sync + 'static>(&self) -> Option<T> {
+        self.get::<T>().map(|arc| (*arc).clone())
+    }
+
+    pub(crate) fn insert_raw(&self, type_id: TypeId, handle: Arc<dyn Any + Send + Sync>) {
+        self.handles.insert(type_id, handle);
+    }
 }
 
 /// Result of building a feature host.
@@ -100,11 +109,12 @@ impl FeatureHostResult {
 /// 3. Returns the assembled host and all registered contributions.
 pub struct FeatureHostBuilder {
     plugins: Vec<Box<dyn AppCorePlugin>>,
+    pre_handles: Vec<(TypeId, Arc<dyn Any + Send + Sync>)>,
 }
 
 impl FeatureHostBuilder {
     pub fn new() -> Self {
-        Self { plugins: vec![] }
+        Self { plugins: vec![], pre_handles: vec![] }
     }
 
     /// Add a plugin to the host.
@@ -113,11 +123,21 @@ impl FeatureHostBuilder {
         self
     }
 
+    /// Pre-insert a typed handle into the host before any plugin runs.
+    /// Useful for handles created before the plugin phase (e.g. cron-built orchestrators).
+    pub fn with_handle<T: Send + Sync + 'static>(mut self, handle: Arc<T>) -> Self {
+        self.pre_handles.push((TypeId::of::<T>(), handle));
+        self
+    }
+
     /// Build the host: run migrations, initialize all plugins, and return contributions.
     pub async fn build(self, deps: &PluginDeps) -> common::Result<FeatureHostResult> {
+        // Phase 0: topological sort by declared dependencies
+        let plugins = super::toposort::resolve_order(self.plugins)?;
+
         // Phase 1: collect and run migrations
         let mut all_migrations = Vec::new();
-        for plugin in &self.plugins {
+        for plugin in &plugins {
             let mut migs = plugin.migrations();
             for m in &mut migs {
                 // Sanity check: migration feature name should match plugin name
@@ -143,7 +163,7 @@ impl FeatureHostBuilder {
             info!(count = all_migrations.len(), "plugin migrations complete");
         }
 
-        // Phase 2: initialize plugins in order
+        // Phase 2: initialize plugins in resolved order
         let mut tools = tools_core::registry::ToolRegistry::new();
         let mut context_sources = Vec::new();
         let mut signal_consumers = Vec::new();
@@ -153,8 +173,11 @@ impl FeatureHostBuilder {
         let mut cron_handlers = Vec::new();
         let mut background_spawns = Vec::new();
         let mut host = FeatureHost::new();
+        for (type_id, handle) in &self.pre_handles {
+            host.insert_raw(*type_id, Arc::clone(handle));
+        }
 
-        for plugin in &self.plugins {
+        for plugin in &plugins {
             let mut ctx = PluginContext::new(
                 deps,
                 &mut tools,
@@ -173,7 +196,7 @@ impl FeatureHostBuilder {
         }
 
         info!(
-            plugins = self.plugins.len(),
+            plugins = plugins.len(),
             tools = tools.len(),
             context_sources = context_sources.len(),
             signal_consumers = signal_consumers.len(),
@@ -190,7 +213,7 @@ impl FeatureHostBuilder {
             metric_registrations,
             cron_handlers,
             background_spawns,
-            plugins: self.plugins,
+            plugins,
         })
     }
 }

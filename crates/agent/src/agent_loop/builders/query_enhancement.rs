@@ -28,25 +28,23 @@ pub(crate) fn build_query_enhancement(
     // Stage 1: Signal Enrichment — wraps ContextualQueryRewriter for
     // heuristic signal-based query enrichment. Autotuner champion
     // overrides are wired onto this rewriter so A/B trials apply.
+    let memory_param_sink = autotuner
+        .as_ref()
+        .and_then(|orch| orch.memory_param_sink());
+
     let mut signal_rewriter = crate::adapters::query_rewriter::ContextualQueryRewriter::new(
         rewriter_provider.clone(),
         rewriter_model.clone(),
         800, // 800ms hard cap per spec
     );
-    if let Some(ref orchestrator) = autotuner {
-        if let Some(sink) = orchestrator.memory_param_sink() {
-            signal_rewriter = signal_rewriter.with_champion_overrides(sink);
-        }
+    if let Some(ref sink) = memory_param_sink {
+        signal_rewriter = signal_rewriter.with_champion_overrides(Arc::clone(sink));
     }
     let signal_stage =
         crate::adapters::signal_enrichment::SignalEnrichmentStage::new(signal_rewriter);
 
     let mut query_stages: Vec<Arc<dyn context_engine::enhancement::QueryStage>> =
         vec![Arc::new(signal_stage)];
-
-    let memory_param_sink = autotuner
-        .as_ref()
-        .and_then(|orch| orch.memory_param_sink());
 
     // Stage 2: PRF (needs memory retriever — only if available)
     if qe.prf.enabled {
