@@ -22,7 +22,8 @@ impl AppCorePlugin for AiPipelinePlugin {
     }
 
     fn dependencies(&self) -> &[&str] {
-        &["mirror", "coaching", "cognitive"]
+        // activity_log: init() calls ctx.require_activity_svc()
+        &["mirror", "coaching", "cognitive", "activity_log"]
     }
 
     async fn init(&self, ctx: &mut PluginContext) -> common::Result<()> {

@@ -13,7 +13,6 @@ use config::Config;
 
 use providers::DynProvider;
 
-use tools::okr_tool::OkrTool;
 use super::{AgentLoop, LastActiveChannel};
 
 /// Builder for constructing an [`AgentLoop`] with all its dependencies.
@@ -470,7 +469,6 @@ impl AgentLoopBuilder {
                 vector_store: &self.vector_store,
                 domain_event_bus: &self.domain_event_bus,
                 latest_enhancement_trace: &latest_enhancement_trace,
-                pool: &self.pool,
                 provider: &provider,
                 skill_reference_index: &skill_reference_index,
             },

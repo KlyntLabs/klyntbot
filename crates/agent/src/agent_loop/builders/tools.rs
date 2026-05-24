@@ -20,7 +20,6 @@ pub(crate) struct ToolsBuildInput<'a> {
     pub vector_store: &'a Option<storage::VectorStore>,
     pub domain_event_bus: &'a Option<Arc<bus::DomainEventBus>>,
     pub latest_enhancement_trace: &'a Arc<context_engine::enhancement::LatestEnhancementTrace>,
-    pub pool: &'a Option<sqlx::SqlitePool>,
     pub provider: &'a DynProvider,
     pub skill_reference_index: &'a Arc<tools::SkillReferenceIndex>,
 }
@@ -43,7 +42,6 @@ pub(crate) async fn build_feature_tools(input: ToolsBuildInput<'_>) -> common::R
         vector_store,
         domain_event_bus,
         latest_enhancement_trace,
-        pool,
         provider,
         skill_reference_index,
     } = input;

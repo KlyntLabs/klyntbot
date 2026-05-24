@@ -32,6 +32,11 @@ impl AppCorePlugin for ProductivityPlugin {
         "productivity"
     }
 
+    fn dependencies(&self) -> &[&str] {
+        // activity_log: init() calls ctx.require_activity_svc()
+        &["activity_log"]
+    }
+
     fn migrations(&self) -> Vec<tools_core::FeatureMigration> {
         feature_productivity::productivity_migrations()
     }
@@ -122,7 +127,7 @@ use feature_productivity::{DailyAggregator, FocusManager, NudgeService, Producti
 use storage::StoragePool;
 use tokio::sync::{mpsc, Mutex};
 use tokio_util::sync::CancellationToken;
-use tracing::{error, info, warn};
+use tracing::{info, warn};
 
 /// Results from the productivity initialization phase.
 pub struct ProductivityResult {
@@ -163,16 +168,9 @@ pub async fn init_productivity(
         dashboard_tick_rx,
     ) = if config.productivity.enabled {
         let pool = storage_pool.inner().clone();
-        // Run feature migrations before creating repos.
-        if let Err(e) = StoragePool::run_feature_migrations(
-            &pool,
-            &feature_productivity::productivity_migrations(),
-        )
-        .await
+        // Migrations already ran in FeatureHost Phase 1 (declared via
+        // ProductivityPlugin::migrations) — do not re-run them here.
         {
-            error!("productivity migration failed — feature disabled: {e}");
-            (None, None, None, None, None, None, None, None, None)
-        } else {
             let prod_repos = ProductivityRepos::new(pool);
             let prod_config = &config.productivity;
             let mgr = Arc::new(

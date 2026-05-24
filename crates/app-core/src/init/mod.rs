@@ -259,27 +259,7 @@ impl AppCore {
         };
 
         let mut host_builder = crate::plugin::host::FeatureHostBuilder::new()
-            .plugin(crate::plugins::activity_log::ActivityLogPlugin)
-            .plugin(crate::plugins::focus::FocusPlugin)
-            .plugin(crate::plugins::notes::NotesPlugin)
-            .plugin(crate::plugins::tasks::TasksPlugin)
-            .plugin(crate::plugins::language_learning::LanguageLearningPlugin)
-            .plugin(crate::plugins::learning::LearningPlugin)
-            .plugin(crate::plugins::insights::InsightsPlugin)
-            .plugin(crate::plugins::cognitive::CognitivePlugin)
-            .plugin(crate::plugins::agent_tools::AgentToolsPlugin)
-            .plugin(crate::plugins::productivity::ProductivityPlugin)
-            .plugin(crate::plugins::launcher::LauncherPlugin)
-            .plugin(crate::plugins::coaching::CoachingPlugin)
-            .plugin(crate::plugins::mirror::MirrorPlugin)
-            .plugin(crate::plugins::brain_voice::BrainVoicePlugin)
-            .plugin(crate::plugins::voice::VoicePlugin)
-            .plugin(crate::plugins::briefing::BriefingPlugin)
-            .plugin(crate::plugins::lifecycle::LifecyclePlugin)
-            .plugin(crate::plugins::notifications::NotificationPlugin)
-            .plugin(crate::plugins::bash_toolkit::BashToolkitPlugin)
-            .plugin(crate::plugins::temporal::TemporalPlugin)
-            .plugin(crate::plugins::ai_pipeline::AiPipelinePlugin)
+            .with_plugins(crate::plugins::all_plugins())
             .with_handle(Arc::clone(&tracing_registry))
             .with_handle(Arc::clone(&active_view))
             .with_handle(Arc::clone(&domain_event_bus))
@@ -321,7 +301,7 @@ impl AppCore {
         let activity_svc = host_result
             .host
             .get::<activity_log::ActivityIngestionService>()
-            .expect("ActivityLogPlugin registered first");
+            .expect("ActivityLogPlugin must be registered");
 
         // Extract cognitive repos from plugins to eliminate agent-side duplication.
         let cog_init = host_result
@@ -417,6 +397,17 @@ impl AppCore {
         // Run plugin post-init hooks now that AppCore is assembled.
         host_result.run_post_init(&core).await.map_err(|e| e.to_string())?;
 
+        // Start the TemporalScheduler now that every plugin's post_init has
+        // registered its cron handlers. Starting earlier (in TemporalPlugin::init)
+        // would let a due/recovered fire be published before its handler exists,
+        // dropping that execution.
+        if let Some(temporal) = core
+            .host
+            .get::<crate::plugins::temporal::TemporalInitResult>()
+        {
+            crate::plugins::temporal::start_temporal_scheduler(&temporal);
+        }
+
         // ── Phase 8: Mirror self-reflection layer (populated by MirrorPlugin) ──
         let mirror_result = host_result
             .host
@@ -430,17 +421,11 @@ impl AppCore {
             core.host.insert(Arc::new(token));
         }
 
-        // ── Notification Dispatcher (populated by NotificationPlugin) ─────
-
-
         // ── Phase 9: AI Pipeline — SignalRouter + all consumers ───────────
         tracing::info!(
             features = feature_registry.len(),
             "ai feature registry built"
         );
-
-        // ── Voice service (populated by VoicePlugin) ────────────────────
-
 
         // Spawn background services (agent loop + channel manager).
         spawn_background(inbound_rx, channel_manager, &agent, &shutdown_token);

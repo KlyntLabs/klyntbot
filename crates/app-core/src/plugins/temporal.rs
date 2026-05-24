@@ -101,8 +101,12 @@ impl AppCorePlugin for TemporalPlugin {
             }
         });
 
-        let scheduler_handle = scheduler.clone().start_background();
-        info!("TemporalScheduler started (side-by-side with CronExecutor)");
+        // NOTE: the scheduler is intentionally NOT started here. Several plugins
+        // register their cron handlers in `post_init` (which runs after the whole
+        // host is built). Starting the scheduler now would open a window where a
+        // due/recovered fire is published before its handler is registered and is
+        // silently dropped. `init::start_temporal_scheduler` starts it after all
+        // post_init hooks have run. See crates/app-core/src/init/mod.rs.
 
         // Register temporal tool
         let temporal_service = ::cognitive::TemporalService::new(
@@ -117,11 +121,23 @@ impl AppCorePlugin for TemporalPlugin {
         ctx.insert_handle(Arc::new(TemporalInitResult {
             scheduler,
             cron_bridge: bridge_for_appcore,
-            scheduler_handle: std::sync::Mutex::new(Some(scheduler_handle)),
+            scheduler_handle: std::sync::Mutex::new(None),
             wake_subscriber: std::sync::Mutex::new(Some(wake_subscriber)),
         }));
 
         Ok(())
     }
 
+}
+
+/// Start the TemporalScheduler firing loop. Called from `init::init_app` *after*
+/// all plugin `post_init` hooks have run, so every cron handler is registered
+/// before any fire can be published (see `TemporalPlugin::init`).
+pub(crate) fn start_temporal_scheduler(result: &TemporalInitResult) {
+    let handle = result.scheduler.clone().start_background();
+    *result
+        .scheduler_handle
+        .lock()
+        .expect("scheduler_handle lock poisoned") = Some(handle);
+    info!("TemporalScheduler started (after plugin post_init)");
 }

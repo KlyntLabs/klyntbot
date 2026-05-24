@@ -123,6 +123,13 @@ impl FeatureHostBuilder {
         self
     }
 
+    /// Add many pre-boxed plugins at once. Lets the canonical plugin list
+    /// (`crate::plugins::all_plugins`) be the single source shared with tests.
+    pub fn with_plugins(mut self, plugins: Vec<Box<dyn AppCorePlugin>>) -> Self {
+        self.plugins.extend(plugins);
+        self
+    }
+
     /// Pre-insert a typed handle into the host before any plugin runs.
     /// Useful for handles created before the plugin phase (e.g. cron-built orchestrators).
     pub fn with_handle<T: Send + Sync + 'static>(mut self, handle: Arc<T>) -> Self {

@@ -4,6 +4,7 @@ use tools_core::FeaturePackage;
 
 use crate::plugin::context::PluginContext;
 use crate::plugin::AppCorePlugin;
+use crate::state::AppCore;
 
 /// Plugin wrapper for the `feature-tasks` crate.
 /// Registers task/OKR tools and spawns focus-alarm background loops.
@@ -120,6 +121,180 @@ impl AppCorePlugin for TasksPlugin {
         );
 
         tracing::info!("tasks plugin: tools registered + focus alarm background loops spawned");
+        Ok(())
+    }
+
+    async fn post_init(&self, app: &AppCore) -> common::Result<()> {
+        use crate::init::cron::{
+            publish_cron_alarm, JOB_DAILY_DIGEST, JOB_FOCUS_CHECK, JOB_OVERDUE_CHECK,
+            JOB_RECURRING_TASKS,
+        };
+
+        let (deadline_hours, timezone) = {
+            let config = app.config.read().await;
+            (config.todo.focus.deadline_hours, config.timezone.clone())
+        };
+
+        // ── recurring_tasks (no domain bus required — register unconditionally) ──
+        {
+            let todo_repo = app.repos.tasks.clone();
+            let rt = tokio::runtime::Handle::current();
+            app.cron_executor.register(
+                JOB_RECURRING_TASKS,
+                Arc::new(move |_job: &scheduling::CronJob| {
+                    let todo_repo = todo_repo.clone();
+                    let timezone = timezone.clone();
+                    tokio::task::block_in_place(|| {
+                        rt.block_on(async move {
+                            match ::agent::services::recurring_tasks::RecurringTaskSpawner::check_and_spawn_static(
+                                &todo_repo,
+                                &timezone,
+                            )
+                            .await
+                            {
+                                Ok(()) => Ok(Some("Recurring task check complete".to_string())),
+                                Err(e) => {
+                                    tracing::warn!("Recurring task check failed: {e}");
+                                    Ok(Some(format!("Recurring task check failed: {e}")))
+                                }
+                            }
+                        })
+                    })
+                }),
+            );
+        }
+
+        // The remaining task cron handlers publish AlarmFired events, so they
+        // require the domain bus.
+        let Ok(domain_bus) = app.domain_event_bus() else {
+            tracing::warn!("tasks plugin: no domain event bus, skipping alarm-publishing cron handlers");
+            return Ok(());
+        };
+
+        // ── todo_focus_check ──────────────────────────────────────────────
+        {
+            let todo_repo = app.repos.tasks.clone();
+            let domain_bus = Arc::clone(&domain_bus);
+            let rt = tokio::runtime::Handle::current();
+            app.cron_executor.register(
+                JOB_FOCUS_CHECK,
+                Arc::new(move |_job: &scheduling::CronJob| {
+                    let todo_repo = todo_repo.clone();
+                    let domain_bus = Arc::clone(&domain_bus);
+                    tokio::task::block_in_place(|| {
+                        rt.block_on(async move {
+                            let focused: Vec<storage::TaskRow> = todo_repo.list_focused().await?;
+                            for task in &focused {
+                                if let Some(deadline) = task.focus_deadline {
+                                    let hours_left = (deadline.as_millisecond()
+                                        - jiff::Timestamp::now().as_millisecond())
+                                        / 3_600_000;
+                                    if hours_left <= 1 && hours_left > 0 {
+                                        publish_cron_alarm(
+                                            &domain_bus,
+                                            Some(JOB_FOCUS_CHECK.to_string()),
+                                            "⏰ Focus Deadline: 1h left",
+                                            format!("\"{}\" — deadline approaching!", task.title),
+                                        );
+                                    } else if hours_left <= 3 && hours_left > 1 {
+                                        publish_cron_alarm(
+                                            &domain_bus,
+                                            Some(JOB_FOCUS_CHECK.to_string()),
+                                            "⏰ Focus Deadline: 3h left",
+                                            format!("\"{}\" — stay on track", task.title),
+                                        );
+                                    } else if hours_left <= 6 && hours_left > 3 {
+                                        publish_cron_alarm(
+                                            &domain_bus,
+                                            Some(JOB_FOCUS_CHECK.to_string()),
+                                            "⏰ Focus Deadline: 6h left",
+                                            format!("\"{}\" — keep going", task.title),
+                                        );
+                                    }
+                                }
+                            }
+                            Ok(Some(format!("Checked {} focused tasks", focused.len())))
+                        })
+                    })
+                }),
+            );
+        }
+
+        // ── todo_daily_digest ─────────────────────────────────────────────
+        {
+            let todo_repo = app.repos.tasks.clone();
+            let domain_bus = Arc::clone(&domain_bus);
+            let rt = tokio::runtime::Handle::current();
+            app.cron_executor.register(
+                JOB_DAILY_DIGEST,
+                Arc::new(move |_job: &scheduling::CronJob| {
+                    let todo_repo = todo_repo.clone();
+                    let domain_bus = Arc::clone(&domain_bus);
+                    tokio::task::block_in_place(|| {
+                        rt.block_on(async move {
+                            let summary = todo_repo.summary().await?;
+                            let overdue: Vec<storage::TaskRow> = todo_repo.overdue().await?;
+                            let body = format!(
+                                "Total: {} | Todo: {} | Doing: {} | Done: {} | Overdue: {}",
+                                summary.total,
+                                summary.todo,
+                                summary.doing,
+                                summary.done,
+                                overdue.len()
+                            );
+                            publish_cron_alarm(
+                                &domain_bus,
+                                Some(JOB_DAILY_DIGEST.to_string()),
+                                "📋 Daily Task Digest",
+                                body,
+                            );
+                            Ok(Some("Daily digest sent".to_string()))
+                        })
+                    })
+                }),
+            );
+        }
+
+        // ── todo_overdue_check ────────────────────────────────────────────
+        {
+            let todo_repo = app.repos.tasks.clone();
+            let domain_bus = Arc::clone(&domain_bus);
+            let rt = tokio::runtime::Handle::current();
+            app.cron_executor.register(
+                JOB_OVERDUE_CHECK,
+                Arc::new(move |_job: &scheduling::CronJob| {
+                    let todo_repo = todo_repo.clone();
+                    let domain_bus = Arc::clone(&domain_bus);
+                    tokio::task::block_in_place(|| {
+                        rt.block_on(async move {
+                            let focused: Vec<storage::TaskRow> = todo_repo.list_focused().await?;
+                            let now_jiff = jiff::Timestamp::now();
+                            let mut expired_count = 0u32;
+                            for task in &focused {
+                                if task.focus_deadline.map(|d| *d < now_jiff).unwrap_or(false) {
+                                    let _ = todo_repo.unfocus(&task.id).await;
+                                    expired_count += 1;
+                                }
+                            }
+                            if expired_count > 0 {
+                                let body = format!(
+                                    "{} task(s) auto-unfocused due to {}h deadline",
+                                    expired_count, deadline_hours
+                                );
+                                publish_cron_alarm(
+                                    &domain_bus,
+                                    Some(JOB_OVERDUE_CHECK.to_string()),
+                                    "⏰ Focus Tasks Expired",
+                                    body,
+                                );
+                            }
+                            Ok(Some("Overdue check complete".to_string()))
+                        })
+                    })
+                }),
+            );
+        }
+
         Ok(())
     }
 }

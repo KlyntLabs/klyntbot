@@ -4,6 +4,7 @@ use tools_core::FeaturePackage;
 
 use crate::plugin::context::PluginContext;
 use crate::plugin::AppCorePlugin;
+use crate::state::AppCore;
 
 /// Plugin wrapper for the `feature-launcher` crate.
 /// Initializes the launcher search engine and registers launcher tools during init.
@@ -68,7 +69,72 @@ impl AppCorePlugin for LauncherPlugin {
         Ok(())
     }
 
+    async fn post_init(&self, app: &AppCore) -> common::Result<()> {
+        use crate::init::cron::{JOB_LAUNCHER_ATTENTION_REBUILD, JOB_LAUNCHER_USAGE_PRUNE};
 
+        // ── launcher_usage_prune ──────────────────────────────────────────
+        {
+            let pool = app.storage_pool.inner().clone();
+            let rt = tokio::runtime::Handle::current();
+            app.cron_executor.register(
+                JOB_LAUNCHER_USAGE_PRUNE,
+                Arc::new(move |_job: &scheduling::CronJob| {
+                    let pool = pool.clone();
+                    tokio::task::block_in_place(|| {
+                        rt.block_on(async move {
+                            let repo = feature_launcher::FrequencyRepo::new(pool);
+                            match repo.prune_old_entries().await {
+                                Ok(0) => {
+                                    Ok(Some("No old launcher usage entries to prune".to_string()))
+                                }
+                                Ok(n) => {
+                                    tracing::info!(
+                                        pruned = n,
+                                        "Launcher usage prune: removed old entries"
+                                    );
+                                    Ok(Some(format!("Pruned {n} old launcher usage entries")))
+                                }
+                                Err(e) => {
+                                    tracing::warn!(error = %e, "Launcher usage prune failed");
+                                    Ok(Some(format!("Launcher usage prune failed: {e}")))
+                                }
+                            }
+                        })
+                    })
+                }),
+            );
+        }
+
+        // ── launcher_attention_rebuild ────────────────────────────────────
+        {
+            let pool = app.storage_pool.inner().clone();
+            let rt = tokio::runtime::Handle::current();
+            app.cron_executor.register(
+                JOB_LAUNCHER_ATTENTION_REBUILD,
+                Arc::new(move |_job: &scheduling::CronJob| {
+                    let pool = pool.clone();
+                    tokio::task::block_in_place(|| {
+                        rt.block_on(async move {
+                            let aggregator = feature_launcher::AttentionAggregator::new(pool);
+                            match aggregator.rebuild_from_activity(90).await {
+                                Ok(0) => Ok(Some("No attention data to rebuild".to_string())),
+                                Ok(n) => {
+                                    tracing::info!(rows = n, "Launcher attention rebuild complete");
+                                    Ok(Some(format!("Rebuilt attention for {n} entities")))
+                                }
+                                Err(e) => {
+                                    tracing::warn!(error = %e, "Launcher attention rebuild failed");
+                                    Ok(Some(format!("Launcher attention rebuild failed: {e}")))
+                                }
+                            }
+                        })
+                    })
+                }),
+            );
+        }
+
+        Ok(())
+    }
 }
 
 mod init {

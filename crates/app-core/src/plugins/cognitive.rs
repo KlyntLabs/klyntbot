@@ -96,7 +96,6 @@ impl AppCorePlugin for CognitivePlugin {
                 &app.activity_ingestion_service()
                     .expect("activity svc available"),
                 &app.shutdown_token,
-                app.embedding_engine().expect("embedding engine available"),
             )
             .await;
         }
@@ -173,6 +172,336 @@ impl AppCorePlugin for CognitivePlugin {
             );
         }
 
+        // ── Cognitive maintenance cron handlers (migrated from init/cron.rs) ──
+        {
+            let pool = app.storage_pool.inner().clone();
+            let cog_config = app.config.read().await.clone();
+            let cog_provider = app.cognitive_provider();
+            let domain_bus = app.domain_event_bus().ok();
+
+            // atom_decay_daily
+            if let Some(ref bus) = domain_bus {
+                let pool = pool.clone();
+                let bus = Arc::clone(bus);
+                let rt = tokio::runtime::Handle::current();
+                app.cron_executor.register(
+                    crate::init::cron::JOB_ATOM_DECAY,
+                    Arc::new(move |_job: &scheduling::CronJob| {
+                        let pool = pool.clone();
+                        let bus = Arc::clone(&bus);
+                        tokio::task::block_in_place(|| {
+                            rt.block_on(async {
+                                if let Err(e) =
+                                    ::cognitive::services::atom_decay::run_decay_cycle(&pool, &bus)
+                                        .await
+                                {
+                                    tracing::warn!("Atom decay cycle failed: {e}");
+                                }
+                                Ok(None)
+                            })
+                        })
+                    }),
+                );
+            }
+
+            // fsrs_optimize_weekly
+            {
+                let pool = pool.clone();
+                let rt = tokio::runtime::Handle::current();
+                app.cron_executor.register(
+                    crate::init::cron::JOB_FSRS_OPTIMIZE,
+                    Arc::new(move |_job: &scheduling::CronJob| {
+                        let pool = pool.clone();
+                        tokio::task::block_in_place(|| {
+                            rt.block_on(async {
+                                let storage_pool = storage::StoragePool::from_existing(pool.clone());
+                                let repo = ::cognitive::FsrsParamsRepo::new(storage_pool.clone());
+                                match ::agent::adapters::fsrs_writeback::train_fsrs_weights(
+                                    &storage_pool,
+                                    &repo,
+                                )
+                                .await
+                                {
+                                    Ok(true) => tracing::info!(
+                                        "FSRS weekly optimization: weights improved and persisted"
+                                    ),
+                                    Ok(false) => tracing::info!(
+                                        "FSRS weekly optimization: no improvement or insufficient data"
+                                    ),
+                                    Err(e) => {
+                                        tracing::warn!("FSRS weekly optimization failed: {e}")
+                                    }
+                                }
+                                Ok(None)
+                            })
+                        })
+                    }),
+                );
+            }
+
+            // micro_reforge
+            {
+                let pool = pool.clone();
+                let cog_config = cog_config.clone();
+                let cog_provider = cog_provider.clone();
+                let rt = tokio::runtime::Handle::current();
+                app.cron_executor.register(
+                    crate::init::cron::JOB_MICRO_REFORGE,
+                    Arc::new(move |_job: &scheduling::CronJob| {
+                        let pool = pool.clone();
+                        let cog_config = cog_config.clone();
+                        let cog_provider = cog_provider.clone();
+                        tokio::task::block_in_place(|| {
+                            rt.block_on(async move {
+                                if !cog_config.cognitive.micro_reforge.enabled {
+                                    return Ok(None);
+                                }
+                                let svc =
+                                    ::cognitive::services::micro_reforge::MicroReforgeService::new(
+                                        storage::StoragePool::from_existing(pool.clone()),
+                                        cog_config.cognitive.micro_reforge.clone(),
+                                    );
+                                if !svc.should_run().await.unwrap_or(false) {
+                                    return Ok(None);
+                                }
+                                let handler = crate::handlers::cognitive::build_micro_reforge_handler(
+                                    &cog_provider,
+                                    &cog_config,
+                                );
+                                let rule_repo = ::cognitive::ProceduralRuleRepo::new(pool.clone());
+                                let ep_repo = ::cognitive::EpisodicMemoryRepo::new(pool.clone());
+                                let obs_repo =
+                                    ::cognitive::AccumulatedObservationRepo::new(pool.clone());
+                                match svc
+                                    .run("minute_threshold", handler, &rule_repo, &ep_repo, &obs_repo)
+                                    .await
+                                {
+                                    Ok(n) => {
+                                        tracing::info!(accepted = n, "micro_reforge ran");
+                                        Ok(Some(format!("Micro-Reforge: {} rules promoted", n)))
+                                    }
+                                    Err(e) => {
+                                        tracing::warn!(error = %e, "micro_reforge failed");
+                                        Ok(Some(format!("Micro-Reforge failed: {e}")))
+                                    }
+                                }
+                            })
+                        })
+                    }),
+                );
+            }
+
+            // episodic rollup hourly / daily / weekly
+            for (job, kind) in [
+                (crate::init::cron::JOB_EPISODIC_ROLLUP_HOURLY, "hourly"),
+                (crate::init::cron::JOB_EPISODIC_ROLLUP_DAILY, "daily"),
+                (crate::init::cron::JOB_EPISODIC_ROLLUP_WEEKLY, "weekly"),
+            ] {
+                let pool = pool.clone();
+                let cog_config = cog_config.clone();
+                let cog_provider = cog_provider.clone();
+                let rt = tokio::runtime::Handle::current();
+                app.cron_executor.register(
+                    job,
+                    Arc::new(move |_job: &scheduling::CronJob| {
+                        let pool = pool.clone();
+                        let cog_config = cog_config.clone();
+                        let cog_provider = cog_provider.clone();
+                        tokio::task::block_in_place(|| {
+                            rt.block_on(async move {
+                                if !cog_config.cognitive.hierarchical.enabled {
+                                    return Ok(None);
+                                }
+                                let repo = ::cognitive::EpisodicMemoryRepo::new(pool.clone());
+                                let summarizer =
+                                    crate::handlers::cognitive::build_hierarchical_summarizer(
+                                        &cog_provider,
+                                        &cog_config,
+                                    );
+                                let result = match kind {
+                                    "hourly" => ::cognitive::services::hierarchical_compressor::roll_up_hourly(&repo, summarizer).await,
+                                    "daily" => ::cognitive::services::hierarchical_compressor::roll_up_daily(&repo, summarizer).await,
+                                    "weekly" => ::cognitive::services::hierarchical_compressor::roll_up_weekly(&repo, summarizer).await,
+                                    other => {
+                                        // Defensive: only hourly/daily/weekly are registered above.
+                                        // Fail loud-but-safe rather than misrouting to a compressor.
+                                        tracing::error!("unknown episodic rollup kind '{other}', skipping");
+                                        return Ok(None);
+                                    }
+                                };
+                                match result {
+                                    Ok(n) => {
+                                        tracing::info!(created = n, kind, "hierarchical rollup done");
+                                        Ok(Some(format!("Hierarchical {kind}: {n} buckets created")))
+                                    }
+                                    Err(e) => {
+                                        tracing::warn!(error = %e, kind, "hierarchical rollup failed");
+                                        Ok(Some(format!("Hierarchical {kind} failed: {e}")))
+                                    }
+                                }
+                            })
+                        })
+                    }),
+                );
+            }
+
+            // atom_extraction_catchall
+            if let Some(ref bus) = domain_bus {
+                let pool = pool.clone();
+                let bus = Arc::clone(bus);
+                let rt = tokio::runtime::Handle::current();
+                app.cron_executor.register(
+                    crate::init::cron::JOB_ATOM_EXTRACTION_CATCHALL,
+                    Arc::new(move |_job: &scheduling::CronJob| {
+                        let pool = pool.clone();
+                        let bus = Arc::clone(&bus);
+                        tokio::task::block_in_place(|| {
+                            rt.block_on(async {
+                                let cache = ::cognitive::repos::AtomExtractionCache::new(pool);
+                                match cache.find_unextracted_notes(50).await {
+                                    Ok(notes) => {
+                                        let count = notes.len();
+                                        for note_id in notes {
+                                            bus.publish(bus::DomainEvent::NoteEditingFinished {
+                                                note_id,
+                                            });
+                                        }
+                                        if count > 0 {
+                                            tracing::info!(
+                                                "Atom extraction catchall: queued {count} unextracted notes"
+                                            );
+                                        }
+                                        Ok(Some(format!("Queued {count} notes for extraction")))
+                                    }
+                                    Err(e) => {
+                                        tracing::warn!("Atom extraction catchall failed: {e}");
+                                        Ok(None)
+                                    }
+                                }
+                            })
+                        })
+                    }),
+                );
+            }
+
+            // morning_briefing
+            {
+                let pool = pool.clone();
+                let rt = tokio::runtime::Handle::current();
+                app.cron_executor.register(
+                    crate::init::cron::JOB_MORNING_BRIEFING,
+                    Arc::new(move |_job: &scheduling::CronJob| {
+                        let pool = pool.clone();
+                        tokio::task::block_in_place(|| {
+                            rt.block_on(async {
+                                let atom_repo = ::cognitive::KnowledgeAtomRepo::new(pool.clone());
+                                let review_stats = ::cognitive::ReviewStatsRepo::new(pool.clone());
+                                let (fading_res, streak_res) = tokio::join!(
+                                    atom_repo.list_fading_important(5),
+                                    review_stats.current_streak(),
+                                );
+                                let fading_count = fading_res.map(|v| v.len()).unwrap_or(0);
+                                let streak = streak_res.unwrap_or(0);
+                                if fading_count > 0 {
+                                    tracing::info!(
+                                        "Morning briefing: {fading_count} fading atoms, streak={streak}"
+                                    );
+                                }
+                                Ok(Some(format!(
+                                    "Morning briefing: {fading_count} fading, streak={streak}"
+                                )))
+                            })
+                        })
+                    }),
+                );
+            }
+
+            // weekly_knowledge_digest
+            {
+                let pool = pool.clone();
+                let rt = tokio::runtime::Handle::current();
+                app.cron_executor.register(
+                    crate::init::cron::JOB_WEEKLY_KNOWLEDGE_DIGEST,
+                    Arc::new(move |_job: &scheduling::CronJob| {
+                        let pool = pool.clone();
+                        tokio::task::block_in_place(|| {
+                            rt.block_on(async {
+                                let atom_repo = ::cognitive::KnowledgeAtomRepo::new(pool.clone());
+                                let review_stats = ::cognitive::ReviewStatsRepo::new(pool.clone());
+                                let topic_count_fut = sqlx::query_as::<_, (i64,)>(
+                                    "SELECT COUNT(DISTINCT topic_id) FROM knowledge_atoms WHERE status = 'active' AND topic_id IS NOT NULL",
+                                )
+                                .fetch_one(&pool);
+                                let (streak, topic_count, fading, daily) = tokio::join!(
+                                    review_stats.current_streak(),
+                                    topic_count_fut,
+                                    atom_repo.list_fading_important(10),
+                                    review_stats.daily_reviews(7),
+                                );
+                                let streak = streak.unwrap_or(0);
+                                let topic_count = topic_count.map(|r| r.0).unwrap_or(0);
+                                let fading_count = fading.unwrap_or_default().len();
+                                let reviews_week: i64 =
+                                    daily.unwrap_or_default().iter().map(|d| d.review_count).sum();
+                                tracing::info!(
+                                    "Weekly knowledge digest: streak={streak}, reviews={reviews_week}, fading={fading_count}, topics={topic_count}",
+                                );
+                                Ok(Some(format!(
+                                    "Weekly digest: streak={streak}, fading={fading_count}"
+                                )))
+                            })
+                        })
+                    }),
+                );
+            }
+
+            // analytics_cleanup
+            {
+                let repos_bg = app.repos.clone();
+                let cog_pool = pool.clone();
+                let rt = tokio::runtime::Handle::current();
+                app.cron_executor.register(
+                    crate::init::cron::JOB_ANALYTICS_CLEANUP,
+                    Arc::new(move |_job: &scheduling::CronJob| {
+                        let repos_bg = repos_bg.clone();
+                        let cog_pool = cog_pool.clone();
+                        tokio::task::block_in_place(|| {
+                            rt.block_on(async move {
+                                let cleaned = match repos_bg.cleanup_analytics().await {
+                                    Ok(n) => n,
+                                    Err(e) => {
+                                        tracing::warn!(error = %e, "Analytics cleanup failed");
+                                        0
+                                    }
+                                };
+                                let fact_repo = ::cognitive::SemanticFactRepo::new(cog_pool.clone());
+                                let pruned = match fact_repo.prune_low_salience(0.05, 180).await {
+                                    Ok(n) => n,
+                                    Err(e) => {
+                                        tracing::warn!(error = %e, "Fact pruning failed");
+                                        0
+                                    }
+                                };
+                                let pending_repo =
+                                    ::cognitive::repos::PendingMemoryRepo::new(cog_pool);
+                                let pending_cleaned = match pending_repo.cleanup_older_than(30).await
+                                {
+                                    Ok(n) => n,
+                                    Err(e) => {
+                                        tracing::warn!(error = %e, "Pending memory cleanup failed");
+                                        0
+                                    }
+                                };
+                                Ok(Some(format!(
+                                    "Analytics: {cleaned} records cleaned, {pruned} facts pruned, {pending_cleaned} stale pending memories removed"
+                                )))
+                            })
+                        })
+                    }),
+                );
+            }
+        }
+
         Ok(())
     }
 }
@@ -189,13 +518,12 @@ use crate::state::AppCore;
 
 /// Initialize cognitive event log, pipeline, domain bus wiring, and ActivityIngestionService.
 ///
-/// Also handles capture config (ingestion token, file watcher) and work context inference.
+/// Also handles capture config (ingestion token, file watcher).
 pub(crate) async fn init_cognitive(
     config: &mut config::Config,
     storage_pool: &StoragePool,
     activity_svc: &Arc<activity_log::ActivityIngestionService>,
     shutdown_token: &CancellationToken,
-    embedding_engine: Arc<tools::EmbeddingEngine>,
 ) {
     // Seed compiled default skills to disk on first run (skills dir empty).
     // Records v1 in skill_versions for each seeded file so the Reforge cycle
@@ -275,29 +603,10 @@ pub(crate) async fn init_cognitive(
         }
     }
 
-    // Phase 2: Start Work Context inference engine + loop.
-    if config.work_context.enabled {
-        let inference_cfg =
-            activity_log::inference::ContextInferenceConfig::from_work_context_config(
-                &config.work_context,
-            );
-        let text_embedder = Arc::new(agent::TextEmbedderImpl::new(embedding_engine.clone()));
-        let inference_engine = Arc::new(activity_log::inference::ContextInferenceEngine::new(
-            storage_pool.clone(),
-            text_embedder,
-            None, // VectorStore already consumed by agent builder; centroids cached in-memory
-            inference_cfg,
-        ));
-        let dormancy_days = config.work_context.max_dormancy_days as i64;
-        let _inference_loop = activity_log::inference_loop::ContextInferenceLoop::start(
-            inference_engine,
-            storage_pool.clone(),
-            config.work_context.inference_interval_mins,
-            dormancy_days,
-            shutdown_token.child_token(),
-        );
-        info!("work context inference loop started");
-    }
+    // NOTE: Work Context inference engine + loop are started in the agent builder
+    // (agent/src/agent_loop/builders/context_sources.rs), where the WorkContextSource
+    // is also registered and the real VectorStore is available. Do not start a second
+    // loop here — it duplicates the inference work with a degraded (None) vector store.
 }
 
 /// Spawn post-core background services: activity subscriber, analytics retention, event log persistence.

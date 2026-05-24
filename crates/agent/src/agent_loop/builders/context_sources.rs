@@ -280,8 +280,10 @@ pub(crate) async fn build_context_sources(
             None
         };
 
-    // Productivity context source (optional — requires real pool + enabled).
-    // prod_repos is stored for reuse by the tool registration block below.
+    // Productivity repos (optional — requires real pool + enabled). Stored for
+    // reuse by the tool registration block below. NOTE: the ProductivityContextSource
+    // itself is registered by ProductivityPlugin (app-core), which arrives via
+    // pre_registered_sources — do not push it here or it registers twice.
     let prod_repos = if config.productivity.enabled {
         pool
             .as_ref()
@@ -289,11 +291,6 @@ pub(crate) async fn build_context_sources(
     } else {
         None
     };
-    if let Some(ref repos) = prod_repos {
-        sources.push(Box::new(crate::context_sources::ProductivityContextSource::new(
-            repos.clone(),
-        )));
-    }
 
     // Work context source (optional — requires real pool + enabled config).
     let mut inference_loop_token = None;
