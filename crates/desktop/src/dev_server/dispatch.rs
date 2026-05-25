@@ -25,6 +25,32 @@ pub(super) async fn dispatch(
     let core = &state.core;
     let cmd = cmd.as_str();
 
+    // ── Transport-neutral registry (preferred) ─────────────────────
+    // Every `#[klynt_command]` whose params are all JSON-deserializable
+    // registers a `json` handler in `KLYNT_COMMANDS`. We run it here — the
+    // *same* handler the Tauri IPC adapter uses — so arg decoding cannot drift.
+    // `DEV_INLINE` commands need SSE channels / browser-specific behaviour and
+    // are handled inline below instead.
+    const DEV_INLINE: &[&str] = &[
+        "note_insight_review",
+        "chat_send",
+        "note_insight_tab_chat",
+        "open_url",
+    ];
+    if !DEV_INLINE.contains(&cmd) {
+        if let Some(reg) = crate::specta_builder::KLYNT_COMMANDS
+            .iter()
+            .find(|c| c.name == cmd)
+        {
+            if let Some(json) = reg.json {
+                let emitter: Arc<dyn AppEventEmitter> = Arc::new(SseEmitter {
+                    tx: state.global_event_tx.clone(),
+                });
+                return into_api_result(json(body.clone(), core.clone(), emitter).await);
+            }
+        }
+    }
+
     // ── note_insight_review (needs SSE emitter, handled inline) ─────
     if cmd == "note_insight_review" {
         let id = dev::get_str(&body, "noteId").unwrap_or_default();
@@ -42,63 +68,6 @@ pub(super) async fn dispatch(
     }
 
     // ── Per-module dispatch (co-located with Tauri commands) ─────────
-    if let Some(r) = commands::git::dispatch_dev(cmd, core, &body).await {
-        return into_api_result(r);
-    }
-    if let Some(r) = commands::tasks::dispatch_dev(cmd, core, &body).await {
-        return into_api_result(r);
-    }
-    if let Some(r) = commands::projects::dispatch_dev(cmd, core, &body).await {
-        return into_api_result(r);
-    }
-    if let Some(r) = commands::entities::dispatch_dev(cmd, core, &body).await {
-        return into_api_result(r);
-    }
-    if let Some(r) = commands::entity_links::dispatch_dev(cmd, core, &body).await {
-        return into_api_result(r);
-    }
-    if let Some(r) = commands::annotations::dispatch_dev(cmd, core, &body).await {
-        return into_api_result(r);
-    }
-    if let Some(r) = commands::language::dispatch_dev(cmd, core, &body).await {
-        return into_api_result(r);
-    }
-    if let Some(r) = commands::practice::dispatch_dev(cmd, core, &body).await {
-        return into_api_result(r);
-    }
-    if let Some(r) = commands::knowledge_health::dispatch_dev(cmd, core, &body).await {
-        return into_api_result(r);
-    }
-    if let Some(r) = commands::morning_briefing::dispatch_dev(cmd, core, &body).await {
-        return into_api_result(r);
-    }
-    if let Some(r) = commands::retention_history::dispatch_dev(cmd, core, &body).await {
-        return into_api_result(r);
-    }
-    if let Some(r) = commands::review_stats::dispatch_dev(cmd, core, &body).await {
-        return into_api_result(r);
-    }
-    if let Some(r) = commands::project_sources::dispatch_dev(cmd, core, &body).await {
-        return into_api_result(r);
-    }
-    if let Some(r) = commands::project_memories::dispatch_dev(cmd, core, &body).await {
-        return into_api_result(r);
-    }
-    if let Some(r) = commands::project_conversations::dispatch_dev(cmd, core, &body).await {
-        return into_api_result(r);
-    }
-    if let Some(r) = commands::areas::dispatch_dev(cmd, core, &body).await {
-        return into_api_result(r);
-    }
-    if let Some(r) = commands::objectives::dispatch_dev(cmd, core, &body).await {
-        return into_api_result(r);
-    }
-    if let Some(r) = commands::key_results::dispatch_dev(cmd, core, &body).await {
-        return into_api_result(r);
-    }
-    if let Some(r) = commands::status::dispatch_dev(cmd, core, &body).await {
-        return into_api_result(r);
-    }
     if let Some(r) = commands::notes::dispatch_dev(cmd, core, &body).await {
         return into_api_result(r);
     }
@@ -108,46 +77,7 @@ pub(super) async fn dispatch(
     if let Some(r) = commands::distraction::dispatch_dev(cmd, core, &body).await {
         return into_api_result(r);
     }
-    if let Some(r) = commands::settings::dispatch_dev(cmd, core, &body).await {
-        return into_api_result(r);
-    }
     if let Some(r) = commands::chat::dispatch_dev(cmd, core, &body).await {
-        return into_api_result(r);
-    }
-    if let Some(r) = commands::groups::dispatch_dev(cmd, core, &body).await {
-        return into_api_result(r);
-    }
-    if let Some(r) = commands::workflows::dispatch_dev(cmd, core, &body).await {
-        return into_api_result(r);
-    }
-    if let Some(r) = commands::columns::dispatch_dev(cmd, core, &body).await {
-        return into_api_result(r);
-    }
-    if let Some(r) = commands::cognitive::dispatch_dev(cmd, core, &body).await {
-        return into_api_result(r);
-    }
-    if let Some(r) = commands::timeline::dispatch_dev(cmd, core, &body).await {
-        return into_api_result(r);
-    }
-    if let Some(r) = commands::cron::dispatch_dev(cmd, core, &body).await {
-        return into_api_result(r);
-    }
-    if let Some(r) = commands::capture::dispatch_dev(cmd, core, &body).await {
-        return into_api_result(r);
-    }
-    if let Some(r) = commands::work_context::dispatch_dev(cmd, core, &body).await {
-        return into_api_result(r);
-    }
-    if let Some(r) = commands::workspace::dispatch_dev(cmd, core, &body).await {
-        return into_api_result(r);
-    }
-    if let Some(r) = commands::agents::dispatch_dev(cmd, core, &body).await {
-        return into_api_result(r);
-    }
-    if let Some(r) = commands::autotuner::dispatch_dev(cmd, core, &body).await {
-        return into_api_result(r);
-    }
-    if let Some(r) = commands::integrations::dispatch_dev(cmd, core, &body).await {
         return into_api_result(r);
     }
     if let Some(r) = commands::launcher::dispatch_dev(cmd, core, &body).await {
@@ -156,34 +86,10 @@ pub(super) async fn dispatch(
     if let Some(r) = commands::shortcuts::dispatch_dev(cmd, core, &body).await {
         return into_api_result(r);
     }
-    if let Some(r) = commands::mirror::dispatch_dev(cmd, core, &body).await {
-        return into_api_result(r);
-    }
-    if let Some(r) = commands::pending_memory::dispatch_dev(cmd, core, &body).await {
-        return into_api_result(r);
-    }
-    if let Some(r) = commands::journey::dispatch_dev(cmd, core, &body).await {
-        return into_api_result(r);
-    }
-    if let Some(r) = commands::view::dispatch_dev(cmd, core, &body).await {
-        return into_api_result(r);
-    }
-    if let Some(r) = commands::fabric::dispatch_dev(cmd, core, &body).await {
-        return into_api_result(r);
-    }
-    if let Some(r) = commands::voice::dispatch_dev(cmd, core, &body).await {
-        return into_api_result(r);
-    }
-    if let Some(r) = commands::voice_conversation::dispatch_dev(cmd, core, &body).await {
-        return into_api_result(r);
-    }
     if let Some(r) = commands::status_badge::dispatch_dev(cmd, core, &body).await {
         return into_api_result(r);
     }
     if let Some(r) = commands::focus::dispatch_dev(cmd, core, &body).await {
-        return into_api_result(r);
-    }
-    if let Some(r) = commands::workspace_lifecycle::dispatch_dev(cmd, core, &body).await {
         return into_api_result(r);
     }
 

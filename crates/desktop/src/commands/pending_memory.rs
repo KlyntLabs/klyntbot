@@ -1,9 +1,5 @@
-use desktop_shared::types::EntityKind;
-use desktop_shared::{errors::ApiError, CommandResult};
-
 use desktop_macros::klynt_command;
-
-use crate::app_core::AppCore;
+use desktop_shared::types::EntityKind;
 
 // ── Response type ────────────────────────────────────────────────────────
 
@@ -38,51 +34,15 @@ pub async fn list_pending_memories(limit: Option<i64>) -> Vec<PendingMemoryRespo
 }
 
 #[klynt_command]
-pub async fn approve_pending_memory(app: tauri::AppHandle, id: String) -> () {
+pub async fn approve_pending_memory(id: String) -> () {
     state.approve_pending_memory(&id).await?;
-    super::emit_entity_updated(&app, EntityKind::PendingMemory, &id);
+    emitter.emit_entity_updated(EntityKind::PendingMemory, &id);
     Ok(())
 }
 
 #[klynt_command]
-pub async fn dismiss_pending_memory(app: tauri::AppHandle, id: String) -> () {
+pub async fn dismiss_pending_memory(id: String) -> () {
     state.dismiss_pending_memory(&id).await?;
-    super::emit_entity_updated(&app, EntityKind::PendingMemory, &id);
+    emitter.emit_entity_updated(EntityKind::PendingMemory, &id);
     Ok(())
-}
-
-// ── Dev server dispatch ──────────────────────────────────────────────────
-
-#[cfg(debug_assertions)]
-pub(crate) async fn dispatch_dev(
-    cmd: &str,
-    core: &AppCore,
-    body: &serde_json::Value,
-) -> Option<CommandResult<serde_json::Value>> {
-    use super::dev_helpers::{self as dev, try_field};
-
-    Some(match cmd {
-        "list_pending_memories" => {
-            let repo = match core.pending_memory_repo() {
-                Ok(r) => r,
-                Err(e) => return Some(Err(e)),
-            };
-            let limit: Option<i64> = dev::get(body, "limit");
-            let rows = repo.list_pending(limit.unwrap_or(20)).await;
-            let responses: Vec<PendingMemoryResponse> =
-                rows.into_iter().map(PendingMemoryResponse::from).collect();
-            dev::val(Ok::<_, ApiError>(responses))
-        }
-        "approve_pending_memory" => {
-            let id: String = try_field!(dev::get(body, "id")
-                .ok_or_else(|| ApiError::new("VALIDATION", "missing required field: id")));
-            dev::val(core.approve_pending_memory(&id).await)
-        }
-        "dismiss_pending_memory" => {
-            let id: String = try_field!(dev::get(body, "id")
-                .ok_or_else(|| ApiError::new("VALIDATION", "missing required field: id")));
-            dev::val(core.dismiss_pending_memory(&id).await)
-        }
-        _ => return None,
-    })
 }

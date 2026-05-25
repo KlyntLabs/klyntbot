@@ -52,8 +52,12 @@ pub async fn chat_send(
         })
         .await?;
 
-    let user_msg = outcome.user_message.expect("assistant mode returns user_message");
-    let stream_info = outcome.stream_info.expect("assistant mode returns stream_info");
+    let user_msg = outcome
+        .user_message
+        .expect("assistant mode returns user_message");
+    let stream_info = outcome
+        .stream_info
+        .expect("assistant mode returns stream_info");
 
     // Spawn background task to relay streaming events via Tauri emitter
     let emitter: Arc<dyn ::app_core::events::AppEventEmitter> = Arc::new(TauriEmitter(app));
@@ -121,7 +125,6 @@ pub async fn chat_force_reset(session_key: String) -> () {
     state.chat_force_reset(session_key).await
 }
 
-
 #[klynt_command]
 pub async fn chat_save_starlark_rule(
     app: tauri::AppHandle,
@@ -134,7 +137,6 @@ pub async fn chat_save_starlark_rule(
         .await
         .map_err(|e| desktop_shared::errors::ApiError::new("CONFIG_ERROR", e.to_string()))
 }
-
 
 // ── Dev server dispatch ─────────────────────────────────────────────
 // Note: `chat_send` is dispatched directly in `dev_server.rs` because it needs

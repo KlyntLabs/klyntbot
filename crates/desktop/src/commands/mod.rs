@@ -65,6 +65,39 @@ pub fn emit_updates(app: &tauri::AppHandle, updates: &[::app_core::EntityUpdate]
     }
 }
 
+/// `AppEventEmitter` backed by a Tauri `AppHandle`. Built by `#[klynt_command]`
+/// for the Tauri IPC adapter so one command body can emit through the same
+/// transport-neutral seam the dev HTTP adapter uses.
+pub struct TauriEmitter {
+    app: tauri::AppHandle,
+}
+
+impl TauriEmitter {
+    pub fn new(app: tauri::AppHandle) -> Self {
+        Self { app }
+    }
+}
+
+impl ::app_core::events::AppEventEmitter for TauriEmitter {
+    fn emit_event(&self, event_name: &str, payload: serde_json::Value) {
+        use tauri::Emitter;
+        if let Err(e) = self.app.emit(event_name, payload) {
+            ::tracing::warn!("failed to emit '{event_name}' event: {e}");
+        }
+    }
+}
+
+/// Emit entity updates through the transport-neutral emitter seam. Used by
+/// commands migrated off the `app: tauri::AppHandle` + `emit_updates` pattern.
+pub fn emit_updates_ev(
+    emitter: &dyn ::app_core::events::AppEventEmitter,
+    updates: &[::app_core::EntityUpdate],
+) {
+    for u in updates {
+        emitter.emit_entity_updated(u.kind.clone(), &u.id);
+    }
+}
+
 pub fn emit_entity_updated(app: &tauri::AppHandle, kind: EntityKind, id: &str) {
     let payload = EntityUpdatedPayload {
         entity_kind: kind,

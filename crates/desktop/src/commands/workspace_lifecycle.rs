@@ -49,36 +49,3 @@ pub async fn connect_workspace(id: String) -> () {
         .await
         .map_err(|e| ApiError::new("WORKSPACE_ERROR", e.to_string()))
 }
-
-#[cfg(debug_assertions)]
-pub(crate) async fn dispatch_dev(
-    cmd: &str,
-    core: &::app_core::state::AppCore,
-    body: &serde_json::Value,
-) -> Option<desktop_shared::CommandResult<serde_json::Value>> {
-    use super::dev_helpers::{self as dev, try_field};
-    Some(match cmd {
-        "list_workspaces" => dev::val(core.list_workspaces().await.map_err(ApiError::from)),
-        "add_workspace" => {
-            let path = try_field!(dev::get_str(body, "path"));
-            dev::val(core.add_workspace(path).await.map_err(ApiError::from))
-        }
-        "is_workspace_path_dir" => {
-            let path = try_field!(dev::get_str(body, "path"));
-            dev::val(
-                core.is_workspace_path_dir(path)
-                    .await
-                    .map_err(ApiError::from),
-            )
-        }
-        "remove_workspace" => {
-            let id = try_field!(dev::get_str(body, "id"));
-            dev::val(core.remove_workspace(id).await.map_err(ApiError::from))
-        }
-        "connect_workspace" => {
-            let id = try_field!(dev::get_str(body, "id"));
-            dev::val(core.connect_workspace(id).await.map_err(ApiError::from))
-        }
-        _ => return None,
-    })
-}

@@ -160,35 +160,14 @@ pub(super) fn into_api_result(r: Result<Value, ApiError>) -> ApiResult {
 
 // ── Parity test ─────────────────────────────────────────────────────────
 //
-// Verifies that every Tauri command registered in `main.rs` has a matching
-// entry in some module's `dispatch_dev` (via `DEV_COMMANDS`). If someone adds
-// a new Tauri command but forgets the dev dispatch, this test fails.
+// Verifies that every tauri-specta-typed command is also registered in the
+// runtime `KLYNT_COMMANDS` linkme slice. Dev-vs-Tauri dispatch parity is no
+// longer hand-maintained: the dev HTTP server dispatches through the same
+// slice (via each command's `json` handler) that the Tauri adapter uses.
 
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeSet;
-
-    /// Commands that only exist in Tauri IPC (desktop-only, no HTTP equivalent).
-    const TAURI_ONLY: &[&str] = &[
-        "permissions_check_accessibility",
-        "permissions_open_accessibility",
-        "resize_window",
-        "open_url",
-        "quit_app",
-        "show_dashboard",
-        "focus_session_start",
-        "focus_session_stop",
-        "focus_session_status",
-        "focus_session_pause",
-        "focus_session_resume",
-        "focus_session_extend",
-        "focus_session_start_break",
-        "focus_session_extend_work",
-        "focus_session_skip_break",
-        "focus_session_take_break",
-        "mcp_oauth_start",
-        "mcp_oauth_disconnect",
-    ];
 
     /// All runtime-registered commands from the linkme slice.
     fn tauri_command_names() -> BTreeSet<String> {

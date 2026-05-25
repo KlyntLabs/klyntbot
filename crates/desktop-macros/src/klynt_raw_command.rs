@@ -1,8 +1,8 @@
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
-use syn::{ItemFn, parse2};
+use syn::{parse2, ItemFn};
 
-use crate::errors::{ERR_NOT_FUNCTION, err};
+use crate::errors::{err, ERR_NOT_FUNCTION};
 
 pub fn expand(input: TokenStream) -> TokenStream {
     let fn_item: ItemFn = match parse2(input.clone()) {
@@ -36,6 +36,7 @@ pub fn expand(input: TokenStream) -> TokenStream {
             crate::specta_builder::CommandRegistration {
                 name: #fn_name_str,
                 invoke: #dispatcher_ident,
+                json: ::std::option::Option::None,
                 source: crate::specta_builder::SourceKind::Raw,
             };
     }
