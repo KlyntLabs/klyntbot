@@ -129,6 +129,18 @@ pub trait Tool: Send + Sync {
         common::ChannelMask::ALL
     }
 
+    /// Whether this tool is projected into autonomous subagents' toolkits.
+    ///
+    /// Default `false`: a spawned subagent gets only the filesystem primitives
+    /// and recall stubs built by `ToolKitBuilder`. A *cwd-independent* domain
+    /// tool (e.g. `memory`) opts in here to also be available to subagents,
+    /// projected from the parent agent's registry at spawn time. Tools that
+    /// hold workspace-scoped state (the primitives) must NOT opt in — they are
+    /// rebuilt per-subagent with the subagent's own cwd.
+    fn subagent_visible(&self) -> bool {
+        false
+    }
+
     /// Optional per-tool timeout override.
     ///
     /// When `Some(duration)`, the execution core uses this instead of the

@@ -1,8 +1,8 @@
 //! Learning-service builder for the agent loop.
 
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
-use std::sync::atomic::Ordering;
 use tokio::sync::RwLock;
 use tracing::info;
 

@@ -126,6 +126,13 @@ impl Tool for MemoryTool {
         "memory"
     }
 
+    /// Projected into subagents: memory/recall operates on shared backing
+    /// services (recall handler, embedding store) with no main-agent-specific
+    /// mutable state, so autonomous subagents share the same memory backend.
+    fn subagent_visible(&self) -> bool {
+        true
+    }
+
     fn description(&self) -> &str {
         "Search past conversations using semantic similarity and record user facts. Actions: search_conversations (search conversation history), search_all (unified search across todos and conversations), purge (clear embeddings), status (show memory stats), record_fact (record a fact about the user into the cognitive pipeline), get_last_enhancement_trace (inspect the most recent query enhancement pipeline run)."
     }

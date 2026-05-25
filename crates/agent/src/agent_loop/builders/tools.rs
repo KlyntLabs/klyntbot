@@ -31,7 +31,9 @@ pub(crate) struct ToolsBuildResult {
 }
 
 /// Register feature-specific tools and start ancillary services.
-pub(crate) async fn build_feature_tools(input: ToolsBuildInput<'_>) -> common::Result<ToolsBuildResult> {
+pub(crate) async fn build_feature_tools(
+    input: ToolsBuildInput<'_>,
+) -> common::Result<ToolsBuildResult> {
     let ToolsBuildInput {
         config,
         tool_registry,
@@ -78,11 +80,10 @@ pub(crate) async fn build_feature_tools(input: ToolsBuildInput<'_>) -> common::R
             prod_repos.clone(),
             config.productivity.focus.clone(),
         ));
-        let prod_handler =
-            Arc::new(crate::adapters::productivity::ProductivityHandlerImpl::new(
-                provider.clone(),
-                config.agents.defaults.model.clone(),
-            ));
+        let prod_handler = Arc::new(crate::adapters::productivity::ProductivityHandlerImpl::new(
+            provider.clone(),
+            config.agents.defaults.model.clone(),
+        ));
         let mut daily_agg = feature_productivity::DailyAggregator::new(prod_repos.clone())
             .with_handler(prod_handler);
         if let Some(ref bus) = domain_event_bus {
@@ -98,8 +99,7 @@ pub(crate) async fn build_feature_tools(input: ToolsBuildInput<'_>) -> common::R
     let mcp_manager = if config.mcp.has_active_servers() {
         // connect_all logs startup progress internally via tracing
         let manager =
-            mcp::McpManager::connect_all(&config.mcp, None, mcp::McpClientOptions::default())
-                .await;
+            mcp::McpManager::connect_all(&config.mcp, None, mcp::McpClientOptions::default()).await;
         let mcp_tools = manager.tools();
         let tool_count = mcp_tools.len();
         for tool in mcp_tools {
@@ -118,7 +118,9 @@ pub(crate) async fn build_feature_tools(input: ToolsBuildInput<'_>) -> common::R
     };
 
     // ── Skill reference tool (progressive loading) ───────────────────
-    tool_registry.register(tools::SkillReferenceTool::new(Arc::clone(skill_reference_index)));
+    tool_registry.register(tools::SkillReferenceTool::new(Arc::clone(
+        skill_reference_index,
+    )));
 
     // ── Recurring task spawner ────────────────────────────────────────
     let mut recurring_spawner = crate::RecurringTaskSpawner::new(

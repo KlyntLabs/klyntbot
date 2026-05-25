@@ -48,8 +48,7 @@ pub(crate) async fn build_cognitive_system(
         .with_recall_opt(recall_service.clone())
         .with_embedder_opt(cognitive_embedder);
     if let Some(ref p) = pool {
-        retriever =
-            retriever.with_episodic_repo(cognitive::EpisodicMemoryRepo::new(p.clone()));
+        retriever = retriever.with_episodic_repo(cognitive::EpisodicMemoryRepo::new(p.clone()));
     }
     if let Some(cfg) = cognitive_retrieval_config {
         retriever = retriever.with_config(cfg);
@@ -65,8 +64,7 @@ pub(crate) async fn build_cognitive_system(
     }
     // Wire co-activation tracking for intelligent scoring
     if let Some(ref p) = pool {
-        retriever = retriever
-            .with_co_activation_repo(cognitive::CoActivationRepo::new(p.clone()));
+        retriever = retriever.with_co_activation_repo(cognitive::CoActivationRepo::new(p.clone()));
     }
     // Wire entity graph for graph-aware retrieval boost (uses plugin-provided repo only)
     if let Some(ref entity_repo) = shared_entity_repo {
@@ -84,9 +82,7 @@ pub(crate) async fn build_cognitive_system(
     let predictive_cache_inner =
         Arc::new(cognitive::services::predictive_cache::PredictiveCache::new(
             100,
-            std::time::Duration::from_secs(
-                config.cognitive.predictive_cache.ttl_seconds as u64,
-            ),
+            std::time::Duration::from_secs(config.cognitive.predictive_cache.ttl_seconds as u64),
         ));
     let predictive_cache = Some(predictive_cache_inner.clone());
     retriever = retriever.with_predictive_cache(predictive_cache_inner);
@@ -113,8 +109,7 @@ pub(crate) async fn build_cognitive_system(
                     .with_temperature(0.0)
                     .with_response_format(providers::ResponseFormat::JsonObject),
             ),
-        )
-            as Arc<dyn cognitive::services::temporal_pruner::TemporalPrunerHandler>
+        ) as Arc<dyn cognitive::services::temporal_pruner::TemporalPrunerHandler>
     });
     if let Some(ref pruner) = temporal_pruner {
         retriever = retriever.with_temporal_pruner(pruner.clone());
@@ -174,8 +169,7 @@ pub(crate) async fn build_cognitive_system(
             );
 
             // Community search adapter (Phase 2)
-            let community_repo =
-                cognitive::repos::CommunityRepo::new(storage_pool.inner().clone());
+            let community_repo = cognitive::repos::CommunityRepo::new(storage_pool.inner().clone());
             let community_adapter = Arc::new(
                 crate::adapters::community_search::CommunitySearchAdapter::new(
                     Arc::new(vs.clone()),
@@ -213,48 +207,82 @@ pub(crate) async fn build_cognitive_system(
 
                 let note_tree_note_repo =
                     feature_notes::repo::NoteRepo::new(storage_pool.inner().clone());
-                spawn_subscriber!("NoteTreeBuilder",
+                spawn_subscriber!(
+                    "NoteTreeBuilder",
                     crate::adapters::note_tree_builder::NoteTreeBuilder::new(
-                        tree_repo.clone(), Arc::new(vs.clone()), text_embedder.clone(),
-                        context_update_queue.clone(), domain_event_bus.clone(), note_tree_note_repo,
-                    ));
+                        tree_repo.clone(),
+                        Arc::new(vs.clone()),
+                        text_embedder.clone(),
+                        context_update_queue.clone(),
+                        domain_event_bus.clone(),
+                        note_tree_note_repo,
+                    )
+                );
 
-                spawn_subscriber!("TaskTreeBuilder",
+                spawn_subscriber!(
+                    "TaskTreeBuilder",
                     crate::adapters::task_tree_builder::TaskTreeBuilder::new(
-                        tree_repo.clone(), Arc::new(vs.clone()), text_embedder.clone(),
-                        context_update_queue.clone(), domain_event_bus.clone(), storage_pool.inner().clone(),
-                    ));
+                        tree_repo.clone(),
+                        Arc::new(vs.clone()),
+                        text_embedder.clone(),
+                        context_update_queue.clone(),
+                        domain_event_bus.clone(),
+                        storage_pool.inner().clone(),
+                    )
+                );
 
-                spawn_subscriber!("EntityTreeLinker",
+                spawn_subscriber!(
+                    "EntityTreeLinker",
                     crate::adapters::entity_tree_linker::EntityTreeLinker::new(
                         storage_pool.inner().clone(),
-                    ));
+                    )
+                );
 
                 let community_repo_for_builder =
                     cognitive::repos::CommunityRepo::new(storage_pool.inner().clone());
-                spawn_subscriber!("CommunityBuilder",
+                spawn_subscriber!(
+                    "CommunityBuilder",
                     crate::adapters::community_builder::CommunityBuilder::new(
-                        community_repo_for_builder, Arc::new(vs.clone()), text_embedder.clone(),
-                        tree_repo.clone(), context_update_queue.clone(),
-                    ));
+                        community_repo_for_builder,
+                        Arc::new(vs.clone()),
+                        text_embedder.clone(),
+                        tree_repo.clone(),
+                        context_update_queue.clone(),
+                    )
+                );
 
-                spawn_subscriber!("ProductivityTreeBuilder",
+                spawn_subscriber!(
+                    "ProductivityTreeBuilder",
                     crate::adapters::productivity_tree_builder::ProductivityTreeBuilder::new(
-                        tree_repo.clone(), Arc::new(vs.clone()), text_embedder.clone(),
-                        context_update_queue.clone(), domain_event_bus.clone(),
-                    ));
+                        tree_repo.clone(),
+                        Arc::new(vs.clone()),
+                        text_embedder.clone(),
+                        context_update_queue.clone(),
+                        domain_event_bus.clone(),
+                    )
+                );
 
-                spawn_subscriber!("OkrTreeBuilder",
+                spawn_subscriber!(
+                    "OkrTreeBuilder",
                     crate::adapters::okr_tree_builder::OkrTreeBuilder::new(
-                        tree_repo.clone(), Arc::new(vs.clone()), text_embedder.clone(),
-                        context_update_queue.clone(), domain_event_bus.clone(),
-                    ));
+                        tree_repo.clone(),
+                        Arc::new(vs.clone()),
+                        text_embedder.clone(),
+                        context_update_queue.clone(),
+                        domain_event_bus.clone(),
+                    )
+                );
 
-                spawn_subscriber!("LearningTreeBuilder",
+                spawn_subscriber!(
+                    "LearningTreeBuilder",
                     crate::adapters::learning_tree_builder::LearningTreeBuilder::new(
-                        tree_repo.clone(), Arc::new(vs.clone()), text_embedder.clone(),
-                        context_update_queue.clone(), domain_event_bus.clone(),
-                    ));
+                        tree_repo.clone(),
+                        Arc::new(vs.clone()),
+                        text_embedder.clone(),
+                        context_update_queue.clone(),
+                        domain_event_bus.clone(),
+                    )
+                );
 
                 // NOTE: Backfills removed (pre-production — no legacy data to migrate).
             }
@@ -285,9 +313,7 @@ pub(crate) async fn build_cognitive_system(
     // Wire cognitive memory scorer for tiered compression
     let context_engine = if config.cognitive.history_compression.use_cognitive_scoring {
         let scorer = Arc::new(
-            crate::adapters::memory_scorer_impl::CognitiveMemoryScorer::new(Arc::clone(
-                &retriever,
-            )),
+            crate::adapters::memory_scorer_impl::CognitiveMemoryScorer::new(Arc::clone(&retriever)),
         );
         context_engine.with_memory_scorer(scorer)
     } else {

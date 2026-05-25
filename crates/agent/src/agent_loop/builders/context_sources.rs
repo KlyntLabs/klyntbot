@@ -51,8 +51,7 @@ pub(crate) async fn build_context_sources(
     // Soul context source (KLYNTBOT.md)
     let soul_source = skill_system::SoulContextSource::load(data_dir_path)?;
     // Skill listing source (frontmatter listing of all skills)
-    let skill_listing_source =
-        skill_system::SkillListingSource::new(Arc::clone(skill_store));
+    let skill_listing_source = skill_system::SkillListingSource::new(Arc::clone(skill_store));
 
     let mut sources: Vec<Box<dyn ContextSource>> = vec![
         Box::new(soul_source),
@@ -71,7 +70,9 @@ pub(crate) async fn build_context_sources(
             storage::SessionMemoryRepo::new(storage_pool.inner().clone()),
         )),
         Box::new(crate::context_sources::AreaSource::new(repos.areas.clone())),
-        Box::new(crate::context_sources::PageContextSource::new(repos.clone())),
+        Box::new(crate::context_sources::PageContextSource::new(
+            repos.clone(),
+        )),
     ];
 
     // Cognitive context source (optional — requires real pool).
@@ -80,111 +81,110 @@ pub(crate) async fn build_context_sources(
     let mut cognitive_embedder: Option<Arc<dyn cognitive::SemanticFactEmbedder>> = None;
     let mut cognitive_retrieval_config: Option<cognitive::CognitiveRetrievalConfig> = None;
 
-    let cognitive_bg_service: Option<
-        cognitive::background::BackgroundConsolidationService,
-    > = if let Some(ref pool) = pool {
-        // Use shared repos from app-core plugins when available (eliminates duplication).
-        let fact_repo = shared_fact_repo.unwrap_or_else(|| cognitive::SemanticFactRepo::new(pool.clone()));
-        let rule_repo = cognitive::ProceduralRuleRepo::new(pool.clone());
+    let cognitive_bg_service: Option<cognitive::background::BackgroundConsolidationService> =
+        if let Some(ref pool) = pool {
+            // Use shared repos from app-core plugins when available (eliminates duplication).
+            let fact_repo =
+                shared_fact_repo.unwrap_or_else(|| cognitive::SemanticFactRepo::new(pool.clone()));
+            let rule_repo = cognitive::ProceduralRuleRepo::new(pool.clone());
 
-        // Use shared embedder from app-core plugins when available.
-        let cognitive_embedder_local: Option<Arc<dyn cognitive::SemanticFactEmbedder>> =
-            shared_embedder.or_else(|| {
-                vector_store.as_ref().map(|vs| {
-                    Arc::new(
-                        crate::adapters::cognitive_embedder::SemanticFactEmbedderImpl::new(
-                            Arc::clone(embedding_engine),
-                            vs.clone(),
-                        ),
-                    ) as Arc<dyn cognitive::SemanticFactEmbedder>
-                })
-            });
+            // Use shared embedder from app-core plugins when available.
+            let cognitive_embedder_local: Option<Arc<dyn cognitive::SemanticFactEmbedder>> =
+                shared_embedder.or_else(|| {
+                    vector_store.as_ref().map(|vs| {
+                        Arc::new(
+                            crate::adapters::cognitive_embedder::SemanticFactEmbedderImpl::new(
+                                Arc::clone(embedding_engine),
+                                vs.clone(),
+                            ),
+                        ) as Arc<dyn cognitive::SemanticFactEmbedder>
+                    })
+                });
 
-        // Build retrieval config from app config
-        let retrieval_config = cognitive::CognitiveRetrievalConfig {
-            dynamic_facts_enabled: config.cognitive.dynamic_facts_enabled,
-            static_fact_limit: config.cognitive.static_fact_limit,
-            dynamic_fact_limit: config.cognitive.dynamic_fact_limit,
-            vector_top_k: config.cognitive.vector_top_k,
-            min_similarity: config.cognitive.min_similarity,
-            max_stability: config.cognitive.max_stability,
-            relevance_weight_semantic: config.cognitive.relevance_weight_semantic,
-            relevance_weight_retrievability: config.cognitive.relevance_weight_retrievability,
-            relevance_weight_importance: config.cognitive.relevance_weight_importance,
-            relevance_weight_frequency: config.cognitive.relevance_weight_frequency,
-            relevance_weight_situation: config.cognitive.relevance_weight_situation,
-            relevance_weight_temporal: config.cognitive.relevance_weight_temporal,
-            relevance_weight_hierarchy: 0.10,
-            relevance_weight_path_coherence: 0.05,
-            relevance_weight_community: 0.15,
-            relevance_weight_cross_note: 0.10,
-            relevance_weight_recall_support: config.cognitive.relevance_weight_recall_support,
-            relevance_weight_graph_path_boost: config.cognitive.relevance_weight_graph_path_boost,
-        };
+            // Build retrieval config from app config
+            let retrieval_config = cognitive::CognitiveRetrievalConfig {
+                dynamic_facts_enabled: config.cognitive.dynamic_facts_enabled,
+                static_fact_limit: config.cognitive.static_fact_limit,
+                dynamic_fact_limit: config.cognitive.dynamic_fact_limit,
+                vector_top_k: config.cognitive.vector_top_k,
+                min_similarity: config.cognitive.min_similarity,
+                max_stability: config.cognitive.max_stability,
+                relevance_weight_semantic: config.cognitive.relevance_weight_semantic,
+                relevance_weight_retrievability: config.cognitive.relevance_weight_retrievability,
+                relevance_weight_importance: config.cognitive.relevance_weight_importance,
+                relevance_weight_frequency: config.cognitive.relevance_weight_frequency,
+                relevance_weight_situation: config.cognitive.relevance_weight_situation,
+                relevance_weight_temporal: config.cognitive.relevance_weight_temporal,
+                relevance_weight_hierarchy: 0.10,
+                relevance_weight_path_coherence: 0.05,
+                relevance_weight_community: 0.15,
+                relevance_weight_cross_note: 0.10,
+                relevance_weight_recall_support: config.cognitive.relevance_weight_recall_support,
+                relevance_weight_graph_path_boost: config
+                    .cognitive
+                    .relevance_weight_graph_path_boost,
+            };
 
-        // Hoist for UnifiedMemoryService wiring below
-        cognitive_fact_repo = Some(fact_repo.clone());
-        cognitive_embedder = cognitive_embedder_local.clone();
-        cognitive_retrieval_config = Some(retrieval_config);
+            // Hoist for UnifiedMemoryService wiring below
+            cognitive_fact_repo = Some(fact_repo.clone());
+            cognitive_embedder = cognitive_embedder_local.clone();
+            cognitive_retrieval_config = Some(retrieval_config);
 
-        let recall_registry = ai_core::RecallProviderRegistry::new()
-            .with(feature_tasks::TasksFeature::default());
-        let cog_source =
-            cognitive::CognitiveContextSource::new(fact_repo.clone(), rule_repo)
+            let recall_registry =
+                ai_core::RecallProviderRegistry::new().with(feature_tasks::TasksFeature::default());
+            let cog_source = cognitive::CognitiveContextSource::new(fact_repo.clone(), rule_repo)
                 .with_static_fact_limit(config.cognitive.static_fact_limit)
                 .with_confidence_threshold(Arc::clone(&confidence_bits))
                 .with_recall_registry(recall_registry);
-        sources.push(Box::new(cog_source));
+            sources.push(Box::new(cog_source));
 
-        // Project context source — injects project instructions, role, and memories.
-        sources.push(Box::new(crate::context_sources::ProjectContextSource::new(
-            repos.clone(),
-            fact_repo.clone(),
-        )));
+            // Project context source — injects project instructions, role, and memories.
+            sources.push(Box::new(crate::context_sources::ProjectContextSource::new(
+                repos.clone(),
+                fact_repo.clone(),
+            )));
 
-        // Annotation context source — injects critical annotations into prompt.
-        let annotation_repo = cognitive::AnnotationRepo::new(pool.clone());
-        sources.push(Box::new(
-            crate::context_sources::AnnotationContextSource::new(annotation_repo.clone()),
-        ));
+            // Annotation context source — injects critical annotations into prompt.
+            let annotation_repo = cognitive::AnnotationRepo::new(pool.clone());
+            sources.push(Box::new(
+                crate::context_sources::AnnotationContextSource::new(annotation_repo.clone()),
+            ));
 
-        // Start background consolidation service if we have a DomainEventBus
-        if let Some(ref domain_bus) = domain_event_bus {
-            let event_rx = domain_bus.subscribe();
-            let (extraction, consolidation): (
-                Arc<dyn cognitive::ExtractionHandler>,
-                Arc<dyn cognitive::ConsolidationHandler>,
-            ) = if let Some(ref cp) = cognitive_provider {
-                let params = providers::cognitive_chat_params(config, 1024);
-                (
-                    Arc::new(
-                        crate::adapters::cognitive_handlers::LlmExtractionHandler::new(
-                            cp.clone(),
-                            params.clone(),
+            // Start background consolidation service if we have a DomainEventBus
+            if let Some(ref domain_bus) = domain_event_bus {
+                let event_rx = domain_bus.subscribe();
+                let (extraction, consolidation): (
+                    Arc<dyn cognitive::ExtractionHandler>,
+                    Arc<dyn cognitive::ConsolidationHandler>,
+                ) = if let Some(ref cp) = cognitive_provider {
+                    let params = providers::cognitive_chat_params(config, 1024);
+                    (
+                        Arc::new(
+                            crate::adapters::cognitive_handlers::LlmExtractionHandler::new(
+                                cp.clone(),
+                                params.clone(),
+                            ),
                         ),
-                    ),
-                    Arc::new(
-                        crate::adapters::cognitive_handlers::LlmConsolidationHandler::new(
-                            cp.clone(),
-                            params,
+                        Arc::new(
+                            crate::adapters::cognitive_handlers::LlmConsolidationHandler::new(
+                                cp.clone(),
+                                params,
+                            ),
                         ),
-                    ),
-                )
-            } else {
-                (
-                    Arc::new(
-                        crate::adapters::cognitive_handlers::HeuristicExtractionHandler,
-                    ),
-                    Arc::new(
-                        crate::adapters::cognitive_handlers::HeuristicConsolidationHandler,
-                    ),
-                )
-            };
-            let episodic_repo = cognitive::EpisodicMemoryRepo::new(pool.clone());
-            let failed_obs_repo = cognitive::FailedObservationRepo::new(pool.clone());
-            let cancel = CancellationToken::new();
-            let (signal_tx, signal_rx) = cognitive::pipeline::signal_queue(256);
-            let bg_service = cognitive::background::BackgroundConsolidationService::start(
+                    )
+                } else {
+                    (
+                        Arc::new(crate::adapters::cognitive_handlers::HeuristicExtractionHandler),
+                        Arc::new(
+                            crate::adapters::cognitive_handlers::HeuristicConsolidationHandler,
+                        ),
+                    )
+                };
+                let episodic_repo = cognitive::EpisodicMemoryRepo::new(pool.clone());
+                let failed_obs_repo = cognitive::FailedObservationRepo::new(pool.clone());
+                let cancel = CancellationToken::new();
+                let (signal_tx, signal_rx) = cognitive::pipeline::signal_queue(256);
+                let bg_service = cognitive::background::BackgroundConsolidationService::start(
                 cognitive::background::BackgroundServiceConfig {
                     event_rx,
                     extraction,
@@ -254,14 +254,14 @@ pub(crate) async fn build_context_sources(
                     )),
                 },
             );
-            info!("Cognitive background consolidation service started");
-            Some(bg_service)
+                info!("Cognitive background consolidation service started");
+                Some(bg_service)
+            } else {
+                None
+            }
         } else {
             None
-        }
-    } else {
-        None
-    };
+        };
 
     // ── Session memory service (per-session scratchpad maintenance) ─────
     let session_memory_service: Option<cognitive::SessionMemoryService> =
@@ -285,8 +285,7 @@ pub(crate) async fn build_context_sources(
     // itself is registered by ProductivityPlugin (app-core), which arrives via
     // pre_registered_sources — do not push it here or it registers twice.
     let prod_repos = if config.productivity.enabled {
-        pool
-            .as_ref()
+        pool.as_ref()
             .map(|pool| feature_productivity::repos::ProductivityRepos::new(pool.clone()))
     } else {
         None

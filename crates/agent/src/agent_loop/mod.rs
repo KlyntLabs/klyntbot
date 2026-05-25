@@ -142,6 +142,17 @@ impl AgentLoop {
         Arc::clone(&self.hot_config)
     }
 
+    /// Inject the parent registry into the subagent manager so `subagent_visible`
+    /// tools are projected into spawned subagents (called by app-core init).
+    pub fn set_subagent_parent_registry(
+        &self,
+        registry: Arc<RwLock<tools::registry::ToolRegistry>>,
+    ) {
+        if let Some(ref mgr) = self.subagent_manager {
+            mgr.set_parent_registry(registry);
+        }
+    }
+
     /// Inject the tool-kit builder into the subagent manager (called by app-core init).
     pub fn set_subagent_tool_kit(&self, kit: Arc<klynt_core::ToolKitBuilder>) {
         if let Some(ref mgr) = self.subagent_manager {

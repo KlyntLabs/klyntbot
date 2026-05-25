@@ -117,6 +117,12 @@ impl ToolRegistry {
         self.tools.contains_key(name)
     }
 
+    /// All registered tools as dynamic handles. Used to project a subset
+    /// (e.g. the `subagent_visible` tools) into another registry.
+    pub fn dyn_tools(&self) -> Vec<DynTool> {
+        self.tools.values().cloned().collect()
+    }
+
     /// Get all tool definitions in OpenAI function-calling format.
     /// Uses interior mutability so only a shared reference is needed.
     /// Returns `Arc<Vec<Value>>` so cache hits are an atomic increment, not a deep clone.
@@ -394,6 +400,46 @@ mod tests {
                 ..Default::default()
             }
         }
+    }
+
+    struct FakeSubagentTool;
+
+    #[async_trait]
+    impl Tool for FakeSubagentTool {
+        fn name(&self) -> &str {
+            "memory"
+        }
+        fn description(&self) -> &str {
+            "subagent-visible domain tool"
+        }
+        fn parameters(&self) -> Value {
+            json!({"type": "object"})
+        }
+        async fn execute(&self, _args: Value, _ctx: &RoutingContext) -> Result<String> {
+            Ok("ok".into())
+        }
+        fn subagent_visible(&self) -> bool {
+            true
+        }
+    }
+
+    #[test]
+    fn projects_only_subagent_visible_tools() {
+        // Mirrors the subagent spawn projection: take the parent registry's
+        // tools and keep those that opt into `subagent_visible`.
+        let mut reg = ToolRegistry::new();
+        reg.register(FakeSearchTool); // default: not subagent-visible
+        reg.register(FakeWebTool); // default: not subagent-visible
+        reg.register(FakeSubagentTool); // opted in
+
+        let projected: Vec<String> = reg
+            .dyn_tools()
+            .into_iter()
+            .filter(|t| t.subagent_visible())
+            .map(|t| t.name().to_string())
+            .collect();
+
+        assert_eq!(projected, vec!["memory".to_string()]);
     }
 
     #[test]

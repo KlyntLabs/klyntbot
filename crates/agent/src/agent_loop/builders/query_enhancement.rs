@@ -28,9 +28,7 @@ pub(crate) fn build_query_enhancement(
     // Stage 1: Signal Enrichment — wraps ContextualQueryRewriter for
     // heuristic signal-based query enrichment. Autotuner champion
     // overrides are wired onto this rewriter so A/B trials apply.
-    let memory_param_sink = autotuner
-        .as_ref()
-        .and_then(|orch| orch.memory_param_sink());
+    let memory_param_sink = autotuner.as_ref().and_then(|orch| orch.memory_param_sink());
 
     let mut signal_rewriter = crate::adapters::query_rewriter::ContextualQueryRewriter::new(
         rewriter_provider.clone(),
@@ -54,18 +52,14 @@ pub(crate) fn build_query_enhancement(
                 min_score_threshold: qe.prf.min_score_threshold,
                 max_expansion_terms: qe.prf.max_expansion_terms,
             };
-            let mut prf_stage = context_engine::enhancement::prf::PrfStage::new(
-                Arc::clone(retriever),
-                prf_config,
-            );
+            let mut prf_stage =
+                context_engine::enhancement::prf::PrfStage::new(Arc::clone(retriever), prf_config);
             if let Some(ref sink) = memory_param_sink {
                 prf_stage = prf_stage.with_champion_overrides(Arc::clone(sink));
             }
             query_stages.push(Arc::new(prf_stage));
         } else {
-            tracing::debug!(
-                "PRF stage enabled but no memory retriever available — skipping"
-            );
+            tracing::debug!("PRF stage enabled but no memory retriever available — skipping");
         }
     }
 
@@ -96,9 +90,10 @@ pub(crate) fn build_query_enhancement(
     let mut ranking_stages: Vec<Arc<dyn context_engine::enhancement::RankingStage>> = vec![];
 
     if qe.reranking.enabled {
-        let mut heuristic = context_engine::enhancement::heuristic_rerank::HeuristicRerankStage::new(
-            context_engine::enhancement::heuristic_rerank::HeuristicRerankConfig::default(),
-        );
+        let mut heuristic =
+            context_engine::enhancement::heuristic_rerank::HeuristicRerankStage::new(
+                context_engine::enhancement::heuristic_rerank::HeuristicRerankConfig::default(),
+            );
         if let Some(ref sink) = memory_param_sink {
             heuristic = heuristic.with_champion_overrides(Arc::clone(sink));
         }

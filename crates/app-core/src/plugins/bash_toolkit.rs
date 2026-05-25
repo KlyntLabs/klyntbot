@@ -27,8 +27,7 @@ impl AppCorePlugin for BashToolkitPlugin {
 
         let exclude_globs: Vec<&str> = vec![];
         let privacy = Arc::new(
-            klynt_core::privacy::PrivacyGuard::from_globs(&exclude_globs)
-                .expect("privacy globs"),
+            klynt_core::privacy::PrivacyGuard::from_globs(&exclude_globs).expect("privacy globs"),
         );
         let policy = Arc::new(
             dirs::home_dir()
@@ -95,6 +94,10 @@ impl AppCorePlugin for BashToolkitPlugin {
         let kit_arc = Arc::new(kit);
         app.agent.runtime().set_tool_kit(Arc::clone(&kit_arc));
         app.agent.set_subagent_tool_kit(Arc::clone(&kit_arc));
+        // Project subagent-visible domain tools (e.g. memory) from the parent
+        // registry into spawned subagents.
+        app.agent
+            .set_subagent_parent_registry(app.agent.tool_registry());
 
         if let Some(engine) = app.host.get::<klynt_hooks::HookEngine>() {
             app.agent.runtime().set_hook_engine(Arc::clone(&engine));

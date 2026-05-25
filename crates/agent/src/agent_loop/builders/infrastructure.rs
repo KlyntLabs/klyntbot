@@ -10,11 +10,7 @@ use bus::MessageBus;
 use config::Config;
 use providers::DynProvider;
 use session::SessionManager;
-use tools::{
-    cron_tool::CronTool,
-    registry::ToolRegistry,
-    subagents::SubagentsTool,
-};
+use tools::{cron_tool::CronTool, registry::ToolRegistry, subagents::SubagentsTool};
 
 use crate::{CronHandlerAdapter, SubagentManager};
 

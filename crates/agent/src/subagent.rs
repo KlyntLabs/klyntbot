@@ -13,7 +13,8 @@ use bus::InboundMessage;
 use providers::{DynProvider, Message};
 use storage::AgentTaskRepo;
 use tools::{
-    agent_task_tool::AgentTaskTool, registry::ToolRegistry, subagents::SubagentsHandler, RoutingContext,
+    agent_task_tool::AgentTaskTool, registry::ToolRegistry, subagents::SubagentsHandler,
+    RoutingContext,
 };
 
 /// Tracks a running subagent for cancel/status operations.
@@ -56,11 +57,13 @@ pub struct SubagentManager {
     agent_task_repo: AgentTaskRepo,
     tool_kit: std::sync::Mutex<Option<Arc<klynt_core::ToolKitBuilder>>>,
     hook_engine: std::sync::Mutex<Option<Arc<klynt_hooks::HookEngine>>>,
+    /// Parent agent's tool registry; source of `subagent_visible` domain tools
+    /// projected into each spawned subagent (cwd-independent tools only).
+    parent_registry: std::sync::Mutex<Option<Arc<RwLock<ToolRegistry>>>>,
     /// Cache of base ToolRegistry builds keyed by cwd.
     /// The cache stores the registry *before* AgentTaskTool is added,
     /// so each invocation can clone the base and append its task tool.
-    registry_cache:
-        std::sync::Mutex<HashMap<PathBuf, Arc<RwLock<ToolRegistry>>>>,
+    registry_cache: std::sync::Mutex<HashMap<PathBuf, Arc<RwLock<ToolRegistry>>>>,
     event_tx: std::sync::Mutex<
         Option<tokio::sync::broadcast::Sender<crate::subagent_events::SubagentLifecycleEvent>>,
     >,
@@ -162,7 +165,10 @@ impl SubagentManagerBuilder {
                 active: crate::subagent_runtime::ActiveSubagentRegistry::new(),
                 provider: self.provider.clone(),
                 workspace: self.workspace.clone(),
-                model: self.model.clone().unwrap_or_else(|| "claude-sonnet-4".to_string()),
+                model: self
+                    .model
+                    .clone()
+                    .unwrap_or_else(|| "claude-sonnet-4".to_string()),
                 tool_kit: self.tool_kit.clone(),
                 hook_engine: self.hook_engine.clone(),
                 job_supervisor: self.job_supervisor.clone(),
@@ -178,6 +184,7 @@ impl SubagentManagerBuilder {
             agent_task_repo: self.agent_task_repo.expect("agent_task_repo is required"),
             tool_kit: std::sync::Mutex::new(self.tool_kit),
             hook_engine: std::sync::Mutex::new(self.hook_engine),
+            parent_registry: std::sync::Mutex::new(None),
             registry_cache: std::sync::Mutex::new(HashMap::new()),
             event_tx: std::sync::Mutex::new(self.event_sender),
             progress: Arc::new(dashmap::DashMap::new()),
@@ -204,6 +211,14 @@ impl SubagentManager {
     pub fn set_hook_engine(&self, engine: Arc<klynt_hooks::HookEngine>) {
         let mut lock = self.hook_engine.lock().unwrap();
         *lock = Some(engine);
+    }
+
+    /// Inject the parent agent's tool registry. Subagents project the
+    /// `subagent_visible` tools from it (called by app-core after the agent is
+    /// built). Clears the cwd-keyed registry cache so it's rebuilt with them.
+    pub fn set_parent_registry(&self, registry: Arc<RwLock<ToolRegistry>>) {
+        *self.parent_registry.lock().unwrap() = Some(registry);
+        self.registry_cache.lock().unwrap().clear();
     }
 
     pub fn set_event_sender(
@@ -318,6 +333,23 @@ impl SubagentManager {
             agent_id: short_id.clone(),
         };
 
+        // Project subagent-visible domain tools from the parent registry.
+        // These are cwd-independent (e.g. memory/recall), so they live in the
+        // cwd-keyed cache alongside the workspace-scoped primitives.
+        let domain_tools: Vec<tools_core::DynTool> = {
+            let parent = self.parent_registry.lock().unwrap().clone();
+            match parent {
+                Some(reg) => reg
+                    .read()
+                    .await
+                    .dyn_tools()
+                    .into_iter()
+                    .filter(|t| t.subagent_visible())
+                    .collect(),
+                None => Vec::new(),
+            }
+        };
+
         // Build or retrieve cached base registry (without AgentTaskTool).
         let base_registry = if let Some(ref kit) = tool_kit {
             let kit = (**kit).clone().with_cwd(workspace.clone());
@@ -328,6 +360,9 @@ impl SubagentManager {
             } else {
                 let mut tools = ToolRegistry::new();
                 kit.register_all(&mut tools);
+                for tool in &domain_tools {
+                    tools.register_dyn(tool.clone());
+                }
                 let arc = Arc::new(RwLock::new(tools));
                 cache.insert(cache_key, arc.clone());
                 Some(arc)
@@ -483,7 +518,12 @@ impl SubagentManager {
         drop(handles);
 
         // New-style persistent instances that are currently running.
-        if let Ok(rows) = self.runtime.repo.list_by_status(storage::rows::SubagentStatus::Running).await {
+        if let Ok(rows) = self
+            .runtime
+            .repo
+            .list_by_status(storage::rows::SubagentStatus::Running)
+            .await
+        {
             let old_ids: HashSet<String> = out.iter().map(|s| s.agent_id.clone()).collect();
             for row in rows {
                 // Skip if this agent is already tracked as an old-style handle.
@@ -534,7 +574,9 @@ impl SubagentsHandler for SubagentManager {
         action: tools::subagents::SpawnAction,
         ctx: &tools::RoutingContext,
     ) -> common::Result<String> {
-        let parent_session_id = ctx.session_key.as_ref()
+        let parent_session_id = ctx
+            .session_key
+            .as_ref()
             .map(|s| s.to_string())
             .unwrap_or_default();
         // `agent_chain` defaults to `["root"]` for the main agent. "root" is a
@@ -552,15 +594,19 @@ impl SubagentsHandler for SubagentManager {
         // inserted and the cancel token is registered. The full LLM loop runs
         // on a detached task. The parent observes completion via lifecycle
         // events and `subagents list` / `subagents resume`.
-        match self.runtime.spawn_detached(crate::subagent_runtime::SpawnParams {
-            description: action.description,
-            prompt: action.prompt,
-            model: action.model,
-            max_turns: action.max_turns,
-            workspace_path: self.workspace.clone(),
-            parent_session_id,
-            parent_agent_id,
-        }).await {
+        match self
+            .runtime
+            .spawn_detached(crate::subagent_runtime::SpawnParams {
+                description: action.description,
+                prompt: action.prompt,
+                model: action.model,
+                max_turns: action.max_turns,
+                workspace_path: self.workspace.clone(),
+                parent_session_id,
+                parent_agent_id,
+            })
+            .await
+        {
             Ok((agent_id, session_id)) => json_ok(serde_json::json!({
                 "agent_id": agent_id,
                 "session_id": session_id,
@@ -604,10 +650,14 @@ impl SubagentsHandler for SubagentManager {
                 }));
             }
         }
-        match self.runtime.resume(crate::subagent_runtime::ResumeParams {
-            agent_id: action.agent_id,
-            prompt: action.prompt,
-        }).await {
+        match self
+            .runtime
+            .resume(crate::subagent_runtime::ResumeParams {
+                agent_id: action.agent_id,
+                prompt: action.prompt,
+            })
+            .await
+        {
             Ok(res) => json_ok(serde_json::json!({
                 "agent_id": res.agent_id,
                 "session_id": res.session_id,
@@ -624,8 +674,14 @@ impl SubagentsHandler for SubagentManager {
         action: tools::subagents::ListAction,
         _ctx: &tools::RoutingContext,
     ) -> common::Result<String> {
-        let status = action.status.as_deref().and_then(storage::rows::SubagentStatus::parse);
-        let rows = self.runtime.list(action.parent_agent_id.as_deref(), status).await
+        let status = action
+            .status
+            .as_deref()
+            .and_then(storage::rows::SubagentStatus::parse);
+        let rows = self
+            .runtime
+            .list(action.parent_agent_id.as_deref(), status)
+            .await
             .map_err(|e| common::ToolError::ExecutionFailed(e.to_string()))?;
         json_ok(serde_json::json!({
             "instances": rows.into_iter().map(|r| serde_json::json!({
@@ -646,7 +702,10 @@ impl SubagentsHandler for SubagentManager {
         action: tools::subagents::KillAction,
         _ctx: &tools::RoutingContext,
     ) -> common::Result<String> {
-        let res = self.runtime.kill(&action.agent_id).await
+        let res = self
+            .runtime
+            .kill(&action.agent_id)
+            .await
             .map_err(|e| common::ToolError::ExecutionFailed(e.to_string()))?;
         json_ok(serde_json::json!({
             "agent_id": res.agent_id,
@@ -663,7 +722,8 @@ fn json_payload_for_error(e: &common::KlyntbotError) -> String {
 }
 
 fn json_ok<T: serde::Serialize>(value: T) -> common::Result<String> {
-    serde_json::to_string(&value).map_err(|e| common::ToolError::ExecutionFailed(e.to_string()).into())
+    serde_json::to_string(&value)
+        .map_err(|e| common::ToolError::ExecutionFailed(e.to_string()).into())
 }
 
 /// Run the agent loop for a subagent and return the raw result.
@@ -701,13 +761,9 @@ pub async fn run_subagent_loop(
     let tool_defs = tools.get_definitions();
 
     // Build execution engine
-    let core = Arc::new(ExecutionCore::new(
-        provider,
-        Arc::new(RwLock::new(tools)),
-    ));
+    let core = Arc::new(ExecutionCore::new(provider, Arc::new(RwLock::new(tools))));
 
-    let mut params = ExecutionParams::new(&model, 128_000)
-        .with_cancel_token(cancel_token);
+    let mut params = ExecutionParams::new(&model, 128_000).with_cancel_token(cancel_token);
     if let Some(cb) = on_iteration {
         params = params.with_on_iteration(cb);
     }
@@ -896,7 +952,7 @@ async fn run_subagent_task(
     // Execute via unified execute loop with a fixed safety cap
     let mut budget = SafetyCap::with_limits(
         DepthMode::Normal,
-        0, // no token cap for subagents
+        0,   // no token cap for subagents
         500, // default turn cap
     );
 
@@ -1132,10 +1188,7 @@ mod tests {
 
     #[test]
     fn test_build_subagent_prompt_has_task_and_workspace() {
-        let prompt = build_subagent_prompt(
-            std::path::Path::new("/tmp"),
-            "Research Rust patterns",
-        );
+        let prompt = build_subagent_prompt(std::path::Path::new("/tmp"), "Research Rust patterns");
         assert!(prompt.contains("Research Rust patterns"));
         assert!(prompt.contains("/tmp"));
     }
@@ -1201,7 +1254,9 @@ mod tests {
         assert_eq!(out.content, "done");
 
         // ToolStart follows IterationStart, so the snapshot is (iteration=3, "bash").
-        let entry = progress.get(&agent_id).expect("progress should be recorded");
+        let entry = progress
+            .get(&agent_id)
+            .expect("progress should be recorded");
         assert_eq!(entry.value().0, 3);
         assert_eq!(entry.value().1, Some("bash".to_string()));
 

@@ -6,7 +6,6 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tokio_util::sync::CancellationToken;
 
-
 use bus::MessageBus;
 use common::Result;
 use config::Config;
@@ -138,7 +137,10 @@ impl AgentLoopBuilder {
         self.tool_registry = Some(registry);
         self
     }
-    pub fn with_context_sources(mut self, sources: Vec<Box<dyn context_engine::ContextSource>>) -> Self {
+    pub fn with_context_sources(
+        mut self,
+        sources: Vec<Box<dyn context_engine::ContextSource>>,
+    ) -> Self {
         self.context_sources = sources;
         self
     }
@@ -150,7 +152,10 @@ impl AgentLoopBuilder {
         self.cognitive_entity_repo = Some(repo);
         self
     }
-    pub fn with_cognitive_embedder(mut self, embedder: Arc<dyn cognitive::SemanticFactEmbedder>) -> Self {
+    pub fn with_cognitive_embedder(
+        mut self,
+        embedder: Arc<dyn cognitive::SemanticFactEmbedder>,
+    ) -> Self {
         self.cognitive_embedder = Some(embedder);
         self
     }
@@ -458,8 +463,8 @@ impl AgentLoopBuilder {
             });
 
         // ── Feature tools (memory, productivity, MCP, skill reference, recurring spawner) ──
-        let tools_result = super::builders::tools::build_feature_tools(
-            super::builders::tools::ToolsBuildInput {
+        let tools_result =
+            super::builders::tools::build_feature_tools(super::builders::tools::ToolsBuildInput {
                 config: &config,
                 tool_registry: &mut tool_registry,
                 conversation_recall_handler: &conversation_recall_handler,
@@ -471,9 +476,8 @@ impl AgentLoopBuilder {
                 latest_enhancement_trace: &latest_enhancement_trace,
                 provider: &provider,
                 skill_reference_index: &skill_reference_index,
-            },
-        )
-        .await?;
+            })
+            .await?;
         let mcp_manager = tools_result.mcp_manager;
         let recurring_task_spawner = tools_result.recurring_task_spawner;
 
@@ -528,7 +532,9 @@ impl AgentLoopBuilder {
                 tool_registry: Arc::clone(&tool_registry),
                 token_counter: Arc::clone(&token_counter),
                 outcome_recorder: outcome_store.as_ref().map(|store| {
-                    Arc::new(crate::learning::recorder::OutcomeRecorder::new(Arc::clone(store)))
+                    Arc::new(crate::learning::recorder::OutcomeRecorder::new(Arc::clone(
+                        store,
+                    )))
                 }),
                 domain_event_bus: self.domain_event_bus.clone(),
                 pool: self.pool.clone(),
@@ -607,5 +613,3 @@ impl AgentLoop {
         AgentLoopBuilder::new(bus, provider, config)
     }
 }
-
-

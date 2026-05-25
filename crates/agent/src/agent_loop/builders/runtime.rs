@@ -74,9 +74,8 @@ pub(crate) fn build_runtime(input: RuntimeBuildInput) -> crate::agent_runtime::A
     // Approval gate: built whenever a storage pool is available so that
     // every tool call passes through ApprovalGate::check before execute.
     if let Some(ref p) = pool {
-        let grants_repo = approval::ApprovalGrantsRepo::new(
-            storage::StoragePool::from_existing(p.clone()),
-        );
+        let grants_repo =
+            approval::ApprovalGrantsRepo::new(storage::StoragePool::from_existing(p.clone()));
         let channel: Arc<dyn approval::ApprovalChannel> = approval_channel
             .clone()
             .unwrap_or_else(|| Arc::new(approval::BlockingFallbackChannel::desktop_prompt()));
@@ -101,7 +100,9 @@ pub(crate) fn build_runtime(input: RuntimeBuildInput) -> crate::agent_runtime::A
 
     // ── Interaction recorder ──────────────────────────────────────────
     let interaction_recorder = if config.learning.enabled {
-        Some(crate::learning::InteractionRecorder::new(interaction_log_repo))
+        Some(crate::learning::InteractionRecorder::new(
+            interaction_log_repo,
+        ))
     } else {
         None
     };
@@ -120,9 +121,7 @@ pub(crate) fn build_runtime(input: RuntimeBuildInput) -> crate::agent_runtime::A
         Arc::clone(&hot_config),
     )
     .with_tool_registry(Arc::clone(&tool_registry))
-    .with_enhancement_budget_overrides(
-        config.cognitive.query_enhancement.budget_overrides.clone(),
-    );
+    .with_enhancement_budget_overrides(config.cognitive.query_enhancement.budget_overrides.clone());
 
     if let Some(ref bus) = domain_event_bus {
         runtime = runtime.with_domain_event_bus(Arc::clone(bus));
@@ -229,9 +228,8 @@ pub(crate) fn build_runtime(input: RuntimeBuildInput) -> crate::agent_runtime::A
                         config_defaults,
                     ),
                 );
-                hook = hook.with_shadow_retriever(
-                    shadow_retriever as Arc<dyn autotuner::ShadowRetriever>,
-                );
+                hook = hook
+                    .with_shadow_retriever(shadow_retriever as Arc<dyn autotuner::ShadowRetriever>);
             }
 
             runtime = runtime.with_autotuner_hook(Arc::new(hook));
