@@ -1,7 +1,7 @@
 //! TemporalTool — read-only temporal reasoning queries over the knowledge graph.
 
 use common::Result;
-use tools_core::{tool_actions, ActionParams, RoutingContext};
+use tools_core::{tool_actions, ActionParams};
 
 use cognitive::services::temporal::TemporalService;
 
@@ -76,6 +76,7 @@ impl TemporalTool {
 }
 
 #[tool_actions(
+    ctx = "()",
     name = "temporal",
     description = "Time-oriented queries over the knowledge graph. Query fact history, find when something was first mentioned, compare knowledge states across time, and discover decision points where beliefs changed.",
     category = "Memory",
@@ -85,7 +86,7 @@ impl TemporalTool {
 impl TemporalTool {
     /// Return the state of a fact at a specific point in time.
     #[action(name = "facts_as_of")]
-    async fn facts_as_of(&self, params: FactsAsOfParams, _ctx: &RoutingContext) -> Result<String> {
+    async fn facts_as_of(&self, params: FactsAsOfParams, _ctx: ()) -> Result<String> {
         let result = self
             .service
             .facts_as_of(&params.subject, &params.predicate, &params.as_of)
@@ -107,7 +108,7 @@ impl TemporalTool {
     async fn first_mention(
         &self,
         params: FirstMentionParams,
-        _ctx: &RoutingContext,
+        _ctx: (),
     ) -> Result<String> {
         let result = self
             .service
@@ -132,7 +133,7 @@ impl TemporalTool {
     async fn change_history(
         &self,
         params: ChangeHistoryParams,
-        _ctx: &RoutingContext,
+        _ctx: (),
     ) -> Result<String> {
         let history = self
             .service
@@ -155,7 +156,7 @@ impl TemporalTool {
     async fn competing_truths(
         &self,
         params: CompetingTruthsParams,
-        _ctx: &RoutingContext,
+        _ctx: (),
     ) -> Result<String> {
         let truths = self
             .service
@@ -184,7 +185,7 @@ impl TemporalTool {
     async fn knowledge_diff(
         &self,
         params: KnowledgeDiffParams,
-        _ctx: &RoutingContext,
+        _ctx: (),
     ) -> Result<String> {
         let domains_vec: Option<Vec<&str>> = params.domain.as_ref().map(|d| vec![d.as_str()]);
         let diff = self
@@ -201,7 +202,7 @@ impl TemporalTool {
     async fn decision_points(
         &self,
         params: DecisionPointsParams,
-        _ctx: &RoutingContext,
+        _ctx: (),
     ) -> Result<String> {
         let limit = params.limit.unwrap_or(10) as usize;
         let points = self

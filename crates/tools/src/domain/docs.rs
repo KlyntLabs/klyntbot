@@ -1,7 +1,7 @@
 //! docs tool — search and fetch documentation from the content registry.
 
 use common::Result;
-use tools_core::{tool_actions, ActionParams, RoutingContext};
+use tools_core::{tool_actions, ActionParams};
 
 use async_trait::async_trait;
 use std::sync::Arc;
@@ -58,6 +58,7 @@ impl DocsTool {
 }
 
 #[tool_actions(
+    ctx = "()",
     name = "docs",
     description = "Search and fetch documentation for APIs, SDKs, and libraries from the content registry. Use before writing code against external services to get current, accurate API reference.",
     category = "Search",
@@ -66,18 +67,18 @@ impl DocsTool {
 )]
 impl DocsTool {
     #[action(name = "search")]
-    async fn search(&self, params: SearchParams, _ctx: &RoutingContext) -> Result<String> {
+    async fn search(&self, params: SearchParams, _ctx: ()) -> Result<String> {
         let limit = params.limit.unwrap_or(10) as usize;
         self.handler()?.search(&params.query, limit).await
     }
 
     #[action(name = "get")]
-    async fn get(&self, params: GetParams, _ctx: &RoutingContext) -> Result<String> {
+    async fn get(&self, params: GetParams, _ctx: ()) -> Result<String> {
         self.handler()?.get(&params.id).await
     }
 
     #[action(name = "list")]
-    async fn list(&self, _params: ListParams, _ctx: &RoutingContext) -> Result<String> {
+    async fn list(&self, _params: ListParams, _ctx: ()) -> Result<String> {
         self.handler()?.list().await
     }
 }

@@ -3,7 +3,7 @@ use crate::types::WindowAction;
 use crate::{FrequencyRepo, PinsRepo, SourceRegistry};
 use common::Result;
 use std::sync::Arc;
-use tools_core::{tool_actions, RoutingContext};
+use tools_core::tool_actions;
 
 pub mod actions;
 
@@ -28,6 +28,7 @@ impl LauncherTool {
 }
 
 #[tool_actions(
+    ctx = "()",
     name = "launcher",
     description = "Search and execute launcher items: apps, scripts, files, system commands, window layouts, browser bookmarks, contacts, and more.",
     category = "System",
@@ -36,14 +37,14 @@ impl LauncherTool {
 )]
 impl LauncherTool {
     #[action(name = "search")]
-    async fn search(&self, params: SearchParams, _ctx: &RoutingContext) -> Result<String> {
+    async fn search(&self, params: SearchParams, _ctx: ()) -> Result<String> {
         let limit = params.limit.unwrap_or(10) as usize;
         let results = self.registry.search(&params.query, limit).await;
         Ok(serde_json::to_string(&results)?)
     }
 
     #[action(name = "execute")]
-    async fn execute(&self, params: ExecuteParams, _ctx: &RoutingContext) -> Result<String> {
+    async fn execute(&self, params: ExecuteParams, _ctx: ()) -> Result<String> {
         self.frequency
             .record_usage(&params.item_id, &params.kind)
             .await?;
@@ -54,7 +55,7 @@ impl LauncherTool {
     async fn apply_window(
         &self,
         params: ApplyWindowParams,
-        _ctx: &RoutingContext,
+        _ctx: (),
     ) -> Result<String> {
         let action = parse_window_action(&params.action)?;
         crate::window_manager().execute(&action)?;
@@ -62,13 +63,13 @@ impl LauncherTool {
     }
 
     #[action(name = "pin")]
-    async fn pin(&self, params: PinParams, _ctx: &RoutingContext) -> Result<String> {
+    async fn pin(&self, params: PinParams, _ctx: ()) -> Result<String> {
         self.pins.pin(&params.item_id, &params.kind).await?;
         Ok("{\"status\":\"pinned\"}".to_string())
     }
 
     #[action(name = "unpin")]
-    async fn unpin(&self, params: PinParams, _ctx: &RoutingContext) -> Result<String> {
+    async fn unpin(&self, params: PinParams, _ctx: ()) -> Result<String> {
         self.pins.unpin(&params.item_id, &params.kind).await?;
         Ok("{\"status\":\"unpinned\"}".to_string())
     }

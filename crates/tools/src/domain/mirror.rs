@@ -6,7 +6,7 @@
 use std::sync::Arc;
 
 use common::Result;
-use tools_core::{tool_actions, ActionParams, RoutingContext};
+use tools_core::{tool_actions, ActionParams};
 
 use cognitive::mirror::MirrorFacade;
 
@@ -50,6 +50,7 @@ impl MirrorTool {
 }
 
 #[tool_actions(
+    ctx = "()",
     name = "mirror",
     description = "Query the Mirror self-reflection layer for routing patterns, brain versions, narratives, and experiment status. All actions are read-only.",
     category = "Memory",
@@ -60,7 +61,7 @@ impl MirrorTool {
     /// Return the full current MirrorState (latest snapshot, narrative,
     /// pending snippets, meta-rules, brain version, trial previews).
     #[action(name = "get_state")]
-    async fn get_state(&self, _params: GetStateParams, _ctx: &RoutingContext) -> Result<String> {
+    async fn get_state(&self, _params: GetStateParams, _ctx: ()) -> Result<String> {
         let state = self.facade.get_state().await?;
         serde_json::to_string_pretty(&state).map_err(|e| {
             common::KlyntbotError::Tool(common::ToolError::ExecutionFailed(format!(
@@ -74,7 +75,7 @@ impl MirrorTool {
     async fn get_narratives(
         &self,
         params: GetNarrativesParams,
-        _ctx: &RoutingContext,
+        _ctx: (),
     ) -> Result<String> {
         let limit = params.limit.unwrap_or(5) as u32;
         let narratives = self.facade.get_narratives(limit).await?;
@@ -90,7 +91,7 @@ impl MirrorTool {
     async fn get_routing_history(
         &self,
         params: GetRoutingHistoryParams,
-        _ctx: &RoutingContext,
+        _ctx: (),
     ) -> Result<String> {
         let days = params.days.unwrap_or(7) as u32;
         let history = self.facade.get_routing_history(days).await?;
@@ -106,7 +107,7 @@ impl MirrorTool {
     async fn get_brain_versions(
         &self,
         _params: GetBrainVersionsParams,
-        _ctx: &RoutingContext,
+        _ctx: (),
     ) -> Result<String> {
         let versions = self.facade.get_brain_versions().await?;
         serde_json::to_string_pretty(&versions).map_err(|e| {
@@ -121,7 +122,7 @@ impl MirrorTool {
     async fn get_meta_rules(
         &self,
         _params: GetMetaRulesParams,
-        _ctx: &RoutingContext,
+        _ctx: (),
     ) -> Result<String> {
         let (active, pending) = self.facade.get_meta_rules().await?;
         let result = serde_json::json!({
@@ -158,13 +159,6 @@ mod tests {
         pool
     }
 
-    fn ctx() -> RoutingContext {
-        RoutingContext::new(
-            common::ChannelName::new("cli"),
-            common::ChatId::new("test".to_string()),
-        )
-    }
-
     #[test]
     fn test_mirror_tool_name() {
         // Construct a tool using tokio runtime since we need async setup
@@ -176,7 +170,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_state_empty() {
         let tool = setup().await;
-        let result = tool.get_state(GetStateParams {}, &ctx()).await.unwrap();
+        let result = tool.get_state(GetStateParams {}, ()).await.unwrap();
         assert!(result.contains("lastRoutingSnapshot"));
     }
 
@@ -184,7 +178,7 @@ mod tests {
     async fn test_get_narratives_empty() {
         let tool = setup().await;
         let result = tool
-            .get_narratives(GetNarrativesParams { limit: None }, &ctx())
+            .get_narratives(GetNarrativesParams { limit: None }, ())
             .await
             .unwrap();
         assert_eq!(result.trim(), "[]");
@@ -194,7 +188,7 @@ mod tests {
     async fn test_get_routing_history_empty() {
         let tool = setup().await;
         let result = tool
-            .get_routing_history(GetRoutingHistoryParams { days: None }, &ctx())
+            .get_routing_history(GetRoutingHistoryParams { days: None }, ())
             .await
             .unwrap();
         assert_eq!(result.trim(), "[]");
@@ -204,7 +198,7 @@ mod tests {
     async fn test_get_brain_versions_empty() {
         let tool = setup().await;
         let result = tool
-            .get_brain_versions(GetBrainVersionsParams {}, &ctx())
+            .get_brain_versions(GetBrainVersionsParams {}, ())
             .await
             .unwrap();
         assert_eq!(result.trim(), "[]");
@@ -214,7 +208,7 @@ mod tests {
     async fn test_get_meta_rules_empty() {
         let tool = setup().await;
         let result = tool
-            .get_meta_rules(GetMetaRulesParams {}, &ctx())
+            .get_meta_rules(GetMetaRulesParams {}, ())
             .await
             .unwrap();
         let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();

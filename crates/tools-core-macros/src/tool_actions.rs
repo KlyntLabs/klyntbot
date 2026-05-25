@@ -15,40 +15,30 @@ pub fn expand(attr: TokenStream, item: TokenStream) -> TokenStream {
     let mut category: Option<String> = None;
     let mut tags: Option<String> = None;
     let mut cost: Option<String> = None;
+    // Optional narrow context view (ADR-0002). When set (e.g. `ctx = "()"`),
+    // the generated `execute` projects `&RoutingContext` into this view via
+    // `FromRoutingContext` and passes it to each action handler. When absent,
+    // handlers receive `&RoutingContext` unchanged (backward compatible).
+    let mut ctx_type: Option<String> = None;
 
     for meta in &attr_args {
-        if let Meta::NameValue(nv) = meta {
-            if nv.path.is_ident("name") {
-                if let Expr::Lit(lit) = &nv.value {
-                    if let Lit::Str(s) = &lit.lit {
-                        tool_name = s.value();
-                    }
-                }
-            } else if nv.path.is_ident("description") {
-                if let Expr::Lit(lit) = &nv.value {
-                    if let Lit::Str(s) = &lit.lit {
-                        tool_description = s.value();
-                    }
-                }
-            } else if nv.path.is_ident("category") {
-                if let Expr::Lit(lit) = &nv.value {
-                    if let Lit::Str(s) = &lit.lit {
-                        category = Some(s.value());
-                    }
-                }
-            } else if nv.path.is_ident("tags") {
-                if let Expr::Lit(lit) = &nv.value {
-                    if let Lit::Str(s) = &lit.lit {
-                        tags = Some(s.value());
-                    }
-                }
-            } else if nv.path.is_ident("cost") {
-                if let Expr::Lit(lit) = &nv.value {
-                    if let Lit::Str(s) = &lit.lit {
-                        cost = Some(s.value());
-                    }
-                }
-            }
+        let Meta::NameValue(nv) = meta else { continue };
+        let Expr::Lit(lit) = &nv.value else { continue };
+        let Lit::Str(s) = &lit.lit else { continue };
+        let val = s.value();
+
+        if nv.path.is_ident("ctx") {
+            ctx_type = Some(val);
+        } else if nv.path.is_ident("name") {
+            tool_name = val;
+        } else if nv.path.is_ident("description") {
+            tool_description = val;
+        } else if nv.path.is_ident("category") {
+            category = Some(val);
+        } else if nv.path.is_ident("tags") {
+            tags = Some(val);
+        } else if nv.path.is_ident("cost") {
+            cost = Some(val);
         }
     }
 
@@ -157,6 +147,25 @@ pub fn expand(attr: TokenStream, item: TokenStream) -> TokenStream {
         })
         .collect();
 
+    // Resolve the optional narrow context view type. When present, the handler
+    // receives the projected view (`__view`); otherwise it receives the full
+    // `ctx: &RoutingContext` exactly as before.
+    let ctx_ty: Option<Type> = match &ctx_type {
+        Some(s) => match syn::parse_str::<Type>(s) {
+            Ok(t) => Some(t),
+            Err(e) => return e.to_compile_error().into(),
+        },
+        None => None,
+    };
+
+    // Statement that builds the projected view, inserted at the top of `execute`.
+    let project_stmt = match &ctx_ty {
+        Some(t) => quote! {
+            let __view = <#t as ::tools_core::FromRoutingContext>::project(ctx);
+        },
+        None => quote! {},
+    };
+
     // Generate dispatch match arms
     let dispatch_arms: Vec<_> = actions
         .iter()
@@ -164,11 +173,19 @@ pub fn expand(attr: TokenStream, item: TokenStream) -> TokenStream {
             let action_name = &a.action_name;
             let method_name = &a.method_name;
             let params_ty = &a.params_type;
+            // `__view` is `Copy` for the current rungs (`()`, `FullCtx`); even a
+            // non-`Copy` view is fine here because the match arms are mutually
+            // exclusive, so only one moves it.
+            let ctx_arg = if ctx_ty.is_some() {
+                quote! { __view }
+            } else {
+                quote! { ctx }
+            };
             quote! {
                 #action_name => {
                     let params = #params_ty::from_value(&args)
                         .map_err(|e| common::ToolError::InvalidParams(e))?;
-                    self.#method_name(params, ctx).await
+                    self.#method_name(params, #ctx_arg).await
                 }
             }
         })
@@ -222,6 +239,8 @@ pub fn expand(attr: TokenStream, item: TokenStream) -> TokenStream {
                     .ok_or_else(|| common::ToolError::InvalidParams(
                         "missing required 'action' parameter".to_string()
                     ))?;
+
+                #project_stmt
 
                 match action {
                     #(#dispatch_arms)*

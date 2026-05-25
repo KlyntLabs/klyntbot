@@ -1,9 +1,9 @@
 # Deep Dive: Project `RoutingContext` into narrow per-tool context views
 
-> Status: **Phases A–D implemented** (2026-05-24, branch `refactor/tool-context-projection`) — the full ladder is live for the derive path: 5 tools on `HookCtx`, 6 on `IoCtx`, `bash` on `FullCtx`. Design recorded in ADR-0002; vocabulary in CONTEXT.md.
+> Status: **Phases A–E implemented** (2026-05-24/25). Derive path: 5 tools on `HookCtx`, 6 on `IoCtx`, `bash` on `FullCtx`. `#[tool_actions]` family (Phase E): 5 tools on `ctx = "()"`, `subagents` on `&RoutingContext` (boundary). Design recorded in ADR-0002; vocabulary in CONTEXT.md.
 > Architecture candidate #1 of the 2026-05-24 review.
 >
-> **Scope correction (post-exploration):** the seam covers the **12 `ToolExecute` (derive-path) tools** in `klynt-core/src/tools/`, not the ~42 figure from the review (which counted every `Tool::execute` impl). Hand-written `impl Tool` tools and `#[tool_actions]` tools implement the untyped `Tool` directly, keep `&RoutingContext`, and are out of scope (a separate follow-up).
+> **Scope reality (post-exploration):** narrowing is only possible where a tool has a *typed* layer to project at — the `ToolExecute` derive path (12 tools) and the `#[tool_actions]` macro (6 tools). Hand-written `impl Tool` tools and MCP take the untyped `Tool::execute(args, &RoutingContext)` directly (one fixed registry signature, no per-tool `Ctx` slot) and are the **deliberate, documented floor** — see ADR-0002. The review's "~42" counted every `Tool::execute` impl; most hand-written ones already ignore `ctx` (`_ctx`).
 
 ## Decisions Made
 
@@ -186,6 +186,9 @@ Each phase is a standalone, always-green PR.
 | **B — filesystem reads → `HookCtx`** | `read, glob, grep, list_dir, tool_search`. Add `HookCtx { hook_engine, session_key }`. | **Done.** 5 tools narrowed to a 2-field view; bodies unchanged; 142 tests pass, clippy clean. |
 | **C — write/edit/web/plan → `IoCtx`** | `write, edit, apply_patch, notebook_edit, web_fetch, plan_mode`. Add `IoCtx { hook_engine, session_key, channel, chat_id, event_tx, cancel_token, message_id }` (no `entity_tx` — unused by these). | **Done.** 6 tools narrowed; bodies unchanged. |
 | **D — `bash` stays `FullCtx`** | Verified honest (uses `job_supervisor`, `agent_chain`, …). | **Done.** Ladder complete for the derive path. |
+| **E — `#[tool_actions]` family** | Add `ctx = "View"` to the `tool_actions` macro (projects at the top of the generated `execute`). `docs, temporal, annotate, mirror, launcher` → `ctx = "()"`; `subagents` stays `&RoutingContext` (forwards to `SubagentsHandler` trait). | **Done.** 5 tools narrowed to `()`; 266 tests pass; macro default unchanged (backward compatible). |
+
+Beyond Phase E lies the untyped-`Tool` floor (hand-written + MCP tools) — intentionally not narrowed; see ADR-0002.
 
 Only `tool_derive.rs` needed changing (not `tool_actions.rs` — that path doesn't use `ToolExecute`). `bus::InjectorContext` stays implemented on `RoutingContext`; the bus injection layer is unchanged. Each per-tool narrowing in B/C is independently revertible.
 
