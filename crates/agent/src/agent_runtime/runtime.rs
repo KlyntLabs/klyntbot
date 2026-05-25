@@ -15,7 +15,8 @@ use tracing::warn;
 
 use crate::autotuner::hooks::AutoTunerHook;
 use crate::events::AgentEvent;
-use crate::execution::{execute_loop, DepthMode, ExecutionParams, SafetyCap};
+use crate::engines::{CoreEngine, ExecutionEngine};
+use crate::execution::{DepthMode, ExecutionParams, SafetyCap};
 use crate::output::cost_tracker::CostTracker;
 use crate::output::validator::{ResponseValidator, ValidationResult};
 
@@ -565,10 +566,10 @@ impl AgentRuntime {
             safety_timeout_secs,
             "runtime.process_message: calling execute_loop"
         );
+        let engine = CoreEngine::new(Arc::clone(&self.core));
         let loop_result = tokio::time::timeout(
             safety_timeout,
-            execute_loop(
-                &self.core,
+            engine.run(
                 assembled.messages,
                 tool_definitions, // ALL tools, flat
                 &params,

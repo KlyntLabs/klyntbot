@@ -29,6 +29,7 @@ use super::types::{accumulate_usage, CycleOutcome, ExecutionParams, LoopFinishRe
 use crate::events::AgentEvent;
 
 /// Result of the unified execute loop.
+#[derive(Clone)]
 pub struct ExecuteLoopResult {
     /// Final response content (may be empty if cap hit before any text was produced).
     pub content: String,

@@ -682,9 +682,9 @@ pub async fn run_subagent_loop(
     max_turns: u32,
     on_iteration: Option<std::sync::Arc<dyn Fn() + Send + Sync>>,
 ) -> common::Result<crate::execution::execute_loop::ExecuteLoopResult> {
+    use crate::engines::{CoreEngine, ExecutionEngine};
     use crate::execution::budget::{DepthMode, SafetyCap};
     use crate::execution::core::ExecutionCore;
-    use crate::execution::execute_loop::execute_loop;
     use crate::execution::types::ExecutionParams;
     use tokio::sync::RwLock;
     use tools::registry::ToolRegistry;
@@ -725,16 +725,94 @@ pub async fn run_subagent_loop(
         max_turns,
     );
 
-    execute_loop(
-        &core,
-        messages,
-        &tool_defs,
-        &params,
-        &mut budget,
-        &routing_ctx,
-        None,
-    )
-    .await
+    let engine = CoreEngine::new(core);
+    engine
+        .run(
+            messages,
+            &tool_defs,
+            &params,
+            &mut budget,
+            &routing_ctx,
+            None,
+        )
+        .await
+}
+
+/// Drive an [`ExecutionEngine`] while forwarding its `IterationStart`/`ToolStart`
+/// events into the shared subagent `progress` map and the optional lifecycle
+/// broadcast. Extracted from `run_subagent_task` so the forwarder logic can be
+/// tested with a mock engine that scripts the event stream — the real
+/// `execute_loop` cannot be told which events to emit. See ADR-0003.
+#[allow(clippy::too_many_arguments)]
+async fn drive_subagent_with_progress(
+    engine: &dyn crate::engines::ExecutionEngine,
+    messages: Vec<providers::types::Message>,
+    tool_defs: &[serde_json::Value],
+    params: &crate::execution::types::ExecutionParams,
+    budget: &mut crate::execution::budget::SafetyCap,
+    routing_ctx: &tools::RoutingContext,
+    agent_id: String,
+    progress: Arc<dashmap::DashMap<String, (u32, Option<String>)>>,
+    lifecycle_tx: Option<
+        tokio::sync::broadcast::Sender<crate::subagent_events::SubagentLifecycleEvent>,
+    >,
+) -> common::Result<crate::execution::execute_loop::ExecuteLoopResult> {
+    // Side channel: translate AgentEvent::IterationStart / ToolStart into
+    // SubagentLifecycleEvent::Progress so the SubagentTray UI can update mid-flight,
+    // and keep a live (iteration, last_tool) snapshot in the shared progress map
+    // so SubagentManager::list_active reports the real iteration count.
+    let (agent_event_tx, mut agent_event_rx) =
+        tokio::sync::mpsc::channel::<crate::events::AgentEvent>(64);
+    let forwarder = tokio::spawn({
+        let progress = Arc::clone(&progress);
+        let agent_id = agent_id.clone();
+        async move {
+            while let Some(ev) = agent_event_rx.recv().await {
+                match ev {
+                    crate::events::AgentEvent::IterationStart { iteration, .. } => {
+                        let iter_u32 = iteration as u32;
+                        let last_tool = progress
+                            .get(&agent_id)
+                            .map(|e| e.value().1.clone())
+                            .unwrap_or(None);
+                        progress.insert(agent_id.clone(), (iter_u32, last_tool.clone()));
+                        if let Some(ref tx) = lifecycle_tx {
+                            let _ =
+                                tx.send(crate::subagent_events::SubagentLifecycleEvent::Progress {
+                                    agent_id: agent_id.clone(),
+                                    iteration: iter_u32,
+                                    last_tool,
+                                });
+                        }
+                    }
+                    crate::events::AgentEvent::ToolStart { name, .. } => {
+                        let iteration = progress.get(&agent_id).map(|e| e.value().0).unwrap_or(0);
+                        progress.insert(agent_id.clone(), (iteration, Some(name)));
+                    }
+                    _ => {}
+                }
+            }
+        }
+    });
+
+    // `engine` is a `&dyn ExecutionEngine` trait object, so its methods are
+    // callable without importing the trait (the concrete call sites in
+    // `run_subagent_loop` / runtime do need the import).
+    let result = engine
+        .run(
+            messages,
+            tool_defs,
+            params,
+            budget,
+            routing_ctx,
+            Some(agent_event_tx),
+        )
+        .await;
+
+    // Sender dropped at this point (moved into `run` and out of scope on return);
+    // forwarder loop terminates naturally as recv() returns None.
+    let _ = forwarder.await;
+    result
 }
 
 async fn run_subagent_task(
@@ -754,9 +832,9 @@ async fn run_subagent_task(
     >,
     job_supervisor: Option<tools_core::DynJobSupervisor>,
 ) -> std::result::Result<(String, String), Box<dyn std::error::Error + Send + Sync>> {
+    use crate::engines::CoreEngine;
     use crate::execution::budget::{DepthMode, SafetyCap};
     use crate::execution::core::ExecutionCore;
-    use crate::execution::execute_loop::execute_loop;
     use crate::execution::types::ExecutionParams;
     use tokio::sync::RwLock;
 
@@ -822,60 +900,20 @@ async fn run_subagent_task(
         500, // default turn cap
     );
 
-    // Side channel: translate AgentEvent::IterationStart / ToolStart into
-    // SubagentLifecycleEvent::Progress so the SubagentTray UI can update mid-flight,
-    // and keep a live (iteration, last_tool) snapshot in the shared progress map
-    // so SubagentManager::list_active reports the real iteration count.
-    let (agent_event_tx, mut agent_event_rx) =
-        tokio::sync::mpsc::channel::<crate::events::AgentEvent>(64);
-    let forwarder = tokio::spawn({
-        let progress = Arc::clone(&progress);
-        let agent_id = agent_id.clone();
-        async move {
-            while let Some(ev) = agent_event_rx.recv().await {
-                match ev {
-                    crate::events::AgentEvent::IterationStart { iteration, .. } => {
-                        let iter_u32 = iteration as u32;
-                        let last_tool = progress
-                            .get(&agent_id)
-                            .map(|e| e.value().1.clone())
-                            .unwrap_or(None);
-                        progress.insert(agent_id.clone(), (iter_u32, last_tool.clone()));
-                        if let Some(ref tx) = lifecycle_tx {
-                            let _ =
-                                tx.send(crate::subagent_events::SubagentLifecycleEvent::Progress {
-                                    agent_id: agent_id.clone(),
-                                    iteration: iter_u32,
-                                    last_tool,
-                                });
-                        }
-                    }
-                    crate::events::AgentEvent::ToolStart { name, .. } => {
-                        let iteration = progress.get(&agent_id).map(|e| e.value().0).unwrap_or(0);
-                        progress.insert(agent_id.clone(), (iteration, Some(name)));
-                    }
-                    _ => {}
-                }
-            }
-        }
-    });
-
-    let result = execute_loop(
-        &core,
+    let engine = CoreEngine::new(core);
+    let result = drive_subagent_with_progress(
+        &engine,
         messages,
         &tool_defs,
         &params,
         &mut budget,
         &routing_ctx,
-        Some(agent_event_tx),
+        agent_id,
+        progress,
+        lifecycle_tx,
     )
     .await
-    .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>);
-
-    // Channel sender dropped at this point (execute_loop returned, sender out of scope);
-    // forwarder loop terminates naturally as recv() returns None.
-    let _ = forwarder.await;
-    let result = result?;
+    .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
 
     Ok(("ok".to_string(), result.content))
 }
@@ -1100,5 +1138,79 @@ mod tests {
         );
         assert!(prompt.contains("Research Rust patterns"));
         assert!(prompt.contains("/tmp"));
+    }
+
+    /// The subagent event-forwarder (extracted into `drive_subagent_with_progress`)
+    /// translates scripted `IterationStart`/`ToolStart` events into the shared
+    /// `progress` snapshot and a `Progress` lifecycle event. This was untestable
+    /// while `execute_loop` was the only event producer; the `MockEngine` adapter
+    /// (the second `ExecutionEngine` implementor) makes the seam real. See ADR-0003.
+    #[tokio::test]
+    async fn forwarder_maps_scripted_events_to_progress() {
+        use crate::engines::MockEngine;
+        use crate::events::AgentEvent;
+        use crate::execution::budget::{DepthMode, SafetyCap};
+        use crate::execution::execute_loop::ExecuteLoopResult;
+        use crate::execution::types::{ExecutionParams, LoopFinishReason};
+
+        let progress: Arc<dashmap::DashMap<String, (u32, Option<String>)>> =
+            Arc::new(dashmap::DashMap::new());
+        let agent_id = "agent-1".to_string();
+        let (life_tx, mut life_rx) =
+            tokio::sync::broadcast::channel::<crate::subagent_events::SubagentLifecycleEvent>(8);
+
+        let result = ExecuteLoopResult {
+            content: "done".to_string(),
+            usage: Usage::default(),
+            turns: 1,
+            safety_cap_hit: false,
+            tool_calls: vec![],
+            finish_reason: LoopFinishReason::Completed,
+        };
+        let engine = MockEngine::new(result).with_events(vec![
+            AgentEvent::IterationStart {
+                iteration: 3,
+                max: 10,
+            },
+            AgentEvent::ToolStart {
+                name: "bash".to_string(),
+                args: serde_json::Value::Null,
+                agent: None,
+                call_id: None,
+            },
+        ]);
+
+        let mut budget = SafetyCap::with_limits(DepthMode::Normal, 0, 500);
+        let params = ExecutionParams::new("test-model", 128_000);
+        let ctx = tools::RoutingContext::new("subagent".into(), "background".into());
+
+        let out = drive_subagent_with_progress(
+            &engine,
+            vec![Message::user("hi")],
+            &[],
+            &params,
+            &mut budget,
+            &ctx,
+            agent_id.clone(),
+            Arc::clone(&progress),
+            Some(life_tx),
+        )
+        .await
+        .expect("mock engine run should succeed");
+
+        assert_eq!(out.content, "done");
+
+        // ToolStart follows IterationStart, so the snapshot is (iteration=3, "bash").
+        let entry = progress.get(&agent_id).expect("progress should be recorded");
+        assert_eq!(entry.value().0, 3);
+        assert_eq!(entry.value().1, Some("bash".to_string()));
+
+        // The IterationStart fired exactly one Progress lifecycle event.
+        match life_rx.try_recv() {
+            Ok(crate::subagent_events::SubagentLifecycleEvent::Progress { iteration, .. }) => {
+                assert_eq!(iteration, 3);
+            }
+            other => panic!("expected a Progress lifecycle event, got {other:?}"),
+        }
     }
 }
