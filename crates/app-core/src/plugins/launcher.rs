@@ -30,16 +30,11 @@ impl AppCorePlugin for LauncherPlugin {
         .await;
 
         if let Some(engine) = result.launcher_engine {
-            let launcher = feature_launcher::LauncherFeature::with_tool_deps(
-                feature_launcher::LauncherToolDeps {
-                    registry: Arc::clone(&engine.registry),
-                    frequency: Arc::clone(&engine.frequency_repo),
-                    pins: Arc::clone(&engine.pins_repo),
-                },
-            );
-            for tool in launcher.tools() {
-                ctx.register_dyn_tool(tool);
-            }
+            ctx.register_tool(feature_launcher::LauncherTool::new(
+                Arc::clone(&engine.registry),
+                Arc::clone(&engine.frequency_repo),
+                Arc::clone(&engine.pins_repo),
+            ));
             ctx.insert_handle(engine);
         }
 

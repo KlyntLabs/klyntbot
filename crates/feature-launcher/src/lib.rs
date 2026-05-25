@@ -10,8 +10,7 @@ pub mod window_mgmt;
 
 use async_trait::async_trait;
 use common::Result;
-use std::sync::Arc;
-use tools_core::{DynTool, FeatureMigration, FeaturePackage, HealthStatus};
+use tools_core::{FeatureMigration, FeaturePackage, HealthStatus};
 
 pub use clipboard::ClipboardMonitor;
 pub use migration::migrate_app_ids_to_bundle_ids;
@@ -26,26 +25,14 @@ pub use types::*;
 pub use window_mgmt::global as window_manager;
 pub use window_mgmt::WindowManager;
 
-#[derive(Clone)]
-pub struct LauncherToolDeps {
-    pub registry: Arc<SourceRegistry>,
-    pub frequency: Arc<FrequencyRepo>,
-    pub pins: Arc<PinsRepo>,
-}
-
-pub struct LauncherFeature {
-    tool_deps: Option<LauncherToolDeps>,
-}
+/// Feature handle for launcher migrations + health. Tools are registered
+/// imperatively in `LauncherPlugin::init` (the launcher tool needs the live
+/// search engine), so this carries no tool state.
+pub struct LauncherFeature;
 
 impl LauncherFeature {
     pub fn new() -> Self {
-        Self { tool_deps: None }
-    }
-
-    pub fn with_tool_deps(deps: LauncherToolDeps) -> Self {
-        Self {
-            tool_deps: Some(deps),
-        }
+        Self
     }
 }
 
@@ -79,18 +66,6 @@ pub fn launcher_migrations() -> Vec<FeatureMigration> {
 impl FeaturePackage for LauncherFeature {
     fn name(&self) -> &str {
         "launcher"
-    }
-
-    fn tools(&self) -> Vec<DynTool> {
-        if let Some(deps) = &self.tool_deps {
-            vec![Arc::new(LauncherTool::new(
-                deps.registry.clone(),
-                deps.frequency.clone(),
-                deps.pins.clone(),
-            ))]
-        } else {
-            vec![]
-        }
     }
 
     fn migrations(&self) -> Vec<FeatureMigration> {

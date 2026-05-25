@@ -36,7 +36,7 @@ use ai_core_macros::AiFeature;
 use async_trait::async_trait;
 use common::Result;
 use std::sync::Arc;
-use tools_core::{DynTool, FeatureMigration, FeaturePackage, HealthStatus};
+use tools_core::{FeatureMigration, FeaturePackage, HealthStatus};
 
 /// Feature package for task management.
 #[derive(AiFeature)]
@@ -103,13 +103,6 @@ impl FeaturePackage for TasksFeature {
         "tasks"
     }
 
-    fn tools(&self) -> Vec<DynTool> {
-        match &self.task_tool {
-            Some(tool) => vec![Arc::clone(tool) as DynTool],
-            None => vec![],
-        }
-    }
-
     fn migrations(&self) -> Vec<FeatureMigration> {
         vec![FeatureMigration {
             feature_name: "tasks".to_string(),
@@ -150,12 +143,6 @@ mod tests {
     fn test_feature_package_name() {
         let feature = TasksFeature::new();
         assert_eq!(feature.name(), "tasks");
-    }
-
-    #[test]
-    fn test_feature_package_tools_empty_when_no_tool_set() {
-        let feature = TasksFeature::new();
-        assert!(feature.tools().is_empty());
     }
 
     #[test]

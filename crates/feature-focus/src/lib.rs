@@ -39,7 +39,7 @@ impl std::str::FromStr for FocusMode {
 
 use async_trait::async_trait;
 use common::Result;
-use tools_core::{DynTool, FeatureMigration, FeaturePackage, HealthStatus};
+use tools_core::{FeatureMigration, FeaturePackage, HealthStatus};
 
 pub struct FocusFeature;
 
@@ -47,10 +47,6 @@ pub struct FocusFeature;
 impl FeaturePackage for FocusFeature {
     fn name(&self) -> &str {
         "focus"
-    }
-
-    fn tools(&self) -> Vec<DynTool> {
-        vec![]
     }
 
     fn migrations(&self) -> Vec<FeatureMigration> {

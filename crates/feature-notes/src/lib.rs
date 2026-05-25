@@ -10,8 +10,6 @@ pub mod tool;
 
 pub use events::NoteEvent;
 
-use std::sync::Arc;
-
 use ai_core_macros::AiFeature;
 use async_trait::async_trait;
 use common::Result;
@@ -62,10 +60,6 @@ pub fn notes_migrations() -> Vec<FeatureMigration> {
 impl FeaturePackage for NotesFeature {
     fn name(&self) -> &str {
         "notes"
-    }
-
-    fn tools(&self) -> Vec<tools_core::DynTool> {
-        vec![Arc::new(tool::NotesTool::new(self.repo.clone()))]
     }
 
     fn migrations(&self) -> Vec<FeatureMigration> {

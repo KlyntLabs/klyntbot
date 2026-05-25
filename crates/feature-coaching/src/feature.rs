@@ -6,7 +6,7 @@
 use ai_core_macros::AiFeature;
 use async_trait::async_trait;
 use common::Result;
-use tools_core::{DynTool, FeatureMigration, FeaturePackage, HealthStatus};
+use tools_core::{FeatureMigration, FeaturePackage, HealthStatus};
 
 #[derive(AiFeature, Default)]
 #[ai(
@@ -26,10 +26,6 @@ impl CoachingFeature {
 impl FeaturePackage for CoachingFeature {
     fn name(&self) -> &str {
         "coaching"
-    }
-
-    fn tools(&self) -> Vec<DynTool> {
-        Vec::new()
     }
 
     fn migrations(&self) -> Vec<FeatureMigration> {

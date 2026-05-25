@@ -1,13 +1,9 @@
 //! ProductivityFeature — the pipeline-aware FeaturePackage for productivity.
 
-use std::sync::Arc;
-
 use ai_core_macros::AiFeature;
 use async_trait::async_trait;
 use common::Result;
-use tools_core::{DynTool, FeatureMigration, FeaturePackage, HealthStatus};
-
-use crate::tool::ProductivityTool;
+use tools_core::{FeatureMigration, FeaturePackage, HealthStatus};
 
 #[derive(AiFeature, Default)]
 #[ai(
@@ -17,17 +13,7 @@ use crate::tool::ProductivityTool;
     entity_kind = "focus_session",
     event = "crate::events::ProductivityEvent"
 )]
-pub struct ProductivityFeature {
-    tool: Option<DynTool>,
-}
-
-impl ProductivityFeature {
-    pub fn new(tool: ProductivityTool) -> Self {
-        Self {
-            tool: Some(Arc::new(tool)),
-        }
-    }
-}
+pub struct ProductivityFeature;
 
 /// Productivity schema migrations. Free function so callers don't need to
 /// instantiate the feature just to run migrations.
@@ -54,10 +40,6 @@ pub fn productivity_migrations() -> Vec<FeatureMigration> {
 impl FeaturePackage for ProductivityFeature {
     fn name(&self) -> &str {
         "productivity"
-    }
-
-    fn tools(&self) -> Vec<DynTool> {
-        self.tool.iter().cloned().collect()
     }
 
     fn migrations(&self) -> Vec<FeatureMigration> {

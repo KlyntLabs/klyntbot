@@ -9,8 +9,6 @@ pub mod types;
 pub use events::{try_from_domain_event, LanguageLearningEvent};
 pub use pronunciation_provider::AppPronunciationProvider;
 
-use std::sync::Arc;
-
 use ai_core_macros::AiFeature;
 use async_trait::async_trait;
 use common::Result;
@@ -49,10 +47,6 @@ pub fn language_learning_migrations() -> Vec<FeatureMigration> {
 impl FeaturePackage for LanguageLearningFeature {
     fn name(&self) -> &str {
         "language-learning"
-    }
-
-    fn tools(&self) -> Vec<tools_core::DynTool> {
-        vec![Arc::new(practice_tool::LanguagePracticeTool::new())]
     }
 
     fn migrations(&self) -> Vec<FeatureMigration> {

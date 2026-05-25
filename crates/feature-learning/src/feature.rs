@@ -4,7 +4,7 @@
 use ai_core_macros::AiFeature;
 use async_trait::async_trait;
 use common::Result;
-use tools_core::{DynTool, FeatureMigration, FeaturePackage, HealthStatus};
+use tools_core::{FeatureMigration, FeaturePackage, HealthStatus};
 
 #[derive(AiFeature, Default)]
 #[ai(
@@ -36,14 +36,6 @@ impl LearningFeature {
 impl FeaturePackage for LearningFeature {
     fn name(&self) -> &str {
         "learning"
-    }
-
-    fn tools(&self) -> Vec<DynTool> {
-        // The "learning" Tool lives in `crates/tools/src/domain/learning_tool.rs`
-        // and is registered directly by the agent builder
-        // (`crates/agent/src/agent_loop/builder.rs`, search `LearningTool::new`),
-        // not through `FeaturePackage::tools()`. Returning empty here is intentional.
-        Vec::new()
     }
 
     fn migrations(&self) -> Vec<FeatureMigration> {
