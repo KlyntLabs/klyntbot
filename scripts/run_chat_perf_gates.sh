@@ -14,20 +14,28 @@ FAIL=0
 # ── Helper: extract criterion mean time in microseconds ─────────────────────
 extract_criterion_mean_us() {
     local log="$1"
-    # Criterion outputs: "time:   [11.234 µs 11.345 µs 11.456 µs]"
-    # We grab the median (middle) value.
-    grep -oP 'time:\s+\[\K[^\]]+' "$log" | head -1 | awk '{print $2}' | sed 's/µs//' | sed 's/us//' || true
+    # Criterion outputs: "time:   [11.234 µs 11.345 µs 11.456 µs]" — value and unit
+    # are separate whitespace fields, so the median value is $3 and its unit is $4.
+    # Normalise to µs.
+    grep -oP 'time:\s+\[\K[^\]]+' "$log" | head -1 | awk '{
+        val = $3; unit = $4
+        if (unit ~ /ns/)        { print val / 1000 }
+        else if (unit ~ /µs|us/) { print val }
+        else if (unit ~ /ms/)   { print val * 1000 }
+        else if (unit ~ /s/)    { print val * 1000000 }
+        else                    { print val }
+    }' || true
 }
 
 # ── Helper: extract criterion throughput in elem/s ──────────────────────────
 extract_criterion_thrpt() {
     local log="$1"
-    # Criterion outputs: "thrpt:  [87.654 Kelem/s 88.123 Kelem/s 88.456 Kelem/s]"
-    # We grab the median and normalize K/M suffixes.
+    # Criterion outputs: "thrpt:  [87.654 Kelem/s 88.123 Kelem/s 88.456 Kelem/s]" —
+    # the median value is $3 and its unit (with K/M prefix) is $4.
     grep -oP 'thrpt:\s+\[\K[^\]]+' "$log" | head -1 | awk '{
-        val = $2
-        if (val ~ /K/) { gsub(/K/, "", val); print val * 1000 }
-        else if (val ~ /M/) { gsub(/M/, "", val); print val * 1000000 }
+        val = $3; unit = $4
+        if (unit ~ /K/) { print val * 1000 }
+        else if (unit ~ /M/) { print val * 1000000 }
         else { print val }
     }' || true
 }
@@ -45,11 +53,13 @@ echo "[perf-gate] criterion: stream_throughput"
 cargo bench -p agent --bench stream_throughput -- --quick --noplot 2>&1 | tee /tmp/throughput.log
 
 # Extract throughput at 10,000 batch size (last group in the bench).
+# Criterion line: "thrpt:  [<low> <unit> <point-est> <unit> <high> <unit>]" — we
+# gate on the point estimate (the middle value, $4) and its unit ($5), matching
+# the statistic the helpers use so all extractors stay consistent.
 THRPT_10K=$(grep -A2 'stream_throughput/10000' /tmp/throughput.log | grep 'thrpt:' | head -1 | awk '{
-    val = $2
-    gsub(/[\[\]]/, "", val)
-    if (val ~ /K/) { gsub(/K/, "", val); print val * 1000 }
-    else if (val ~ /M/) { gsub(/M/, "", val); print val * 1000000 }
+    val = $4; unit = $5
+    if (unit ~ /K/) { print val * 1000 }
+    else if (unit ~ /M/) { print val * 1000000 }
     else { print val }
 }' || true)
 
@@ -69,8 +79,18 @@ fi
 echo "[perf-gate] criterion: relay_cleanup_latency"
 cargo bench -p desktop --bench relay_cleanup_latency -- --quick --noplot 2>&1 | tee /tmp/cleanup.log
 
-# Extract mean cleanup time in microseconds.
-CLEANUP_MEAN_US=$(grep -A2 'relay_cleanup_latency/drop_and_observe' /tmp/cleanup.log | grep 'time:' | awk '{print $2}' | sed 's/µs//' | sed 's/us//' | head -1 || true)
+# Extract the mean (point-estimate) cleanup time, normalised to microseconds. The
+# criterion line is "time:   [<low> <unit> <point-est> <unit> <high> <unit>]"; the
+# point estimate is the middle value ($4) with unit $5 — the right statistic for a
+# "must be ≤ threshold" latency gate (the lower CI bound $2 would be too optimistic).
+CLEANUP_MEAN_US=$(grep -A2 'relay_cleanup_latency/drop_and_observe' /tmp/cleanup.log | grep 'time:' | head -1 | awk '{
+    val = $4; unit = $5
+    if (unit ~ /ns/)        { print val / 1000 }
+    else if (unit ~ /µs|us/) { print val }
+    else if (unit ~ /ms/)   { print val * 1000 }
+    else if (unit ~ /s/)    { print val * 1000000 }
+    else                    { print val }
+}' || true)
 
 if [[ -n "$CLEANUP_MEAN_US" ]]; then
     # Convert µs to ms for comparison.
