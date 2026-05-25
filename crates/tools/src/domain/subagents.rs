@@ -1,12 +1,11 @@
 //! Subagents multi-action tool — spawn, resume, list, kill.
 
 use async_trait::async_trait;
-use serde_json::Value;
 use std::sync::Arc;
 use tracing::debug;
 
 use common::Result;
-use tools_core::{tool_actions, ActionParams, RoutingContext, Tool};
+use tools_core::{tool_actions, ActionParams, RoutingContext};
 
 #[derive(Debug, Clone, serde::Deserialize, ActionParams)]
 pub struct SpawnAction {
