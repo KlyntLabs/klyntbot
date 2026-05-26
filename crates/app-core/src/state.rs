@@ -702,8 +702,14 @@ impl AppCore {
         emitter: std::sync::Arc<dyn crate::events::AppEventEmitter>,
     ) -> Result<Self, String> {
         let mut config = config::Config::default();
-        let tmp = tempfile::tempdir().map_err(|e| e.to_string())?;
-        config.data_dir = Some(tmp.path().to_string_lossy().into_owned());
+        // Persist the temp dir for the process lifetime rather than letting the
+        // `TempDir` guard drop at the end of this constructor. If it dropped here
+        // the directory would be removed out from under the SQLite pool we just
+        // opened, surfacing later as an intermittent `unable to open database
+        // file` (code 14) under parallel test load. The OS reaps the leaked dir
+        // from the system temp root.
+        let data_dir = tempfile::tempdir().map_err(|e| e.to_string())?.keep();
+        config.data_dir = Some(data_dir.to_string_lossy().into_owned());
         let (core, _channels) = Self::init_with_sender(
             common::AppMode::Server,
             Some(config),
