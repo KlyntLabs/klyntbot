@@ -122,7 +122,7 @@ impl NoteTreeBuilder {
         //    fall back to markdown.
         let nodes = {
             let tiptap_nodes =
-                cognitive::services::tiptap_parser::parse_tiptap_to_tree(note_id, content);
+                context_engine::book_index::tiptap_parser::parse_tiptap_to_tree(note_id, content);
             if tiptap_nodes.is_empty() {
                 cognitive::repos::markdown_parser::parse_markdown_to_tree(note_id, content)
             } else {

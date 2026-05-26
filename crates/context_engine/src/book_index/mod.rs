@@ -1,5 +1,6 @@
 pub mod entity_resolution;
 pub mod gt_link;
+pub mod tiptap_parser;
 pub mod tree;
 pub mod types;
 

@@ -1,4 +1,4 @@
-use context_engine::book_index::types::{SourceType, TreeNode, TreeNodeType};
+use crate::book_index::types::{SourceType, TreeNode, TreeNodeType};
 use serde_json::Value;
 use uuid::Uuid;
 
