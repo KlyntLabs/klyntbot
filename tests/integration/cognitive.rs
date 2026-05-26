@@ -926,7 +926,7 @@ impl klyntbot::cognitive::services::reforge::ReforgeHandler for MockReforgeHandl
 #[tokio::test]
 async fn test_reforge_cycle_end_to_end() {
     use klyntbot::cognitive::repos::{EpisodicMemoryRepo, ProceduralRuleRepo, SemanticFactRepo};
-    use klyntbot::cognitive::services::reforge::service::run_reforge;
+    use klyntbot::cognitive::services::reforge::{run_reforge, ReforgeContext, ReforgeRun};
     use klyntbot::cognitive::services::reforge::skill_files::SkillFileManager;
     use klyntbot::cognitive::types::EpisodicMemory;
     use klyntbot::storage::repos::{ReforgeStateRepo, SkillVersionRepo};
@@ -1005,30 +1005,31 @@ async fn test_reforge_cycle_end_to_end() {
     // 6. Run the full Reforge cycle with the mock handler
     let handler = MockReforgeHandler;
     let result = run_reforge(
-        &reforge_state_repo,
-        &skill_version_repo,
-        &session_memory_repo,
-        &fact_repo,
-        &episodic_repo,
-        &rule_repo,
-        &handler,
-        &skill_mgr,
-        None,
-        None,
-        None,
-        None, // no autotuner bridge
-        None, // no autotuner context
-        None, // no feedback sources
-        None, // no graph enrichment handler
-        None, // no density repo
-        None, // no entity repo
-        None, // no snapshot repo
-        None, // no community intelligence handler
-        None, // no community repo
-        None, // no co_activation repo for split
-        None, // no domain event bus
-        None, // no cross-cli runner
-        None, // no skill discovery runner
+        ReforgeContext {
+            reforge_state_repo: &reforge_state_repo,
+            skill_version_repo: &skill_version_repo,
+            session_memory_repo: &session_memory_repo,
+            fact_repo: &fact_repo,
+            episodic_repo: &episodic_repo,
+            rule_repo: &rule_repo,
+            handler: &handler,
+            skill_mgr: &skill_mgr,
+            mirror_repo: None,
+            feedback_repo: None,
+            autotuner_bridge: None,
+            feedback_sources: None,
+            graph_enrichment_handler: None,
+            density_repo: None,
+            entity_repo: None,
+            snapshot_repo: None,
+            community_intelligence_handler: None,
+            community_repo: None,
+            co_activation_repo_for_split: None,
+            domain_event_bus: None,
+            cross_cli_runner: None,
+            skill_discovery_runner: None,
+        },
+        ReforgeRun::default(),
     )
     .await;
 
@@ -1123,7 +1124,7 @@ impl klyntbot::cognitive::services::reforge::AutotunerBridge for MockAutotunerBr
 #[tokio::test]
 async fn test_reforge_phase6_with_autotuner_bridge() {
     use klyntbot::cognitive::repos::{EpisodicMemoryRepo, ProceduralRuleRepo, SemanticFactRepo};
-    use klyntbot::cognitive::services::reforge::service::run_reforge;
+    use klyntbot::cognitive::services::reforge::{run_reforge, ReforgeContext, ReforgeRun};
     use klyntbot::cognitive::services::reforge::skill_files::SkillFileManager;
     use klyntbot::cognitive::types::EpisodicMemory;
     use klyntbot::storage::repos::{ReforgeStateRepo, SkillVersionRepo};
@@ -1196,30 +1197,31 @@ async fn test_reforge_phase6_with_autotuner_bridge() {
     let bridge = MockAutotunerBridge::new(true);
 
     let result = run_reforge(
-        &reforge_state_repo,
-        &skill_version_repo,
-        &session_memory_repo,
-        &fact_repo,
-        &episodic_repo,
-        &rule_repo,
-        &handler,
-        &skill_mgr,
-        None,
-        None,
-        None,
-        Some(&bridge),
-        None, // no autotuner context for this test
-        None, // no feedback sources
-        None, // no graph enrichment handler
-        None, // no density repo
-        None, // no entity repo
-        None, // no snapshot repo
-        None, // no community intelligence handler
-        None, // no community repo
-        None, // no co_activation repo for split
-        None, // no domain event bus
-        None, // no cross-cli runner
-        None, // no skill discovery runner
+        ReforgeContext {
+            reforge_state_repo: &reforge_state_repo,
+            skill_version_repo: &skill_version_repo,
+            session_memory_repo: &session_memory_repo,
+            fact_repo: &fact_repo,
+            episodic_repo: &episodic_repo,
+            rule_repo: &rule_repo,
+            handler: &handler,
+            skill_mgr: &skill_mgr,
+            mirror_repo: None,
+            feedback_repo: None,
+            autotuner_bridge: Some(&bridge),
+            feedback_sources: None,
+            graph_enrichment_handler: None,
+            density_repo: None,
+            entity_repo: None,
+            snapshot_repo: None,
+            community_intelligence_handler: None,
+            community_repo: None,
+            co_activation_repo_for_split: None,
+            domain_event_bus: None,
+            cross_cli_runner: None,
+            skill_discovery_runner: None,
+        },
+        ReforgeRun::default(),
     )
     .await;
 
@@ -1257,7 +1259,7 @@ async fn test_reforge_with_feedback_signals() {
         CoActivationRepo, EpisodicMemoryRepo, EventLogRepo, ProceduralRuleRepo, SemanticFactRepo,
     };
     use klyntbot::cognitive::services::reforge::collector::FeedbackSources;
-    use klyntbot::cognitive::services::reforge::service::run_reforge;
+    use klyntbot::cognitive::services::reforge::{run_reforge, ReforgeContext, ReforgeRun};
     use klyntbot::cognitive::services::reforge::skill_files::SkillFileManager;
     use klyntbot::cognitive::types::EpisodicMemory;
     use klyntbot::storage::repos::{ReforgeStateRepo, SkillVersionRepo};
@@ -1365,30 +1367,31 @@ async fn test_reforge_with_feedback_signals() {
     };
 
     let result = run_reforge(
-        &reforge_state_repo,
-        &skill_version_repo,
-        &session_memory_repo,
-        &fact_repo,
-        &episodic_repo,
-        &rule_repo,
-        &handler,
-        &skill_mgr,
-        None,
-        None,
-        None,
-        None,
-        None,
-        Some(&feedback_sources),
-        None, // no graph enrichment handler
-        None, // no density repo
-        None, // no entity repo
-        None, // no snapshot repo
-        None, // no community intelligence handler
-        None, // no community repo
-        None, // no co_activation repo for split
-        None, // no domain event bus
-        None, // no cross-cli runner
-        None, // no skill discovery runner
+        ReforgeContext {
+            reforge_state_repo: &reforge_state_repo,
+            skill_version_repo: &skill_version_repo,
+            session_memory_repo: &session_memory_repo,
+            fact_repo: &fact_repo,
+            episodic_repo: &episodic_repo,
+            rule_repo: &rule_repo,
+            handler: &handler,
+            skill_mgr: &skill_mgr,
+            mirror_repo: None,
+            feedback_repo: None,
+            autotuner_bridge: None,
+            feedback_sources: Some(&feedback_sources),
+            graph_enrichment_handler: None,
+            density_repo: None,
+            entity_repo: None,
+            snapshot_repo: None,
+            community_intelligence_handler: None,
+            community_repo: None,
+            co_activation_repo_for_split: None,
+            domain_event_bus: None,
+            cross_cli_runner: None,
+            skill_discovery_runner: None,
+        },
+        ReforgeRun::default(),
     )
     .await;
 

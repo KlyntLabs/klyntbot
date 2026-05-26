@@ -1,10 +1,12 @@
 pub mod collector;
 pub mod feedback;
+pub mod pipeline;
 pub mod service;
 pub mod skill_discovery;
 pub mod skill_files;
 pub mod types;
 
+pub use pipeline::{run_reforge, Phase, ReforgeContext, ReforgeRun};
 pub use skill_discovery::{cluster_rules_for_skill_discovery, RuleCluster};
 
 use std::collections::HashMap;

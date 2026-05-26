@@ -426,41 +426,48 @@ fn register_cron_callbacks(
                                 metric_registry: metric_registry.get(),
                             };
 
-                        match cognitive::services::reforge::service::run_reforge(
-                            &repos_reforge.reforge_state,
-                            &repos_reforge.skill_version,
-                            &repos_reforge.session_memory,
-                            &fact_repo,
-                            &episodic_repo,
-                            &rule_repo,
-                            handler.as_ref(),
-                            &skill_mgr,
-                            Some(pre_read_files),
-                            Some(&mirror_repo),
-                            Some(&feedback_repo),
-                            bridge_ref,
-                            autotuner_ctx,
-                            Some(&feedback_sources),
+                        let graph_handler =
                             crate::handlers::cognitive::build_graph_enrichment_handler(
                                 &cog_provider,
                                 &cog_config,
-                            )
-                            .as_deref(),
-                            Some(&density_repo),
-                            Some(&entity_repo),
-                            Some(&snapshot_repo),
+                            );
+                        let community_handler =
                             crate::handlers::cognitive::build_community_intelligence_handler(
                                 &cog_provider,
                                 &cog_config,
-                            )
-                            .as_deref(),
-                            Some(&cognitive::CommunityRepo::new(pool.clone())),
-                            Some(&co_activation_repo),
-                            Some(domain_event_bus),
-                            None,
-                            None,
-                        )
-                        .await
+                            );
+                        let community_repo = cognitive::CommunityRepo::new(pool.clone());
+                        let reforge_ctx = cognitive::services::reforge::ReforgeContext {
+                            reforge_state_repo: &repos_reforge.reforge_state,
+                            skill_version_repo: &repos_reforge.skill_version,
+                            session_memory_repo: &repos_reforge.session_memory,
+                            fact_repo: &fact_repo,
+                            episodic_repo: &episodic_repo,
+                            rule_repo: &rule_repo,
+                            handler: handler.as_ref(),
+                            skill_mgr: &skill_mgr,
+                            mirror_repo: Some(&mirror_repo),
+                            feedback_repo: Some(&feedback_repo),
+                            autotuner_bridge: bridge_ref,
+                            feedback_sources: Some(&feedback_sources),
+                            graph_enrichment_handler: graph_handler.as_deref(),
+                            density_repo: Some(&density_repo),
+                            entity_repo: Some(&entity_repo),
+                            snapshot_repo: Some(&snapshot_repo),
+                            community_intelligence_handler: community_handler.as_deref(),
+                            community_repo: Some(&community_repo),
+                            co_activation_repo_for_split: Some(&co_activation_repo),
+                            domain_event_bus: Some(domain_event_bus),
+                            cross_cli_runner: None,
+                            skill_discovery_runner: None,
+                        };
+                        let reforge_run = cognitive::services::reforge::ReforgeRun {
+                            pre_read_skill_files: Some(pre_read_files),
+                            autotuner_ctx,
+                            ..Default::default()
+                        };
+                        match cognitive::services::reforge::run_reforge(reforge_ctx, reforge_run)
+                            .await
                         {
                             Some(result) => {
                                 // Clean up old suggestions (90 day retention)

@@ -26,631 +26,20 @@
 //! removed 2026-05-17 — features had been off in production for months.
 
 use std::collections::HashMap;
-use std::sync::Arc;
 
 use jiff::Timestamp;
 use sqlx;
 use tracing::{debug, info, warn};
 
-use crate::repos::{EpisodicMemoryRepo, ProceduralRuleRepo, SemanticFactRepo};
+use crate::repos::{ProceduralRuleRepo, SemanticFactRepo};
 use crate::services::reforge::skill_files::{
     compute_diff, content_hash, SkillFile, SkillFileManager,
 };
 use crate::services::reforge::{types::*, AutotunerBridge, Phase6Result};
-use crate::types::{EpisodicMemory, ProceduralRule, SemanticFact, DEFAULT_MEMORY_TYPE};
+use crate::types::{ProceduralRule, SemanticFact, DEFAULT_MEMORY_TYPE};
 
 use common::helpers::truncate_chars;
 
-// ---------------------------------------------------------------------------
-// Public entry point
-// ---------------------------------------------------------------------------
-
-/// Run the full Reforge cycle, returning `None` when the collector decides
-/// there is nothing new to process.
-#[allow(clippy::too_many_arguments)]
-pub async fn run_reforge(
-    reforge_state_repo: &storage::repos::ReforgeStateRepo,
-    skill_version_repo: &storage::repos::SkillVersionRepo,
-    session_memory_repo: &storage::SessionMemoryRepo,
-    fact_repo: &SemanticFactRepo,
-    episodic_repo: &EpisodicMemoryRepo,
-    rule_repo: &ProceduralRuleRepo,
-    handler: &dyn super::ReforgeHandler,
-    skill_mgr: &SkillFileManager,
-    pre_read_skill_files: Option<HashMap<String, Vec<SkillFile>>>,
-    mirror_repo: Option<&crate::mirror::MirrorRepo>,
-    feedback_repo: Option<&storage::RetrievalFeedbackRepo>,
-    autotuner_bridge: Option<&dyn super::AutotunerBridge>,
-    autotuner_ctx: Option<AutotunerContext>,
-    feedback_sources: Option<&super::collector::FeedbackSources<'_>>,
-    graph_enrichment_handler: Option<&dyn super::GraphEnrichmentHandler>,
-    density_repo: Option<&crate::repos::ConversationDensityRepo>,
-    entity_repo: Option<&crate::repos::EntityRepo>,
-    snapshot_repo: Option<&crate::repos::KnowledgeSnapshotRepo>,
-    community_intelligence_handler: Option<&dyn super::CommunityIntelligenceHandler>,
-    community_repo: Option<&crate::repos::CommunityRepo>,
-    co_activation_repo_for_split: Option<&crate::repos::CoActivationRepo>,
-    domain_event_bus: Option<Arc<bus::DomainEventBus>>,
-    cross_cli_runner: Option<&dyn super::CrossCliPhaseRunner>,
-    skill_discovery_runner: Option<&dyn super::SkillDiscoveryRunner>,
-) -> Option<ReforgeResult> {
-    let mut result = ReforgeResult::default();
-    let run_id = uuid::Uuid::new_v4().to_string();
-
-    // ------------------------------------------------------------------
-    // Fetch last run timestamp
-    // ------------------------------------------------------------------
-    let last_run_at = match reforge_state_repo.get().await {
-        Ok(state) => state.last_run_at,
-        Err(e) => {
-            warn!("Reforge: failed to read reforge_state: {e}");
-            None
-        }
-    };
-
-    // ------------------------------------------------------------------
-    // Phase 1: Collect
-    // ------------------------------------------------------------------
-    info!("Reforge Phase 1: Collect");
-    let collected = super::collector::collect(
-        last_run_at.as_deref(),
-        session_memory_repo,
-        fact_repo,
-        episodic_repo,
-        rule_repo,
-        skill_mgr,
-        pre_read_skill_files,
-        mirror_repo,
-        feedback_repo,
-        feedback_sources,
-    )
-    .await;
-
-    let collected = match collected {
-        Some(mut c) => {
-            // Inject autotuner context from the cron handler (where metric_source is available).
-            c.autotuner_ctx = autotuner_ctx;
-            c
-        }
-        None => {
-            info!("Reforge: skipped — no new data");
-            return None;
-        }
-    };
-
-    // Snapshot content hashes at collection time for conflict detection.
-    let collected_hashes: HashMap<(String, String), String> = collected
-        .skill_files
-        .iter()
-        .flat_map(|(_, files)| {
-            files.iter().map(|f| {
-                (
-                    (f.skill_name.clone(), f.file_path.clone()),
-                    f.content_hash.clone(),
-                )
-            })
-        })
-        .collect();
-
-    // ------------------------------------------------------------------
-    // Phase 2: Synthesize (LLM call #1)
-    // ------------------------------------------------------------------
-    info!("Reforge Phase 2: Synthesize");
-    let synthesize_input = build_synthesize_input(&collected);
-    let synthesize_output = match handler.synthesize(&synthesize_input).await {
-        Ok(output) => {
-            debug!(
-                facts = output.fact_updates.len(),
-                rules = output.rule_updates.len(),
-                stale = output.stale_facts.len(),
-                "Reforge Phase 2 complete"
-            );
-            Some(output)
-        }
-        Err(e) => {
-            warn!("Reforge Phase 2 failed: {e}");
-            result.phase_errors.push(format!("synthesize: {e}"));
-            None
-        }
-    };
-
-    // Persist high-confidence cross-session patterns as episodic memories.
-    if let Some(ref syn) = synthesize_output {
-        for pattern in &syn.cross_session_patterns {
-            if pattern.confidence >= 0.7 {
-                let mem = EpisodicMemory {
-                    id: uuid::Uuid::new_v4().to_string(),
-                    domain: SOURCE_REFORGE.to_string(),
-                    content: pattern.pattern.clone(),
-                    summary: Some("Cross-session pattern".to_string()),
-                    importance: pattern.confidence,
-                    occurred_at: Timestamp::now().to_string(),
-                    recorded_at: Timestamp::now().to_string(),
-                    stability: 3.0,
-                    last_accessed: None,
-                    access_count: 0,
-                    project_id: None,
-                    scope_type: "system".to_string(),
-                    scope_id: None,
-                    kind: None,
-                    scope_repo_id: None,
-                    metadata: None,
-                    actor_id: None,
-                    tier: "raw".to_string(),
-                    parent_id: None,
-                    child_count: 0,
-                    rolled_up_at: None,
-                };
-                if let Err(e) = episodic_repo.insert(&mem).await {
-                    warn!("Reforge: failed to persist cross-session pattern: {e}");
-                } else {
-                    result.patterns_persisted += 1;
-                }
-            }
-        }
-    }
-
-    // ------------------------------------------------------------------
-    // Phase 3: Review (LLM call #2)
-    // ------------------------------------------------------------------
-    info!("Reforge Phase 3: Review");
-    let review_input = build_review_input(&collected, &synthesize_output);
-    let review_output = match handler.review(&review_input).await {
-        Ok(output) => {
-            debug!(
-                skill_edits = output.skill_edits.len(),
-                routing_insights = output.routing_insights.len(),
-                "Reforge Phase 3 complete"
-            );
-            Some(output)
-        }
-        Err(e) => {
-            warn!("Reforge Phase 3 failed: {e}");
-            result.phase_errors.push(format!("review: {e}"));
-            None
-        }
-    };
-
-    // Persist context priority suggestions for the next cycle's feedback loop.
-    if let Some(ref review) = review_output {
-        if let Some(repo) = feedback_sources.and_then(|fb| fb.suggestion_repo) {
-            let now = Timestamp::now().to_string();
-            for suggestion in &review.context_priority_suggestions {
-                let row = storage::repos::reforge_suggestion::ReforgeSuggestionRow {
-                    id: uuid::Uuid::new_v4().to_string(),
-                    suggestion_type: "context_priority".to_string(),
-                    content: suggestion.suggestion.clone(),
-                    reason: suggestion.reason.clone(),
-                    confidence: 0.8,
-                    cycle_run_at: now.clone(),
-                    acted_upon: false,
-                    created_at: now.clone(),
-                };
-                if let Err(e) = repo.insert(&row).await {
-                    warn!("Reforge: failed to persist context priority suggestion: {e}");
-                } else {
-                    result.suggestions_persisted += 1;
-                }
-            }
-        }
-    }
-
-    // ------------------------------------------------------------------
-    // Phase 2.6: Cross-CLI transfer (KCA Track 10)
-    // ------------------------------------------------------------------
-    if let Some(runner) = cross_cli_runner {
-        info!("Reforge Phase 2.6: Cross-CLI transfer");
-        match runner.run_cross_cli_transfer(&run_id).await {
-            Ok(promoted) => {
-                debug!(promoted, "Phase 2.6 complete");
-                result.cross_cli_promoted = promoted;
-            }
-            Err(e) => {
-                warn!("Phase 2.6 failed: {e}");
-                result.phase_errors.push(format!("phase 2.6: {e}"));
-            }
-        }
-    }
-
-    // ------------------------------------------------------------------
-    // Phase 4: Narrate (LLM call #3)
-    // ------------------------------------------------------------------
-    info!("Reforge Phase 4: Narrate");
-    let narrate_input = build_narrate_input(&synthesize_output, &review_output);
-    let narrative = match handler.narrate(&narrate_input).await {
-        Ok(text) => {
-            debug!(len = text.len(), "Reforge Phase 4 complete");
-            text
-        }
-        Err(e) => {
-            warn!("Reforge Phase 4 failed: {e}");
-            result.phase_errors.push(format!("narrate: {e}"));
-            "Reforge cycle completed with partial results.".to_string()
-        }
-    };
-    result.narrative = narrative.clone();
-
-    // ------------------------------------------------------------------
-    // Phase 5: Apply
-    // ------------------------------------------------------------------
-    info!("Reforge Phase 5: Apply");
-
-    // 5a. Apply knowledge (facts + rules) from Phase 2.
-    if let Some(ref syn) = synthesize_output {
-        apply_knowledge(syn, fact_repo, rule_repo, &mut result).await;
-    }
-
-    // 5b. Apply skill edits from Phase 3.
-    if let Some(ref rev) = review_output {
-        apply_skill_edits(
-            &rev.skill_edits,
-            &collected_hashes,
-            skill_mgr,
-            skill_version_repo,
-            &mut result,
-        )
-        .await;
-    }
-
-    // 5c. Store narrative as episodic memory.
-    let narrative_mem = EpisodicMemory {
-        id: uuid::Uuid::new_v4().to_string(),
-        domain: SOURCE_REFORGE.to_string(),
-        content: narrative,
-        summary: Some("Reforge cycle narrative".to_string()),
-        importance: 0.9,
-        occurred_at: Timestamp::now().to_string(),
-        recorded_at: Timestamp::now().to_string(),
-        stability: 5.0,
-        last_accessed: None,
-        access_count: 0,
-        project_id: None,
-        scope_type: "system".to_string(),
-        scope_id: None,
-        kind: None,
-        scope_repo_id: None,
-        metadata: None,
-        actor_id: None,
-        tier: "raw".to_string(),
-        parent_id: None,
-        child_count: 0,
-        rolled_up_at: None,
-    };
-    if let Err(e) = episodic_repo.insert(&narrative_mem).await {
-        warn!("Reforge: failed to store narrative memory: {e}");
-        result.phase_errors.push(format!("narrative_store: {e}"));
-    }
-
-    // ------------------------------------------------------------------
-    // Phase 3.6: Skill discovery (KCA Track 12)
-    // ------------------------------------------------------------------
-    if let Some(runner) = skill_discovery_runner {
-        info!("Reforge Phase 3.6: Skill discovery");
-        match runner.run_skill_discovery(&run_id).await {
-            Ok(proposed) => {
-                debug!(proposed, "Phase 3.6 complete");
-                result.skills_proposed = proposed;
-            }
-            Err(e) => {
-                warn!("Phase 3.6 failed: {e}");
-                result.phase_errors.push(format!("phase 3.6: {e}"));
-            }
-        }
-    }
-
-    // ------------------------------------------------------------------
-    // Phase 6: Optimize
-    // ------------------------------------------------------------------
-    info!("Reforge Phase 6: Optimize");
-    if let Some(bridge) = autotuner_bridge {
-        // Step 1: Evaluate existing trials
-        match run_phase6_autotuner(bridge).await {
-            Ok(eval) => {
-                result.champion_promoted = eval.promoted;
-                result.regression_detected = eval.regression;
-                if let Some(ref summary) = eval.promotion_summary {
-                    info!("Reforge Phase 6: {summary}");
-                }
-                if eval.regression {
-                    warn!("Reforge Phase 6: champion regression detected");
-                }
-                if !eval.failed_constraints.is_empty() {
-                    debug!(
-                        "Reforge Phase 6: {} trial(s) failed constraints: {}",
-                        eval.failed_constraints.len(),
-                        eval.failed_constraints.join("; "),
-                    );
-                }
-                debug!(
-                    evaluated = eval.evaluated_count,
-                    promoted = eval.promoted,
-                    regression = eval.regression,
-                    "Reforge Phase 6 evaluation complete"
-                );
-            }
-            Err(e) => {
-                warn!("Reforge Phase 6 evaluation failed: {e}");
-                result.phase_errors.push(format!("optimize/evaluate: {e}"));
-            }
-        }
-
-        // Step 2: Create new trials from Phase 3 suggestions
-        if let Some(ref review) = review_output {
-            let created = create_trials_from_suggestions(&review.trial_suggestions, bridge).await;
-            result.trials_created = created;
-        }
-    } else {
-        debug!("Reforge Phase 6: skipped (no autotuner bridge)");
-    }
-
-    // ------------------------------------------------------------------
-    // Phase 6.5: Graph Consolidation
-    // ------------------------------------------------------------------
-    if let (Some(enricher), Some(density_repo), Some(entity_repo)) =
-        (graph_enrichment_handler, density_repo, entity_repo)
-    {
-        info!("Reforge Phase 6.5: Graph Consolidation");
-
-        // Step 1: Load medium-density turns queued since last cycle
-        let pending_turns = match density_repo.load_pending_medium(50).await {
-            Ok(turns) => turns,
-            Err(e) => {
-                warn!("Reforge Phase 6.5: failed to load pending turns: {e}");
-                result
-                    .phase_errors
-                    .push(format!("graph_consolidation/load: {e}"));
-                Vec::new()
-            }
-        };
-
-        // Step 2: Find duplicate entity candidates
-        let dup_candidates = match entity_repo.find_duplicate_candidates(30).await {
-            Ok(dups) => dups,
-            Err(e) => {
-                warn!("Reforge Phase 6.5: failed to find duplicates: {e}");
-                Vec::new()
-            }
-        };
-
-        // Step 3: Run LLM enrichment (single call) if there's work to do
-        if !pending_turns.is_empty() || !dup_candidates.is_empty() {
-            let input = crate::services::graph_enrichment::GraphEnrichmentInput {
-                turn_previews: pending_turns
-                    .iter()
-                    .map(|t| t.content_preview.clone())
-                    .collect(),
-                duplicate_candidates: dup_candidates
-                    .iter()
-                    .map(|(a_id, b_id, a_name, b_name)| {
-                        crate::services::graph_enrichment::DuplicateCandidate {
-                            entity_a_id: a_id.clone(),
-                            entity_b_id: b_id.clone(),
-                            entity_a_name: a_name.clone(),
-                            entity_b_name: b_name.clone(),
-                        }
-                    })
-                    .collect(),
-            };
-
-            match enricher.enrich_graph(&input).await {
-                Ok(output) => {
-                    // Apply merge decisions
-                    for decision in &output.merge_decisions {
-                        if decision.should_merge {
-                            if let Err(e) = entity_repo
-                                .merge_entities(&decision.entity_a_id, &decision.entity_b_id)
-                                .await
-                            {
-                                debug!("Phase 6.5: merge failed: {e}");
-                            } else {
-                                result.entities_merged += 1;
-                            }
-                        }
-                    }
-
-                    // Apply discovered relationships
-                    for rel in &output.discovered_relationships {
-                        let source_entities = entity_repo
-                            .find_by_name(&rel.source_entity_name)
-                            .await
-                            .unwrap_or_default();
-                        let target_entities = entity_repo
-                            .find_by_name(&rel.target_entity_name)
-                            .await
-                            .unwrap_or_default();
-
-                        if let (Some(src), Some(tgt)) =
-                            (source_entities.first(), target_entities.first())
-                        {
-                            let new_rel = crate::repos::entity::NewRelationship {
-                                source_entity_id: src.id.clone(),
-                                target_entity_id: tgt.id.clone(),
-                                relationship_type: rel.relationship_type.clone(),
-                                evidence: None,
-                                source: "reforge_phase_6.5".to_string(),
-                            };
-                            if entity_repo.upsert_relationship(&new_rel).await.is_ok() {
-                                result.relationships_discovered += 1;
-                            }
-                        }
-                    }
-
-                    // Mark processed turns as enriched
-                    let turn_ids: Vec<String> =
-                        pending_turns.iter().map(|t| t.id.clone()).collect();
-                    if let Err(e) = density_repo.mark_enriched(&turn_ids).await {
-                        debug!("Phase 6.5: mark_enriched failed: {e}");
-                    }
-
-                    info!(
-                        merged = result.entities_merged,
-                        relationships = result.relationships_discovered,
-                        turns_processed = pending_turns.len(),
-                        "Reforge Phase 6.5 complete"
-                    );
-                }
-                Err(e) => {
-                    warn!("Reforge Phase 6.5 enrichment failed: {e}");
-                    result
-                        .phase_errors
-                        .push(format!("graph_consolidation/enrich: {e}"));
-                }
-            }
-        } else {
-            debug!("Reforge Phase 6.5: nothing to consolidate");
-        }
-
-        // Step 4: Record knowledge snapshot
-        if let Some(snapshot_repo) = snapshot_repo {
-            if let Err(e) = record_knowledge_snapshot(entity_repo, fact_repo, snapshot_repo).await {
-                debug!("Phase 6.5: snapshot failed: {e}");
-            } else {
-                result.snapshot_recorded = true;
-            }
-        }
-    } else {
-        debug!("Reforge Phase 6.5: skipped (missing repos or handler)");
-    }
-
-    // ------------------------------------------------------------------
-    // Phase 6.5b: Community Intelligence — LLM naming, merge, split
-    // ------------------------------------------------------------------
-    if let (Some(ci_handler), Some(community_repo)) =
-        (community_intelligence_handler, community_repo)
-    {
-        match crate::services::community_intelligence::build_intelligence_input(community_repo)
-            .await
-        {
-            Ok(input) if !input.communities.is_empty() => {
-                match ci_handler.analyze_communities(&input).await {
-                    Ok(output) => {
-                        let (renamed, merged, split_count) = if let Some(co_act) =
-                            co_activation_repo_for_split
-                        {
-                            crate::services::community_intelligence::apply_intelligence(
-                                &output,
-                                community_repo,
-                                co_act,
-                                domain_event_bus.clone(),
-                            )
-                            .await
-                        } else {
-                            // No co-activation repo — can rename/merge but not split
-                            let no_splits =
-                                    crate::services::community_intelligence::CommunityIntelligenceOutput {
-                                        names: output.names.clone(),
-                                        merges: output.merges.clone(),
-                                        splits: Vec::new(),
-                                    };
-                            let fallback_co_act =
-                                crate::repos::CoActivationRepo::new(community_repo.pool().clone());
-                            crate::services::community_intelligence::apply_intelligence(
-                                &no_splits,
-                                community_repo,
-                                &fallback_co_act,
-                                domain_event_bus.clone(),
-                            )
-                            .await
-                        };
-                        result.communities_renamed = renamed;
-                        result.communities_merged = merged;
-                        result.communities_split = split_count;
-                        info!(
-                            renamed,
-                            merged,
-                            split = split_count,
-                            "Phase 6.5b: community intelligence complete"
-                        );
-                    }
-                    Err(e) => {
-                        warn!("Phase 6.5b community intelligence failed: {e}");
-                        result
-                            .phase_errors
-                            .push(format!("community_intelligence: {e}"));
-                    }
-                }
-            }
-            Ok(_) => {
-                debug!("Phase 6.5b: no active communities for intelligence");
-            }
-            Err(e) => {
-                debug!("Phase 6.5b: failed to build community input: {e}");
-            }
-        }
-    }
-
-    // ------------------------------------------------------------------
-    // Phase 7: Compact
-    // ------------------------------------------------------------------
-    info!("Reforge Phase 7: Compact");
-    let mut compaction_stats: Option<serde_json::Value> = None;
-    match crate::services::compaction::run_compaction(
-        fact_repo,
-        episodic_repo,
-        Some(rule_repo),
-        None,
-        None,
-        Some(session_memory_repo),
-        None,
-        None,
-    )
-    .await
-    {
-        Ok(cr) => {
-            debug!(
-                facts_archived = cr.facts_archived,
-                episodic_deleted = cr.episodic_deleted,
-                rules_deactivated = cr.rules_deactivated,
-                "Reforge Phase 7 complete"
-            );
-            compaction_stats = Some(serde_json::json!({
-                "facts_archived": cr.facts_archived,
-                "episodic_deleted": cr.episodic_deleted,
-                "low_stability_archived": cr.low_stability_archived,
-                "rules_deactivated": cr.rules_deactivated,
-            }));
-        }
-        Err(e) => {
-            warn!("Reforge Phase 7 failed: {e}");
-            result.phase_errors.push(format!("compact: {e}"));
-        }
-    }
-
-    // Record run in reforge_state (after all phases, including compaction).
-    let stats_json = serde_json::json!({
-        "facts_added": result.facts_added,
-        "facts_updated": result.facts_updated,
-        "facts_stale_flagged": result.facts_stale_flagged,
-        "rules_added": result.rules_added,
-        "rules_reinforced": result.rules_reinforced,
-        "skills_edited": result.skills_edited,
-        "skipped_skill_edits": result.skipped_skill_edits.len(),
-        "phase_errors": result.phase_errors.len(),
-        "trials_created": result.trials_created,
-        "champion_promoted": result.champion_promoted,
-        "regression_detected": result.regression_detected,
-        "suggestions_persisted": result.suggestions_persisted,
-        "patterns_persisted": result.patterns_persisted,
-        "communities_renamed": result.communities_renamed,
-        "communities_merged": result.communities_merged,
-        "communities_split": result.communities_split,
-        "compaction": compaction_stats,
-    });
-    if let Err(e) = reforge_state_repo.record_run(&stats_json.to_string()).await {
-        warn!("Reforge: failed to record run: {e}");
-    }
-
-    info!(
-        facts_added = result.facts_added,
-        facts_updated = result.facts_updated,
-        rules_added = result.rules_added,
-        skills_edited = result.skills_edited,
-        errors = result.phase_errors.len(),
-        "Reforge cycle complete"
-    );
-
-    Some(result)
-}
 
 // ---------------------------------------------------------------------------
 // Standalone Phase 6 autotuner evaluation (also called by cron)
@@ -668,7 +57,7 @@ pub async fn run_phase6_autotuner(bridge: &dyn AutotunerBridge) -> common::Resul
 // Phase input builders
 // ---------------------------------------------------------------------------
 
-fn build_synthesize_input(collected: &ReforgeCollected) -> SynthesizeInput {
+pub(crate) fn build_synthesize_input(collected: &ReforgeCollected) -> SynthesizeInput {
     let sessions = collected.sessions.clone();
 
     let episodic_memories: Vec<EpisodicSummary> = collected
@@ -699,7 +88,7 @@ fn build_synthesize_input(collected: &ReforgeCollected) -> SynthesizeInput {
     }
 }
 
-fn build_review_input(
+pub(crate) fn build_review_input(
     collected: &ReforgeCollected,
     synthesize_output: &Option<SynthesizeOutput>,
 ) -> ReviewInput {
@@ -820,7 +209,7 @@ fn build_review_input(
     }
 }
 
-fn build_narrate_input(
+pub(crate) fn build_narrate_input(
     synthesize_output: &Option<SynthesizeOutput>,
     review_output: &Option<ReviewOutput>,
 ) -> NarrateInput {
@@ -859,7 +248,7 @@ fn build_narrate_input(
 // Phase 5a: Apply knowledge
 // ---------------------------------------------------------------------------
 
-async fn apply_knowledge(
+pub(crate) async fn apply_knowledge(
     syn: &SynthesizeOutput,
     fact_repo: &SemanticFactRepo,
     rule_repo: &ProceduralRuleRepo,
@@ -1013,7 +402,7 @@ async fn upsert_fact(
 // Phase 5b: Apply skill edits
 // ---------------------------------------------------------------------------
 
-async fn apply_skill_edits(
+pub(crate) async fn apply_skill_edits(
     edits: &[SkillEdit],
     collected_hashes: &HashMap<(String, String), String>,
     skill_mgr: &SkillFileManager,
@@ -1429,7 +818,7 @@ fn format_rules(rules: &[ProceduralRule]) -> String {
 // ---------------------------------------------------------------------------
 
 /// Validate, deduplicate, and create trials from LLM suggestions.
-async fn create_trials_from_suggestions(
+pub(crate) async fn create_trials_from_suggestions(
     suggestions: &[TrialSuggestion],
     bridge: &dyn super::AutotunerBridge,
 ) -> u32 {
@@ -1496,7 +885,7 @@ async fn create_trials_from_suggestions(
 // ---------------------------------------------------------------------------
 
 /// Record a nightly knowledge graph snapshot.
-async fn record_knowledge_snapshot(
+pub(crate) async fn record_knowledge_snapshot(
     entity_repo: &crate::repos::EntityRepo,
     fact_repo: &SemanticFactRepo,
     snapshot_repo: &crate::repos::KnowledgeSnapshotRepo,
