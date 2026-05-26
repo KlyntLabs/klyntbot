@@ -3,7 +3,6 @@ use std::sync::Arc;
 
 use crate::plugin::context::PluginContext;
 use crate::plugin::AppCorePlugin;
-use crate::state::AppCore;
 
 /// Plugin that registers the bash tool kit (edit, bash, str_replace, etc.)
 /// and wires hook engines into the agent runtime.
@@ -77,32 +76,13 @@ impl AppCorePlugin for BashToolkitPlugin {
         kit.register_all(ctx.tools);
         tracing::info!("Tool kit registered");
 
-        // Store the kit builder in FeatureHost so post_init can wire it into the agent runtime.
+        // Store the kit builder + hook engine in FeatureHost so the agent phase
+        // (init/mod.rs Phase 5) can inject them into the AgentLoop at construction.
         ctx.insert_handle(Arc::new(kit));
         if let Some(ref engine) = hook_engine {
             ctx.insert_handle(Arc::clone(engine));
         }
 
-        Ok(())
-    }
-
-    async fn post_init(&self, app: &AppCore) -> common::Result<()> {
-        let kit = app
-            .host
-            .get::<klynt_core::ToolKitBuilder>()
-            .expect("ToolKitBuilder stored in init");
-        let kit_arc = Arc::new(kit);
-        app.agent.runtime().set_tool_kit(Arc::clone(&kit_arc));
-        app.agent.set_subagent_tool_kit(Arc::clone(&kit_arc));
-        // Project subagent-visible domain tools (e.g. memory) from the parent
-        // registry into spawned subagents.
-        app.agent
-            .set_subagent_parent_registry(app.agent.tool_registry());
-
-        if let Some(engine) = app.host.get::<klynt_hooks::HookEngine>() {
-            app.agent.runtime().set_hook_engine(Arc::clone(&engine));
-            app.agent.set_subagent_hook_engine(Arc::clone(&engine));
-        }
         Ok(())
     }
 }

@@ -79,6 +79,8 @@ pub struct AgentLoopBuilder {
     cognitive_fact_repo: Option<cognitive::SemanticFactRepo>,
     cognitive_entity_repo: Option<cognitive::EntityRepo>,
     cognitive_embedder: Option<Arc<dyn cognitive::SemanticFactEmbedder>>,
+    tool_kit: Option<Arc<klynt_core::ToolKitBuilder>>,
+    hook_engine: Option<Arc<klynt_hooks::HookEngine>>,
 }
 
 impl AgentLoopBuilder {
@@ -111,6 +113,8 @@ impl AgentLoopBuilder {
             cognitive_fact_repo: None,
             cognitive_entity_repo: None,
             cognitive_embedder: None,
+            tool_kit: None,
+            hook_engine: None,
         }
     }
 
@@ -127,6 +131,14 @@ impl AgentLoopBuilder {
     }
     pub fn with_injector_registry(mut self, registry: bus::InjectorRegistry) -> Self {
         self.injector_registry = Some(registry);
+        self
+    }
+    pub fn with_tool_kit(mut self, kit: Arc<klynt_core::ToolKitBuilder>) -> Self {
+        self.tool_kit = Some(kit);
+        self
+    }
+    pub fn with_hook_engine(mut self, engine: Arc<klynt_hooks::HookEngine>) -> Self {
+        self.hook_engine = Some(engine);
         self
     }
     pub fn with_job_supervisor(mut self, supervisor: tools_core::DynJobSupervisor) -> Self {
@@ -377,6 +389,8 @@ impl AgentLoopBuilder {
             &self.cron_executor,
             &self.job_supervisor,
             tool_registry,
+            self.tool_kit.clone(),
+            self.hook_engine.clone(),
         )
         .await;
         let session_manager = infra.session_manager;
@@ -552,8 +566,16 @@ impl AgentLoopBuilder {
                 context_update_queue: self.context_update_queue.clone(),
                 injector_registry: self.injector_registry.clone(),
                 storage_pool: storage_pool.clone(),
+                tool_kit: self.tool_kit.clone(),
+                hook_engine: self.hook_engine.clone(),
             },
         ));
+
+        // Project `subagent_visible` domain tools (e.g. memory) from the main
+        // agent's registry into spawned subagents. Wired here — once the registry
+        // is `Arc`-wrapped — rather than via a post-init setter, so the subagent
+        // manager is fully resolved by the time the AgentLoop is returned.
+        subagent_manager.set_parent_registry(Arc::clone(&tool_registry));
 
         // Session cleanup and memory maintenance are handled by CronService
         // (registered in app-core/init/cron.rs as __klyntbot_session_cleanup

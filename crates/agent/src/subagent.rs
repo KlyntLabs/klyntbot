@@ -199,23 +199,10 @@ impl SubagentManager {
         SubagentManagerBuilder::new(provider, workspace)
     }
 
-    /// Inject the shared tool-kit builder (called by app-core after AgentRuntime is built).
-    pub fn set_tool_kit(&self, kit: Arc<klynt_core::ToolKitBuilder>) {
-        let mut lock = self.tool_kit.lock().unwrap();
-        *lock = Some(kit);
-        // ToolKitBuilder deps changed → cached registries are stale.
-        let mut cache = self.registry_cache.lock().unwrap();
-        cache.clear();
-    }
-
-    pub fn set_hook_engine(&self, engine: Arc<klynt_hooks::HookEngine>) {
-        let mut lock = self.hook_engine.lock().unwrap();
-        *lock = Some(engine);
-    }
-
     /// Inject the parent agent's tool registry. Subagents project the
-    /// `subagent_visible` tools from it (called by app-core after the agent is
-    /// built). Clears the cwd-keyed registry cache so it's rebuilt with them.
+    /// `subagent_visible` tools from it (called inside `AgentLoopBuilder::build`
+    /// once the registry is `Arc`-wrapped). Clears the cwd-keyed registry cache
+    /// so it's rebuilt with them.
     pub fn set_parent_registry(&self, registry: Arc<RwLock<ToolRegistry>>) {
         *self.parent_registry.lock().unwrap() = Some(registry);
         self.registry_cache.lock().unwrap().clear();

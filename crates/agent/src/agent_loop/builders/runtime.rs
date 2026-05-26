@@ -32,6 +32,8 @@ pub(crate) struct RuntimeBuildInput {
     pub context_update_queue: Option<Arc<bus::ContextUpdateQueue>>,
     pub injector_registry: Option<bus::InjectorRegistry>,
     pub storage_pool: storage::StoragePool,
+    pub tool_kit: Option<Arc<klynt_core::ToolKitBuilder>>,
+    pub hook_engine: Option<Arc<klynt_hooks::HookEngine>>,
 }
 
 /// Assemble the [`AgentRuntime`] with all optional extensions wired.
@@ -59,6 +61,8 @@ pub(crate) fn build_runtime(input: RuntimeBuildInput) -> crate::agent_runtime::A
         context_update_queue,
         injector_registry,
         storage_pool,
+        tool_kit,
+        hook_engine,
     } = input;
 
     let mut execution_core =
@@ -252,6 +256,15 @@ pub(crate) fn build_runtime(input: RuntimeBuildInput) -> crate::agent_runtime::A
         runtime = runtime.with_feedback_repo(storage::RetrievalFeedbackRepo::new(p.clone()));
         runtime = runtime.with_strategy_repo(storage::StrategyRepo::new(p.clone()));
         runtime = runtime.with_warning_repo(storage::ResponseWarningRepo::new(p.clone()));
+    }
+
+    // Tool kit + hook engine: resolved before the agent is built (Phase 4) and
+    // injected at construction so the runtime is never observably half-wired.
+    if let Some(kit) = tool_kit {
+        runtime = runtime.with_tool_kit(kit);
+    }
+    if let Some(engine) = hook_engine {
+        runtime = runtime.with_hook_engine(engine);
     }
 
     info!("Agent runtime initialized");

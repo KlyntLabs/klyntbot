@@ -39,6 +39,8 @@ pub(crate) async fn build_infrastructure(
     )>,
     job_supervisor: &Option<tools_core::DynJobSupervisor>,
     tool_registry: Option<tools_core::registry::ToolRegistry>,
+    tool_kit: Option<Arc<klynt_core::ToolKitBuilder>>,
+    hook_engine: Option<Arc<klynt_hooks::HookEngine>>,
 ) -> InfrastructureResult {
     // ── Session manager (SQL-backed) ──────────────────────────────────
     let session_manager = SessionManager::from_repo(
@@ -48,16 +50,21 @@ pub(crate) async fn build_infrastructure(
     .await;
 
     // ── Subagent manager ──────────────────────────────────────────────
-    let subagent_manager = Arc::new(
+    let mut subagent_builder =
         SubagentManager::builder(Arc::clone(provider), workspace.to_path_buf())
             .inbound_sender(bus.inbound_sender())
             .model(config.agents.defaults.model.clone())
             .max_concurrent_subagents(config.agents.defaults.max_concurrent_subagents)
             .agent_task_repo(repos.agent_tasks.clone())
             .job_supervisor(job_supervisor.clone())
-            .repos(repos.clone())
-            .build(),
-    );
+            .repos(repos.clone());
+    if let Some(kit) = tool_kit {
+        subagent_builder = subagent_builder.tool_kit(kit);
+    }
+    if let Some(engine) = hook_engine {
+        subagent_builder = subagent_builder.hook_engine(engine);
+    }
+    let subagent_manager = Arc::new(subagent_builder.build());
 
     // ── Tool registry ─────────────────────────────────────────────────
     let mut tool_registry = tool_registry.unwrap_or_else(ToolRegistry::new);

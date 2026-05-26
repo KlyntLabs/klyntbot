@@ -46,6 +46,8 @@ pub(super) async fn init_agent(
     cognitive_fact_repo: Option<cognitive::SemanticFactRepo>,
     cognitive_entity_repo: Option<cognitive::EntityRepo>,
     cognitive_embedder: Option<Arc<dyn cognitive::SemanticFactEmbedder>>,
+    tool_kit: Option<Arc<klynt_core::ToolKitBuilder>>,
+    hook_engine: Option<Arc<klynt_hooks::HookEngine>>,
 ) -> Result<AgentResult, String> {
     let pipeline_tx = pipeline_broadcast_tx.clone();
     let mut builder = AgentLoop::builder(bus.clone(), provider, config.clone())
@@ -93,6 +95,12 @@ pub(super) async fn init_agent(
     }
     if let Some(registry) = injector_registry {
         builder = builder.with_injector_registry(registry);
+    }
+    if let Some(kit) = tool_kit {
+        builder = builder.with_tool_kit(kit);
+    }
+    if let Some(engine) = hook_engine {
+        builder = builder.with_hook_engine(engine);
     }
 
     let mut agent_loop_raw = builder

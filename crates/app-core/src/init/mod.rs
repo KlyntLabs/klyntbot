@@ -311,6 +311,12 @@ impl AppCore {
         let cognitive_entity_repo = cog_init.as_ref().map(|r| r.entity_repo.clone());
         let cognitive_embedder = cog_init.as_ref().and_then(|r| r.cognitive_fact_embedder.clone());
 
+        // Tool kit + hook engine were built by BashToolkitPlugin in Phase 4 and
+        // stashed in the FeatureHost; inject them into the agent at construction
+        // so the runtime is never observably half-wired.
+        let tool_kit = host_result.host.get::<klynt_core::ToolKitBuilder>();
+        let hook_engine = host_result.host.get::<klynt_hooks::HookEngine>();
+
         // ── Phase 5: Agent (consumes plugin-built tool registry) ──────────
         let agent::AgentResult {
             cognitive_provider,
@@ -342,6 +348,8 @@ impl AppCore {
             cognitive_fact_repo,
             cognitive_entity_repo,
             cognitive_embedder,
+            tool_kit,
+            hook_engine,
         )
         .await?;
 

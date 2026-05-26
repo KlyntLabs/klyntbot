@@ -14,8 +14,8 @@ use tools::RoutingContext;
 use tracing::warn;
 
 use crate::autotuner::hooks::AutoTunerHook;
-use crate::events::AgentEvent;
 use crate::engines::{CoreEngine, ExecutionEngine};
+use crate::events::AgentEvent;
 use crate::execution::{DepthMode, ExecutionParams, SafetyCap};
 use crate::output::cost_tracker::CostTracker;
 use crate::output::validator::{ResponseValidator, ValidationResult};
@@ -79,9 +79,11 @@ pub struct AgentRuntime {
     /// KCA Track 7: number of predictions to generate per turn.
     predictions_per_turn: u32,
     /// Tool-kit builder for constructing tool registries (main agent + sub-agents).
-    tool_kit: std::sync::Mutex<Option<Arc<klynt_core::ToolKitBuilder>>>,
+    /// Resolved at construction (see `with_tool_kit`); never mutated afterwards.
+    tool_kit: Option<Arc<klynt_core::ToolKitBuilder>>,
     /// Hook engine for firing lifecycle and tool-use hooks.
-    hook_engine: std::sync::Mutex<Option<Arc<klynt_hooks::HookEngine>>>,
+    /// Resolved at construction (see `with_hook_engine`); never mutated afterwards.
+    hook_engine: Option<Arc<klynt_hooks::HookEngine>>,
     /// Domain event bus for emitting cross-cutting events (e.g. Mirror alerts).
     domain_event_bus: Option<Arc<bus::DomainEventBus>>,
     /// Global kill switch for cache-breakpoint placement.
@@ -124,8 +126,8 @@ impl AgentRuntime {
             predictive_cache: None,
             query_predictor: None,
             predictions_per_turn: 3,
-            tool_kit: std::sync::Mutex::new(None),
-            hook_engine: std::sync::Mutex::new(None),
+            tool_kit: None,
+            hook_engine: None,
             domain_event_bus: None,
             cache_enabled: cfg.cache_enabled,
         }
@@ -137,19 +139,11 @@ impl AgentRuntime {
     }
 
     pub fn tool_kit(&self) -> Option<Arc<klynt_core::ToolKitBuilder>> {
-        self.tool_kit.lock().unwrap().clone()
-    }
-
-    pub fn set_tool_kit(&self, kit: Arc<klynt_core::ToolKitBuilder>) {
-        *self.tool_kit.lock().unwrap() = Some(kit);
+        self.tool_kit.clone()
     }
 
     pub fn hook_engine(&self) -> Option<Arc<klynt_hooks::HookEngine>> {
-        self.hook_engine.lock().unwrap().clone()
-    }
-
-    pub fn set_hook_engine(&self, engine: Arc<klynt_hooks::HookEngine>) {
-        *self.hook_engine.lock().unwrap() = Some(engine);
+        self.hook_engine.clone()
     }
 
     // ── Builder methods ─────────────────────────────────────────
@@ -213,6 +207,16 @@ impl AgentRuntime {
 
     pub fn with_domain_event_bus(mut self, bus: Arc<bus::DomainEventBus>) -> Self {
         self.domain_event_bus = Some(bus);
+        self
+    }
+
+    pub fn with_tool_kit(mut self, kit: Arc<klynt_core::ToolKitBuilder>) -> Self {
+        self.tool_kit = Some(kit);
+        self
+    }
+
+    pub fn with_hook_engine(mut self, engine: Arc<klynt_hooks::HookEngine>) -> Self {
+        self.hook_engine = Some(engine);
         self
     }
 
@@ -929,8 +933,6 @@ impl AgentRuntime {
                 usage,
                 &self.execution_model,
             );
-
-
         }
 
         if let Some(ref tx) = event_tx {
