@@ -106,7 +106,7 @@ impl CoActivationRepo {
 
                 if let Some(bus) = &self.bus {
                     if prev_strength < STRENGTH_THRESHOLD && new_strength >= STRENGTH_THRESHOLD {
-                        use crate::services::community_intelligence::co_activation_events::CoActivationEvent;
+                        use crate::community_intelligence::co_activation_events::CoActivationEvent;
                         let event: bus::DomainEvent = CoActivationEvent::Strengthened {
                             fact_id_a: a.clone(),
                             fact_id_b: b.clone(),
@@ -219,7 +219,7 @@ impl CoActivationRepo {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::repos::cognitive_test_pool;
+    use cognitive_schema::cognitive_test_pool;
 
     #[tokio::test]
     async fn test_record_co_retrieval() {

@@ -9,7 +9,7 @@ pub mod events;
 
 use std::collections::HashMap;
 
-use crate::repos::community::{CommunityRepo, CommunityRow};
+use crate::community::{CommunityRepo, CommunityRow};
 
 /// Context for a single community, sent to the LLM.
 #[derive(Debug, Clone, serde::Serialize)]
@@ -71,7 +71,7 @@ const MIN_AGE_FOR_RESTRUCTURE: u32 = 3;
 pub async fn apply_intelligence(
     output: &CommunityIntelligenceOutput,
     community_repo: &CommunityRepo,
-    co_activation_repo: &crate::repos::CoActivationRepo,
+    co_activation_repo: &crate::CoActivationRepo,
     bus: Option<std::sync::Arc<bus::DomainEventBus>>,
 ) -> (u32, u32, u32) {
     use events::CommunityEvent;
@@ -215,7 +215,7 @@ async fn community_age_days(repo: &CommunityRepo, id: &str) -> u32 {
 async fn execute_split(
     split: &CommunitySplit,
     community_repo: &CommunityRepo,
-    co_activation_repo: &crate::repos::CoActivationRepo,
+    co_activation_repo: &crate::CoActivationRepo,
 ) -> common::Result<usize> {
     // 1. Get current members
     let members = community_repo.get_members(&split.community_id).await?;
@@ -241,7 +241,7 @@ async fn execute_split(
     }
 
     // 3. Re-run Louvain on sub-graph
-    let assignment = crate::services::louvain::detect_communities(&sub_edges);
+    let assignment = crate::louvain::detect_communities(&sub_edges);
     if assignment.community_count <= 1 {
         return Ok(1); // Louvain confirms it's one cluster — abort
     }

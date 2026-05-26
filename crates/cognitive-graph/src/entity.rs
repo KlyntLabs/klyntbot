@@ -1008,7 +1008,7 @@ mod tests {
     use super::*;
 
     async fn setup() -> SqlitePool {
-        crate::repos::cognitive_test_pool().await
+        cognitive_schema::cognitive_test_pool().await
     }
 
     fn person_entity(name: &str) -> NewEntity {
@@ -1158,7 +1158,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_find_duplicate_candidates() {
-        let pool = crate::repos::cognitive_test_pool().await;
+        let pool = cognitive_schema::cognitive_test_pool().await;
         let repo = EntityRepo::new(pool);
 
         repo.upsert_entity(&NewEntity {

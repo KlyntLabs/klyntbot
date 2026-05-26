@@ -9,6 +9,12 @@
 
 use tools_core::FeatureMigration;
 
+/// Map a `sqlx::Error` to our domain error type. Shared by every cognitive
+/// concern crate's repos.
+pub fn map_sqlx(e: sqlx::Error) -> common::KlyntbotError {
+    common::KlyntbotError::Storage(e.to_string())
+}
+
 /// Return cognitive feature migrations for use with `StoragePool::run_feature_migrations`.
 pub fn cognitive_migrations() -> Vec<FeatureMigration> {
     vec![

@@ -2418,6 +2418,7 @@ dependencies = [
  "ai-core-macros",
  "async-trait",
  "bus",
+ "cognitive-graph",
  "cognitive-learning",
  "cognitive-schema",
  "common",
@@ -2449,6 +2450,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "cognitive-graph"
+version = "0.1.1"
+dependencies = [
+ "ai-core",
+ "ai-core-macros",
+ "async-trait",
+ "bus",
+ "cognitive-schema",
+ "common",
+ "context_engine",
+ "jiff",
+ "petgraph 0.8.3",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "storage",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "cognitive-learning"
 version = "0.1.1"
 dependencies = [
@@ -2467,6 +2490,7 @@ dependencies = [
 name = "cognitive-schema"
 version = "0.1.1"
 dependencies = [
+ "common",
  "sqlx",
  "storage",
  "tools-core",

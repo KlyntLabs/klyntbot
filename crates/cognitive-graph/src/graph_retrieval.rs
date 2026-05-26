@@ -5,7 +5,7 @@
 //! The boost score is the 12th relevance weight factor. It rewards facts whose
 //! subject or object mentions entities that are in the query's graph neighborhood.
 
-use crate::repos::entity::{EdgeType, EntityRepo};
+use crate::entity::{EdgeType, EntityRepo};
 
 /// Compute graph_path_boost scores for a set of facts based on query entity context.
 ///
@@ -82,7 +82,7 @@ pub async fn compute_graph_boosts(
 /// We do not lookup against the entity table here because the function
 /// is sync. Wave 3 adds an async `_with_repo` variant that does proper
 /// alias resolution.
-pub(crate) fn extract_query_entities(query: &str) -> Vec<String> {
+pub fn extract_query_entities(query: &str) -> Vec<String> {
     let words: Vec<&str> = query.split_whitespace().collect();
     let mut entities = Vec::new();
 

@@ -6,6 +6,7 @@ rust-version.workspace = true
 license.workspace = true
 
 [dependencies]
+common = { workspace = true }
 storage = { workspace = true }
 tools-core = { workspace = true }
 sqlx = { workspace = true }

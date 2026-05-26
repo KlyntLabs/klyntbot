@@ -1,7 +1,7 @@
 use common::Result;
 use sqlx::SqlitePool;
 
-use crate::repos::map_sqlx;
+use cognitive_schema::map_sqlx;
 
 #[derive(Debug, Clone, sqlx::FromRow)]
 pub struct CommunityRow {
@@ -335,7 +335,7 @@ impl CommunityRepo {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::repos::cognitive_test_pool;
+    use cognitive_schema::cognitive_test_pool;
 
     #[tokio::test]
     async fn test_upsert_and_get_community() {

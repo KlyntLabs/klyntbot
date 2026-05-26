@@ -4,7 +4,7 @@
 
 use async_trait::async_trait;
 
-use crate::services::graph_linker_types::{GraphLinkInput, GraphLinkOutput};
+use crate::graph_linker_types::{GraphLinkInput, GraphLinkOutput};
 
 #[async_trait]
 pub trait GraphLinkHandler: Send + Sync {

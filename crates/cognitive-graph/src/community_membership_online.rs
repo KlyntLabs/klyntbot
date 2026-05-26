@@ -1,7 +1,7 @@
 //! KCA Track 11 — online community membership.
 
-use crate::repos::community::CommunityRepo;
-use crate::repos::entity::EntityRepo;
+use crate::community::CommunityRepo;
+use crate::entity::EntityRepo;
 use async_trait::async_trait;
 
 #[derive(Debug, Clone)]
@@ -16,7 +16,7 @@ pub async fn find_best_community_for_entity(
     community_repo: &CommunityRepo,
     entity_id: &str,
 ) -> common::Result<Option<CommunityMatch>> {
-    use crate::repos::co_activation::CoActivationRepo;
+    use crate::co_activation::CoActivationRepo;
     let coact = CoActivationRepo::new(entity_repo.pool().clone());
 
     // Get top-20 co-activated entities for this entity.
@@ -118,14 +118,14 @@ pub async fn run_for_session(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::repos::community::CommunityRepo;
-    use crate::repos::entity::EntityRepo;
+    use crate::community::CommunityRepo;
+    use crate::entity::EntityRepo;
     use storage::StoragePool;
 
     #[tokio::test]
     async fn finds_best_community_via_co_activation() {
         let pool = StoragePool::connect_in_memory().await.unwrap();
-        let migrations = crate::repos::cognitive_migrations();
+        let migrations = cognitive_schema::cognitive_migrations();
         StoragePool::run_feature_migrations(pool.inner(), &migrations)
             .await
             .unwrap();
@@ -134,7 +134,7 @@ mod tests {
 
         // Seed: 3 entities, A & B in community "alpha", C uncategorized.
         let a = entity_repo
-            .upsert_entity(&crate::repos::NewEntity {
+            .upsert_entity(&crate::NewEntity {
                 name: "A".into(),
                 entity_type: "concept".into(),
                 description: None,
@@ -145,7 +145,7 @@ mod tests {
             .await
             .unwrap();
         let b = entity_repo
-            .upsert_entity(&crate::repos::NewEntity {
+            .upsert_entity(&crate::NewEntity {
                 name: "B".into(),
                 entity_type: "concept".into(),
                 description: None,
@@ -156,7 +156,7 @@ mod tests {
             .await
             .unwrap();
         let c = entity_repo
-            .upsert_entity(&crate::repos::NewEntity {
+            .upsert_entity(&crate::NewEntity {
                 name: "C".into(),
                 entity_type: "concept".into(),
                 description: None,
@@ -174,11 +174,11 @@ mod tests {
         community_repo.add_member(&alpha.id, &b.id).await.unwrap();
 
         // Co-activate C with A (strength 0.9), C with B (0.7) — strong signal C ∈ alpha.
-        crate::repos::CoActivationRepo::new(pool.inner().clone())
+        crate::CoActivationRepo::new(pool.inner().clone())
             .increment_pair(&c.id, &a.id)
             .await
             .unwrap();
-        crate::repos::CoActivationRepo::new(pool.inner().clone())
+        crate::CoActivationRepo::new(pool.inner().clone())
             .increment_pair(&c.id, &b.id)
             .await
             .unwrap();

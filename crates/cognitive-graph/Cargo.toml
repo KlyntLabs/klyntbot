@@ -1,0 +1,27 @@
+[package]
+name = "cognitive-graph"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+common = { workspace = true }
+cognitive-schema = { workspace = true }
+context_engine = { workspace = true }
+bus = { workspace = true }
+ai-core = { workspace = true }
+ai-core-macros = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+sqlx = { workspace = true }
+jiff = { workspace = true }
+uuid = { workspace = true, features = ["v4"] }
+petgraph = { workspace = true }
+async-trait = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+storage = { workspace = true }
+tokio = { workspace = true }

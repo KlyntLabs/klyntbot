@@ -3,13 +3,13 @@ pub mod ai_metric_samples;
 pub mod ai_signal_index;
 pub mod annotation;
 pub mod atom_extraction_cache;
-pub mod book_tree;
-pub mod co_activation;
-pub mod community;
+pub use cognitive_graph::book_tree;
+pub use cognitive_graph::co_activation;
+pub use cognitive_graph::community;
 pub use cognitive_learning::deck_preference;
 pub mod enhancement_trace;
 pub mod enrichment;
-pub mod entity;
+pub use cognitive_graph::entity;
 pub mod episodic_memory;
 pub mod event_log;
 pub mod extraction_critic_log;
@@ -17,9 +17,9 @@ pub mod fact_changelog;
 pub mod failed_observation;
 pub use cognitive_learning::flashcard;
 pub use cognitive_learning::fsrs_params;
-pub mod gt_link;
+pub use cognitive_graph::gt_link;
 pub mod knowledge_atom;
-pub mod markdown_parser;
+pub use cognitive_graph::markdown_parser;
 pub mod pending_memory;
 pub mod procedural_rule;
 pub use cognitive_learning::retention_history;
@@ -73,10 +73,7 @@ use tracing::warn;
 
 use crate::types::UserModel;
 
-/// Map a `sqlx::Error` to our domain error type.
-pub(crate) fn map_sqlx(e: sqlx::Error) -> common::KlyntbotError {
-    common::KlyntbotError::Storage(e.to_string())
-}
+pub(crate) use cognitive_schema::map_sqlx;
 
 /// Shared domain list for user model fields.
 ///
