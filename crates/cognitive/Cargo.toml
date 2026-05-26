@@ -11,6 +11,7 @@ ai-core-macros = { workspace = true }
 common = { workspace = true }
 storage = { workspace = true }
 cognitive-schema = { workspace = true }
+cognitive-learning = { workspace = true }
 bus = { workspace = true }
 feature-notes = { workspace = true }
 context_engine = { workspace = true }

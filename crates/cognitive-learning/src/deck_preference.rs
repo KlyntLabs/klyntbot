@@ -67,7 +67,7 @@ mod tests {
     use super::*;
 
     async fn setup() -> DeckPreferenceRepo {
-        let pool = crate::repos::cognitive_test_pool().await;
+        let pool = cognitive_schema::cognitive_test_pool().await;
         DeckPreferenceRepo::new(pool)
     }
 

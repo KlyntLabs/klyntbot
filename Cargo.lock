@@ -2418,6 +2418,7 @@ dependencies = [
  "ai-core-macros",
  "async-trait",
  "bus",
+ "cognitive-learning",
  "cognitive-schema",
  "common",
  "config",
@@ -2444,6 +2445,21 @@ dependencies = [
  "tokio-util",
  "tools-core",
  "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "cognitive-learning"
+version = "0.1.1"
+dependencies = [
+ "cognitive-schema",
+ "common",
+ "jiff",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "storage",
+ "tokio",
  "uuid",
 ]
 

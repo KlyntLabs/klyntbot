@@ -326,12 +326,12 @@ impl FlashcardRepo {
 
         // Use FSRS-5
         let (new_stability, new_difficulty, interval_days) = if card.state == "new" {
-            let s0 = crate::services::fsrs5::initial_stability(rating, &weights);
-            let d0 = crate::services::fsrs5::initial_difficulty(rating, &weights);
-            let interval = crate::services::fsrs5::next_interval(s0, desired_retention);
+            let s0 = crate::fsrs5::initial_stability(rating, &weights);
+            let d0 = crate::fsrs5::initial_difficulty(rating, &weights);
+            let interval = crate::fsrs5::next_interval(s0, desired_retention);
             (s0, d0, interval)
         } else {
-            crate::services::fsrs5::schedule_review(
+            crate::fsrs5::schedule_review(
                 card.stability,
                 card.difficulty,
                 elapsed_days,
@@ -683,10 +683,10 @@ impl FlashcardRepo {
         {
             Some(p) => {
                 let arr: [f64; 19] = serde_json::from_str(&p.weights)
-                    .unwrap_or(crate::services::fsrs5::DEFAULT_WEIGHTS);
+                    .unwrap_or(crate::fsrs5::DEFAULT_WEIGHTS);
                 Ok((arr, p.desired_retention))
             }
-            None => Ok((crate::services::fsrs5::DEFAULT_WEIGHTS, 0.9)),
+            None => Ok((crate::fsrs5::DEFAULT_WEIGHTS, 0.9)),
         }
     }
 
@@ -845,7 +845,7 @@ mod tests {
     use super::*;
 
     async fn setup() -> (SqlitePool, FlashcardRepo) {
-        let pool = crate::repos::cognitive_test_pool().await;
+        let pool = cognitive_schema::cognitive_test_pool().await;
         let repo = FlashcardRepo::new(pool.clone());
         (pool, repo)
     }

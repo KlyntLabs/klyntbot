@@ -114,7 +114,7 @@ impl RetentionHistoryRepo {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::repos::cognitive_test_pool;
+    use cognitive_schema::cognitive_test_pool;
 
     #[tokio::test]
     async fn test_daily_retention_empty() {

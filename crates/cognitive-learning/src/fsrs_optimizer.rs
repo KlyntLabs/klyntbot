@@ -461,7 +461,7 @@ mod tests {
     #[tokio::test]
     async fn load_review_sequences_groups_by_card() {
         let pool = StoragePool::connect_in_memory().await.unwrap();
-        let migrations = crate::repos::cognitive_migrations();
+        let migrations = cognitive_schema::cognitive_migrations();
         StoragePool::run_feature_migrations(pool.inner(), &migrations)
             .await
             .unwrap();

@@ -107,7 +107,7 @@ mod tests {
     async fn writes_and_reads_back() {
         let pool = StoragePool::connect_in_memory().await.unwrap();
         // Apply cognitive migrations so the table + seed row exist.
-        let migrations = crate::repos::cognitive_migrations();
+        let migrations = cognitive_schema::cognitive_migrations();
         storage::StoragePool::run_feature_migrations(pool.inner(), &migrations)
             .await
             .unwrap();
@@ -127,7 +127,7 @@ mod tests {
     #[tokio::test]
     async fn update_weights_round_trips() {
         let pool = StoragePool::connect_in_memory().await.unwrap();
-        let migrations = crate::repos::cognitive_migrations();
+        let migrations = cognitive_schema::cognitive_migrations();
         StoragePool::run_feature_migrations(pool.inner(), &migrations)
             .await
             .unwrap();
@@ -147,7 +147,7 @@ mod tests {
     #[tokio::test]
     async fn update_weights_rejects_non_finite() {
         let pool = StoragePool::connect_in_memory().await.unwrap();
-        let migrations = crate::repos::cognitive_migrations();
+        let migrations = cognitive_schema::cognitive_migrations();
         StoragePool::run_feature_migrations(pool.inner(), &migrations)
             .await
             .unwrap();
@@ -163,7 +163,7 @@ mod tests {
     #[tokio::test]
     async fn rejects_out_of_range() {
         let pool = StoragePool::connect_in_memory().await.unwrap();
-        let migrations = crate::repos::cognitive_migrations();
+        let migrations = cognitive_schema::cognitive_migrations();
         storage::StoragePool::run_feature_migrations(pool.inner(), &migrations)
             .await
             .unwrap();

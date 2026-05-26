@@ -140,7 +140,7 @@ mod tests {
     use super::*;
 
     async fn setup() -> ReviewSessionRepo {
-        let pool = crate::repos::cognitive_test_pool().await;
+        let pool = cognitive_schema::cognitive_test_pool().await;
         ReviewSessionRepo::new(pool)
     }
 

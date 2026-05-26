@@ -24,6 +24,7 @@ members = [
     "crates/feature-productivity",
     "crates/cognitive",
     "crates/cognitive-schema",
+    "crates/cognitive-learning",
     "crates/feature-coaching",
     "crates/feature-insights",
     "crates/app-core",
@@ -152,6 +153,7 @@ feature-notes = { path = "crates/feature-notes" }
 feature-productivity = { path = "crates/feature-productivity" }
 cognitive = { path = "crates/cognitive" }
 cognitive-schema = { path = "crates/cognitive-schema" }
+cognitive-learning = { path = "crates/cognitive-learning" }
 feature-coaching = { path = "crates/feature-coaching" }
 feature-insights = { path = "crates/feature-insights" }
 desktop-shared = { path = "crates/desktop-shared" }
