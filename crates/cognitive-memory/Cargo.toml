@@ -1,0 +1,43 @@
+[package]
+name = "cognitive-memory"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+ai-core = { workspace = true }
+ai-core-macros = { workspace = true }
+common = { workspace = true }
+storage = { workspace = true }
+cognitive-schema = { workspace = true }
+cognitive-learning = { workspace = true }
+cognitive-graph = { workspace = true }
+bus = { workspace = true }
+feature-notes = { workspace = true }
+context_engine = { workspace = true }
+jiff = { workspace = true }
+dashmap = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+specta = { workspace = true }
+sqlx = { workspace = true }
+tokio = { workspace = true }
+tokio-util = { workspace = true }
+async-trait = { workspace = true }
+tracing = { workspace = true }
+uuid = { workspace = true, features = ["v4"] }
+tools-core = { workspace = true }
+futures-util = { workspace = true }
+providers = { workspace = true }
+config = { workspace = true }
+sha2 = { workspace = true }
+hex.workspace = true
+similar.workspace = true
+petgraph.workspace = true
+lru.workspace = true
+
+[dev-dependencies]
+tempfile = { workspace = true }
+feature-tasks = { workspace = true }
+proptest = { workspace = true }
