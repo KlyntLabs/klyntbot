@@ -2418,6 +2418,7 @@ dependencies = [
  "ai-core-macros",
  "async-trait",
  "bus",
+ "cognitive-schema",
  "common",
  "config",
  "context_engine",
@@ -2444,6 +2445,15 @@ dependencies = [
  "tools-core",
  "tracing",
  "uuid",
+]
+
+[[package]]
+name = "cognitive-schema"
+version = "0.1.1"
+dependencies = [
+ "sqlx",
+ "storage",
+ "tools-core",
 ]
 
 [[package]]
