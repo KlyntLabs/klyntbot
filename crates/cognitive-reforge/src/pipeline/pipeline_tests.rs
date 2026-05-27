@@ -125,3 +125,78 @@ async fn harness_builds_context_with_optionals_none() {
     assert!(ctx.mirror_repo.is_none());
     assert!(ctx.cross_cli_runner.is_none());
 }
+
+// --- Layer-1: LLM-handler phases ------------------------------------------------
+
+/// Minimal non-empty collected data so phases past Collect can run.
+fn seed_collected(run: &mut ReforgeRun) {
+    // ReforgeCollected derives Default; empty collections are enough for the
+    // handler phases, which only read what the fake returns.
+    run.collected = Some(ReforgeCollected::default());
+}
+
+#[tokio::test]
+async fn synthesize_populates_output_from_handler() {
+    let h = ReforgeTestHarness::new().await;
+    *h.handler.synthesize_out.lock().unwrap() = Some(FakeReforgeHandler::empty_synth());
+    let ctx = h.ctx();
+    let mut run = ReforgeRun::default();
+    seed_collected(&mut run);
+
+    SynthesizePhase.run(&ctx, &mut run).await;
+
+    assert!(run.synthesize_output.is_some());
+    assert!(run.result.phase_errors.is_empty());
+}
+
+#[tokio::test]
+async fn synthesize_records_phase_error_on_handler_failure() {
+    let mut h = ReforgeTestHarness::new().await;
+    h.handler.fail = true;
+    let ctx = h.ctx();
+    let mut run = ReforgeRun::default();
+    seed_collected(&mut run);
+
+    SynthesizePhase.run(&ctx, &mut run).await;
+
+    assert!(run.synthesize_output.is_none());
+    assert_eq!(run.result.phase_errors.len(), 1);
+    assert!(run.result.phase_errors[0].starts_with("synthesize:"));
+}
+
+#[tokio::test]
+async fn review_populates_output_from_handler() {
+    let h = ReforgeTestHarness::new().await;
+    *h.handler.review_out.lock().unwrap() = Some(ReviewOutput::default());
+    let ctx = h.ctx();
+    let mut run = ReforgeRun::default();
+    seed_collected(&mut run);
+
+    ReviewPhase.run(&ctx, &mut run).await;
+
+    assert!(run.review_output.is_some());
+    assert!(run.result.phase_errors.is_empty());
+}
+
+#[tokio::test]
+async fn narrate_sets_narrative_and_falls_back_on_error() {
+    // success path
+    let h = ReforgeTestHarness::new().await;
+    *h.handler.narrate_out.lock().unwrap() = Some("hello".to_string());
+    let ctx = h.ctx();
+    let mut run = ReforgeRun::default();
+    seed_collected(&mut run);
+    NarratePhase.run(&ctx, &mut run).await;
+    assert_eq!(run.result.narrative, "hello");
+    assert_eq!(run.narrative, "hello");
+
+    // failure path → fallback string + recorded error
+    let mut h2 = ReforgeTestHarness::new().await;
+    h2.handler.fail = true;
+    let ctx2 = h2.ctx();
+    let mut run2 = ReforgeRun::default();
+    seed_collected(&mut run2);
+    NarratePhase.run(&ctx2, &mut run2).await;
+    assert!(run2.narrative.contains("partial results"));
+    assert!(run2.result.phase_errors.iter().any(|e| e.starts_with("narrate:")));
+}
