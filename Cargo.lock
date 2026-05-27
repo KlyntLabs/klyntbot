@@ -2415,6 +2415,7 @@ name = "cognitive"
 version = "0.1.1"
 dependencies = [
  "cognitive-memory",
+ "cognitive-mirror",
  "cognitive-reforge",
 ]
 
@@ -2495,6 +2496,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "cognitive-mirror"
+version = "0.1.1"
+dependencies = [
+ "ai-core",
+ "async-trait",
+ "bus",
+ "cognitive-memory",
+ "cognitive-schema",
+ "common",
+ "dashmap",
+ "futures-util",
+ "jiff",
+ "serde",
+ "serde_json",
+ "similar",
+ "specta",
+ "sqlx",
+ "storage",
+ "tempfile",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "cognitive-reforge"
 version = "0.1.1"
 dependencies = [
@@ -2502,6 +2529,7 @@ dependencies = [
  "async-trait",
  "bus",
  "cognitive-memory",
+ "cognitive-mirror",
  "cognitive-schema",
  "common",
  "hex",

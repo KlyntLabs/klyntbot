@@ -25,6 +25,7 @@ members = [
     "crates/cognitive",
     "crates/cognitive-memory",
     "crates/cognitive-reforge",
+    "crates/cognitive-mirror",
     "crates/cognitive-schema",
     "crates/cognitive-learning",
     "crates/cognitive-graph",
@@ -157,6 +158,7 @@ feature-productivity = { path = "crates/feature-productivity" }
 cognitive = { path = "crates/cognitive" }
 cognitive-memory = { path = "crates/cognitive-memory" }
 cognitive-reforge = { path = "crates/cognitive-reforge" }
+cognitive-mirror = { path = "crates/cognitive-mirror" }
 cognitive-schema = { path = "crates/cognitive-schema" }
 cognitive-learning = { path = "crates/cognitive-learning" }
 cognitive-graph = { path = "crates/cognitive-graph" }

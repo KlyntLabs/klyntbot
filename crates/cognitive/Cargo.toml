@@ -13,3 +13,4 @@ license.workspace = true
 [dependencies]
 cognitive-memory = { workspace = true }
 cognitive-reforge = { workspace = true }
+cognitive-mirror = { workspace = true }

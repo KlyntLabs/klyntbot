@@ -20,13 +20,13 @@ pub struct MirrorState {
 pub struct BrainVersion {
     pub version: u32,
     pub trial_id: Option<String>,
-    #[specta(type = crate::specta_helpers::Timestamp)]
+    #[specta(type = cognitive_memory::specta_helpers::Timestamp)]
     pub promoted_at: Timestamp,
-    #[specta(type = crate::specta_helpers::JsonValue)]
+    #[specta(type = cognitive_memory::specta_helpers::JsonValue)]
     pub params: serde_json::Value,
     pub reason: String,
     pub parent_version: Option<u32>,
-    #[specta(type = crate::specta_helpers::JsonValue)]
+    #[specta(type = cognitive_memory::specta_helpers::JsonValue)]
     pub metrics_at_promotion: serde_json::Value,
     pub reverted: bool,
 }
@@ -42,7 +42,7 @@ pub trait AutotunerBridge: Send + Sync {
 #[serde(rename_all = "camelCase")]
 pub struct RoutingSnapshot {
     pub id: Uuid,
-    #[specta(type = crate::specta_helpers::Timestamp)]
+    #[specta(type = cognitive_memory::specta_helpers::Timestamp)]
     pub captured_at: Timestamp,
     pub window_hours: u8,
     pub total_messages: u32,
@@ -66,11 +66,11 @@ pub struct SkillRouteStats {
 #[serde(rename_all = "camelCase")]
 pub struct TrendNarrative {
     pub id: Uuid,
-    #[specta(type = crate::specta_helpers::Timestamp)]
+    #[specta(type = cognitive_memory::specta_helpers::Timestamp)]
     pub generated_at: Timestamp,
-    #[specta(type = crate::specta_helpers::Timestamp)]
+    #[specta(type = cognitive_memory::specta_helpers::Timestamp)]
     pub period_start: Timestamp,
-    #[specta(type = crate::specta_helpers::Timestamp)]
+    #[specta(type = cognitive_memory::specta_helpers::Timestamp)]
     pub period_end: Timestamp,
     pub routing_summary: String,
     pub improvement_highlights: Vec<String>,
@@ -84,14 +84,14 @@ pub struct TrendNarrative {
 #[serde(rename_all = "camelCase")]
 pub struct NarrativeSnippet {
     pub id: Uuid,
-    #[specta(type = crate::specta_helpers::Timestamp)]
+    #[specta(type = cognitive_memory::specta_helpers::Timestamp)]
     pub created_at: Timestamp,
     pub alert_type: MirrorAlertType,
     pub headline: String,
     pub body: String,
     pub suggested_action: Option<SuggestedAction>,
     pub user_feedback: Option<UserFeedback>,
-    #[specta(type = Option<crate::specta_helpers::Timestamp>)]
+    #[specta(type = Option<cognitive_memory::specta_helpers::Timestamp>)]
     pub dismissed_at: Option<Timestamp>,
     pub coding_alert_kind: Option<String>,
     pub coding_alert_severity: Option<MirrorAlertSeverity>,
@@ -155,7 +155,7 @@ pub enum SuggestedAction {
 /// Context assembled for the NarrativeHandler LLM call
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 pub struct NarrativeContext {
-    #[specta(type = crate::specta_helpers::TimestampTuple)]
+    #[specta(type = cognitive_memory::specta_helpers::TimestampTuple)]
     pub period: (Timestamp, Timestamp),
     pub routing_snapshots: Vec<RoutingSnapshot>,
     pub correction_count: u32,
@@ -211,7 +211,7 @@ pub enum MirrorAlert {
     Coding {
         kind: String,
         severity: MirrorAlertSeverity,
-        #[specta(type = crate::specta_helpers::JsonValue)]
+        #[specta(type = cognitive_memory::specta_helpers::JsonValue)]
         payload: serde_json::Value,
     },
     CostThresholdCrossed {
@@ -232,9 +232,9 @@ pub struct MetaRule {
     pub effectiveness_score: f64,
     pub status: MetaRuleStatus,
     pub signal_count: u32,
-    #[specta(type = crate::specta_helpers::Timestamp)]
+    #[specta(type = cognitive_memory::specta_helpers::Timestamp)]
     pub created_at: Timestamp,
-    #[specta(type = crate::specta_helpers::Timestamp)]
+    #[specta(type = cognitive_memory::specta_helpers::Timestamp)]
     pub updated_at: Timestamp,
 }
 
@@ -255,7 +255,7 @@ pub enum MetaRuleAction {
         message: String,
     },
     Custom {
-        #[specta(type = crate::specta_helpers::JsonValue)]
+        #[specta(type = cognitive_memory::specta_helpers::JsonValue)]
         payload: serde_json::Value,
     },
 }
@@ -284,9 +284,9 @@ pub enum MetaRuleStatus {
 pub struct TrialPreview {
     pub id: Uuid,
     pub trial_id: String,
-    #[specta(type = crate::specta_helpers::Timestamp)]
+    #[specta(type = cognitive_memory::specta_helpers::Timestamp)]
     pub started_at: Timestamp,
-    #[specta(type = crate::specta_helpers::Timestamp)]
+    #[specta(type = cognitive_memory::specta_helpers::Timestamp)]
     pub preview_at: Timestamp,
     pub messages_scored: u32,
     pub early_signals: TrialEarlySignals,
@@ -338,7 +338,7 @@ pub trait EarlyTrialEvaluator: Send + Sync {
 #[serde(rename_all = "camelCase")]
 pub struct TaskFocusSnapshot {
     pub id: Uuid,
-    #[specta(type = crate::specta_helpers::Timestamp)]
+    #[specta(type = cognitive_memory::specta_helpers::Timestamp)]
     pub captured_at: Timestamp,
     pub window_hours: u8,
     pub focus_changes: u32,
@@ -356,7 +356,7 @@ pub struct TaskFocusSnapshot {
 #[serde(rename_all = "camelCase")]
 pub struct TodoSnapshot {
     pub id: Uuid,
-    #[specta(type = crate::specta_helpers::Timestamp)]
+    #[specta(type = cognitive_memory::specta_helpers::Timestamp)]
     pub captured_at: Timestamp,
     pub window_hours: u8,
     pub status_changes: u32,

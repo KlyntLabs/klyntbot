@@ -62,7 +62,7 @@ pub struct ReforgeContext<'a> {
     pub rule_repo: &'a ProceduralRuleRepo,
     pub handler: &'a dyn super::ReforgeHandler,
     pub skill_mgr: &'a SkillFileManager,
-    pub mirror_repo: Option<&'a cognitive_memory::mirror::MirrorRepo>,
+    pub mirror_repo: Option<&'a cognitive_mirror::MirrorRepo>,
     pub feedback_repo: Option<&'a storage::RetrievalFeedbackRepo>,
     pub autotuner_bridge: Option<&'a dyn super::AutotunerBridge>,
     pub feedback_sources: Option<&'a super::collector::FeedbackSources<'a>>,

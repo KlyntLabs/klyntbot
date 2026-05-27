@@ -6,7 +6,7 @@ use jiff::Timestamp;
 use std::sync::atomic::{AtomicU32, Ordering};
 use uuid::Uuid;
 
-use crate::mirror::{MirrorRepo, TaskFocusSnapshot};
+use crate::{MirrorRepo, TaskFocusSnapshot};
 
 pub struct TaskFocusPatternSource {
     repo: MirrorRepo,

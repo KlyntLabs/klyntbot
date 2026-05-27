@@ -6,13 +6,13 @@ use uuid::Uuid;
 
 use common::{Result, MIRROR_ALERT_COST_THRESHOLD_CROSSED};
 
-use crate::mirror::{
+use crate::{
     MetaRule, MirrorAlert, MirrorAlertSeverity, MirrorAlertType, NarrativeContext,
     NarrativeSnippet, SuggestedAction,
 };
 
 /// Generated components of a narrative output from an LLM call.
-pub use crate::mirror::GeneratedNarrative;
+pub use crate::GeneratedNarrative;
 
 // ---------------------------------------------------------------------------
 // NarrativeHandler trait
@@ -167,7 +167,7 @@ pub fn snippet_from_alert(alert: &MirrorAlert) -> NarrativeSnippet {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mirror::MetaRuleSource;
+    use crate::MetaRuleSource;
 
     #[test]
     fn test_snippet_from_routing_drift() {

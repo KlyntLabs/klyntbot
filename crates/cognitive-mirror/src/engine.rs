@@ -12,7 +12,7 @@ use dashmap::DashMap;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
-use crate::mirror::{
+use crate::{
     sources::{
         ApprovalHistorySource, ConfigArchiverSource, CostCeilingSource,
         MetaRuleSignalSource, RoutingSignalSource,
@@ -20,7 +20,7 @@ use crate::mirror::{
     },
     AutotunerBridge, MirrorFacade, MirrorRepo, NarrativeHandler,
 };
-use crate::repos::{EpisodicMemoryRepo, ProceduralRuleRepo};
+use cognitive_memory::repos::{EpisodicMemoryRepo, ProceduralRuleRepo};
 
 pub struct StartedMirror {
     pub facade: MirrorFacade,
@@ -38,7 +38,7 @@ impl MirrorEngine {
         autotuner_bridge: Option<Arc<dyn AutotunerBridge>>,
         episodic_repo: Option<EpisodicMemoryRepo>,
         rule_repo: Option<ProceduralRuleRepo>,
-        trial_evaluator: Option<Arc<dyn crate::mirror::types::EarlyTrialEvaluator>>,
+        trial_evaluator: Option<Arc<dyn crate::types::EarlyTrialEvaluator>>,
         approval_pattern_repo: Option<Arc<storage::repos::ApprovalPatternHistoryRepo>>,
     ) -> StartedMirror {
         let shutdown = CancellationToken::new();
@@ -121,7 +121,7 @@ mod tests {
 
     #[tokio::test]
     async fn start_produces_seven_consumers() {
-        let repo = crate::mirror::test_mirror_repo().await;
+        let repo = crate::test_mirror_repo().await;
         let built = MirrorEngine::start(repo, None, None, None, None, None, None);
         assert_eq!(
             built.consumers.len(),

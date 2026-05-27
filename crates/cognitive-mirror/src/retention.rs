@@ -1,6 +1,6 @@
 //! Periodic cleanup of aged mirror rows.
 
-use crate::mirror::MirrorRepo;
+use crate::MirrorRepo;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::task::JoinHandle;
@@ -91,7 +91,7 @@ mod tests {
 
     #[tokio::test]
     async fn sweep_once_does_not_panic_on_empty_tables() {
-        let repo = crate::mirror::test_mirror_repo().await;
+        let repo = crate::test_mirror_repo().await;
         MirrorRetentionService::sweep_once(&repo, &MirrorRetentionConfig::default()).await;
     }
 }

@@ -6,7 +6,7 @@ use sqlx::Row;
 use std::collections::HashMap;
 use uuid::Uuid;
 
-use crate::mirror::{
+use crate::{
     BrainVersion, FeedbackTarget, MetaRule, MetaRuleAction,
     MetaRuleSource, MetaRuleStatus, NarrativeSnippet, PreviewRecommendation, RoutingSnapshot,
     TaskFocusSnapshot, TrendNarrative, TrialEarlySignals, TrialPreview, UserFeedback,
@@ -387,9 +387,9 @@ impl MirrorRepo {
     /// Convenience: build a snippet from an alert and insert it.
     pub async fn insert_snippet_from_alert(
         &self,
-        alert: &crate::mirror::types::MirrorAlert,
+        alert: &crate::types::MirrorAlert,
     ) -> Result<()> {
-        let snippet = crate::mirror::snippet_from_alert(alert);
+        let snippet = crate::snippet_from_alert(alert);
         self.insert_snippet(&snippet).await
     }
 
@@ -876,7 +876,7 @@ impl MirrorRepo {
     // Coding todo snapshots
     // -----------------------------------------------------------------------
 
-    pub async fn insert_todo_snapshot(&self, snap: &crate::mirror::TodoSnapshot) -> Result<()> {
+    pub async fn insert_todo_snapshot(&self, snap: &crate::TodoSnapshot) -> Result<()> {
         let clusters_json = serde_json::to_string(&snap.blocked_reason_clusters)
             .map_err(|e| common::KlyntbotError::Storage(format!("serialize clusters: {e}")))?;
         sqlx::query(
@@ -899,7 +899,7 @@ impl MirrorRepo {
         Ok(())
     }
 
-    pub async fn get_latest_todo_snapshot(&self) -> Result<Option<crate::mirror::TodoSnapshot>> {
+    pub async fn get_latest_todo_snapshot(&self) -> Result<Option<crate::TodoSnapshot>> {
         let row = sqlx::query(
             "SELECT id, captured_at, window_hours, status_changes, cancellations,
                     plans_proposed, plans_ratified, blocked_reason_clusters_json
@@ -919,7 +919,7 @@ impl MirrorRepo {
         let clusters_json: String = row.try_get(7)?;
         let blocked_reason_clusters: Vec<(String, u32)> = serde_json::from_str(&clusters_json)
             .map_err(|e| common::KlyntbotError::Storage(format!("deserialize clusters: {e}")))?;
-        Ok(Some(crate::mirror::TodoSnapshot {
+        Ok(Some(crate::TodoSnapshot {
             id: Uuid::parse_str(&id)
                 .map_err(|e| common::KlyntbotError::Storage(format!("uuid: {e}")))?,
             captured_at: captured_at
@@ -944,7 +944,7 @@ mod tests {
     use std::collections::HashMap;
 
     use super::*;
-    use crate::mirror::{
+    use crate::{
         MetaRuleAction, MirrorAlertType, PreviewRecommendation, SkillRouteStats, SuggestedAction,
         TrendDirection, TrialEarlySignals, TrialPreview,
     };
@@ -1005,7 +1005,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_insert_and_get_routing_snapshot() {
-        let repo = crate::mirror::test_mirror_repo().await;
+        let repo = crate::test_mirror_repo().await;
         let snap = make_snapshot();
         repo.insert_routing_snapshot(&snap).await.unwrap();
 
@@ -1025,7 +1025,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_insert_and_get_snippet() {
-        let repo = crate::mirror::test_mirror_repo().await;
+        let repo = crate::test_mirror_repo().await;
         let snippet = make_snippet();
         repo.insert_snippet(&snippet).await.unwrap();
 
@@ -1039,7 +1039,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_insert_and_get_narrative() {
-        let repo = crate::mirror::test_mirror_repo().await;
+        let repo = crate::test_mirror_repo().await;
         let narrative = make_narrative();
         repo.insert_trend_narrative(&narrative).await.unwrap();
 
@@ -1056,7 +1056,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_feedback_update() {
-        let repo = crate::mirror::test_mirror_repo().await;
+        let repo = crate::test_mirror_repo().await;
 
         // Routing feedback
         let snap = make_snapshot();
@@ -1096,7 +1096,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_retention_cleanup() {
-        let repo = crate::mirror::test_mirror_repo().await;
+        let repo = crate::test_mirror_repo().await;
 
         // Insert a recent snapshot (should survive cleanup)
         let recent_snap = make_snapshot();
@@ -1161,7 +1161,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_insert_and_get_meta_rule() {
-        let repo = crate::mirror::test_mirror_repo().await;
+        let repo = crate::test_mirror_repo().await;
         let rule = make_meta_rule();
         repo.insert_meta_rule(&rule).await.unwrap();
 
@@ -1181,7 +1181,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_approve_meta_rule() {
-        let repo = crate::mirror::test_mirror_repo().await;
+        let repo = crate::test_mirror_repo().await;
         let rule = make_meta_rule();
         repo.insert_meta_rule(&rule).await.unwrap();
 
@@ -1205,7 +1205,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_dismiss_meta_rule() {
-        let repo = crate::mirror::test_mirror_repo().await;
+        let repo = crate::test_mirror_repo().await;
         let rule = make_meta_rule();
         repo.insert_meta_rule(&rule).await.unwrap();
 
@@ -1229,7 +1229,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_increment_signal_count() {
-        let repo = crate::mirror::test_mirror_repo().await;
+        let repo = crate::test_mirror_repo().await;
         let rule = make_meta_rule();
         repo.insert_meta_rule(&rule).await.unwrap();
 
@@ -1259,7 +1259,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_insert_and_get_brain_version() {
-        let repo = crate::mirror::test_mirror_repo().await;
+        let repo = crate::test_mirror_repo().await;
         let v = make_brain_version(1, None);
         repo.insert_brain_version(&v).await.unwrap();
 
@@ -1274,7 +1274,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_brain_versions_ordered() {
-        let repo = crate::mirror::test_mirror_repo().await;
+        let repo = crate::test_mirror_repo().await;
         repo.insert_brain_version(&make_brain_version(1, None))
             .await
             .unwrap();
@@ -1295,7 +1295,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_next_version_number() {
-        let repo = crate::mirror::test_mirror_repo().await;
+        let repo = crate::test_mirror_repo().await;
 
         // Empty table → next is 1
         let next = repo.get_next_version_number().await.unwrap();
@@ -1311,7 +1311,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_mark_versions_reverted() {
-        let repo = crate::mirror::test_mirror_repo().await;
+        let repo = crate::test_mirror_repo().await;
         repo.insert_brain_version(&make_brain_version(1, None))
             .await
             .unwrap();
@@ -1353,7 +1353,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_insert_and_get_trial_preview() {
-        let repo = crate::mirror::test_mirror_repo().await;
+        let repo = crate::test_mirror_repo().await;
         let preview = make_trial_preview("trial-abc", PreviewRecommendation::Kill);
         repo.insert_trial_preview(&preview).await.unwrap();
         let previews = repo.get_recent_trial_previews().await.unwrap();
@@ -1364,7 +1364,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_trial_preview_by_trial_id() {
-        let repo = crate::mirror::test_mirror_repo().await;
+        let repo = crate::test_mirror_repo().await;
         let preview = make_trial_preview("trial-abc", PreviewRecommendation::Kill);
         repo.insert_trial_preview(&preview).await.unwrap();
         let found = repo
@@ -1381,7 +1381,7 @@ mod tests {
 
     #[tokio::test]
     async fn cleanup_old_trend_narratives_keeps_recent() {
-        let repo = crate::mirror::test_mirror_repo().await;
+        let repo = crate::test_mirror_repo().await;
         let old = TrendNarrative {
             id: Uuid::new_v4(),
             generated_at: Timestamp::now() - jiff::SignedDuration::from_secs(400 * 86400),
@@ -1411,7 +1411,7 @@ mod tests {
 
     #[tokio::test]
     async fn cleanup_old_meta_rules_only_disabled() {
-        let repo = crate::mirror::test_mirror_repo().await;
+        let repo = crate::test_mirror_repo().await;
         let mk = |status: MetaRuleStatus, created_at: Timestamp| MetaRule {
             id: Uuid::new_v4(),
             trigger_condition: String::new(),

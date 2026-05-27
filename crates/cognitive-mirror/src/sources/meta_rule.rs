@@ -9,7 +9,7 @@ use jiff::Timestamp;
 use tracing::warn;
 use uuid::Uuid;
 
-use crate::mirror::{
+use crate::{
     MetaRule, MetaRuleAction, MetaRuleSource, MetaRuleStatus, MirrorAlert, MirrorRepo,
 };
 

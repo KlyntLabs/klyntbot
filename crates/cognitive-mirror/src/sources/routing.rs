@@ -11,7 +11,7 @@ use jiff::Timestamp;
 use tracing::{debug, info, warn};
 use uuid::Uuid;
 
-use crate::mirror::{MirrorAlert, MirrorRepo, RoutingSnapshot, SkillRouteStats};
+use crate::{MirrorAlert, MirrorRepo, RoutingSnapshot, SkillRouteStats};
 
 const MAX_TRIGGER_PHRASES: usize = 100;
 
@@ -291,7 +291,7 @@ mod tests {
 
     #[tokio::test]
     async fn accumulates_skill_routed_signals() {
-        let repo = crate::mirror::test_mirror_repo().await;
+        let repo = crate::test_mirror_repo().await;
         let source = Arc::new(RoutingSignalSource::new(repo));
 
         source
@@ -314,7 +314,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_drift_detection_high_fallback() {
-        let repo = crate::mirror::test_mirror_repo().await;
+        let repo = crate::test_mirror_repo().await;
         let source = RoutingSignalSource::new(repo);
         for _ in 0..8 {
             source.accumulate_signal("general", 0.4, &[]);
@@ -328,7 +328,7 @@ mod tests {
 
         let history = vec![snapshot.clone()];
         let source2 = {
-            let repo = crate::mirror::test_mirror_repo().await;
+            let repo = crate::test_mirror_repo().await;
             RoutingSignalSource::new(repo)
         };
         for _ in 0..9 {

@@ -7,7 +7,7 @@ use ai_core::{AiSignal, MirrorSignalSource, MirrorSnapshotSpec};
 use async_trait::async_trait;
 use jiff::Timestamp;
 
-use crate::mirror::{AutotunerBridge, BrainVersion, MirrorRepo};
+use crate::{AutotunerBridge, BrainVersion, MirrorRepo};
 
 pub struct ConfigArchiverSource {
     repo: MirrorRepo,

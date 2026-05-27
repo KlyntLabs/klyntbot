@@ -109,7 +109,7 @@ pub async fn collect(
     rule_repo: &ProceduralRuleRepo,
     skill_mgr: &SkillFileManager,
     pre_read_skill_files: Option<HashMap<String, Vec<SkillFile>>>,
-    mirror_repo: Option<&cognitive_memory::mirror::MirrorRepo>,
+    mirror_repo: Option<&cognitive_mirror::MirrorRepo>,
     feedback_repo: Option<&storage::RetrievalFeedbackRepo>,
     feedback_sources: Option<&FeedbackSources<'_>>,
 ) -> Option<ReforgeCollected> {
@@ -195,7 +195,7 @@ pub async fn collect(
     // --- Pending meta-rules ---
     let pending_meta_rules = if let Some(mirror) = mirror_repo {
         match mirror
-            .get_meta_rules_by_status(cognitive_memory::mirror::MetaRuleStatus::Pending)
+            .get_meta_rules_by_status(cognitive_mirror::MetaRuleStatus::Pending)
             .await
         {
             Ok(rules) => rules.into_iter().map(|r| r.trigger_condition).collect(),
@@ -562,7 +562,7 @@ pub fn format_champion_params(params: &common::TrialParams) -> String {
 /// For each skill present in the snapshots, sums message counts and computes
 /// a weighted average of confidence values (weighted by message count).
 fn aggregate_routing_snapshots(
-    snapshots: &[cognitive_memory::mirror::RoutingSnapshot],
+    snapshots: &[cognitive_mirror::RoutingSnapshot],
 ) -> Vec<RoutingSummary> {
     use std::collections::HashMap;
 

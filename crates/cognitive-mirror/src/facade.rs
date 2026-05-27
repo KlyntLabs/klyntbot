@@ -12,13 +12,13 @@ use uuid::Uuid;
 
 use common::Result;
 
-use crate::mirror::{
+use crate::{
     AutotunerBridge, BrainVersion, FeedbackTarget, MetaRule, MetaRuleAction, MetaRuleSource,
     MetaRuleStatus, MirrorRepo, MirrorResponse, MirrorState, NarrativeContext, NarrativeHandler,
     NarrativeSnippet, RoutingSnapshot, TrendNarrative, TrialPreview, UserFeedback,
 };
-use crate::repos::EpisodicMemoryRepo;
-use crate::types::ProceduralRule;
+use cognitive_memory::repos::EpisodicMemoryRepo;
+use cognitive_memory::types::ProceduralRule;
 
 // ---------------------------------------------------------------------------
 // MirrorFacade
@@ -34,9 +34,9 @@ pub struct MirrorFacade {
     autotuner_bridge: Option<Arc<dyn AutotunerBridge>>,
     pub(crate) active_timers: Option<Arc<DashMap<String, JoinHandle<()>>>>,
     episodic_repo: Option<EpisodicMemoryRepo>,
-    rule_repo: Option<crate::repos::ProceduralRuleRepo>,
-    text_embedder: Option<Arc<dyn crate::embedder::TextEmbedder>>,
-    approval_history: Option<Arc<crate::mirror::sources::ApprovalHistorySource>>,
+    rule_repo: Option<cognitive_memory::repos::ProceduralRuleRepo>,
+    text_embedder: Option<Arc<dyn cognitive_memory::embedder::TextEmbedder>>,
+    approval_history: Option<Arc<crate::sources::ApprovalHistorySource>>,
 }
 
 impl MirrorFacade {
@@ -79,7 +79,7 @@ impl MirrorFacade {
     /// Attach the approval history source for pattern suggestion.
     pub fn with_approval_history(
         mut self,
-        source: Arc<crate::mirror::sources::ApprovalHistorySource>,
+        source: Arc<crate::sources::ApprovalHistorySource>,
     ) -> Self {
         self.approval_history = Some(source);
         self
@@ -90,7 +90,7 @@ impl MirrorFacade {
         &self,
         tool: &str,
         path: Option<&str>,
-    ) -> Option<crate::mirror::sources::approval_history::SuggestedPattern> {
+    ) -> Option<crate::sources::approval_history::SuggestedPattern> {
         self.approval_history
             .as_ref()?
             .suggest_pattern(tool, path)
@@ -105,16 +105,16 @@ impl MirrorFacade {
         self
     }
 
-    /// Attach a [`ProceduralRuleRepo`](crate::repos::ProceduralRuleRepo) so that
+    /// Attach a [`ProceduralRuleRepo`](cognitive_memory::repos::ProceduralRuleRepo) so that
     /// approved meta-rules are promoted to procedural rules. Returns `self` for
     /// builder-style chaining.
-    pub fn with_rule_repo(mut self, repo: crate::repos::ProceduralRuleRepo) -> Self {
+    pub fn with_rule_repo(mut self, repo: cognitive_memory::repos::ProceduralRuleRepo) -> Self {
         self.rule_repo = Some(repo);
         self
     }
 
-    /// Attach a [`TextEmbedder`](crate::embedder::TextEmbedder) for semantic snippet similarity in voice echo.
-    pub fn with_text_embedder(mut self, embedder: Arc<dyn crate::embedder::TextEmbedder>) -> Self {
+    /// Attach a [`TextEmbedder`](cognitive_memory::embedder::TextEmbedder) for semantic snippet similarity in voice echo.
+    pub fn with_text_embedder(mut self, embedder: Arc<dyn cognitive_memory::embedder::TextEmbedder>) -> Self {
         self.text_embedder = Some(embedder);
         self
     }
@@ -216,7 +216,7 @@ impl MirrorFacade {
 
     /// Approve a pending meta-rule, transitioning it to [`MetaRuleStatus::Active`].
     ///
-    /// If a [`ProceduralRuleRepo`](crate::repos::ProceduralRuleRepo) is attached,
+    /// If a [`ProceduralRuleRepo`](cognitive_memory::repos::ProceduralRuleRepo) is attached,
     /// the meta-rule is also promoted to a procedural rule. If a similar rule already
     /// exists its `signal_count` is incremented instead of creating a duplicate.
     pub async fn approve_meta_rule(&self, rule_id: Uuid) -> Result<()> {
@@ -496,7 +496,7 @@ impl MirrorFacade {
             let repo = episodic.clone();
             let now = Timestamp::now().to_string();
             tokio::spawn(async move {
-                let mem = crate::types::EpisodicMemory {
+                let mem = cognitive_memory::types::EpisodicMemory {
                     id: Uuid::new_v4().to_string(),
                     domain: "mirror".to_string(),
                     content,
@@ -697,12 +697,12 @@ mod tests {
     use std::collections::HashMap;
 
     use super::*;
-    use crate::mirror::{
+    use crate::{
         MetaRule, MetaRuleAction, MetaRuleSource, MetaRuleStatus, MirrorAlertType, SkillRouteStats,
     };
 
     async fn setup() -> MirrorFacade {
-        MirrorFacade::new(crate::mirror::test_mirror_repo().await)
+        MirrorFacade::new(crate::test_mirror_repo().await)
     }
 
     fn make_snapshot() -> RoutingSnapshot {
@@ -869,7 +869,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_pending_snippets_returns_undismissed() {
         let facade = setup().await;
-        let snippet = crate::mirror::NarrativeSnippet {
+        let snippet = crate::NarrativeSnippet {
             id: Uuid::new_v4(),
             created_at: Timestamp::now(),
             alert_type: MirrorAlertType::RoutingDrift,
@@ -890,8 +890,8 @@ mod tests {
 
     // -- Brain version tests -----------------------------------------------
 
-    fn make_brain_version(version: u32, parent: Option<u32>) -> crate::mirror::BrainVersion {
-        crate::mirror::BrainVersion {
+    fn make_brain_version(version: u32, parent: Option<u32>) -> crate::BrainVersion {
+        crate::BrainVersion {
             version,
             trial_id: None,
             promoted_at: Timestamp::now(),

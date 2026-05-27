@@ -10,7 +10,7 @@ use jiff::Timestamp;
 use tokio::task::JoinHandle;
 use uuid::Uuid;
 
-use crate::mirror::{
+use crate::{
     EarlyTrialEvaluator, MirrorAlert, MirrorRepo, PreviewRecommendation, TrialEarlySignals,
     TrialPreview,
 };
@@ -140,14 +140,14 @@ pub fn compute_recommendation(
         return PreviewRecommendation::Kill;
     }
     if messages_scored < MIN_MESSAGES_FOR_KILL
-        && signals.confidence_trend == crate::mirror::TrendDirection::Falling
+        && signals.confidence_trend == crate::TrendDirection::Falling
     {
         return PreviewRecommendation::Kill;
     }
     if messages_scored >= MIN_MESSAGES_FOR_KILL
         && signals.correction_rate_delta > 0.0
-        && (signals.confidence_trend == crate::mirror::TrendDirection::Rising
-            || signals.confidence_trend == crate::mirror::TrendDirection::Stable)
+        && (signals.confidence_trend == crate::TrendDirection::Rising
+            || signals.confidence_trend == crate::TrendDirection::Stable)
     {
         return PreviewRecommendation::Continue;
     }

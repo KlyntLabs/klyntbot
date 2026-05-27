@@ -29,7 +29,7 @@ pub(crate) async fn test_mirror_repo() -> MirrorRepo {
     let pool = storage::StoragePool::connect_in_memory().await.unwrap();
     storage::StoragePool::run_feature_migrations(
         pool.inner(),
-        &crate::repos::cognitive_migrations(),
+        &cognitive_schema::cognitive_migrations(),
     )
     .await
     .unwrap();
