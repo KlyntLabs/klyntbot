@@ -2472,7 +2472,6 @@ name = "cognitive-memory"
 version = "0.1.1"
 dependencies = [
  "ai-core",
- "ai-core-macros",
  "async-trait",
  "bus",
  "cognitive-graph",
@@ -2481,7 +2480,6 @@ dependencies = [
  "common",
  "config",
  "context_engine",
- "dashmap",
  "feature-notes",
  "feature-tasks",
  "futures-util",
@@ -2494,14 +2492,11 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.11.0",
- "similar",
  "specta",
  "sqlx",
  "storage",
- "tempfile",
  "tokio",
  "tokio-util",
- "tools-core",
  "tracing",
  "uuid",
 ]
@@ -2521,7 +2516,6 @@ dependencies = [
  "jiff",
  "serde",
  "serde_json",
- "similar",
  "specta",
  "sqlx",
  "storage",

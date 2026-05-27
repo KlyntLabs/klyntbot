@@ -5,6 +5,12 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 
+# `ai-core` is used only through the `#[derive(AiEvent)]` macro expansion in
+# community_intelligence/*events.rs; cargo-machete's static scan can't see
+# macro-generated `ai_core::` paths, so it false-positives. Keep it explicit.
+[package.metadata.cargo-machete]
+ignored = ["ai-core"]
+
 [dependencies]
 common = { workspace = true }
 cognitive-schema = { workspace = true }

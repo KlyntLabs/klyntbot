@@ -17,7 +17,6 @@ specta = { workspace = true }
 sqlx = { workspace = true }
 jiff = { workspace = true }
 uuid = { workspace = true, features = ["v4"] }
-similar = { workspace = true }
 async-trait = { workspace = true }
 tracing = { workspace = true }
 tokio = { workspace = true }
