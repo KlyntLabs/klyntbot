@@ -1021,46 +1021,4 @@ impl Phase for CompactPhase {
 }
 
 #[cfg(test)]
-mod builder_test {
-    use super::*;
-
-    // A no-op handler so we can build a context in a pure (no-DB) unit test.
-    struct NoopHandler;
-    #[async_trait]
-    impl crate::ReforgeHandler for NoopHandler {
-        async fn synthesize(&self, _: &SynthesizeInput) -> common::Result<SynthesizeOutput> {
-            Ok(SynthesizeOutput {
-                fact_updates: vec![], rule_updates: vec![], stale_facts: vec![],
-                cross_session_patterns: vec![], extraction_quality_flag: None,
-            })
-        }
-        async fn review(&self, _: &ReviewInput) -> common::Result<ReviewOutput> {
-            Ok(ReviewOutput::default())
-        }
-        async fn narrate(&self, _: &NarrateInput) -> common::Result<String> {
-            Ok(String::new())
-        }
-    }
-
-    #[tokio::test]
-    async fn builder_sets_required_and_defaults_optionals_to_none() {
-        let pool = cognitive_schema::cognitive_test_pool().await;
-        let state = storage::repos::ReforgeStateRepo::new(pool.clone());
-        let skillv = storage::repos::SkillVersionRepo::new(pool.clone());
-        let sess = storage::SessionMemoryRepo::new(pool.clone());
-        let facts = SemanticFactRepo::new(pool.clone());
-        let epis = EpisodicMemoryRepo::new(pool.clone());
-        let rules = ProceduralRuleRepo::new(pool.clone());
-        let dir = tempfile::tempdir().unwrap();
-        let skill_mgr = SkillFileManager::new(dir.path().to_path_buf());
-        let handler = NoopHandler;
-
-        let ctx = ReforgeContext::builder(
-            &state, &skillv, &sess, &facts, &epis, &rules, &handler, &skill_mgr,
-        )
-        .build();
-
-        assert!(ctx.mirror_repo.is_none());
-        assert!(ctx.cross_cli_runner.is_none());
-    }
-}
+mod pipeline_tests;
