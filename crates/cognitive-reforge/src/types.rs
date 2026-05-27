@@ -33,7 +33,7 @@ pub struct RoutingSummary {
 // Phase 1: Collect
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct ReforgeCollected {
     pub sessions: Vec<SessionContext>,
     pub episodic_memories: Vec<cognitive_memory::types::EpisodicMemory>,
@@ -220,7 +220,7 @@ pub struct SkillContent {
     pub content: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Default)]
 pub struct ReviewOutput {
     #[serde(default)]
     pub skill_edits: Vec<SkillEdit>,

@@ -78,6 +78,135 @@ pub struct ReforgeContext<'a> {
     pub skill_discovery_runner: Option<&'a dyn super::SkillDiscoveryRunner>,
 }
 
+impl<'a> ReforgeContext<'a> {
+    /// Start building a context from the eight always-required dependencies.
+    /// Optional phase hooks default to `None`; set them with the chained
+    /// setters below. This is the canonical construction path — see
+    /// `app-core/src/init/cron.rs` for the production call site.
+    #[allow(clippy::too_many_arguments)]
+    pub fn builder(
+        reforge_state_repo: &'a storage::repos::ReforgeStateRepo,
+        skill_version_repo: &'a storage::repos::SkillVersionRepo,
+        session_memory_repo: &'a storage::SessionMemoryRepo,
+        fact_repo: &'a SemanticFactRepo,
+        episodic_repo: &'a EpisodicMemoryRepo,
+        rule_repo: &'a ProceduralRuleRepo,
+        handler: &'a dyn super::ReforgeHandler,
+        skill_mgr: &'a SkillFileManager,
+    ) -> ReforgeContextBuilder<'a> {
+        ReforgeContextBuilder {
+            ctx: ReforgeContext {
+                reforge_state_repo,
+                skill_version_repo,
+                session_memory_repo,
+                fact_repo,
+                episodic_repo,
+                rule_repo,
+                handler,
+                skill_mgr,
+                mirror_repo: None,
+                feedback_repo: None,
+                autotuner_bridge: None,
+                feedback_sources: None,
+                graph_enrichment_handler: None,
+                density_repo: None,
+                entity_repo: None,
+                snapshot_repo: None,
+                community_intelligence_handler: None,
+                community_repo: None,
+                co_activation_repo_for_split: None,
+                domain_event_bus: None,
+                cross_cli_runner: None,
+                skill_discovery_runner: None,
+            },
+        }
+    }
+}
+
+/// Builder for [`ReforgeContext`]. Required deps are fixed at `builder(...)`;
+/// each optional phase hook has a chained setter. Hooks left unset stay `None`
+/// and the corresponding phase degrades to a no-op.
+pub struct ReforgeContextBuilder<'a> {
+    ctx: ReforgeContext<'a>,
+}
+
+impl<'a> ReforgeContextBuilder<'a> {
+    pub fn mirror_repo(mut self, v: &'a cognitive_mirror::MirrorRepo) -> Self {
+        self.ctx.mirror_repo = Some(v);
+        self
+    }
+    pub fn feedback_repo(mut self, v: &'a storage::RetrievalFeedbackRepo) -> Self {
+        self.ctx.feedback_repo = Some(v);
+        self
+    }
+    /// Already-`Option` at the call site — accepts the option directly.
+    pub fn autotuner_bridge(mut self, v: Option<&'a dyn super::AutotunerBridge>) -> Self {
+        self.ctx.autotuner_bridge = v;
+        self
+    }
+    pub fn feedback_sources(mut self, v: &'a super::collector::FeedbackSources<'a>) -> Self {
+        self.ctx.feedback_sources = Some(v);
+        self
+    }
+    /// Already-`Option` at the call site — accepts the option directly.
+    pub fn graph_enrichment_handler(
+        mut self,
+        v: Option<&'a dyn super::GraphEnrichmentHandler>,
+    ) -> Self {
+        self.ctx.graph_enrichment_handler = v;
+        self
+    }
+    pub fn density_repo(mut self, v: &'a cognitive_memory::repos::ConversationDensityRepo) -> Self {
+        self.ctx.density_repo = Some(v);
+        self
+    }
+    pub fn entity_repo(mut self, v: &'a cognitive_memory::repos::EntityRepo) -> Self {
+        self.ctx.entity_repo = Some(v);
+        self
+    }
+    pub fn snapshot_repo(
+        mut self,
+        v: &'a cognitive_memory::repos::KnowledgeSnapshotRepo,
+    ) -> Self {
+        self.ctx.snapshot_repo = Some(v);
+        self
+    }
+    /// Already-`Option` at the call site — accepts the option directly.
+    pub fn community_intelligence_handler(
+        mut self,
+        v: Option<&'a dyn super::CommunityIntelligenceHandler>,
+    ) -> Self {
+        self.ctx.community_intelligence_handler = v;
+        self
+    }
+    pub fn community_repo(mut self, v: &'a cognitive_memory::repos::CommunityRepo) -> Self {
+        self.ctx.community_repo = Some(v);
+        self
+    }
+    pub fn co_activation_repo_for_split(
+        mut self,
+        v: &'a cognitive_memory::repos::CoActivationRepo,
+    ) -> Self {
+        self.ctx.co_activation_repo_for_split = Some(v);
+        self
+    }
+    pub fn domain_event_bus(mut self, v: std::sync::Arc<bus::DomainEventBus>) -> Self {
+        self.ctx.domain_event_bus = Some(v);
+        self
+    }
+    pub fn cross_cli_runner(mut self, v: &'a dyn super::CrossCliPhaseRunner) -> Self {
+        self.ctx.cross_cli_runner = Some(v);
+        self
+    }
+    pub fn skill_discovery_runner(mut self, v: &'a dyn super::SkillDiscoveryRunner) -> Self {
+        self.ctx.skill_discovery_runner = Some(v);
+        self
+    }
+    pub fn build(self) -> ReforgeContext<'a> {
+        self.ctx
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Run state: the mutable per-cycle bindings phases hand off between each other
 // ---------------------------------------------------------------------------
@@ -888,5 +1017,50 @@ impl Phase for CompactPhase {
                 run.result.phase_errors.push(format!("compact: {e}"));
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod builder_test {
+    use super::*;
+
+    // A no-op handler so we can build a context in a pure (no-DB) unit test.
+    struct NoopHandler;
+    #[async_trait]
+    impl crate::ReforgeHandler for NoopHandler {
+        async fn synthesize(&self, _: &SynthesizeInput) -> common::Result<SynthesizeOutput> {
+            Ok(SynthesizeOutput {
+                fact_updates: vec![], rule_updates: vec![], stale_facts: vec![],
+                cross_session_patterns: vec![], extraction_quality_flag: None,
+            })
+        }
+        async fn review(&self, _: &ReviewInput) -> common::Result<ReviewOutput> {
+            Ok(ReviewOutput::default())
+        }
+        async fn narrate(&self, _: &NarrateInput) -> common::Result<String> {
+            Ok(String::new())
+        }
+    }
+
+    #[tokio::test]
+    async fn builder_sets_required_and_defaults_optionals_to_none() {
+        let pool = cognitive_schema::cognitive_test_pool().await;
+        let state = storage::repos::ReforgeStateRepo::new(pool.clone());
+        let skillv = storage::repos::SkillVersionRepo::new(pool.clone());
+        let sess = storage::SessionMemoryRepo::new(pool.clone());
+        let facts = SemanticFactRepo::new(pool.clone());
+        let epis = EpisodicMemoryRepo::new(pool.clone());
+        let rules = ProceduralRuleRepo::new(pool.clone());
+        let dir = tempfile::tempdir().unwrap();
+        let skill_mgr = SkillFileManager::new(dir.path().to_path_buf());
+        let handler = NoopHandler;
+
+        let ctx = ReforgeContext::builder(
+            &state, &skillv, &sess, &facts, &epis, &rules, &handler, &skill_mgr,
+        )
+        .build();
+
+        assert!(ctx.mirror_repo.is_none());
+        assert!(ctx.cross_cli_runner.is_none());
     }
 }

@@ -437,30 +437,29 @@ fn register_cron_callbacks(
                                 &cog_config,
                             );
                         let community_repo = cognitive::CommunityRepo::new(pool.clone());
-                        let reforge_ctx = cognitive::services::reforge::ReforgeContext {
-                            reforge_state_repo: &repos_reforge.reforge_state,
-                            skill_version_repo: &repos_reforge.skill_version,
-                            session_memory_repo: &repos_reforge.session_memory,
-                            fact_repo: &fact_repo,
-                            episodic_repo: &episodic_repo,
-                            rule_repo: &rule_repo,
-                            handler: handler.as_ref(),
-                            skill_mgr: &skill_mgr,
-                            mirror_repo: Some(&mirror_repo),
-                            feedback_repo: Some(&feedback_repo),
-                            autotuner_bridge: bridge_ref,
-                            feedback_sources: Some(&feedback_sources),
-                            graph_enrichment_handler: graph_handler.as_deref(),
-                            density_repo: Some(&density_repo),
-                            entity_repo: Some(&entity_repo),
-                            snapshot_repo: Some(&snapshot_repo),
-                            community_intelligence_handler: community_handler.as_deref(),
-                            community_repo: Some(&community_repo),
-                            co_activation_repo_for_split: Some(&co_activation_repo),
-                            domain_event_bus: Some(domain_event_bus),
-                            cross_cli_runner: None,
-                            skill_discovery_runner: None,
-                        };
+                        let reforge_ctx = cognitive::services::reforge::ReforgeContext::builder(
+                            &repos_reforge.reforge_state,
+                            &repos_reforge.skill_version,
+                            &repos_reforge.session_memory,
+                            &fact_repo,
+                            &episodic_repo,
+                            &rule_repo,
+                            handler.as_ref(),
+                            &skill_mgr,
+                        )
+                        .mirror_repo(&mirror_repo)
+                        .feedback_repo(&feedback_repo)
+                        .autotuner_bridge(bridge_ref)
+                        .feedback_sources(&feedback_sources)
+                        .graph_enrichment_handler(graph_handler.as_deref())
+                        .density_repo(&density_repo)
+                        .entity_repo(&entity_repo)
+                        .snapshot_repo(&snapshot_repo)
+                        .community_intelligence_handler(community_handler.as_deref())
+                        .community_repo(&community_repo)
+                        .co_activation_repo_for_split(&co_activation_repo)
+                        .domain_event_bus(domain_event_bus)
+                        .build();
                         let reforge_run = cognitive::services::reforge::ReforgeRun {
                             pre_read_skill_files: Some(pre_read_files),
                             autotuner_ctx,
