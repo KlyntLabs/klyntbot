@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Implementation Notes — Reforge Pipeline Testability</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 900px; margin: 2rem auto; padding: 0 1rem; line-height: 1.6; }
+    h1 { font-size: 1.5rem; border-bottom: 2px solid #333; padding-bottom: .3rem; }
+    h2 { font-size: 1.2rem; margin-top: 1.5rem; }
+    .entry { margin: .8rem 0; padding: .8rem; border-left: 3px solid #0066cc; background: #f8f9fa; }
+    .deviation { border-left-color: #cc3300; }
+    .tradeoff { border-left-color: #cc9900; }
+    .question { border-left-color: #6600cc; }
+    .done { opacity: .6; }
+    code { background: #eee; padding: .1rem .3rem; border-radius: 3px; font-size: .9em; }
+    pre { background: #eee; padding: .6rem; overflow-x: auto; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <h1>Implementation Notes — Reforge Pipeline Testability</h1>
+  <p>Running record of design decisions, deviations, tradeoffs, and open questions while executing <code>docs/superpowers/plans/2026-05-27-reforge-pipeline-testability.md</code>.</p>
+
+  <h2>Pre-Execution Review Findings</h2>
+
+  <div class="entry deviation">
+    <strong>Deviation (pre-emptive):</strong> <code>ReforgeCollected</code> does <em>not</em> derive <code>Default</code> in <code>types.rs</code>, but the plan assumes it does (Task 3 seed helper). I will add <code>#[derive(Default)]</code> to <code>ReforgeCollected</code> — it is a safe, behavior-neutral change for an internal collection struct.
+  </div>
+
+  <div class="entry deviation">
+    <strong>Deviation (pre-emptive):</strong> <code>ReviewOutput</code> does <em>not</em> derive <code>Default</code> in <code>types.rs</code> (line 223). The plan's smoke test uses <code>ReviewOutput::default()</code>. I will add <code>#[derive(Default)]</code> to <code>ReviewOutput</code>.
+  </div>
+
+  <div class="entry">
+    <strong>Design decision:</strong> EpisodicMemoryRepo query method is <code>list_by_domain(domain, limit)</code> (not <code>recent_by_domain</code> as in the plan's Task 5 draft). I'll use the actual method name.
+  </div>
+
+  <div class="entry">
+    <strong>Design decision:</strong> For seeding collectable data in Task 6, the cheapest trigger is inserting a session via <code>session_memory_repo.upsert(session_key, content, turn_count)</code>. The collector's skip gate is: <code>!is_bootstrap && sessions.is_empty() && episodic_memories.is_empty()</code>. Since bootstrap is false when <code>last_run_at</code> is <code>Some</code> (set by <code>run_reforge</code>), seeding one session memory makes Collect yield <code>Some</code>. However, <code>session_memory.upsert</code> requires a matching <code>sessions</code> row for FK. The test harness will insert a dummy <code>sessions</code> row first.
+  </div>
+
+  <div class="entry tradeoff">
+    <strong>Tradeoff:</strong> The plan's <code>seed_collectable</code> helper is described as inserting via repo, but <code>session_memory.upsert</code> is simpler than constructing a full <code>SessionMemoryRow</code> with <code>SqlTs</code>. I'll use <code>upsert</code> in the harness helper.
+  </div>
+
+</body>
+</html>
