@@ -348,3 +348,54 @@ async fn collect_yields_none_on_empty_db() {
         "empty DB should yield no collectable data"
     );
 }
+
+// --- Layer-2: Full pipeline -----------------------------------------------------
+
+impl ReforgeTestHarness {
+    /// Seed the minimum rows that make CollectPhase yield non-empty data.
+    /// Inserts a dummy session and a session memory row.
+    pub async fn seed_collectable(&self) {
+        // Insert a sessions row (required FK for session_memory).
+        sqlx::query("INSERT OR IGNORE INTO sessions (key) VALUES ('test-session')")
+            .execute(self.fact_repo.pool())
+            .await
+            .unwrap();
+        self.session_memory
+            .upsert("test-session", "test content", 1)
+            .await
+            .unwrap();
+    }
+}
+
+#[tokio::test]
+async fn run_reforge_returns_none_when_no_new_data() {
+    let h = ReforgeTestHarness::new().await;
+    // Pre-seed a previous run so CollectPhase does not treat this as bootstrap.
+    h.reforge_state.record_run("{}").await.unwrap();
+    let ctx = h.ctx();
+    let run = ReforgeRun::default();
+
+    let result = run_reforge(ctx, run).await;
+
+    assert!(result.is_none(), "empty DB → cycle skipped, returns None");
+
+    // And no run was recorded in reforge_state (the first record_run was our seed).
+    let state = h.reforge_state.get().await.unwrap();
+    assert_eq!(state.run_count, 1);
+}
+
+#[tokio::test]
+async fn run_reforge_completes_and_records_a_run_when_data_present() {
+    let h = ReforgeTestHarness::new().await;
+    h.seed_collectable().await;
+    let ctx = h.ctx();
+    let run = ReforgeRun::default();
+
+    let result = run_reforge(ctx, run).await;
+
+    assert!(result.is_some(), "data present → cycle runs to completion");
+    // The driver records the run in reforge_state after all phases.
+    let state = h.reforge_state.get().await.unwrap();
+    assert!(state.last_run_at.is_some(), "run should be recorded");
+    assert_eq!(state.run_count, 1);
+}
