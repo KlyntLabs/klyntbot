@@ -33,15 +33,15 @@ use async_trait::async_trait;
 use jiff::Timestamp;
 use tracing::{debug, info, warn};
 
-use crate::repos::{EpisodicMemoryRepo, ProceduralRuleRepo, SemanticFactRepo};
-use crate::services::reforge::service::{
+use cognitive_memory::repos::{EpisodicMemoryRepo, ProceduralRuleRepo, SemanticFactRepo};
+use crate::service::{
     apply_knowledge, apply_skill_edits, build_narrate_input, build_review_input,
     build_synthesize_input, create_trials_from_suggestions, record_knowledge_snapshot,
     run_phase6_autotuner,
 };
-use crate::services::reforge::skill_files::{SkillFile, SkillFileManager};
-use crate::services::reforge::types::*;
-use crate::types::EpisodicMemory;
+use crate::skill_files::{SkillFile, SkillFileManager};
+use crate::types::*;
+use cognitive_memory::types::EpisodicMemory;
 
 // ---------------------------------------------------------------------------
 // Context: the resolved dependencies (was 24 positional params)
@@ -62,17 +62,17 @@ pub struct ReforgeContext<'a> {
     pub rule_repo: &'a ProceduralRuleRepo,
     pub handler: &'a dyn super::ReforgeHandler,
     pub skill_mgr: &'a SkillFileManager,
-    pub mirror_repo: Option<&'a crate::mirror::MirrorRepo>,
+    pub mirror_repo: Option<&'a cognitive_memory::mirror::MirrorRepo>,
     pub feedback_repo: Option<&'a storage::RetrievalFeedbackRepo>,
     pub autotuner_bridge: Option<&'a dyn super::AutotunerBridge>,
     pub feedback_sources: Option<&'a super::collector::FeedbackSources<'a>>,
     pub graph_enrichment_handler: Option<&'a dyn super::GraphEnrichmentHandler>,
-    pub density_repo: Option<&'a crate::repos::ConversationDensityRepo>,
-    pub entity_repo: Option<&'a crate::repos::EntityRepo>,
-    pub snapshot_repo: Option<&'a crate::repos::KnowledgeSnapshotRepo>,
+    pub density_repo: Option<&'a cognitive_memory::repos::ConversationDensityRepo>,
+    pub entity_repo: Option<&'a cognitive_memory::repos::EntityRepo>,
+    pub snapshot_repo: Option<&'a cognitive_memory::repos::KnowledgeSnapshotRepo>,
     pub community_intelligence_handler: Option<&'a dyn super::CommunityIntelligenceHandler>,
-    pub community_repo: Option<&'a crate::repos::CommunityRepo>,
-    pub co_activation_repo_for_split: Option<&'a crate::repos::CoActivationRepo>,
+    pub community_repo: Option<&'a cognitive_memory::repos::CommunityRepo>,
+    pub co_activation_repo_for_split: Option<&'a cognitive_memory::repos::CoActivationRepo>,
     pub domain_event_bus: Option<Arc<bus::DomainEventBus>>,
     pub cross_cli_runner: Option<&'a dyn super::CrossCliPhaseRunner>,
     pub skill_discovery_runner: Option<&'a dyn super::SkillDiscoveryRunner>,
@@ -661,7 +661,7 @@ impl Phase for GraphConsolidationPhase {
 
             // Step 3: Run LLM enrichment (single call) if there's work to do
             if !pending_turns.is_empty() || !dup_candidates.is_empty() {
-                let input = crate::services::graph_enrichment::GraphEnrichmentInput {
+                let input = cognitive_memory::services::graph_enrichment::GraphEnrichmentInput {
                     turn_previews: pending_turns
                         .iter()
                         .map(|t| t.content_preview.clone())
@@ -669,7 +669,7 @@ impl Phase for GraphConsolidationPhase {
                     duplicate_candidates: dup_candidates
                         .iter()
                         .map(|(a_id, b_id, a_name, b_name)| {
-                            crate::services::graph_enrichment::DuplicateCandidate {
+                            cognitive_memory::services::graph_enrichment::DuplicateCandidate {
                                 entity_a_id: a_id.clone(),
                                 entity_b_id: b_id.clone(),
                                 entity_a_name: a_name.clone(),
@@ -709,7 +709,7 @@ impl Phase for GraphConsolidationPhase {
                             if let (Some(src), Some(tgt)) =
                                 (source_entities.first(), target_entities.first())
                             {
-                                let new_rel = crate::repos::entity::NewRelationship {
+                                let new_rel = cognitive_memory::repos::entity::NewRelationship {
                                     source_entity_id: src.id.clone(),
                                     target_entity_id: tgt.id.clone(),
                                     relationship_type: rel.relationship_type.clone(),
@@ -779,7 +779,7 @@ impl Phase for CommunityIntelligencePhase {
         if let (Some(ci_handler), Some(community_repo)) =
             (ctx.community_intelligence_handler, ctx.community_repo)
         {
-            match crate::services::community_intelligence::build_intelligence_input(community_repo)
+            match cognitive_memory::services::community_intelligence::build_intelligence_input(community_repo)
                 .await
             {
                 Ok(input) if !input.communities.is_empty() => {
@@ -788,7 +788,7 @@ impl Phase for CommunityIntelligencePhase {
                             let (renamed, merged, split_count) = if let Some(co_act) =
                                 ctx.co_activation_repo_for_split
                             {
-                                crate::services::community_intelligence::apply_intelligence(
+                                cognitive_memory::services::community_intelligence::apply_intelligence(
                                     &output,
                                     community_repo,
                                     co_act,
@@ -798,15 +798,15 @@ impl Phase for CommunityIntelligencePhase {
                             } else {
                                 // No co-activation repo — can rename/merge but not split
                                 let no_splits =
-                                    crate::services::community_intelligence::CommunityIntelligenceOutput {
+                                    cognitive_memory::services::community_intelligence::CommunityIntelligenceOutput {
                                         names: output.names.clone(),
                                         merges: output.merges.clone(),
                                         splits: Vec::new(),
                                     };
-                                let fallback_co_act = crate::repos::CoActivationRepo::new(
+                                let fallback_co_act = cognitive_memory::repos::CoActivationRepo::new(
                                     community_repo.pool().clone(),
                                 );
-                                crate::services::community_intelligence::apply_intelligence(
+                                cognitive_memory::services::community_intelligence::apply_intelligence(
                                     &no_splits,
                                     community_repo,
                                     &fallback_co_act,
@@ -857,7 +857,7 @@ impl Phase for CompactPhase {
 
     async fn run(&self, ctx: &ReforgeContext<'_>, run: &mut ReforgeRun) {
         info!("Reforge Phase 7: Compact");
-        match crate::services::compaction::run_compaction(
+        match cognitive_memory::services::compaction::run_compaction(
             ctx.fact_repo,
             ctx.episodic_repo,
             Some(ctx.rule_repo),

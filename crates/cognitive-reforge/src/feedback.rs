@@ -47,7 +47,7 @@ pub async fn load_tool_failures(
 
 /// Load correction summaries grouped by skill from the domain_event_log.
 pub async fn load_correction_summaries(
-    event_log_repo: &crate::repos::EventLogRepo,
+    event_log_repo: &cognitive_memory::repos::EventLogRepo,
     since: &str,
 ) -> Vec<CorrectionSummary> {
     let events = match event_log_repo
@@ -93,7 +93,7 @@ pub async fn load_correction_summaries(
 /// Load behavioral metrics from the unified `ai_metric_samples` table.
 /// Iterates the `MetricRegistry` and runs one aggregate query per `MetricSpec`.
 pub async fn load_behavioral_metrics(
-    repo: &crate::repos::MetricRepo,
+    repo: &cognitive_memory::repos::MetricRepo,
     registry: &ai_core::MetricRegistry,
 ) -> BehavioralMetrics {
     let mut metrics = BehavioralMetrics::default();
@@ -116,9 +116,9 @@ pub async fn load_behavioral_metrics(
 
 /// Load knowledge graph health metrics.
 pub async fn load_graph_health(
-    fact_repo: &crate::repos::SemanticFactRepo,
-    rule_repo: &crate::repos::ProceduralRuleRepo,
-    co_activation_repo: &crate::repos::CoActivationRepo,
+    fact_repo: &cognitive_memory::repos::SemanticFactRepo,
+    rule_repo: &cognitive_memory::repos::ProceduralRuleRepo,
+    co_activation_repo: &cognitive_memory::repos::CoActivationRepo,
 ) -> GraphHealthMetrics {
     let (active_facts, active_rules, co_activation_pairs, facts_per_domain, avg_fact_stability) = tokio::join!(
         fact_repo.count_active(),
@@ -243,7 +243,7 @@ pub async fn load_coaching_behavioral(
 
 /// Load enhancement pipeline aggregate metrics for Reforge analysis.
 pub async fn collect_enhancement_signals(
-    trace_repo: &crate::repos::EnhancementTraceRepo,
+    trace_repo: &cognitive_memory::repos::EnhancementTraceRepo,
     since: &str,
 ) -> Vec<super::types::EnhancementSignal> {
     match trace_repo.load_aggregates_since(since).await {
@@ -266,7 +266,7 @@ pub async fn collect_enhancement_signals(
 
 /// Load extraction yield by domain from pipeline_event_log.
 pub async fn load_extraction_yield(
-    event_log_repo: &crate::repos::EventLogRepo,
+    event_log_repo: &cognitive_memory::repos::EventLogRepo,
     since: &str,
 ) -> Vec<(String, f64)> {
     match event_log_repo.extraction_yield_by_domain(since).await {

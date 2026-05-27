@@ -44,7 +44,6 @@ pub use temporal_pruner::{
     apply_prune, DropDecision, NoopTemporalPruner, PruneFactRef, PruneInput, PruneOutput,
     TemporalPrunerHandler,
 };
-pub mod reforge;
 pub mod retrieval;
 
 pub mod scoring;

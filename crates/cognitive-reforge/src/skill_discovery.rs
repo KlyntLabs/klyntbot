@@ -1,6 +1,6 @@
 //! KCA Track 12 — memory-grounded skill discovery.
 
-use crate::repos::procedural_rule::ProceduralRuleRepo;
+use cognitive_memory::repos::procedural_rule::ProceduralRuleRepo;
 
 /// A cluster of related procedural rules that may form a skill.
 #[derive(Debug, Clone)]
@@ -106,12 +106,12 @@ fn keywords_from(s: &str) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::repos::procedural_rule::ProceduralRuleRepo;
-    use crate::types::ProceduralRule;
+    use cognitive_memory::repos::procedural_rule::ProceduralRuleRepo;
+    use cognitive_memory::types::ProceduralRule;
 
     #[tokio::test]
     async fn clusters_rules_with_shared_keywords() {
-        let pool = crate::repos::cognitive_test_pool().await;
+        let pool = cognitive_schema::cognitive_test_pool().await;
         let rule_repo = ProceduralRuleRepo::new(pool.clone());
 
         for (i, text) in [

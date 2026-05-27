@@ -31,12 +31,12 @@ use jiff::Timestamp;
 use sqlx;
 use tracing::{debug, info, warn};
 
-use crate::repos::{ProceduralRuleRepo, SemanticFactRepo};
-use crate::services::reforge::skill_files::{
+use cognitive_memory::repos::{ProceduralRuleRepo, SemanticFactRepo};
+use crate::skill_files::{
     compute_diff, content_hash, SkillFile, SkillFileManager,
 };
-use crate::services::reforge::{types::*, AutotunerBridge, Phase6Result};
-use crate::types::{ProceduralRule, SemanticFact, DEFAULT_MEMORY_TYPE};
+use crate::{types::*, AutotunerBridge, Phase6Result};
+use cognitive_memory::types::{ProceduralRule, SemanticFact, DEFAULT_MEMORY_TYPE};
 
 use common::helpers::truncate_chars;
 
@@ -764,7 +764,7 @@ fn format_autotuner_context(ctx: &AutotunerContext) -> String {
     out
 }
 
-fn format_user_model(model: &crate::types::UserModel) -> String {
+fn format_user_model(model: &cognitive_memory::types::UserModel) -> String {
     let mut parts = Vec::new();
     let domains = [
         ("identity", &model.identity),
@@ -886,9 +886,9 @@ pub(crate) async fn create_trials_from_suggestions(
 
 /// Record a nightly knowledge graph snapshot.
 pub(crate) async fn record_knowledge_snapshot(
-    entity_repo: &crate::repos::EntityRepo,
+    entity_repo: &cognitive_memory::repos::EntityRepo,
     fact_repo: &SemanticFactRepo,
-    snapshot_repo: &crate::repos::KnowledgeSnapshotRepo,
+    snapshot_repo: &cognitive_memory::repos::KnowledgeSnapshotRepo,
 ) -> common::Result<()> {
     let facts = fact_repo.count_active().await.unwrap_or(0) as u32;
 
@@ -1255,7 +1255,7 @@ mod tests {
 
     #[test]
     fn test_format_user_model_empty() {
-        let model = crate::types::UserModel::default();
+        let model = cognitive_memory::types::UserModel::default();
         assert_eq!(format_user_model(&model), "No user model facts yet.");
     }
 

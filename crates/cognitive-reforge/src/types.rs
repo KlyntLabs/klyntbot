@@ -36,9 +36,9 @@ pub struct RoutingSummary {
 #[derive(Debug, Clone)]
 pub struct ReforgeCollected {
     pub sessions: Vec<SessionContext>,
-    pub episodic_memories: Vec<crate::types::EpisodicMemory>,
-    pub user_model: crate::types::UserModel,
-    pub rules: Vec<crate::types::ProceduralRule>,
+    pub episodic_memories: Vec<cognitive_memory::types::EpisodicMemory>,
+    pub user_model: cognitive_memory::types::UserModel,
+    pub rules: Vec<cognitive_memory::types::ProceduralRule>,
     pub routing_summaries: Vec<RoutingSummary>,
     pub pending_meta_rules: Vec<String>,
     pub skill_files: std::collections::HashMap<String, Vec<super::skill_files::SkillFile>>,

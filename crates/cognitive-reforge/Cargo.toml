@@ -1,0 +1,29 @@
+[package]
+name = "cognitive-reforge"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+common = { workspace = true }
+storage = { workspace = true }
+cognitive-memory = { workspace = true }
+ai-core = { workspace = true }
+bus = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+sqlx = { workspace = true }
+jiff = { workspace = true }
+uuid = { workspace = true, features = ["v4"] }
+sha2 = { workspace = true }
+hex = { workspace = true }
+similar = { workspace = true }
+async-trait = { workspace = true }
+tracing = { workspace = true }
+tokio = { workspace = true }
+
+[dev-dependencies]
+cognitive-schema = { workspace = true }
+tempfile = { workspace = true }
+tokio = { workspace = true }

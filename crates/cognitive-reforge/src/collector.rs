@@ -4,11 +4,11 @@ use std::collections::HashMap;
 
 use tracing::debug;
 
-use crate::repos::{
+use cognitive_memory::repos::{
     load_user_model, EpisodicMemoryRepo, ProceduralRuleRepo, SemanticFactRepo, RULE_DOMAINS,
 };
-use crate::services::reforge::skill_files::{SkillFile, SkillFileManager};
-use crate::services::reforge::types::{
+use crate::skill_files::{SkillFile, SkillFileManager};
+use crate::types::{
     BehavioralMetrics, GraphHealthMetrics, ReforgeCollected, RoutingSummary, SessionContext,
 };
 
@@ -66,12 +66,12 @@ pub async fn detect_user_edits(
 /// All fields are optional — missing sources are gracefully skipped.
 pub struct FeedbackSources<'a> {
     pub outcome_repo: Option<&'a storage::OutcomeRepo>,
-    pub event_log_repo: Option<&'a crate::repos::EventLogRepo>,
-    pub co_activation_repo: Option<&'a crate::repos::CoActivationRepo>,
+    pub event_log_repo: Option<&'a cognitive_memory::repos::EventLogRepo>,
+    pub co_activation_repo: Option<&'a cognitive_memory::repos::CoActivationRepo>,
     pub suggestion_repo: Option<&'a storage::ReforgeSuggestionRepo>,
     pub pool: Option<&'a sqlx::SqlitePool>,
-    pub density_repo: Option<&'a crate::repos::ConversationDensityRepo>,
-    pub metric_repo: Option<&'a crate::repos::MetricRepo>,
+    pub density_repo: Option<&'a cognitive_memory::repos::ConversationDensityRepo>,
+    pub metric_repo: Option<&'a cognitive_memory::repos::MetricRepo>,
     pub metric_registry: Option<&'a ai_core::MetricRegistry>,
 }
 
@@ -109,7 +109,7 @@ pub async fn collect(
     rule_repo: &ProceduralRuleRepo,
     skill_mgr: &SkillFileManager,
     pre_read_skill_files: Option<HashMap<String, Vec<SkillFile>>>,
-    mirror_repo: Option<&crate::mirror::MirrorRepo>,
+    mirror_repo: Option<&cognitive_memory::mirror::MirrorRepo>,
     feedback_repo: Option<&storage::RetrievalFeedbackRepo>,
     feedback_sources: Option<&FeedbackSources<'_>>,
 ) -> Option<ReforgeCollected> {
@@ -195,7 +195,7 @@ pub async fn collect(
     // --- Pending meta-rules ---
     let pending_meta_rules = if let Some(mirror) = mirror_repo {
         match mirror
-            .get_meta_rules_by_status(crate::mirror::MetaRuleStatus::Pending)
+            .get_meta_rules_by_status(cognitive_memory::mirror::MetaRuleStatus::Pending)
             .await
         {
             Ok(rules) => rules.into_iter().map(|r| r.trigger_condition).collect(),
@@ -261,7 +261,7 @@ pub async fn collect(
             rule_repo,
             fb.co_activation_repo.unwrap_or(
                 // Fallback: create a temporary repo from fact_repo's pool
-                &crate::repos::CoActivationRepo::new(fact_repo.pool().clone()),
+                &cognitive_memory::repos::CoActivationRepo::new(fact_repo.pool().clone()),
             ),
         )
         .await;
@@ -562,7 +562,7 @@ pub fn format_champion_params(params: &common::TrialParams) -> String {
 /// For each skill present in the snapshots, sums message counts and computes
 /// a weighted average of confidence values (weighted by message count).
 fn aggregate_routing_snapshots(
-    snapshots: &[crate::mirror::RoutingSnapshot],
+    snapshots: &[cognitive_memory::mirror::RoutingSnapshot],
 ) -> Vec<RoutingSummary> {
     use std::collections::HashMap;
 

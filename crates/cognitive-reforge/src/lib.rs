@@ -83,8 +83,8 @@ pub trait GraphEnrichmentHandler: Send + Sync {
     /// Single LLM call processes all duplicate candidates and turn previews.
     async fn enrich_graph(
         &self,
-        input: &crate::services::graph_enrichment::GraphEnrichmentInput,
-    ) -> common::Result<crate::services::graph_enrichment::GraphEnrichmentOutput>;
+        input: &cognitive_memory::services::graph_enrichment::GraphEnrichmentInput,
+    ) -> common::Result<cognitive_memory::services::graph_enrichment::GraphEnrichmentOutput>;
 }
 
 // ---------------------------------------------------------------------------
@@ -98,8 +98,8 @@ pub trait CommunityIntelligenceHandler: Send + Sync {
     /// Name communities, suggest merges and splits in a single LLM call.
     async fn analyze_communities(
         &self,
-        input: &crate::services::community_intelligence::CommunityIntelligenceInput,
-    ) -> common::Result<crate::services::community_intelligence::CommunityIntelligenceOutput>;
+        input: &cognitive_memory::services::community_intelligence::CommunityIntelligenceInput,
+    ) -> common::Result<cognitive_memory::services::community_intelligence::CommunityIntelligenceOutput>;
 }
 
 // ---------------------------------------------------------------------------
