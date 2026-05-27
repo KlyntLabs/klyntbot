@@ -310,3 +310,41 @@ async fn skill_discovery_records_proposed_when_runner_present() {
 
     assert_eq!(run.result.skills_proposed, 2);
 }
+
+// --- Layer-1: Apply + Collect ---------------------------------------------------
+
+#[tokio::test]
+async fn apply_stores_narrative_as_episodic_memory() {
+    let h = ReforgeTestHarness::new().await;
+    let ctx = h.ctx();
+    let mut run = ReforgeRun::default();
+    seed_collected(&mut run);
+    run.narrative = "cycle narrative".to_string();
+
+    ApplyPhase.run(&ctx, &mut run).await;
+
+    // The narrative episodic is recorded under the reforge domain.
+    let mems = h
+        .episodic_repo
+        .list_by_domain("reforge", 10)
+        .await
+        .unwrap();
+    assert!(!mems.is_empty(), "expected a reforge-domain narrative memory");
+    assert!(run.result.phase_errors.is_empty());
+}
+
+#[tokio::test]
+async fn collect_yields_none_on_empty_db() {
+    let h = ReforgeTestHarness::new().await;
+    let ctx = h.ctx();
+    let mut run = ReforgeRun::default();
+    // Set a non-bootstrap last_run_at so the empty-db skip gate triggers.
+    run.last_run_at = Some(jiff::Timestamp::now().to_string());
+
+    CollectPhase.run(&ctx, &mut run).await;
+
+    assert!(
+        run.collected.is_none(),
+        "empty DB should yield no collectable data"
+    );
+}
