@@ -22,24 +22,71 @@
 
   <h2>Pre-Execution Review Findings</h2>
 
-  <div class="entry deviation">
-    <strong>Deviation (pre-emptive):</strong> <code>ReforgeCollected</code> does <em>not</em> derive <code>Default</code> in <code>types.rs</code>, but the plan assumes it does (Task 3 seed helper). I will add <code>#[derive(Default)]</code> to <code>ReforgeCollected</code> — it is a safe, behavior-neutral change for an internal collection struct.
+  <div class="entry deviation done">
+    <strong>Deviation (pre-emptive):</strong> <code>ReforgeCollected</code> did <em>not</em> derive <code>Default</code> in <code>types.rs</code>, but the plan assumed it did (Task 3 seed helper). Added <code>#[derive(Default)]</code> to <code>ReforgeCollected</code> — safe, behavior-neutral change for an internal collection struct.
   </div>
 
-  <div class="entry deviation">
-    <strong>Deviation (pre-emptive):</strong> <code>ReviewOutput</code> does <em>not</em> derive <code>Default</code> in <code>types.rs</code> (line 223). The plan's smoke test uses <code>ReviewOutput::default()</code>. I will add <code>#[derive(Default)]</code> to <code>ReviewOutput</code>.
+  <div class="entry deviation done">
+    <strong>Deviation (pre-emptive):</strong> <code>ReviewOutput</code> did <em>not</em> derive <code>Default</code> in <code>types.rs</code>. The plan's smoke test uses <code>ReviewOutput::default()</code>. Added <code>#[derive(Default)]</code> to <code>ReviewOutput</code>.
   </div>
 
-  <div class="entry">
-    <strong>Design decision:</strong> EpisodicMemoryRepo query method is <code>list_by_domain(domain, limit)</code> (not <code>recent_by_domain</code> as in the plan's Task 5 draft). I'll use the actual method name.
+  <div class="entry done">
+    <strong>Design decision:</strong> EpisodicMemoryRepo query method is <code>list_by_domain(domain, limit)</code> (not <code>recent_by_domain</code> as in the plan's Task 5 draft). Used the actual method name.
   </div>
 
-  <div class="entry">
-    <strong>Design decision:</strong> For seeding collectable data in Task 6, the cheapest trigger is inserting a session via <code>session_memory_repo.upsert(session_key, content, turn_count)</code>. The collector's skip gate is: <code>!is_bootstrap && sessions.is_empty() && episodic_memories.is_empty()</code>. Since bootstrap is false when <code>last_run_at</code> is <code>Some</code> (set by <code>run_reforge</code>), seeding one session memory makes Collect yield <code>Some</code>. However, <code>session_memory.upsert</code> requires a matching <code>sessions</code> row for FK. The test harness will insert a dummy <code>sessions</code> row first.
+  <h2>Task 1 — ReforgeContextBuilder</h2>
+
+  <div class="entry done">
+    <strong>Executed as spec'd.</strong> Builder implemented with 8 required args + 14 optional chained setters. Production call site in <code>cron.rs</code> migrated cleanly. <code>app-core</code> builds without errors.
   </div>
 
-  <div class="entry tradeoff">
-    <strong>Tradeoff:</strong> The plan's <code>seed_collectable</code> helper is described as inserting via repo, but <code>session_memory.upsert</code> is simpler than constructing a full <code>SessionMemoryRow</code> with <code>SqlTs</code>. I'll use <code>upsert</code> in the harness helper.
+  <h2>Task 2 — Test Harness</h2>
+
+  <div class="entry deviation done">
+    <strong>Deviation:</strong> <code>common::KlyntbotError::Internal</code> does not exist. Used <code>common::KlyntbotError::Storage("...".into())</code> instead in <code>FakeReforgeHandler</code> error paths. Any error variant works for the tests; <code>Storage</code> is a generic catch-all.
+  </div>
+
+  <div class="entry deviation done">
+    <strong>Deviation:</strong> The plan placed <code>pipeline_tests.rs</code> at <code>src/pipeline_tests.rs</code>, but Rust's module system for <code>src/pipeline.rs</code> expects submodules in <code>src/pipeline/</code>. Created <code>crates/cognitive-reforge/src/pipeline/pipeline_tests.rs</code> instead.
+  </div>
+
+  <h2>Task 5 — Apply + Collect</h2>
+
+  <div class="entry deviation done">
+    <strong>Deviation:</strong> The plan's <code>collect_yields_none_on_empty_db</code> test did not account for bootstrap mode. <code>CollectPhase</code> treats <code>last_run_at = None</code> as bootstrap and returns <code>Some</code> even on an empty DB. Set <code>run.last_run_at = Some(jiff::Timestamp::now().to_string())</code> in the test to trigger the empty-db skip gate.
+  </div>
+
+  <h2>Task 6 — Full Pipeline</h2>
+
+  <div class="entry deviation done">
+    <strong>Deviation:</strong> The plan's <code>run_reforge_returns_none_when_no_new_data</code> test would fail on a fresh DB because bootstrap mode returns <code>Some</code>. Pre-seeded a previous run via <code>h.reforge_state.record_run("{}").await</code> so <code>last_run_at</code> is non-null, causing Collect to properly skip.
+  </div>
+
+  <div class="entry deviation done">
+    <strong>Deviation:</strong> The plan's <code>seed_collectable</code> helper was underspecified. Implemented it by inserting a dummy <code>sessions</code> row (required FK) and calling <code>session_memory.upsert</code>. Used <code>self.fact_repo.pool()</code> for the raw SQL insert because <code>SessionMemoryRepo</code> does not expose its pool.
+  </div>
+
+  <div class="entry tradeoff done">
+    <strong>Tradeoff:</strong> <code>SessionMemoryRepo</code> stores <code>updated_at</code> as INTEGER (epoch ms) while <code>list_since</code> binds an RFC 3339 TEXT timestamp. SQLite coercion means the comparison behaves differently than intended, but the existing production code relies on this behavior. The test harness works with it without modification.
+  </div>
+
+  <h2>Task 7 — Final Verification</h2>
+
+  <div class="entry done">
+    <strong>Results:</strong>
+    <ul>
+      <li><code>cargo nextest run -p cognitive-reforge</code> — <strong>37/37 passed</strong></li>
+      <li><code>cargo nextest run -p cognitive</code> — <strong>26/26 passed</strong></li>
+      <li><code>cargo build --workspace</code> — <strong>clean</strong></li>
+      <li><code>cargo clippy -p cognitive-reforge -p app-core</code> — <strong>no new warnings</strong> (all pre-existing)</li>
+      <li><code>cargo machete</code> — <strong>no orphaned deps</strong> in cognitive facade</li>
+    </ul>
+  </div>
+
+  <h2>Open Questions</h2>
+
+  <div class="entry question">
+    <strong>SQLite type mismatch in <code>session_memory.list_since</code>:</strong> <code>updated_at</code> is INTEGER (epoch ms) but the query binds a TEXT RFC 3339 <code>since</code> parameter. Should this be normalized? It hasn't caused visible issues, but it's a latent bug if SQLite coercion rules ever change behavior.
   </div>
 
 </body>
