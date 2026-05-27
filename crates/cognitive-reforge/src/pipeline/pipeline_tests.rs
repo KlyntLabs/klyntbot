@@ -200,3 +200,113 @@ async fn narrate_sets_narrative_and_falls_back_on_error() {
     assert!(run2.narrative.contains("partial results"));
     assert!(run2.result.phase_errors.iter().any(|e| e.starts_with("narrate:")));
 }
+
+// --- Layer-1: None-guard phases -------------------------------------------------
+
+struct FakeCrossCli(u32);
+#[async_trait]
+impl crate::CrossCliPhaseRunner for FakeCrossCli {
+    async fn run_cross_cli_transfer(&self, _: &str) -> common::Result<u32> {
+        Ok(self.0)
+    }
+}
+
+struct FakeSkillDiscovery(u32);
+#[async_trait]
+impl crate::SkillDiscoveryRunner for FakeSkillDiscovery {
+    async fn run_skill_discovery(&self, _: &str) -> common::Result<u32> {
+        Ok(self.0)
+    }
+}
+
+#[tokio::test]
+async fn cross_cli_skips_when_runner_absent() {
+    let h = ReforgeTestHarness::new().await;
+    let ctx = h.ctx(); // cross_cli_runner = None
+    let mut run = ReforgeRun::default();
+    seed_collected(&mut run);
+
+    CrossCliPhase.run(&ctx, &mut run).await;
+
+    assert_eq!(run.result.cross_cli_promoted, 0);
+    assert!(run.result.phase_errors.is_empty());
+}
+
+#[tokio::test]
+async fn skill_discovery_skips_when_runner_absent() {
+    let h = ReforgeTestHarness::new().await;
+    let ctx = h.ctx();
+    let mut run = ReforgeRun::default();
+    seed_collected(&mut run);
+
+    SkillDiscoveryPhase.run(&ctx, &mut run).await;
+
+    assert_eq!(run.result.skills_proposed, 0);
+    assert!(run.result.phase_errors.is_empty());
+}
+
+#[tokio::test]
+async fn optimize_skips_when_bridge_absent() {
+    let h = ReforgeTestHarness::new().await;
+    let ctx = h.ctx(); // autotuner_bridge = None
+    let mut run = ReforgeRun::default();
+    seed_collected(&mut run);
+
+    OptimizePhase.run(&ctx, &mut run).await;
+
+    assert!(!run.result.champion_promoted);
+    assert!(!run.result.regression_detected);
+    assert!(run.result.phase_errors.is_empty());
+}
+
+#[tokio::test]
+async fn graph_consolidation_skips_when_handler_absent() {
+    let h = ReforgeTestHarness::new().await;
+    let ctx = h.ctx(); // graph_enrichment_handler = None
+    let mut run = ReforgeRun::default();
+    seed_collected(&mut run);
+
+    GraphConsolidationPhase.run(&ctx, &mut run).await;
+
+    assert_eq!(run.result.entities_merged, 0);
+    assert!(run.result.phase_errors.is_empty());
+}
+
+#[tokio::test]
+async fn community_intelligence_skips_when_handler_absent() {
+    let h = ReforgeTestHarness::new().await;
+    let ctx = h.ctx(); // community_intelligence_handler = None
+    let mut run = ReforgeRun::default();
+    seed_collected(&mut run);
+
+    CommunityIntelligencePhase.run(&ctx, &mut run).await;
+
+    assert_eq!(run.result.communities_renamed, 0);
+    assert!(run.result.phase_errors.is_empty());
+}
+
+#[tokio::test]
+async fn cross_cli_records_promoted_when_runner_present() {
+    let h = ReforgeTestHarness::new().await;
+    let runner = FakeCrossCli(3);
+    let ctx = h.ctx_builder().cross_cli_runner(&runner).build();
+    let mut run = ReforgeRun::default();
+    seed_collected(&mut run);
+
+    CrossCliPhase.run(&ctx, &mut run).await;
+
+    assert_eq!(run.result.cross_cli_promoted, 3);
+}
+
+#[tokio::test]
+async fn skill_discovery_records_proposed_when_runner_present() {
+    let h = ReforgeTestHarness::new().await;
+    let runner = FakeSkillDiscovery(2);
+    let ctx = h.ctx_builder().skill_discovery_runner(&runner).build();
+    let mut run = ReforgeRun::default();
+    seed_collected(&mut run);
+
+    SkillDiscoveryPhase.run(&ctx, &mut run).await;
+
+    assert_eq!(run.result.skills_proposed, 2);
+}
