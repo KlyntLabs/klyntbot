@@ -61,8 +61,17 @@ async fn full_lifecycle_spawn_list_resume_kill() {
     assert_eq!(r2.agent_id, r1.agent_id);
 
     // 4. turns_used_total should have accumulated across both runs.
-    let row = repos.subagent_instances.get(&r1.agent_id).await.unwrap().unwrap();
-    assert!(row.turns_used_total >= 2, "expected at least 2 total turns, got {}", row.turns_used_total);
+    let row = repos
+        .subagent_instances
+        .get(&r1.agent_id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(
+        row.turns_used_total >= 2,
+        "expected at least 2 total turns, got {}",
+        row.turns_used_total
+    );
 
     // 5. Kill should flip to killed.
     let r3 = rt.kill(&r1.agent_id).await.unwrap();
@@ -77,7 +86,11 @@ async fn full_lifecycle_spawn_list_resume_kill() {
         .await;
     assert!(err.is_err());
     let msg = err.unwrap_err().to_string();
-    assert!(msg.contains("not resumable"), "expected 'not resumable' error, got: {}", msg);
+    assert!(
+        msg.contains("not resumable"),
+        "expected 'not resumable' error, got: {}",
+        msg
+    );
 }
 
 #[tokio::test]

@@ -22,10 +22,7 @@ pub use storage;
 pub use tools;
 
 // Re-export commonly used types for convenience
-pub use agent::{
-    AgentEvent, AgentLoop, ProgressHandlerImpl, StreamingHandle,
-    SubagentManager,
-};
+pub use agent::{AgentEvent, AgentLoop, ProgressHandlerImpl, StreamingHandle, SubagentManager};
 pub use bus::{InboundMessage, MessageBus, OutboundMessage};
 pub use channels::{Channel, ChannelManager, DynChannel};
 pub use common::error;

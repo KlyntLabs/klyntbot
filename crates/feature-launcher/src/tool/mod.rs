@@ -52,11 +52,7 @@ impl LauncherTool {
     }
 
     #[action(name = "apply_window")]
-    async fn apply_window(
-        &self,
-        params: ApplyWindowParams,
-        _ctx: (),
-    ) -> Result<String> {
+    async fn apply_window(&self, params: ApplyWindowParams, _ctx: ()) -> Result<String> {
         let action = parse_window_action(&params.action)?;
         crate::window_manager().execute(&action)?;
         Ok("{\"status\":\"ok\"}".to_string())

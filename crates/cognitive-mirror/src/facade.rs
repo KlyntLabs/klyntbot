@@ -114,7 +114,10 @@ impl MirrorFacade {
     }
 
     /// Attach a [`TextEmbedder`](cognitive_memory::embedder::TextEmbedder) for semantic snippet similarity in voice echo.
-    pub fn with_text_embedder(mut self, embedder: Arc<dyn cognitive_memory::embedder::TextEmbedder>) -> Self {
+    pub fn with_text_embedder(
+        mut self,
+        embedder: Arc<dyn cognitive_memory::embedder::TextEmbedder>,
+    ) -> Self {
         self.text_embedder = Some(embedder);
         self
     }

@@ -105,11 +105,7 @@ impl TemporalTool {
 
     /// Find when a subject+predicate was first mentioned.
     #[action(name = "first_mention")]
-    async fn first_mention(
-        &self,
-        params: FirstMentionParams,
-        _ctx: (),
-    ) -> Result<String> {
+    async fn first_mention(&self, params: FirstMentionParams, _ctx: ()) -> Result<String> {
         let result = self
             .service
             .first_mention(&params.subject, &params.predicate)
@@ -130,11 +126,7 @@ impl TemporalTool {
 
     /// Return full version history of a fact (newest first).
     #[action(name = "change_history")]
-    async fn change_history(
-        &self,
-        params: ChangeHistoryParams,
-        _ctx: (),
-    ) -> Result<String> {
+    async fn change_history(&self, params: ChangeHistoryParams, _ctx: ()) -> Result<String> {
         let history = self
             .service
             .get_fact_history(&params.subject, &params.predicate)
@@ -153,11 +145,7 @@ impl TemporalTool {
 
     /// Find competing truths — active facts with the same key but different values.
     #[action(name = "competing_truths")]
-    async fn competing_truths(
-        &self,
-        params: CompetingTruthsParams,
-        _ctx: (),
-    ) -> Result<String> {
+    async fn competing_truths(&self, params: CompetingTruthsParams, _ctx: ()) -> Result<String> {
         let truths = self
             .service
             .competing_truths(&params.subject, &params.predicate)
@@ -182,11 +170,7 @@ impl TemporalTool {
 
     /// Compute a knowledge diff between two timestamps.
     #[action(name = "knowledge_diff")]
-    async fn knowledge_diff(
-        &self,
-        params: KnowledgeDiffParams,
-        _ctx: (),
-    ) -> Result<String> {
+    async fn knowledge_diff(&self, params: KnowledgeDiffParams, _ctx: ()) -> Result<String> {
         let domains_vec: Option<Vec<&str>> = params.domain.as_ref().map(|d| vec![d.as_str()]);
         let diff = self
             .service
@@ -199,11 +183,7 @@ impl TemporalTool {
 
     /// Find decision points where the user changed their mind.
     #[action(name = "decision_points")]
-    async fn decision_points(
-        &self,
-        params: DecisionPointsParams,
-        _ctx: (),
-    ) -> Result<String> {
+    async fn decision_points(&self, params: DecisionPointsParams, _ctx: ()) -> Result<String> {
         let limit = params.limit.unwrap_or(10) as usize;
         let points = self
             .service

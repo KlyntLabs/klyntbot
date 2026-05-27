@@ -14,7 +14,6 @@ pub struct ActivationConfig {
     pub max_active_skills: usize,
 }
 
-
 pub(crate) struct ConditionalSkill {
     pub name: String,
     pub glob_set: GlobSet,

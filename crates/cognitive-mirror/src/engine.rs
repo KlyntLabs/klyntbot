@@ -14,9 +14,8 @@ use tokio_util::sync::CancellationToken;
 
 use crate::{
     sources::{
-        ApprovalHistorySource, ConfigArchiverSource, CostCeilingSource,
-        MetaRuleSignalSource, RoutingSignalSource,
-        TaskFocusPatternSource, TrialPreviewSource,
+        ApprovalHistorySource, ConfigArchiverSource, CostCeilingSource, MetaRuleSignalSource,
+        RoutingSignalSource, TaskFocusPatternSource, TrialPreviewSource,
     },
     AutotunerBridge, MirrorFacade, MirrorRepo, NarrativeHandler,
 };

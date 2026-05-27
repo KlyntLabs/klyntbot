@@ -12,12 +12,8 @@ fn every_default_skill_filename_corresponds_to_registered_feature_skill() {
 
     // Hardcoded DEFAULT_SKILLS filenames (must match crates/skill-system/src/store.rs).
     // The skill-name is the filename minus ".md".
-    let default_skill_names: Vec<&str> = vec![
-        "task-management",
-        "automation",
-        "notebook",
-        "learning",
-    ];
+    let default_skill_names: Vec<&str> =
+        vec!["task-management", "automation", "notebook", "learning"];
 
     // Skills that are pure orchestrators without a corresponding AiFeature crate.
     // These are valid DEFAULT_SKILLS entries that don't need feature registration.

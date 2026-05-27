@@ -43,7 +43,6 @@ impl ChatTestHarness {
             .expect("test AppCore should build");
         (Arc::new(core), emitter_clone)
     }
-
 }
 
 #[cfg(test)]

@@ -28,7 +28,11 @@ impl GTLinkRepo for SqliteGTLinkRepo {
     }
 
     async fn link_batch(&self, links: &[(String, String)]) -> Result<()> {
-        let mut tx = self.pool.begin().await.map_err(cognitive_schema::map_sqlx)?;
+        let mut tx = self
+            .pool
+            .begin()
+            .await
+            .map_err(cognitive_schema::map_sqlx)?;
         for (entity_id, tree_node_id) in links {
             sqlx::query(
                 "INSERT OR IGNORE INTO entity_tree_links (entity_id, tree_node_id) VALUES (?1, ?2)",
@@ -122,7 +126,11 @@ impl GTLinkRepo for SqliteGTLinkRepo {
         source_entity_id: &str,
         target_entity_id: &str,
     ) -> Result<()> {
-        let mut tx = self.pool.begin().await.map_err(cognitive_schema::map_sqlx)?;
+        let mut tx = self
+            .pool
+            .begin()
+            .await
+            .map_err(cognitive_schema::map_sqlx)?;
 
         sqlx::query(
             "INSERT OR IGNORE INTO entity_tree_links (entity_id, tree_node_id, created_at)

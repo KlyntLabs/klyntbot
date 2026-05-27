@@ -97,7 +97,7 @@ mod tests {
 #[cfg(test)]
 mod framing_tests {
     use super::*;
-    use tokio::io::{AsyncWriteExt, duplex};
+    use tokio::io::{duplex, AsyncWriteExt};
 
     fn sample_frame() -> BridgeFrame {
         BridgeFrame {

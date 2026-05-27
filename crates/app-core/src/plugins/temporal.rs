@@ -44,18 +44,19 @@ impl AppCorePlugin for TemporalPlugin {
 
     async fn init(&self, ctx: &mut PluginContext) -> common::Result<()> {
         let repos = &ctx.deps.repos;
-        let domain_event_bus = ctx.deps.domain_event_bus.as_ref().ok_or_else(|| {
-            common::KlyntbotError::Storage("no domain event bus".into())
-        })?;
+        let domain_event_bus = ctx
+            .deps
+            .domain_event_bus
+            .as_ref()
+            .ok_or_else(|| common::KlyntbotError::Storage("no domain event bus".into()))?;
         let pool = ctx.deps.storage_pool.clone();
 
         let fire_store = FireStore::new(repos.scheduled_fires.clone());
         let bridge = CronBridge::new(repos.cron.clone(), fire_store.clone());
 
-        bridge
-            .reconcile_all()
-            .await
-            .map_err(|e| common::KlyntbotError::Storage(format!("TemporalScheduler cron reconcile failed: {e}")))?;
+        bridge.reconcile_all().await.map_err(|e| {
+            common::KlyntbotError::Storage(format!("TemporalScheduler cron reconcile failed: {e}"))
+        })?;
 
         // Clone before the bridge is moved into the scheduler.
         let bridge_for_appcore = bridge.clone();
@@ -127,7 +128,6 @@ impl AppCorePlugin for TemporalPlugin {
 
         Ok(())
     }
-
 }
 
 /// Start the TemporalScheduler firing loop. Called from `init::init_app` *after*

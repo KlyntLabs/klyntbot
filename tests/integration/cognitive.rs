@@ -926,8 +926,8 @@ impl klyntbot::cognitive::services::reforge::ReforgeHandler for MockReforgeHandl
 #[tokio::test]
 async fn test_reforge_cycle_end_to_end() {
     use klyntbot::cognitive::repos::{EpisodicMemoryRepo, ProceduralRuleRepo, SemanticFactRepo};
-    use klyntbot::cognitive::services::reforge::{run_reforge, ReforgeContext, ReforgeRun};
     use klyntbot::cognitive::services::reforge::skill_files::SkillFileManager;
+    use klyntbot::cognitive::services::reforge::{run_reforge, ReforgeContext, ReforgeRun};
     use klyntbot::cognitive::types::EpisodicMemory;
     use klyntbot::storage::repos::{ReforgeStateRepo, SkillVersionRepo};
     use klyntbot::storage::SessionMemoryRepo;
@@ -1124,8 +1124,8 @@ impl klyntbot::cognitive::services::reforge::AutotunerBridge for MockAutotunerBr
 #[tokio::test]
 async fn test_reforge_phase6_with_autotuner_bridge() {
     use klyntbot::cognitive::repos::{EpisodicMemoryRepo, ProceduralRuleRepo, SemanticFactRepo};
-    use klyntbot::cognitive::services::reforge::{run_reforge, ReforgeContext, ReforgeRun};
     use klyntbot::cognitive::services::reforge::skill_files::SkillFileManager;
+    use klyntbot::cognitive::services::reforge::{run_reforge, ReforgeContext, ReforgeRun};
     use klyntbot::cognitive::types::EpisodicMemory;
     use klyntbot::storage::repos::{ReforgeStateRepo, SkillVersionRepo};
     use klyntbot::storage::SessionMemoryRepo;
@@ -1259,8 +1259,8 @@ async fn test_reforge_with_feedback_signals() {
         CoActivationRepo, EpisodicMemoryRepo, EventLogRepo, ProceduralRuleRepo, SemanticFactRepo,
     };
     use klyntbot::cognitive::services::reforge::collector::FeedbackSources;
-    use klyntbot::cognitive::services::reforge::{run_reforge, ReforgeContext, ReforgeRun};
     use klyntbot::cognitive::services::reforge::skill_files::SkillFileManager;
+    use klyntbot::cognitive::services::reforge::{run_reforge, ReforgeContext, ReforgeRun};
     use klyntbot::cognitive::types::EpisodicMemory;
     use klyntbot::storage::repos::{ReforgeStateRepo, SkillVersionRepo};
     use klyntbot::storage::{ReforgeSuggestionRepo, SessionMemoryRepo};

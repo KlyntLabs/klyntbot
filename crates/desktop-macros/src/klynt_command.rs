@@ -1,6 +1,6 @@
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
-use syn::{parse2, FnArg, ItemFn, Pat, Type, Visibility};
+use syn::{FnArg, ItemFn, Pat, Type, Visibility, parse2};
 
 use crate::{errors::*, parse::ParsedCommand};
 

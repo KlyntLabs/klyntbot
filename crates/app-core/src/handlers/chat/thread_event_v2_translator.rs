@@ -20,7 +20,11 @@ pub fn agent_event_to_thread_event(
             session_key,
             data,
         },
-        agent::AgentEvent::ToolStart { name, agent: tool_agent, .. } => ThreadEvent::ToolStart {
+        agent::AgentEvent::ToolStart {
+            name,
+            agent: tool_agent,
+            ..
+        } => ThreadEvent::ToolStart {
             generation,
             session_key,
             name,
@@ -42,7 +46,9 @@ pub fn agent_event_to_thread_event(
             success,
             duration_ms,
             result: result.clone(),
-            estimated_tokens: result.as_ref().map(|r| (r.len() as u32).saturating_add(3) / 4),
+            estimated_tokens: result
+                .as_ref()
+                .map(|r| (r.len() as u32).saturating_add(3) / 4),
             agent: tool_agent,
         },
         agent::AgentEvent::EntityCreated(card) => ThreadEvent::EntityCreated {
@@ -146,15 +152,17 @@ pub fn agent_event_to_thread_event(
             query,
             results_count,
         },
-        agent::AgentEvent::SkillLoaded { name, trigger, agent: skill_agent } => {
-            ThreadEvent::SkillLoaded {
-                generation,
-                session_key,
-                name,
-                trigger,
-                agent: skill_agent,
-            }
-        }
+        agent::AgentEvent::SkillLoaded {
+            name,
+            trigger,
+            agent: skill_agent,
+        } => ThreadEvent::SkillLoaded {
+            generation,
+            session_key,
+            name,
+            trigger,
+            agent: skill_agent,
+        },
         agent::AgentEvent::LearningEvent { event_type, detail } => ThreadEvent::LearningEvent {
             generation,
             session_key,
@@ -248,10 +256,16 @@ pub fn agent_event_to_thread_event(
             predicate,
         },
         // Terminal events — these map to the `Terminal` variant.
-        agent::AgentEvent::Done { content, message_id } => ThreadEvent::Terminal {
+        agent::AgentEvent::Done {
+            content,
+            message_id,
+        } => ThreadEvent::Terminal {
             generation,
             session_key,
-            kind: TerminalKind::Done { content, message_id },
+            kind: TerminalKind::Done {
+                content,
+                message_id,
+            },
             transparency: None, // populated by relay before emit if available
         },
         agent::AgentEvent::Error { message } => ThreadEvent::Terminal {

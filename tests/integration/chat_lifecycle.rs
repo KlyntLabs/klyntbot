@@ -121,7 +121,11 @@ async fn both_runtimes_share_active_turns_map() {
     let (core, _emitter) = ChatTestHarness::new_real().await;
     let assistant = std::sync::Arc::clone(&core).assistant_runtime();
 
-    assert_eq!(assistant.active_turns().len(), 0, "no active turns in fresh harness");
+    assert_eq!(
+        assistant.active_turns().len(),
+        0,
+        "no active turns in fresh harness"
+    );
 }
 
 /// Assistant runtime `start_turn` returns the expected outcome shape.
@@ -142,9 +146,14 @@ async fn assistant_runtime_start_turn_returns_outcome() {
         .expect("start_turn");
 
     assert_eq!(outcome.handle.thread_id, "test:assistant-runtime");
-    assert!(outcome.user_message.is_some(), "assistant mode returns user_message");
-    assert!(outcome.stream_info.is_some(), "assistant mode returns stream_info");
-
+    assert!(
+        outcome.user_message.is_some(),
+        "assistant mode returns user_message"
+    );
+    assert!(
+        outcome.stream_info.is_some(),
+        "assistant mode returns stream_info"
+    );
 }
 
 /// Assistant runtime `cancel_turn` removes the turn from active_turns.

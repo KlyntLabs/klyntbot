@@ -92,10 +92,7 @@ impl SubagentInstanceRepo {
         .map_err(|e| common::KlyntbotError::Storage(format!("subagent list_by_parent: {e}")))
     }
 
-    pub async fn list_by_status(
-        &self,
-        status: SubagentStatus,
-    ) -> Result<Vec<SubagentInstanceRow>> {
+    pub async fn list_by_status(&self, status: SubagentStatus) -> Result<Vec<SubagentInstanceRow>> {
         sqlx::query_as::<_, SubagentInstanceRow>(
             "SELECT * FROM subagent_instances WHERE status = ?1 ORDER BY updated_at DESC",
         )
@@ -119,17 +116,11 @@ impl SubagentInstanceRepo {
     /// - From `running`: any non-running state.
     /// - From `idle` or `stopped_turn`: to `running` (on resume) or any terminal.
     /// Returns `Err(KlyntbotError::Storage)` if the transition is rejected.
-    pub async fn update_status(
-        &self,
-        agent_id: &str,
-        next: SubagentStatus,
-    ) -> Result<()> {
+    pub async fn update_status(&self, agent_id: &str, next: SubagentStatus) -> Result<()> {
         let current = self
             .get(agent_id)
             .await?
-            .ok_or_else(|| {
-                common::KlyntbotError::StorageNotFound(format!("subagent {agent_id}"))
-            })?
+            .ok_or_else(|| common::KlyntbotError::StorageNotFound(format!("subagent {agent_id}")))?
             .status_enum();
         if current.is_terminal() {
             return Err(common::KlyntbotError::Storage(format!(
@@ -180,11 +171,7 @@ impl SubagentInstanceRepo {
     }
 
     /// Store the last assistant text (or fallback) when a cap-hit occurs.
-    pub async fn set_partial_summary(
-        &self,
-        agent_id: &str,
-        summary: &str,
-    ) -> Result<()> {
+    pub async fn set_partial_summary(&self, agent_id: &str, summary: &str) -> Result<()> {
         sqlx::query(
             r#"
             UPDATE subagent_instances
@@ -198,7 +185,9 @@ impl SubagentInstanceRepo {
         .bind(agent_id)
         .execute(&self.pool)
         .await
-        .map_err(|e| common::KlyntbotError::Storage(format!("subagent set_partial_summary: {e}")))?;
+        .map_err(|e| {
+            common::KlyntbotError::Storage(format!("subagent set_partial_summary: {e}"))
+        })?;
         Ok(())
     }
 
@@ -246,13 +235,11 @@ mod tests {
     }
 
     async fn insert_parent_session(pool: &SqlitePool, key: &str) {
-        sqlx::query(
-            "INSERT INTO sessions (key, mode) VALUES (?1, 'subagent')",
-        )
-        .bind(key)
-        .execute(pool)
-        .await
-        .unwrap();
+        sqlx::query("INSERT INTO sessions (key, mode) VALUES (?1, 'subagent')")
+            .bind(key)
+            .execute(pool)
+            .await
+            .unwrap();
     }
 
     #[tokio::test]
@@ -357,7 +344,9 @@ mod tests {
         .await
         .unwrap();
 
-        repo.update_status("ag1", SubagentStatus::StoppedTurn).await.unwrap();
+        repo.update_status("ag1", SubagentStatus::StoppedTurn)
+            .await
+            .unwrap();
         let row = repo.get("ag1").await.unwrap().unwrap();
         assert_eq!(row.status, "stopped_turn");
     }
@@ -381,9 +370,14 @@ mod tests {
         .await
         .unwrap();
 
-        repo.update_status("ag1", SubagentStatus::Killed).await.unwrap();
+        repo.update_status("ag1", SubagentStatus::Killed)
+            .await
+            .unwrap();
         let err = repo.update_status("ag1", SubagentStatus::Running).await;
-        assert!(err.is_err(), "must reject transition out of terminal Killed");
+        assert!(
+            err.is_err(),
+            "must reject transition out of terminal Killed"
+        );
     }
 
     #[tokio::test]

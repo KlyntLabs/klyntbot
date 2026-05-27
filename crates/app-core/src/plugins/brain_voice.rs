@@ -43,5 +43,4 @@ impl AppCorePlugin for BrainVoicePlugin {
 
         Ok(())
     }
-
 }

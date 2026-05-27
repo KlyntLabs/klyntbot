@@ -128,7 +128,10 @@ impl<'a> PluginContext<'a> {
     }
 
     /// Add an event translator for `DomainEvent → AiSignal` conversion.
-    pub fn add_event_translator(&mut self, translator: impl Fn(&DomainEvent) -> Option<ai_core::AiSignal> + Send + Sync + 'static) {
+    pub fn add_event_translator(
+        &mut self,
+        translator: impl Fn(&DomainEvent) -> Option<ai_core::AiSignal> + Send + Sync + 'static,
+    ) {
         self.event_translators.push(Arc::new(translator));
     }
 
@@ -149,12 +152,18 @@ impl<'a> PluginContext<'a> {
     }
 
     /// Register an AI feature in the workspace registry.
-    pub fn register_ai_feature(&mut self, f: impl Fn(&mut ai_core::AiFeatureRegistry) + Send + Sync + 'static) {
+    pub fn register_ai_feature(
+        &mut self,
+        f: impl Fn(&mut ai_core::AiFeatureRegistry) + Send + Sync + 'static,
+    ) {
         self.ai_feature_registrations.push(Box::new(f));
     }
 
     /// Register metrics in the workspace metric registry.
-    pub fn register_metrics(&mut self, f: impl Fn(&mut ai_core::MetricRegistry) + Send + Sync + 'static) {
+    pub fn register_metrics(
+        &mut self,
+        f: impl Fn(&mut ai_core::MetricRegistry) + Send + Sync + 'static,
+    ) {
         self.metric_registrations.push(Box::new(f));
     }
 
@@ -177,7 +186,10 @@ impl<'a> PluginContext<'a> {
     }
 
     /// Spawn a background task tied to the app lifecycle.
-    pub fn spawn_background(&mut self, task: impl std::future::Future<Output = ()> + Send + 'static) {
+    pub fn spawn_background(
+        &mut self,
+        task: impl std::future::Future<Output = ()> + Send + 'static,
+    ) {
         let handle = tokio::spawn(task);
         self.background_spawns.push(handle);
     }
@@ -196,13 +208,16 @@ impl<'a> PluginContext<'a> {
 
     /// Require the domain event bus or return an error.
     pub fn require_domain_bus(&self) -> common::Result<Arc<bus::DomainEventBus>> {
-        self.deps.domain_event_bus.clone().ok_or_else(|| {
-            common::KlyntbotError::Storage("no domain event bus".into())
-        })
+        self.deps
+            .domain_event_bus
+            .clone()
+            .ok_or_else(|| common::KlyntbotError::Storage("no domain event bus".into()))
     }
 
     /// Require the activity ingestion service or return an error.
-    pub fn require_activity_svc(&self) -> common::Result<Arc<activity_log::ActivityIngestionService>> {
+    pub fn require_activity_svc(
+        &self,
+    ) -> common::Result<Arc<activity_log::ActivityIngestionService>> {
         self.host
             .get::<activity_log::ActivityIngestionService>()
             .ok_or_else(|| {
@@ -213,14 +228,20 @@ impl<'a> PluginContext<'a> {
     }
 
     /// Require the user situation or return an error.
-    pub fn require_user_situation(&self) -> common::Result<Arc<tokio::sync::Mutex<cognitive::situation::UserSituation>>> {
-        self.deps.user_situation.clone().ok_or_else(|| {
-            common::KlyntbotError::Storage("no user situation".into())
-        })
+    pub fn require_user_situation(
+        &self,
+    ) -> common::Result<Arc<tokio::sync::Mutex<cognitive::situation::UserSituation>>> {
+        self.deps
+            .user_situation
+            .clone()
+            .ok_or_else(|| common::KlyntbotError::Storage("no user situation".into()))
     }
 
     /// Call a closure with the embedding engine and vector store if both are available.
-    pub fn with_embedding<T>(&self, f: impl Fn(Arc<EmbeddingEngine>, VectorStore) -> T) -> Option<T> {
+    pub fn with_embedding<T>(
+        &self,
+        f: impl Fn(Arc<EmbeddingEngine>, VectorStore) -> T,
+    ) -> Option<T> {
         let engine = self.deps.embedding_engine.as_ref()?;
         let vs = self.deps.vector_store.as_ref()?;
         Some(f(Arc::clone(engine), vs.clone()))

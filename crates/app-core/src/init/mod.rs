@@ -1,8 +1,8 @@
 mod agent;
 pub mod ai_pipeline;
 mod channels;
-pub mod event_channels;
 pub(crate) mod cron;
+pub mod event_channels;
 mod storage;
 
 use std::sync::Arc;
@@ -61,14 +61,7 @@ impl AppCore {
     /// When `event_emitter` is `Some`, entity update events from MCP tool
     /// mutations are forwarded to the frontend. When `None`, a no-op emitter
     /// is used (CLI / standalone MCP server).
-    #[tracing::instrument(
-        skip(
-            notification_sender,
-            event_emitter,
-            provider_override
-        ),
-        err
-    )]
+    #[tracing::instrument(skip(notification_sender, event_emitter, provider_override), err)]
     pub async fn init_with_sender(
         mode: common::AppMode,
         config_override: Option<config::Config>,
@@ -202,7 +195,9 @@ impl AppCore {
         // and cognitive repos are all initialized by their respective plugins.
 
         // ── Phase 3: Shared services (needed by plugins + agent) ─────────
-        let user_situation = Arc::new(tokio::sync::Mutex::new(::cognitive::situation::UserSituation::default()));
+        let user_situation = Arc::new(tokio::sync::Mutex::new(
+            ::cognitive::situation::UserSituation::default(),
+        ));
         let active_view: Arc<tokio::sync::RwLock<Option<context_engine::ActiveView>>> =
             Arc::new(tokio::sync::RwLock::new(None));
         let (pipeline_broadcast_tx, _) =
@@ -309,7 +304,9 @@ impl AppCore {
             .get::<crate::plugins::cognitive::CognitiveInitResult>();
         let cognitive_fact_repo = cog_init.as_ref().map(|r| r.semantic_fact_repo.clone());
         let cognitive_entity_repo = cog_init.as_ref().map(|r| r.entity_repo.clone());
-        let cognitive_embedder = cog_init.as_ref().and_then(|r| r.cognitive_fact_embedder.clone());
+        let cognitive_embedder = cog_init
+            .as_ref()
+            .and_then(|r| r.cognitive_fact_embedder.clone());
 
         // Tool kit + hook engine were built by BashToolkitPlugin in Phase 4 and
         // stashed in the FeatureHost; inject them into the agent at construction
@@ -393,17 +390,19 @@ impl AppCore {
             user_situation: Some(user_situation.clone()),
 
             consecutive_coaching_ignores: Arc::new(std::sync::atomic::AtomicI32::new(0)),
-            event_emitter: event_emitter.clone().unwrap_or_else(|| Arc::new(NoopEmitter)),
-
-
-
+            event_emitter: event_emitter
+                .clone()
+                .unwrap_or_else(|| Arc::new(NoopEmitter)),
 
             host: host_result.host.clone(),
             assistant_runtime: std::sync::OnceLock::new(),
         };
 
         // Run plugin post-init hooks now that AppCore is assembled.
-        host_result.run_post_init(&core).await.map_err(|e| e.to_string())?;
+        host_result
+            .run_post_init(&core)
+            .await
+            .map_err(|e| e.to_string())?;
 
         // Start the TemporalScheduler now that every plugin's post_init has
         // registered its cron handlers. Starting earlier (in TemporalPlugin::init)
@@ -420,9 +419,7 @@ impl AppCore {
         let mirror_result = host_result
             .host
             .get::<crate::plugins::mirror::MirrorInitResult>();
-        let mirror_shutdown = mirror_result
-            .as_ref()
-            .map(|r| r.shutdown.clone());
+        let mirror_shutdown = mirror_result.as_ref().map(|r| r.shutdown.clone());
 
         // Store mirror shutdown token in FeatureHost for shutdown() to find.
         if let Some(token) = mirror_shutdown {

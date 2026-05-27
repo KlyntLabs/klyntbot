@@ -4,12 +4,12 @@ use std::collections::HashMap;
 
 use tracing::debug;
 
-use cognitive_memory::repos::{
-    load_user_model, EpisodicMemoryRepo, ProceduralRuleRepo, SemanticFactRepo, RULE_DOMAINS,
-};
 use crate::skill_files::{SkillFile, SkillFileManager};
 use crate::types::{
     BehavioralMetrics, GraphHealthMetrics, ReforgeCollected, RoutingSummary, SessionContext,
+};
+use cognitive_memory::repos::{
+    load_user_model, EpisodicMemoryRepo, ProceduralRuleRepo, SemanticFactRepo, RULE_DOMAINS,
 };
 
 /// Scan skill files on disk and record a new version row for any file whose

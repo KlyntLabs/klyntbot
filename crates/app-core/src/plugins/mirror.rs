@@ -32,13 +32,9 @@ impl AppCorePlugin for MirrorPlugin {
                 .unwrap_or(&config.agents.defaults.model)
                 .to_string()
         };
-        let mirror_repo =
-            ::cognitive::mirror::MirrorRepo::new(ctx.deps.storage_pool.clone());
-        let narrative_handler: Option<Arc<dyn ::cognitive::mirror::NarrativeHandler>> = ctx
-            .deps
-            .cognitive_provider
-            .as_ref()
-            .map(|cp| {
+        let mirror_repo = ::cognitive::mirror::MirrorRepo::new(ctx.deps.storage_pool.clone());
+        let narrative_handler: Option<Arc<dyn ::cognitive::mirror::NarrativeHandler>> =
+            ctx.deps.cognitive_provider.as_ref().map(|cp| {
                 Arc::new(::agent::mirror_handlers::LlmNarrativeHandler::new(
                     cp.clone(),
                     mirror_model.clone(),
@@ -127,9 +123,8 @@ impl AppCorePlugin for MirrorPlugin {
     async fn post_init(&self, app: &AppCore) -> common::Result<()> {
         if let Ok(facade) = app.mirror_facade() {
             // Wire the Mirror facade as the approval gate's suggester via bridge adapter.
-            let suggester = Arc::new(
-                crate::adapters::approval_suggester::MirrorApprovalSuggester::new(facade),
-            );
+            let suggester =
+                Arc::new(crate::adapters::approval_suggester::MirrorApprovalSuggester::new(facade));
             app.agent.set_approval_suggester(suggester);
         }
         Ok(())

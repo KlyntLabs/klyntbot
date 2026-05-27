@@ -55,8 +55,7 @@ impl ApprovalHistorySource {
     }
 
     /// Record an approval resolution (no-op since legacy repo was removed).
-    pub async fn observe_resolution(&self, _request_id: &str, _decision: &str, _decided_by: &str) {
-    }
+    pub async fn observe_resolution(&self, _request_id: &str, _decision: &str, _decided_by: &str) {}
 
     /// Persist a resolved approval directly to the pattern history table.
     pub async fn persist_pattern_observation(
@@ -204,7 +203,6 @@ impl ApprovalHistorySource {
             }
         }
     }
-
 }
 
 /// Build candidate patterns for a given path with specificity weights.

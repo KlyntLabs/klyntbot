@@ -198,7 +198,11 @@ async fn narrate_sets_narrative_and_falls_back_on_error() {
     seed_collected(&mut run2);
     NarratePhase.run(&ctx2, &mut run2).await;
     assert!(run2.narrative.contains("partial results"));
-    assert!(run2.result.phase_errors.iter().any(|e| e.starts_with("narrate:")));
+    assert!(run2
+        .result
+        .phase_errors
+        .iter()
+        .any(|e| e.starts_with("narrate:")));
 }
 
 // --- Layer-1: None-guard phases -------------------------------------------------
@@ -324,12 +328,11 @@ async fn apply_stores_narrative_as_episodic_memory() {
     ApplyPhase.run(&ctx, &mut run).await;
 
     // The narrative episodic is recorded under the reforge domain.
-    let mems = h
-        .episodic_repo
-        .list_by_domain("reforge", 10)
-        .await
-        .unwrap();
-    assert!(!mems.is_empty(), "expected a reforge-domain narrative memory");
+    let mems = h.episodic_repo.list_by_domain("reforge", 10).await.unwrap();
+    assert!(
+        !mems.is_empty(),
+        "expected a reforge-domain narrative memory"
+    );
     assert!(run.result.phase_errors.is_empty());
 }
 

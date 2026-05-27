@@ -729,7 +729,9 @@ mod tests {
         assert!(result.is_some());
         let r = result.unwrap();
         assert!(
-            r.enriched_query.to_lowercase().contains("march task review"),
+            r.enriched_query
+                .to_lowercase()
+                .contains("march task review"),
             "Expected 'march task review' in enriched query: {}",
             r.enriched_query
         );

@@ -65,5 +65,4 @@ impl AppCorePlugin for BriefingPlugin {
 
         Ok(())
     }
-
 }

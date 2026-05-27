@@ -118,7 +118,8 @@ impl AppCore {
                 .unwrap_or("0000")
         );
 
-        let provider = self.cognitive_provider()
+        let provider = self
+            .cognitive_provider()
             .ok_or_else(|| ApiError::not_available("LLM provider not configured"))?;
 
         // NoteRow doesn't carry tags — fetch them separately
@@ -335,7 +336,8 @@ impl AppCore {
         let related_notes = self.fetch_related_notes(note_id).await;
         let ctx = insight_context::assemble_context(&note, &related_notes, None);
 
-        let provider = self.cognitive_provider()
+        let provider = self
+            .cognitive_provider()
             .ok_or_else(|| ApiError::not_available("LLM provider not configured"))?;
 
         let config = self.config.read().await;
@@ -500,7 +502,8 @@ impl AppCore {
         &self,
         note_id: &str,
     ) -> Result<ScenarioChallengeResponse, ApiError> {
-        let provider = self.cognitive_provider()
+        let provider = self
+            .cognitive_provider()
             .ok_or_else(|| ApiError::not_available("LLM provider not configured"))?;
 
         let note = self
@@ -583,7 +586,8 @@ impl AppCore {
         note_id: &str,
         tab: &str,
     ) -> Result<TabContent, ApiError> {
-        let provider = self.cognitive_provider()
+        let provider = self
+            .cognitive_provider()
             .ok_or_else(|| ApiError::not_available("LLM provider not configured"))?;
 
         let note = self

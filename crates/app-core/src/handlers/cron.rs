@@ -146,7 +146,10 @@ impl AppCore {
 
         // Wake the scheduler so it fires immediately instead of waiting up to 30 s.
         // The scheduler is owned by TemporalInitResult in the FeatureHost, not stored bare.
-        if let Some(temporal) = self.host.get::<crate::plugins::temporal::TemporalInitResult>() {
+        if let Some(temporal) = self
+            .host
+            .get::<crate::plugins::temporal::TemporalInitResult>()
+        {
             temporal.scheduler.wake();
         }
 

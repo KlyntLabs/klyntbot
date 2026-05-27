@@ -512,7 +512,8 @@ mod tests {
 
     #[test]
     fn test_ui_config_serde_roundtrip() {
-        let json = r#"{"ui": {"theme": "dark", "uiScale": 1.25, "notificationSoundsEnabled": false}}"#;
+        let json =
+            r#"{"ui": {"theme": "dark", "uiScale": 1.25, "notificationSoundsEnabled": false}}"#;
         let config: Config = serde_json::from_str(json).unwrap();
         assert_eq!(config.ui.theme, "dark");
         assert!((config.ui.ui_scale - 1.25).abs() < f64::EPSILON);

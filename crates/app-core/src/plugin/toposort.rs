@@ -136,15 +136,19 @@ mod tests {
 
     #[test]
     fn no_dependencies_preserves_all_plugins() {
-        let out = resolve_order(vec![MockPlugin::new("a", &[]), MockPlugin::new("b", &[])]).unwrap();
+        let out =
+            resolve_order(vec![MockPlugin::new("a", &[]), MockPlugin::new("b", &[])]).unwrap();
         assert_eq!(out.len(), 2);
     }
 
     #[test]
     fn dependency_is_ordered_before_dependent() {
         // "b" depends on "a" but is registered first; the sort must reorder.
-        let out = resolve_order(vec![MockPlugin::new("b", &["a"]), MockPlugin::new("a", &[])])
-            .unwrap();
+        let out = resolve_order(vec![
+            MockPlugin::new("b", &["a"]),
+            MockPlugin::new("a", &[]),
+        ])
+        .unwrap();
         let out = names(&out);
         let pos_a = out.iter().position(|n| *n == "a").unwrap();
         let pos_b = out.iter().position(|n| *n == "b").unwrap();
@@ -167,7 +171,10 @@ mod tests {
     fn missing_dependency_is_an_error() {
         let err = expect_err(resolve_order(vec![MockPlugin::new("a", &["ghost"])]));
         let msg = err.to_string();
-        assert!(msg.contains("ghost"), "expected dep name in error, got: {msg}");
+        assert!(
+            msg.contains("ghost"),
+            "expected dep name in error, got: {msg}"
+        );
         assert!(msg.contains("not registered"), "got: {msg}");
     }
 

@@ -56,7 +56,11 @@ impl AppCorePlugin for FocusPlugin {
         let focus_bridge: Arc<dyn feature_focus::FocusBridge> = Arc::new(NoopFocusBridge);
 
         let repo = feature_focus::FocusSessionRepo::new(ctx.deps.pool());
-        let manager = Arc::new(feature_focus::DndManager::new(repo, alarm_bridge, focus_bridge));
+        let manager = Arc::new(feature_focus::DndManager::new(
+            repo,
+            alarm_bridge,
+            focus_bridge,
+        ));
 
         if let Some(ref bus) = ctx.deps.domain_event_bus {
             crate::focus::end_subscriber::spawn_focus_end_subscriber(

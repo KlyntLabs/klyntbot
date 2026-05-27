@@ -261,7 +261,6 @@ mod tests {
         }
     }
 
-
     fn note_ref(id: &str, title: &str) -> EntityRef {
         EntityRef {
             domain: EntityDomain::Note,

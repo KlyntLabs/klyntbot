@@ -5,8 +5,8 @@
 
 use ai_core::MirrorSignalSource;
 use cognitive::mirror::sources::{
-    ConfigArchiverSource, MetaRuleSignalSource, RoutingSignalSource,
-    TaskFocusPatternSource, TrialPreviewSource,
+    ConfigArchiverSource, MetaRuleSignalSource, RoutingSignalSource, TaskFocusPatternSource,
+    TrialPreviewSource,
 };
 
 fn collect_specs() -> Vec<ai_core::MirrorSnapshotSpec> {
@@ -35,12 +35,10 @@ fn collect_specs() -> Vec<ai_core::MirrorSnapshotSpec> {
 #[test]
 fn every_declared_mirror_snapshot_has_a_registered_source() {
     // Hand-maintained list — update when adding a feature.
-    let declared_specs: Vec<(&'static str, &'static [ai_core::MirrorSnapshotSpec])> = vec![
-        (
-            "TasksFeature",
-            feature_tasks::TasksFeature::MIRROR_SNAPSHOTS,
-        ),
-    ];
+    let declared_specs: Vec<(&'static str, &'static [ai_core::MirrorSnapshotSpec])> = vec![(
+        "TasksFeature",
+        feature_tasks::TasksFeature::MIRROR_SNAPSHOTS,
+    )];
 
     let registered_specs = collect_specs();
 
@@ -61,12 +59,10 @@ fn every_declared_mirror_snapshot_has_a_registered_source() {
 fn feature_owned_sources_have_a_declaration() {
     const SYSTEM_OWNED: &[&str] = &["routing", "meta_rule", "config_archiver", "trial_preview"];
     let registered_specs = collect_specs();
-    let all_declared: Vec<&'static str> = [
-        feature_tasks::TasksFeature::MIRROR_SNAPSHOTS,
-    ]
-    .iter()
-    .flat_map(|s| s.iter().map(|spec| spec.name))
-    .collect();
+    let all_declared: Vec<&'static str> = [feature_tasks::TasksFeature::MIRROR_SNAPSHOTS]
+        .iter()
+        .flat_map(|s| s.iter().map(|spec| spec.name))
+        .collect();
 
     for spec in &registered_specs {
         if SYSTEM_OWNED.contains(&spec.name) {

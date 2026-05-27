@@ -2,13 +2,13 @@ use crate::privacy::PrivacyGuard;
 use crate::tools::shared::file_edit_event::fan_out_tool_event;
 use crate::tools::shared::fs_resolve::resolve_path;
 use crate::tools::shared::hook_emit::{fire_post_tool_use, fire_pre_tool_use};
+use async_trait::async_trait;
 use bus::DomainEventBus;
 use klynt_execpolicy::Policy;
 use klynt_sandbox::SandboxRunner;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
-use async_trait::async_trait;
 use tools_core::events::ToolEvent;
 use tools_core::{FullCtx, RoutingContext, ToolExecute, ToolParams};
 
@@ -176,9 +176,7 @@ impl BashTool {
         let tty = args.tty.unwrap_or(false);
         if (args.tty_rows.is_some() || args.tty_cols.is_some()) && !tty {
             return Err(common::KlyntbotError::Tool(
-                common::ToolError::ExecutionFailed(
-                    "tty_rows/tty_cols require tty=true".into(),
-                ),
+                common::ToolError::ExecutionFailed("tty_rows/tty_cols require tty=true".into()),
             ));
         }
         let mut warnings: Vec<String> = Vec::new();

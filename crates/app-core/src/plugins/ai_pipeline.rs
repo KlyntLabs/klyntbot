@@ -34,25 +34,27 @@ impl AppCorePlugin for AiPipelinePlugin {
             .map(|r| r.consumers.clone())
             .unwrap_or_default();
 
-        let observation_repo =
-            ::cognitive::repos::AccumulatedObservationRepo::new(ctx.deps.storage_pool.inner().clone());
-        let entity_repo = ::cognitive::repos::EntityRepo::new(ctx.deps.storage_pool.inner().clone());
+        let observation_repo = ::cognitive::repos::AccumulatedObservationRepo::new(
+            ctx.deps.storage_pool.inner().clone(),
+        );
+        let entity_repo =
+            ::cognitive::repos::EntityRepo::new(ctx.deps.storage_pool.inner().clone());
         let episodic_repo =
             ::cognitive::EpisodicMemoryRepo::new(ctx.deps.storage_pool.inner().clone());
-        let extraction_handler: Option<Arc<dyn ::cognitive::ExtractionHandler>> = ctx
-            .deps
-            .cognitive_provider
-            .as_ref()
-            .map(|cp| {
+        let extraction_handler: Option<Arc<dyn ::cognitive::ExtractionHandler>> =
+            ctx.deps.cognitive_provider.as_ref().map(|cp| {
                 let params = providers::cognitive_chat_params(&config, 4096);
-                Arc::new(::agent::cognitive_handlers::LlmExtractionHandler::new(cp.clone(), params))
-                    as Arc<dyn ::cognitive::ExtractionHandler>
+                Arc::new(::agent::cognitive_handlers::LlmExtractionHandler::new(
+                    cp.clone(),
+                    params,
+                )) as Arc<dyn ::cognitive::ExtractionHandler>
             });
         let audd_resolver: Option<Arc<dyn ::cognitive::services::extraction::ConflictResolver>> =
             ctx.deps.cognitive_provider.clone().map(|cp| {
                 let params = providers::cognitive_chat_params(&config, 1024);
-                Arc::new(::agent::cognitive_handlers::LlmConflictResolver::new(cp, params))
-                    as Arc<dyn ::cognitive::services::extraction::ConflictResolver>
+                Arc::new(::agent::cognitive_handlers::LlmConflictResolver::new(
+                    cp, params,
+                )) as Arc<dyn ::cognitive::services::extraction::ConflictResolver>
             });
         let mut ingestion_inner = ::cognitive::consumers::IngestionConsumer::new(
             observation_repo,
@@ -88,12 +90,10 @@ impl AppCorePlugin for AiPipelinePlugin {
         ctx.add_signal_consumer(Arc::new(::cognitive::pipeline::RecallCollector::new(
             cognitive_tx.clone(),
         )));
-        ctx.add_signal_consumer(Arc::new(
-            ::cognitive::pipeline::SessionCollector::new(
-                cognitive_tx.clone(),
-                ctx.deps.repos.session_memory.clone(),
-            ),
-        ));
+        ctx.add_signal_consumer(Arc::new(::cognitive::pipeline::SessionCollector::new(
+            cognitive_tx.clone(),
+            ctx.deps.repos.session_memory.clone(),
+        )));
         ctx.add_signal_consumer(Arc::new(::cognitive::pipeline::AtomCollector::new(
             cognitive_tx.clone(),
         )));
@@ -103,9 +103,9 @@ impl AppCorePlugin for AiPipelinePlugin {
 
         // Coaching signal consumer
         let (coaching_signal_tx, coaching_signal_rx) = tokio::sync::mpsc::channel(256);
-        ctx.add_signal_consumer(Arc::new(
-            feature_coaching::CoachingSignalConsumer::new(coaching_signal_tx),
-        ));
+        ctx.add_signal_consumer(Arc::new(feature_coaching::CoachingSignalConsumer::new(
+            coaching_signal_tx,
+        )));
 
         // Metric harvest consumer
         let metric_repo = ::cognitive::MetricRepo::new(ctx.deps.storage_pool.inner().clone());
@@ -115,16 +115,16 @@ impl AppCorePlugin for AiPipelinePlugin {
 
         // Activity-log normalizer consumer
         let activity_svc = ctx.require_activity_svc()?;
-        ctx.add_signal_consumer(Arc::new(
-            activity_log::NormalizerSignalConsumer::new(Arc::clone(&activity_svc)),
-        ));
+        ctx.add_signal_consumer(Arc::new(activity_log::NormalizerSignalConsumer::new(
+            Arc::clone(&activity_svc),
+        )));
 
         // Retrieval indexer
         let signal_index_repo =
             ::cognitive::AiSignalIndexRepo::new(ctx.deps.storage_pool.inner().clone());
-        ctx.add_signal_consumer(Arc::new(
-            ::cognitive::consumers::RetrievalIndexer::new(signal_index_repo),
-        ));
+        ctx.add_signal_consumer(Arc::new(::cognitive::consumers::RetrievalIndexer::new(
+            signal_index_repo,
+        )));
 
         // Build consumer list: plugin-registered + mirror consumers
         let mut consumers = ctx.signal_consumers.clone();
@@ -139,8 +139,12 @@ impl AppCorePlugin for AiPipelinePlugin {
             PluginContext::run_translators(&translators, event)
         };
 
-        let domain_event_bus =
-            Arc::clone(ctx.deps.domain_event_bus.as_ref().expect("domain event bus available"));
+        let domain_event_bus = Arc::clone(
+            ctx.deps
+                .domain_event_bus
+                .as_ref()
+                .expect("domain event bus available"),
+        );
         let base_count = ctx.signal_consumers.len();
         let router = ai_core::SignalRouter::start(domain_event_bus, consumers, translate);
         tracing::info!(
@@ -172,7 +176,12 @@ impl AppCorePlugin for AiPipelinePlugin {
                     let ops = ::cognitive::pipeline::heuristic_promote(&clusters);
                     if !ops.is_empty() {
                         ::cognitive::pipeline::execute_promotions(
-                            &ops, &repo, &rule_repo, &episodic, None, Some(&pipeline_tx),
+                            &ops,
+                            &repo,
+                            &rule_repo,
+                            &episodic,
+                            None,
+                            Some(&pipeline_tx),
                         )
                         .await;
                     }
@@ -185,55 +194,59 @@ impl AppCorePlugin for AiPipelinePlugin {
             .host
             .get::<crate::plugins::coaching::CoachingInitResult>()
             .map(|b| b.intervention_tx.clone());
-        let _coaching_service = if let (
-            Some(acc),
-            Some(det),
-            Some(router),
-            Some(fb),
-            Some(log_repo),
-        ) = (
-            ctx.host.get::<tokio::sync::Mutex<feature_coaching::SignalAccumulator>>(),
-            ctx.host.get::<tokio::sync::Mutex<feature_coaching::PatternDetector>>(),
-            ctx.host.get::<tokio::sync::Mutex<feature_coaching::InterventionRouter>>(),
-            ctx.host.get::<tokio::sync::Mutex<feature_coaching::FeedbackTracker>>(),
-            ctx.host.get::<::storage::CoachingInterventionLogRepo>(),
-        ) {
-            let log_repo = (*log_repo).clone();
-            let coaching_reasoner: Arc<dyn feature_coaching::CoachingReasonerHandler> =
-                if let Some(ref cp) = ctx.deps.cognitive_provider {
-                    let params = providers::cognitive_chat_params(&config, 1024);
-                    Arc::new(::agent::cognitive_handlers::LlmCoachingReasonerHandler::new(
-                        cp.clone(), params,
-                    ))
-                } else {
-                    Arc::new(::agent::cognitive_handlers::HeuristicCoachingReasonerHandler)
-                };
+        let _coaching_service =
+            if let (Some(acc), Some(det), Some(router), Some(fb), Some(log_repo)) = (
+                ctx.host
+                    .get::<tokio::sync::Mutex<feature_coaching::SignalAccumulator>>(),
+                ctx.host
+                    .get::<tokio::sync::Mutex<feature_coaching::PatternDetector>>(),
+                ctx.host
+                    .get::<tokio::sync::Mutex<feature_coaching::InterventionRouter>>(),
+                ctx.host
+                    .get::<tokio::sync::Mutex<feature_coaching::FeedbackTracker>>(),
+                ctx.host.get::<::storage::CoachingInterventionLogRepo>(),
+            ) {
+                let log_repo = (*log_repo).clone();
+                let coaching_reasoner: Arc<dyn feature_coaching::CoachingReasonerHandler> =
+                    if let Some(ref cp) = ctx.deps.cognitive_provider {
+                        let params = providers::cognitive_chat_params(&config, 1024);
+                        Arc::new(
+                            ::agent::cognitive_handlers::LlmCoachingReasonerHandler::new(
+                                cp.clone(),
+                                params,
+                            ),
+                        )
+                    } else {
+                        Arc::new(::agent::cognitive_handlers::HeuristicCoachingReasonerHandler)
+                    };
 
-            let coaching_cancel = ctx.deps.shutdown_token.child_token();
-            if let Some(tx) = intervention_tx {
-                let service = feature_coaching::CoachingService::start(
-                    coaching_signal_rx,
-                    Arc::clone(&acc),
-                    Arc::clone(&det),
-                    Arc::clone(&router),
-                    Arc::clone(&fb),
-                    ctx.deps
-                        .user_situation
-                        .clone()
-                        .expect("user situation available"),
-                    coaching_reasoner,
-                    tx,
-                    Some(log_repo),
-                    coaching_cancel,
-                );
-                tracing::info!("coaching service started (reading AiSignals via CoachingSignalConsumer)");
-                Some(service)
+                let coaching_cancel = ctx.deps.shutdown_token.child_token();
+                if let Some(tx) = intervention_tx {
+                    let service = feature_coaching::CoachingService::start(
+                        coaching_signal_rx,
+                        Arc::clone(&acc),
+                        Arc::clone(&det),
+                        Arc::clone(&router),
+                        Arc::clone(&fb),
+                        ctx.deps
+                            .user_situation
+                            .clone()
+                            .expect("user situation available"),
+                        coaching_reasoner,
+                        tx,
+                        Some(log_repo),
+                        coaching_cancel,
+                    );
+                    tracing::info!(
+                        "coaching service started (reading AiSignals via CoachingSignalConsumer)"
+                    );
+                    Some(service)
+                } else {
+                    None
+                }
             } else {
                 None
-            }
-        } else {
-            None
-        };
+            };
 
         let router = Arc::new(router);
         ctx.insert_handle(Arc::new(AiPipelineInitResult {

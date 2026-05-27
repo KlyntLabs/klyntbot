@@ -484,8 +484,8 @@ mod tests {
     #[tokio::test]
     async fn context_source_uses_recall_registry() {
         let pool = setup().await;
-        let registry = ai_core::RecallProviderRegistry::new()
-            .with(feature_tasks::TasksFeature::default());
+        let registry =
+            ai_core::RecallProviderRegistry::new().with(feature_tasks::TasksFeature::default());
 
         let fact_repo = SemanticFactRepo::new(pool.clone());
         let rule_repo = ProceduralRuleRepo::new(pool);

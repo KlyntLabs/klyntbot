@@ -206,8 +206,7 @@ mod tests {
         let rule_id = Uuid::new_v4();
         let alert = MirrorAlert::MetaRuleProposed {
             rule_id,
-            rule_text: "When user corrects me twice about tasks, ask for clarification"
-                .to_string(),
+            rule_text: "When user corrects me twice about tasks, ask for clarification".to_string(),
             source: MetaRuleSource::CorrectionDerived,
         };
         let snippet = snippet_from_alert(&alert);

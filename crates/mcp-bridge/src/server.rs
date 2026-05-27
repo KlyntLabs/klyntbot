@@ -4,7 +4,7 @@ use tokio::net::{UnixListener, UnixStream};
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, warn};
 
-use crate::protocol::{BridgeFrame, read_frame};
+use crate::protocol::{read_frame, BridgeFrame};
 
 /// Synchronous handler invoked once per inbound frame. Must be cheap and
 /// non-blocking — the connection reader awaits its return.

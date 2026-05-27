@@ -36,8 +36,8 @@ fn coaching_pattern_translates() {
         signal_count: 3,
         rule_text: "Schedule demanding tasks in the morning".into(),
     };
-    let coaching_event = feature_coaching::events::try_from_domain_event(&e)
-        .expect("should parse coaching event");
+    let coaching_event =
+        feature_coaching::events::try_from_domain_event(&e).expect("should parse coaching event");
     let sig = coaching_event.to_signal();
     assert_eq!(sig.event_kind, "PatternDetected");
     assert_eq!(
@@ -56,8 +56,8 @@ fn atom_reinforced_translates() {
         domain: "learning".into(),
         reinforcement_count: 3,
     };
-    let learning_event = feature_learning::try_from_domain_event(&e)
-        .expect("should parse learning event");
+    let learning_event =
+        feature_learning::try_from_domain_event(&e).expect("should parse learning event");
     let sig = learning_event.to_signal();
     assert_eq!(sig.event_kind, "AtomReinforced");
 }

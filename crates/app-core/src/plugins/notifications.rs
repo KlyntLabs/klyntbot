@@ -61,7 +61,10 @@ impl AppCorePlugin for NotificationPlugin {
         ));
         registry.register(std::sync::Arc::new(
             notifications::channel::tray::TrayChannel::new(Arc::clone(
-                ctx.deps.domain_event_bus.as_ref().expect("domain event bus available"),
+                ctx.deps
+                    .domain_event_bus
+                    .as_ref()
+                    .expect("domain event bus available"),
             )),
         ));
         // Outbound channels (telegram, discord, slack, email)
@@ -80,7 +83,12 @@ impl AppCorePlugin for NotificationPlugin {
         let fire_store = scheduling::FireStore::new(sf_repo);
 
         let dispatcher = notifications::NotificationDispatcher::new(
-            Arc::clone(ctx.deps.domain_event_bus.as_ref().expect("domain event bus available")),
+            Arc::clone(
+                ctx.deps
+                    .domain_event_bus
+                    .as_ref()
+                    .expect("domain event bus available"),
+            ),
             registry,
             notif_cfg.default_channels.clone(),
             quiet_hours,
@@ -100,5 +108,4 @@ impl AppCorePlugin for NotificationPlugin {
 
         Ok(())
     }
-
 }

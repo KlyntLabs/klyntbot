@@ -166,5 +166,4 @@ impl AppCore {
         let session = focus_mgr.end_break_session().await.map_err(map_prod_err)?;
         Ok(session.map(session_to_response))
     }
-
 }

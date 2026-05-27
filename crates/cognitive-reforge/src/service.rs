@@ -31,15 +31,12 @@ use jiff::Timestamp;
 use sqlx;
 use tracing::{debug, info, warn};
 
-use cognitive_memory::repos::{ProceduralRuleRepo, SemanticFactRepo};
-use crate::skill_files::{
-    compute_diff, content_hash, SkillFile, SkillFileManager,
-};
+use crate::skill_files::{compute_diff, content_hash, SkillFile, SkillFileManager};
 use crate::{types::*, AutotunerBridge, Phase6Result};
+use cognitive_memory::repos::{ProceduralRuleRepo, SemanticFactRepo};
 use cognitive_memory::types::{ProceduralRule, SemanticFact, DEFAULT_MEMORY_TYPE};
 
 use common::helpers::truncate_chars;
-
 
 // ---------------------------------------------------------------------------
 // Standalone Phase 6 autotuner evaluation (also called by cron)

@@ -15,9 +15,9 @@ pub mod event_log;
 pub mod extraction_critic_log;
 pub mod fact_changelog;
 pub mod failed_observation;
+pub use cognitive_graph::gt_link;
 pub use cognitive_learning::flashcard;
 pub use cognitive_learning::fsrs_params;
-pub use cognitive_graph::gt_link;
 pub mod knowledge_atom;
 pub use cognitive_graph::markdown_parser;
 pub mod pending_memory;
@@ -120,7 +120,6 @@ pub async fn load_user_model(fact_repo: &SemanticFactRepo) -> UserModel {
     }
     model
 }
-
 
 #[cfg(test)]
 mod tests {

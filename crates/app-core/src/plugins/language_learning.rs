@@ -1,5 +1,5 @@
-use async_trait::async_trait;
 use ai_core::AiEventMeta;
+use async_trait::async_trait;
 
 use crate::plugin::context::PluginContext;
 use crate::plugin::AppCorePlugin;
@@ -38,5 +38,4 @@ impl AppCorePlugin for LanguageLearningPlugin {
         }
         Ok(())
     }
-
 }

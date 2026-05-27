@@ -347,7 +347,10 @@ impl AppCore {
     /// Refresh the in-memory categorizer from DB so the background tracker
     /// picks up category changes immediately.
     async fn refresh_categorizer(&self, repo: &feature_productivity::repos::ActivityCategoryRepo) {
-        if let Some(engine) = self.host.get::<tokio::sync::Mutex<feature_productivity::ProductivityEngine>>() {
+        if let Some(engine) = self
+            .host
+            .get::<tokio::sync::Mutex<feature_productivity::ProductivityEngine>>()
+        {
             let engine = engine.lock().await;
             let mut categorizer = engine.categorizer().write().await;
             if let Err(e) = categorizer.refresh(repo).await {

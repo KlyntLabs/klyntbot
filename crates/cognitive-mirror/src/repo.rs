@@ -7,9 +7,9 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 use crate::{
-    BrainVersion, FeedbackTarget, MetaRule, MetaRuleAction,
-    MetaRuleSource, MetaRuleStatus, NarrativeSnippet, PreviewRecommendation, RoutingSnapshot,
-    TaskFocusSnapshot, TrendNarrative, TrialEarlySignals, TrialPreview, UserFeedback,
+    BrainVersion, FeedbackTarget, MetaRule, MetaRuleAction, MetaRuleSource, MetaRuleStatus,
+    NarrativeSnippet, PreviewRecommendation, RoutingSnapshot, TaskFocusSnapshot, TrendNarrative,
+    TrialEarlySignals, TrialPreview, UserFeedback,
 };
 
 // ---------------------------------------------------------------------------
@@ -385,10 +385,7 @@ impl MirrorRepo {
     }
 
     /// Convenience: build a snippet from an alert and insert it.
-    pub async fn insert_snippet_from_alert(
-        &self,
-        alert: &crate::types::MirrorAlert,
-    ) -> Result<()> {
+    pub async fn insert_snippet_from_alert(&self, alert: &crate::types::MirrorAlert) -> Result<()> {
         let snippet = crate::snippet_from_alert(alert);
         self.insert_snippet(&snippet).await
     }

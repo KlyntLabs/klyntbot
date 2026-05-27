@@ -9,9 +9,7 @@ use jiff::Timestamp;
 use tracing::warn;
 use uuid::Uuid;
 
-use crate::{
-    MetaRule, MetaRuleAction, MetaRuleSource, MetaRuleStatus, MirrorAlert, MirrorRepo,
-};
+use crate::{MetaRule, MetaRuleAction, MetaRuleSource, MetaRuleStatus, MirrorAlert, MirrorRepo};
 
 const LOW_CONFIDENCE_THRESHOLD: f64 = 0.4;
 const SAME_SESSION_CORRECTION_THRESHOLD: u32 = 2;

@@ -682,8 +682,8 @@ impl FlashcardRepo {
         .await?
         {
             Some(p) => {
-                let arr: [f64; 19] = serde_json::from_str(&p.weights)
-                    .unwrap_or(crate::fsrs5::DEFAULT_WEIGHTS);
+                let arr: [f64; 19] =
+                    serde_json::from_str(&p.weights).unwrap_or(crate::fsrs5::DEFAULT_WEIGHTS);
                 Ok((arr, p.desired_retention))
             }
             None => Ok((crate::fsrs5::DEFAULT_WEIGHTS, 0.9)),

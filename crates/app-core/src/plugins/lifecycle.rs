@@ -37,8 +37,10 @@ impl AppCorePlugin for LifecyclePlugin {
 
         // Start wake orchestrator.
         let wake_orchestrator_handle = if let Some(ref bus) = ctx.deps.domain_event_bus {
-            let orchestrator =
-                crate::wake_orchestrator::WakeOrchestrator::new(bus.clone(), lifecycle_config.wake_delivery.clone());
+            let orchestrator = crate::wake_orchestrator::WakeOrchestrator::new(
+                bus.clone(),
+                lifecycle_config.wake_delivery.clone(),
+            );
             Some(orchestrator.start())
         } else {
             None
@@ -112,5 +114,4 @@ impl AppCorePlugin for LifecyclePlugin {
 
         Ok(())
     }
-
 }

@@ -50,5 +50,4 @@ impl AppCorePlugin for AgentToolsPlugin {
         tracing::info!("Agent domain tools registered");
         Ok(())
     }
-
 }

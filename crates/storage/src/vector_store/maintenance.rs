@@ -239,7 +239,9 @@ impl VectorStore {
                 Err(e) => {
                     let msg = e.to_string();
                     if msg.contains("Please retry") || msg.contains("Retryable commit conflict") {
-                        tracing::debug!("Retryable commit conflict on {table_name}, attempt {attempt}/4");
+                        tracing::debug!(
+                            "Retryable commit conflict on {table_name}, attempt {attempt}/4"
+                        );
                         tokio::time::sleep(std::time::Duration::from_millis(100 * attempt)).await;
                         last_err = Some(e);
                         continue;

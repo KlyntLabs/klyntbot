@@ -1,5 +1,5 @@
-use async_trait::async_trait;
 use ai_core::AiEventMeta;
+use async_trait::async_trait;
 use std::sync::Arc;
 
 use crate::plugin::context::PluginContext;
@@ -32,19 +32,21 @@ impl AppCorePlugin for NotesPlugin {
             ai_core::RecallDomain::Notes,
         );
 
-        let note_embedding_handler =
-            if let (Some(ref engine), Some(ref vs)) =
-                (&ctx.deps.embedding_engine, &ctx.deps.vector_store)
-            {
-                Some(Arc::new(
-                    ::agent::adapters::note_embedding::NoteEmbeddingAdapter::new(
-                        Arc::clone(engine),
-                        vs.clone(),
-                    ),
-                ) as Arc<dyn feature_notes::handlers::embedding::NoteEmbeddingHandler>)
-            } else {
-                None
-            };
+        let note_embedding_handler = if let (Some(ref engine), Some(ref vs)) =
+            (&ctx.deps.embedding_engine, &ctx.deps.vector_store)
+        {
+            Some(Arc::new(
+                ::agent::adapters::note_embedding::NoteEmbeddingAdapter::new(
+                    Arc::clone(engine),
+                    vs.clone(),
+                ),
+            )
+                as Arc<
+                    dyn feature_notes::handlers::embedding::NoteEmbeddingHandler,
+                >)
+        } else {
+            None
+        };
 
         // Register notes tool into the plugin-built registry
         let note_repo = feature_notes::repo::NoteRepo::new(ctx.deps.storage_pool.inner().clone());

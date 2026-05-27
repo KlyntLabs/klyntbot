@@ -99,7 +99,9 @@ pub trait CommunityIntelligenceHandler: Send + Sync {
     async fn analyze_communities(
         &self,
         input: &cognitive_memory::services::community_intelligence::CommunityIntelligenceInput,
-    ) -> common::Result<cognitive_memory::services::community_intelligence::CommunityIntelligenceOutput>;
+    ) -> common::Result<
+        cognitive_memory::services::community_intelligence::CommunityIntelligenceOutput,
+    >;
 }
 
 // ---------------------------------------------------------------------------
@@ -125,4 +127,3 @@ pub trait SkillDiscoveryRunner: Send + Sync {
     /// Returns count of skills proposed.
     async fn run_skill_discovery(&self, run_id: &str) -> common::Result<u32>;
 }
-

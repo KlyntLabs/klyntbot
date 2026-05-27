@@ -198,11 +198,14 @@ pub fn translate_system_event(event: &DomainEvent) -> Option<AiSignal> {
             content: intervention_id.clone(),
             coaching_signal: true,
             metrics: AiMetrics {
-                category: Some(match response {
-                    bus::FeedbackResponse::Helpful => "thumbs_up",
-                    bus::FeedbackResponse::Dismissed => "thumbs_down",
-                    bus::FeedbackResponse::StopSuggesting => "stop_suggesting",
-                }.into()),
+                category: Some(
+                    match response {
+                        bus::FeedbackResponse::Helpful => "thumbs_up",
+                        bus::FeedbackResponse::Dismissed => "thumbs_down",
+                        bus::FeedbackResponse::StopSuggesting => "stop_suggesting",
+                    }
+                    .into(),
+                ),
                 ..AiMetrics::default()
             },
             ..base

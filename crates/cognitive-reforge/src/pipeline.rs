@@ -33,7 +33,6 @@ use async_trait::async_trait;
 use jiff::Timestamp;
 use tracing::{debug, info, warn};
 
-use cognitive_memory::repos::{EpisodicMemoryRepo, ProceduralRuleRepo, SemanticFactRepo};
 use crate::service::{
     apply_knowledge, apply_skill_edits, build_narrate_input, build_review_input,
     build_synthesize_input, create_trials_from_suggestions, record_knowledge_snapshot,
@@ -41,6 +40,7 @@ use crate::service::{
 };
 use crate::skill_files::{SkillFile, SkillFileManager};
 use crate::types::*;
+use cognitive_memory::repos::{EpisodicMemoryRepo, ProceduralRuleRepo, SemanticFactRepo};
 use cognitive_memory::types::EpisodicMemory;
 
 // ---------------------------------------------------------------------------
@@ -164,10 +164,7 @@ impl<'a> ReforgeContextBuilder<'a> {
         self.ctx.entity_repo = Some(v);
         self
     }
-    pub fn snapshot_repo(
-        mut self,
-        v: &'a cognitive_memory::repos::KnowledgeSnapshotRepo,
-    ) -> Self {
+    pub fn snapshot_repo(mut self, v: &'a cognitive_memory::repos::KnowledgeSnapshotRepo) -> Self {
         self.ctx.snapshot_repo = Some(v);
         self
     }
@@ -908,8 +905,10 @@ impl Phase for CommunityIntelligencePhase {
         if let (Some(ci_handler), Some(community_repo)) =
             (ctx.community_intelligence_handler, ctx.community_repo)
         {
-            match cognitive_memory::services::community_intelligence::build_intelligence_input(community_repo)
-                .await
+            match cognitive_memory::services::community_intelligence::build_intelligence_input(
+                community_repo,
+            )
+            .await
             {
                 Ok(input) if !input.communities.is_empty() => {
                     match ci_handler.analyze_communities(&input).await {
@@ -932,9 +931,10 @@ impl Phase for CommunityIntelligencePhase {
                                         merges: output.merges.clone(),
                                         splits: Vec::new(),
                                     };
-                                let fallback_co_act = cognitive_memory::repos::CoActivationRepo::new(
-                                    community_repo.pool().clone(),
-                                );
+                                let fallback_co_act =
+                                    cognitive_memory::repos::CoActivationRepo::new(
+                                        community_repo.pool().clone(),
+                                    );
                                 cognitive_memory::services::community_intelligence::apply_intelligence(
                                     &no_splits,
                                     community_repo,

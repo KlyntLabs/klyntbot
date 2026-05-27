@@ -30,10 +30,7 @@ fn table_for_domain(domain: &EntityDomain) -> Option<&'static str> {
 }
 
 /// All domains we can search as targets.
-const SEARCHABLE_DOMAINS: &[EntityDomain] = &[
-    EntityDomain::Task,
-    EntityDomain::Note,
-];
+const SEARCHABLE_DOMAINS: &[EntityDomain] = &[EntityDomain::Task, EntityDomain::Note];
 
 /// LanceDB retrieval threshold — intentionally lower than the heuristic's
 /// `min_cosine` (0.72) so we don't discard items that have moderate semantic

@@ -93,7 +93,10 @@ async fn cwd_none_uses_registry_base() {
                 tty_rows: None,
                 tty_cols: None,
             },
-            FullCtx(&RoutingContext::new(ChannelName::new("coding"), ChatId::new("test"))),
+            FullCtx(&RoutingContext::new(
+                ChannelName::new("coding"),
+                ChatId::new("test"),
+            )),
         )
         .await
         .unwrap();
@@ -125,7 +128,10 @@ async fn cwd_relative_joins_registry_base() {
                 tty_rows: None,
                 tty_cols: None,
             },
-            FullCtx(&RoutingContext::new(ChannelName::new("coding"), ChatId::new("test"))),
+            FullCtx(&RoutingContext::new(
+                ChannelName::new("coding"),
+                ChatId::new("test"),
+            )),
         )
         .await
         .unwrap();
@@ -154,7 +160,10 @@ async fn cwd_absolute_wins_over_registry_base() {
                 tty_rows: None,
                 tty_cols: None,
             },
-            FullCtx(&RoutingContext::new(ChannelName::new("coding"), ChatId::new("test"))),
+            FullCtx(&RoutingContext::new(
+                ChannelName::new("coding"),
+                ChatId::new("test"),
+            )),
         )
         .await
         .unwrap();

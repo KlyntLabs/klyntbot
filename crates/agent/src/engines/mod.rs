@@ -22,7 +22,9 @@ use std::sync::Arc;
 use async_trait::async_trait;
 
 use crate::events::AgentEvent;
-use crate::execution::{execute_loop, ExecuteLoopResult, ExecutionCore, ExecutionParams, SafetyCap};
+use crate::execution::{
+    execute_loop, ExecuteLoopResult, ExecutionCore, ExecutionParams, SafetyCap,
+};
 use tools::RoutingContext;
 
 /// The contract for driving one agentic turn to completion.
@@ -118,7 +120,10 @@ impl ExecutionEngine for MockEngine {
         _ctx: &RoutingContext,
         event_tx: Option<tokio::sync::mpsc::Sender<AgentEvent>>,
     ) -> common::Result<ExecuteLoopResult> {
-        self.calls.lock().unwrap().push((messages.len(), tools.len()));
+        self.calls
+            .lock()
+            .unwrap()
+            .push((messages.len(), tools.len()));
         if let Some(tx) = event_tx {
             for ev in &self.scripted_events {
                 let _ = tx.send(ev.clone()).await;

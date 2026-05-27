@@ -254,8 +254,7 @@ impl AppCore {
         }
 
         // Fire-and-forget: embed all saved cards in the background.
-        if let (Some(engine), Some(vs)) = (self.embedding_engine(), self.vector_store())
-        {
+        if let (Some(engine), Some(vs)) = (self.embedding_engine(), self.vector_store()) {
             let rows_for_embed = rows.clone();
             let repo_opt = self.flashcard_repo().ok();
             tokio::spawn(async move {

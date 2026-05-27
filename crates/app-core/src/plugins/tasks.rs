@@ -44,11 +44,17 @@ impl AppCorePlugin for TasksPlugin {
 
         // Task embedding (semantic search)
         if let (true, Some(vs)) = (config.todo.search.enabled, ctx.deps.vector_store.clone()) {
-            let task_embed_impl =
-                Arc::new(::agent::adapters::task_embedding::TaskEmbeddingAdapter::new(
-                    Arc::clone(ctx.deps.embedding_engine.as_ref().expect("embedding engine for tasks")),
+            let task_embed_impl = Arc::new(
+                ::agent::adapters::task_embedding::TaskEmbeddingAdapter::new(
+                    Arc::clone(
+                        ctx.deps
+                            .embedding_engine
+                            .as_ref()
+                            .expect("embedding engine for tasks"),
+                    ),
                     vs.clone(),
-                ));
+                ),
+            );
             task_tool = task_tool
                 .with_embedding_handler(
                     Arc::clone(&task_embed_impl) as Arc<dyn feature_tasks::EmbeddingHandler>
@@ -75,10 +81,8 @@ impl AppCorePlugin for TasksPlugin {
         }
 
         // Wire alarm writer
-        task_tool = task_tool.with_alarm_writer(
-            ctx.deps.repos.task_alarms.clone(),
-            ctx.deps.fire_store(),
-        );
+        task_tool =
+            task_tool.with_alarm_writer(ctx.deps.repos.task_alarms.clone(), ctx.deps.fire_store());
 
         ctx.register_tool(task_tool);
 
@@ -167,7 +171,9 @@ impl AppCorePlugin for TasksPlugin {
         // The remaining task cron handlers publish AlarmFired events, so they
         // require the domain bus.
         let Ok(domain_bus) = app.domain_event_bus() else {
-            tracing::warn!("tasks plugin: no domain event bus, skipping alarm-publishing cron handlers");
+            tracing::warn!(
+                "tasks plugin: no domain event bus, skipping alarm-publishing cron handlers"
+            );
             return Ok(());
         };
 

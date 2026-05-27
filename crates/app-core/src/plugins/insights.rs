@@ -69,9 +69,8 @@ impl AppCorePlugin for InsightsPlugin {
             ));
 
         // ── Flashcard accessor for learning progress computation ──
-        let flashcard_accessor: Arc<dyn feature_insights::FlashcardAccessor> = Arc::new(
-            crate::adapters::flashcard_accessor::FlashcardAccessorImpl::new(pool.clone()),
-        );
+        let flashcard_accessor: Arc<dyn feature_insights::FlashcardAccessor> =
+            Arc::new(crate::adapters::flashcard_accessor::FlashcardAccessorImpl::new(pool.clone()));
 
         // ── Insight service ──
         let insight_repo = feature_insights::InsightReviewRepo::new(pool.clone());

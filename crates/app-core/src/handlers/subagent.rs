@@ -12,7 +12,11 @@ impl AppCore {
         &self,
         session_id: String,
     ) -> Result<Vec<SubagentInstanceRow>> {
-        let direct = self.repos.subagent_instances.get_by_session(&session_id).await?;
+        let direct = self
+            .repos
+            .subagent_instances
+            .get_by_session(&session_id)
+            .await?;
         if let Some(row) = direct {
             return Ok(vec![row]);
         }

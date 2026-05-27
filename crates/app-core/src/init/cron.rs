@@ -605,7 +605,6 @@ fn register_cron_callbacks(
 
     // NOTE: launcher_usage_prune + launcher_attention_rebuild handlers now live
     // in LauncherPlugin::post_init (crates/app-core/src/plugins/launcher.rs).
-
 }
 
 /// Register default cron jobs directly via `CronRepo` (idempotent — skips existing).

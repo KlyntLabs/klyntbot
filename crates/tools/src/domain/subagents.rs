@@ -45,26 +45,10 @@ pub struct KillAction {
 /// Implemented by klyntbot-agent's SubagentManager.
 #[async_trait]
 pub trait SubagentsHandler: Send + Sync {
-    async fn spawn(
-        &self,
-        action: SpawnAction,
-        ctx: &RoutingContext,
-    ) -> Result<String>;
-    async fn resume(
-        &self,
-        action: ResumeAction,
-        ctx: &RoutingContext,
-    ) -> Result<String>;
-    async fn list(
-        &self,
-        action: ListAction,
-        ctx: &RoutingContext,
-    ) -> Result<String>;
-    async fn kill(
-        &self,
-        action: KillAction,
-        ctx: &RoutingContext,
-    ) -> Result<String>;
+    async fn spawn(&self, action: SpawnAction, ctx: &RoutingContext) -> Result<String>;
+    async fn resume(&self, action: ResumeAction, ctx: &RoutingContext) -> Result<String>;
+    async fn list(&self, action: ListAction, ctx: &RoutingContext) -> Result<String>;
+    async fn kill(&self, action: KillAction, ctx: &RoutingContext) -> Result<String>;
 }
 
 pub struct SubagentsTool {
@@ -102,11 +86,7 @@ impl SubagentsTool {
     /// detached in the background. Use `subagents list` afterwards to poll
     /// status.
     #[action(name = "spawn")]
-    async fn handle_spawn(
-        &self,
-        params: SpawnAction,
-        ctx: &RoutingContext,
-    ) -> Result<String> {
+    async fn handle_spawn(&self, params: SpawnAction, ctx: &RoutingContext) -> Result<String> {
         let handler = self.handler.as_ref().ok_or_else(|| {
             common::ToolError::ExecutionFailed("SubagentsHandler not available".to_string())
         })?;
@@ -119,11 +99,7 @@ impl SubagentsTool {
     /// `subagents list` for status checks. Calling resume on a running
     /// subagent returns a snapshot instead of resuming.
     #[action(name = "resume")]
-    async fn handle_resume(
-        &self,
-        params: ResumeAction,
-        ctx: &RoutingContext,
-    ) -> Result<String> {
+    async fn handle_resume(&self, params: ResumeAction, ctx: &RoutingContext) -> Result<String> {
         let handler = self.handler.as_ref().ok_or_else(|| {
             common::ToolError::ExecutionFailed("SubagentsHandler not available".to_string())
         })?;
@@ -133,11 +109,7 @@ impl SubagentsTool {
     /// List subagents and their current status. This is the right action for
     /// progress polling. Optional filters: `parent_agent_id`, `status`.
     #[action(name = "list")]
-    async fn handle_list(
-        &self,
-        params: ListAction,
-        ctx: &RoutingContext,
-    ) -> Result<String> {
+    async fn handle_list(&self, params: ListAction, ctx: &RoutingContext) -> Result<String> {
         let handler = self.handler.as_ref().ok_or_else(|| {
             common::ToolError::ExecutionFailed("SubagentsHandler not available".to_string())
         })?;
@@ -146,11 +118,7 @@ impl SubagentsTool {
 
     /// Cancel a running subagent. Terminal — the row transitions to `killed`.
     #[action(name = "kill")]
-    async fn handle_kill(
-        &self,
-        params: KillAction,
-        ctx: &RoutingContext,
-    ) -> Result<String> {
+    async fn handle_kill(&self, params: KillAction, ctx: &RoutingContext) -> Result<String> {
         let handler = self.handler.as_ref().ok_or_else(|| {
             common::ToolError::ExecutionFailed("SubagentsHandler not available".to_string())
         })?;

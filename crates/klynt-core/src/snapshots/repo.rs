@@ -139,12 +139,11 @@ impl SnapshotRepo {
     }
 
     pub async fn list_for_session(&self, session_key: &str) -> Result<Vec<Snapshot>> {
-        let rows =
-            sqlx::query("SELECT * FROM snapshots WHERE session_key = ? ORDER BY id DESC")
-                .bind(session_key)
-                .fetch_all(self.pool.inner())
-                .await
-                .map_err(common::KlyntbotError::from)?;
+        let rows = sqlx::query("SELECT * FROM snapshots WHERE session_key = ? ORDER BY id DESC")
+            .bind(session_key)
+            .fetch_all(self.pool.inner())
+            .await
+            .map_err(common::KlyntbotError::from)?;
         Ok(rows.into_iter().map(row_to_snapshot).collect())
     }
 

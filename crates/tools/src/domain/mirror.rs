@@ -72,11 +72,7 @@ impl MirrorTool {
 
     /// Return recent trend narratives (newest first).
     #[action(name = "get_narratives")]
-    async fn get_narratives(
-        &self,
-        params: GetNarrativesParams,
-        _ctx: (),
-    ) -> Result<String> {
+    async fn get_narratives(&self, params: GetNarrativesParams, _ctx: ()) -> Result<String> {
         let limit = params.limit.unwrap_or(5) as u32;
         let narratives = self.facade.get_narratives(limit).await?;
         serde_json::to_string_pretty(&narratives).map_err(|e| {
@@ -119,11 +115,7 @@ impl MirrorTool {
 
     /// Return active and pending meta-rules.
     #[action(name = "get_meta_rules")]
-    async fn get_meta_rules(
-        &self,
-        _params: GetMetaRulesParams,
-        _ctx: (),
-    ) -> Result<String> {
+    async fn get_meta_rules(&self, _params: GetMetaRulesParams, _ctx: ()) -> Result<String> {
         let (active, pending) = self.facade.get_meta_rules().await?;
         let result = serde_json::json!({
             "active": active,

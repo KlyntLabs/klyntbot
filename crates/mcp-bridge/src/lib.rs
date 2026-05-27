@@ -11,7 +11,7 @@ pub mod server;
 
 pub use client::BridgeClient;
 pub use emitter::SocketBridgeEmitter;
-pub use protocol::{BridgeFrame, FrameError, read_frame, write_frame};
+pub use protocol::{read_frame, write_frame, BridgeFrame, FrameError};
 pub use server::{BridgeServer, BridgeServerHandle};
 
 use std::path::PathBuf;

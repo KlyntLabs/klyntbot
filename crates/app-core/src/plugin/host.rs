@@ -114,7 +114,10 @@ pub struct FeatureHostBuilder {
 
 impl FeatureHostBuilder {
     pub fn new() -> Self {
-        Self { plugins: vec![], pre_handles: vec![] }
+        Self {
+            plugins: vec![],
+            pre_handles: vec![],
+        }
     }
 
     /// Add a plugin to the host.
@@ -160,13 +163,14 @@ impl FeatureHostBuilder {
         }
 
         if !all_migrations.is_empty() {
-            storage::StoragePool::run_feature_migrations(deps.storage_pool.inner(), &all_migrations)
-                .await
-                .map_err(|e| {
-                    common::KlyntbotError::Storage(format!(
-                        "feature host migrations failed: {e}"
-                    ))
-                })?;
+            storage::StoragePool::run_feature_migrations(
+                deps.storage_pool.inner(),
+                &all_migrations,
+            )
+            .await
+            .map_err(|e| {
+                common::KlyntbotError::Storage(format!("feature host migrations failed: {e}"))
+            })?;
             info!(count = all_migrations.len(), "plugin migrations complete");
         }
 

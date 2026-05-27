@@ -97,4 +97,6 @@ pub use temporal::TemporalTool;
 pub use skill_reference::{SkillReferenceIndex, SkillReferenceTool};
 
 // Subagents
-pub use subagents::{KillAction, ListAction, ResumeAction, SpawnAction, SubagentsHandler, SubagentsTool};
+pub use subagents::{
+    KillAction, ListAction, ResumeAction, SpawnAction, SubagentsHandler, SubagentsTool,
+};

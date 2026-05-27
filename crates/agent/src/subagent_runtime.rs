@@ -11,10 +11,10 @@ use std::sync::Arc;
 use dashmap::DashMap;
 use tokio_util::sync::CancellationToken;
 
-use providers::DynProvider;
-use storage::repos::{NewSubagentInstance, SubagentInstanceRepo, SessionRepo};
-use storage::rows::{SubagentInstanceRow, SubagentStatus};
 use common::Result;
+use providers::DynProvider;
+use storage::repos::{NewSubagentInstance, SessionRepo, SubagentInstanceRepo};
+use storage::rows::{SubagentInstanceRow, SubagentStatus};
 
 /// Default turn cap for spawn/resume calls. Matches Kimi's max_steps_per_turn.
 pub const DEFAULT_TURN_CAP: u32 = 500;
@@ -133,7 +133,11 @@ pub struct SubagentRuntime {
     pub hook_engine: Option<Arc<klynt_hooks::HookEngine>>,
     pub job_supervisor: Option<tools_core::DynJobSupervisor>,
     /// Optional lifecycle event broadcaster (injected after construction).
-    pub event_tx: Arc<std::sync::Mutex<Option<tokio::sync::broadcast::Sender<crate::subagent_events::SubagentLifecycleEvent>>>>,
+    pub event_tx: Arc<
+        std::sync::Mutex<
+            Option<tokio::sync::broadcast::Sender<crate::subagent_events::SubagentLifecycleEvent>>,
+        >,
+    >,
 }
 
 impl SubagentRuntime {
@@ -214,22 +218,26 @@ impl SubagentRuntime {
         let started_at = jiff::Timestamp::now().as_millisecond();
 
         // 1. Insert a subagent session row.
-        self.sessions.insert_subagent_session(
-            &session_id,
-            &p.parent_session_id,
-            p.workspace_path.to_string_lossy().as_ref(),
-        ).await?;
+        self.sessions
+            .insert_subagent_session(
+                &session_id,
+                &p.parent_session_id,
+                p.workspace_path.to_string_lossy().as_ref(),
+            )
+            .await?;
 
         // 2. Insert the metadata row (status=running).
-        self.repo.insert(&NewSubagentInstance {
-            agent_id: agent_id.clone(),
-            session_id: session_id.clone(),
-            parent_agent_id: p.parent_agent_id.clone(),
-            description: p.description.clone(),
-            model: Some(model.clone()),
-            workspace_path: p.workspace_path.to_string_lossy().to_string(),
-            turn_cap: max_turns as i64,
-        }).await?;
+        self.repo
+            .insert(&NewSubagentInstance {
+                agent_id: agent_id.clone(),
+                session_id: session_id.clone(),
+                parent_agent_id: p.parent_agent_id.clone(),
+                description: p.description.clone(),
+                model: Some(model.clone()),
+                workspace_path: p.workspace_path.to_string_lossy().to_string(),
+                turn_cap: max_turns as i64,
+            })
+            .await?;
 
         // 3. Register a cancel token in the active map.
         let token = CancellationToken::new();
@@ -366,11 +374,9 @@ impl SubagentRuntime {
 
     /// Resume an existing idle/stopped_turn instance.
     pub async fn resume(&self, p: ResumeParams) -> Result<SubagentRunResult> {
-        let row = self
-            .repo
-            .get(&p.agent_id)
-            .await?
-            .ok_or_else(|| common::KlyntbotError::StorageNotFound(format!("subagent {}", p.agent_id)))?;
+        let row = self.repo.get(&p.agent_id).await?.ok_or_else(|| {
+            common::KlyntbotError::StorageNotFound(format!("subagent {}", p.agent_id))
+        })?;
         let status = row.status_enum();
         match status {
             SubagentStatus::Running => {
@@ -396,7 +402,8 @@ impl SubagentRuntime {
             .await?;
 
         // Load conversation history from the session's messages and append the new prompt.
-        let history: Vec<storage::rows::session::SessionMessageRow> = self.sessions.load_messages(&row.session_id).await?;
+        let history: Vec<storage::rows::session::SessionMessageRow> =
+            self.sessions.load_messages(&row.session_id).await?;
         let mut messages: Vec<providers::types::Message> = history
             .into_iter()
             .filter_map(crate::subagent::row_to_message)
@@ -438,13 +445,9 @@ impl SubagentRuntime {
     /// Cancel an active run (if any) and flip status to `killed`.
     /// If the instance isn't running, just flips the DB row.
     pub async fn kill(&self, agent_id: &str) -> Result<SubagentRunResult> {
-        let row = self
-            .repo
-            .get(agent_id)
-            .await?
-            .ok_or_else(|| {
-                common::KlyntbotError::StorageNotFound(format!("subagent {agent_id}"))
-            })?;
+        let row = self.repo.get(agent_id).await?.ok_or_else(|| {
+            common::KlyntbotError::StorageNotFound(format!("subagent {agent_id}"))
+        })?;
         self.active.cancel(agent_id);
         // Allow kill regardless of state, as long as it isn't already terminal.
         let status_now = row.status_enum();
@@ -458,7 +461,9 @@ impl SubagentRuntime {
                 turns_used: row.turns_used as u32,
             });
         }
-        self.repo.update_status(agent_id, SubagentStatus::Killed).await?;
+        self.repo
+            .update_status(agent_id, SubagentStatus::Killed)
+            .await?;
         Ok(SubagentRunResult {
             agent_id: agent_id.to_string(),
             session_id: row.session_id,
@@ -476,7 +481,10 @@ impl SubagentRuntime {
         let rows = match (status, parent_agent_id) {
             (Some(s), Some(p)) => {
                 let by_status = self.repo.list_by_status(s).await?;
-                Ok(by_status.into_iter().filter(|r| r.parent_agent_id.as_deref() == Some(p)).collect())
+                Ok(by_status
+                    .into_iter()
+                    .filter(|r| r.parent_agent_id.as_deref() == Some(p))
+                    .collect())
             }
             (Some(s), None) => self.repo.list_by_status(s).await,
             (None, Some(p)) => self.repo.list_by_parent(Some(p)).await,
@@ -510,7 +518,9 @@ impl SubagentRuntime {
             .unwrap_or_default();
             return Err(common::ToolError::ExecutionFailed(payload).into());
         }
-        self.repo.update_status(agent_id, SubagentStatus::Idle).await?;
+        self.repo
+            .update_status(agent_id, SubagentStatus::Idle)
+            .await?;
         Ok(SubagentRunResult {
             agent_id: agent_id.to_string(),
             session_id: session_id.to_string(),

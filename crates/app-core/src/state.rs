@@ -67,12 +67,7 @@ pub struct AppCore {
     /// Practice session repo (always available — backed by the same DB as notes).
     pub practice_repo: PracticeSessionRepo,
 
-
-
     pub user_situation: Option<Arc<Mutex<UserSituation>>>,
-
-
-
 
     /// Consecutive coaching nudges that were auto-collapsed (ignored).
     /// Resets on explicit user feedback. Delivery skipped when >= 2.
@@ -82,14 +77,7 @@ pub struct AppCore {
     /// entity updates to the frontend after tool mutations.
     pub event_emitter: Arc<dyn AppEventEmitter>,
 
-
-
-
-
     /// Unified TemporalScheduler — sole firing source post-4.4c.
-
-
-
 
     /// Feature host — holds plugin handles and provides typed lookup.
     pub host: crate::plugin::host::FeatureHost,
@@ -111,10 +99,17 @@ impl AppCore {
 
     /// Return productivity repos or a "feature disabled" error.
     #[tracing::instrument(skip(self), err)]
-    pub fn productivity_repos(&self) -> Result<Arc<feature_productivity::repos::ProductivityRepos>, ApiError> {
+    pub fn productivity_repos(
+        &self,
+    ) -> Result<Arc<feature_productivity::repos::ProductivityRepos>, ApiError> {
         self.host
             .get::<feature_productivity::repos::ProductivityRepos>()
-            .ok_or_else(|| ApiError::new(Self::ERR_FEATURE_DISABLED, "productivity feature is not enabled"))
+            .ok_or_else(|| {
+                ApiError::new(
+                    Self::ERR_FEATURE_DISABLED,
+                    "productivity feature is not enabled",
+                )
+            })
     }
 
     /// Return focus manager or a "feature disabled" error.
@@ -171,7 +166,8 @@ impl AppCore {
 
     #[tracing::instrument(skip(self))]
     pub fn pipeline_broadcast(&self) -> Option<broadcast::Sender<cognitive::PipelineEvent>> {
-        self.host.get_cloned::<broadcast::Sender<cognitive::PipelineEvent>>()
+        self.host
+            .get_cloned::<broadcast::Sender<cognitive::PipelineEvent>>()
     }
 
     pub fn embedding_engine(&self) -> Option<Arc<tools::embedding_engine::EmbeddingEngine>> {
@@ -195,21 +191,29 @@ impl AppCore {
     }
 
     pub fn user_situation(&self) -> Result<&Arc<Mutex<UserSituation>>, ApiError> {
-        self.user_situation
-            .as_ref()
-            .ok_or_else(|| ApiError::new(Self::ERR_FEATURE_DISABLED, "coaching engine is not available"))
+        self.user_situation.as_ref().ok_or_else(|| {
+            ApiError::new(
+                Self::ERR_FEATURE_DISABLED,
+                "coaching engine is not available",
+            )
+        })
     }
 
     #[tracing::instrument(skip(self), err)]
     pub fn domain_event_bus(&self) -> Result<Arc<DomainEventBus>, ApiError> {
-        self.host
-            .get::<DomainEventBus>()
-            .ok_or_else(|| ApiError::new(Self::ERR_FEATURE_DISABLED, "domain event bus is not available"))
+        self.host.get::<DomainEventBus>().ok_or_else(|| {
+            ApiError::new(
+                Self::ERR_FEATURE_DISABLED,
+                "domain event bus is not available",
+            )
+        })
     }
 
     /// Return event log repo or `None` when unavailable.
     #[tracing::instrument(skip(self))]
-    pub fn note_embedding_handler(&self) -> Option<Arc<dyn feature_notes::handlers::embedding::NoteEmbeddingHandler>> {
+    pub fn note_embedding_handler(
+        &self,
+    ) -> Option<Arc<dyn feature_notes::handlers::embedding::NoteEmbeddingHandler>> {
         self.host
             .get::<crate::plugins::notes::NotesInitResult>()
             .and_then(|r| r.note_embedding_handler.clone())
@@ -222,7 +226,10 @@ impl AppCore {
     }
 
     /// Lookup a field from `CognitiveInitResult` or return a "not available" error.
-    fn require_cognitive<T: Clone, F: FnOnce(&crate::plugins::cognitive::CognitiveInitResult) -> Option<T>>(
+    fn require_cognitive<
+        T: Clone,
+        F: FnOnce(&crate::plugins::cognitive::CognitiveInitResult) -> Option<T>,
+    >(
         &self,
         extractor: F,
         msg: &str,
@@ -242,7 +249,10 @@ impl AppCore {
     /// Return knowledge atom repo or a "not available" error.
     #[tracing::instrument(skip(self), err)]
     pub fn knowledge_atom_repo(&self) -> Result<cognitive::KnowledgeAtomRepo, ApiError> {
-        self.require_cognitive(|r| r.knowledge_atom_repo.clone(), "Knowledge atom repo not available")
+        self.require_cognitive(
+            |r| r.knowledge_atom_repo.clone(),
+            "Knowledge atom repo not available",
+        )
     }
 
     /// Return practice session repo.
@@ -254,34 +264,49 @@ impl AppCore {
     /// Return review session repo or a "not available" error.
     #[tracing::instrument(skip(self), err)]
     pub fn review_session_repo(&self) -> Result<cognitive::ReviewSessionRepo, ApiError> {
-        self.require_cognitive(|r| r.review_session_repo.clone(), "Review session repo not available")
+        self.require_cognitive(
+            |r| r.review_session_repo.clone(),
+            "Review session repo not available",
+        )
     }
 
     /// Return deck preference repo or a "not available" error.
     #[tracing::instrument(skip(self), err)]
     pub fn deck_preference_repo(&self) -> Result<cognitive::DeckPreferenceRepo, ApiError> {
-        self.require_cognitive(|r| r.deck_preference_repo.clone(), "Deck preference repo not available")
+        self.require_cognitive(
+            |r| r.deck_preference_repo.clone(),
+            "Deck preference repo not available",
+        )
     }
 
     /// Return activity ingestion service or a "feature disabled" error.
     #[tracing::instrument(skip(self), err)]
-    pub fn activity_ingestion_service(&self) -> Result<Arc<activity_log::ActivityIngestionService>, ApiError> {
+    pub fn activity_ingestion_service(
+        &self,
+    ) -> Result<Arc<activity_log::ActivityIngestionService>, ApiError> {
         self.host
             .get::<activity_log::ActivityIngestionService>()
-            .ok_or_else(|| ApiError::new(Self::ERR_FEATURE_DISABLED, "activity log is not available"))
+            .ok_or_else(|| {
+                ApiError::new(Self::ERR_FEATURE_DISABLED, "activity log is not available")
+            })
     }
 
     /// Return launcher search engine or a "feature disabled" error.
     #[tracing::instrument(skip(self), err)]
     pub fn launcher_engine(&self) -> Result<Arc<LauncherSearchEngine>, ApiError> {
-        self.host
-            .get::<LauncherSearchEngine>()
-            .ok_or_else(|| ApiError::new(Self::ERR_FEATURE_DISABLED, "launcher feature is not enabled"))
+        self.host.get::<LauncherSearchEngine>().ok_or_else(|| {
+            ApiError::new(
+                Self::ERR_FEATURE_DISABLED,
+                "launcher feature is not enabled",
+            )
+        })
     }
 
     /// Return launcher clipboard repo or a "feature disabled" error.
     #[tracing::instrument(skip(self), err)]
-    pub fn launcher_clipboard_repo(&self) -> Result<Arc<feature_launcher::ClipboardRepo>, ApiError> {
+    pub fn launcher_clipboard_repo(
+        &self,
+    ) -> Result<Arc<feature_launcher::ClipboardRepo>, ApiError> {
         self.launcher_engine()
             .map(|e| Arc::clone(&e.clipboard_repo))
     }
@@ -315,10 +340,14 @@ impl AppCore {
 
     /// Return pending memory repo or a "not available" error.
     #[tracing::instrument(skip(self), err)]
-    pub fn pending_memory_repo(&self) -> Result<Arc<cognitive::repos::PendingMemoryRepo>, ApiError> {
+    pub fn pending_memory_repo(
+        &self,
+    ) -> Result<Arc<cognitive::repos::PendingMemoryRepo>, ApiError> {
         self.host
             .get::<cognitive::repos::PendingMemoryRepo>()
-            .ok_or_else(|| ApiError::new(Self::ERR_NOT_AVAILABLE, "Pending memory repo not available"))
+            .ok_or_else(|| {
+                ApiError::new(Self::ERR_NOT_AVAILABLE, "Pending memory repo not available")
+            })
     }
 
     pub fn tracing_registry(&self) -> std::sync::Arc<crate::tracing::TracingRegistry> {
@@ -351,9 +380,12 @@ impl AppCore {
                 ApiError::new("INVALID_DATA", format!("failed to deserialize fact: {e}"))
             })?;
 
-        let cog = self.host
+        let cog = self
+            .host
             .get::<crate::plugins::cognitive::CognitiveInitResult>()
-            .ok_or_else(|| common::KlyntbotError::Storage("cognitive system not initialized".into()))?;
+            .ok_or_else(|| {
+                common::KlyntbotError::Storage("cognitive system not initialized".into())
+            })?;
         cog.semantic_fact_repo
             .upsert(&fact)
             .await
@@ -382,7 +414,9 @@ impl AppCore {
         self.host
             .get::<crate::plugins::voice::VoiceInitResult>()
             .and_then(|r| r.voice_service.clone())
-            .ok_or_else(|| ApiError::new(Self::ERR_FEATURE_DISABLED, "voice feature is not enabled"))
+            .ok_or_else(|| {
+                ApiError::new(Self::ERR_FEATURE_DISABLED, "voice feature is not enabled")
+            })
     }
 
     /// Return voice conversation manager or a "not available" error.
@@ -453,25 +487,36 @@ impl AppCore {
     pub async fn shutdown(&self) {
         info!("shutting down app core");
         // Stop productivity engine first to flush pending events.
-        self.with_handle::<Mutex<feature_productivity::ProductivityEngine>, _, _>(|engine| async move {
-            engine.lock().await.stop().await;
-        }).await;
+        self.with_handle::<Mutex<feature_productivity::ProductivityEngine>, _, _>(
+            |engine| async move {
+                engine.lock().await.stop().await;
+            },
+        )
+        .await;
         // Stop nudge service.
-        self.with_handle::<Arc<Mutex<feature_productivity::NudgeService>>, _, _>(|nudge| async move {
-            nudge.lock().await.stop().await;
-        }).await;
+        self.with_handle::<Arc<Mutex<feature_productivity::NudgeService>>, _, _>(
+            |nudge| async move {
+                nudge.lock().await.stop().await;
+            },
+        )
+        .await;
         // Persist coaching feedback before stopping the service.
         self.with_handle::<Mutex<FeedbackTracker>, _, _>(|tracker| async move {
             tracker.lock().await.persist().await;
-        }).await;
+        })
+        .await;
         // Stop coaching service.
-        self.with_handle::<Arc<Mutex<feature_coaching::CoachingService>>, _, _>(|coaching| async move {
-            coaching.lock().await.stop().await;
-        }).await;
+        self.with_handle::<Arc<Mutex<feature_coaching::CoachingService>>, _, _>(
+            |coaching| async move {
+                coaching.lock().await.stop().await;
+            },
+        )
+        .await;
         // Stop BrainVoice signal router.
         self.with_handle::<crate::brain_voice::BrainVoice, _, _>(|bv| async move {
             bv.shutdown();
-        }).await;
+        })
+        .await;
         if let Err(e) = self.agent.shutdown().await {
             error!("agent shutdown error: {}", e);
         }
@@ -479,17 +524,22 @@ impl AppCore {
         // so they stop consuming domain events immediately.
         self.with_handle::<tokio_util::sync::CancellationToken, _, _>(|token| async move {
             token.cancel();
-        }).await;
+        })
+        .await;
         // Stop the NotificationDispatcher select loop.
-        self.with_handle::<notifications::NotificationDispatcherHandle, _, _>(|handle| async move {
-            handle.shutdown.cancel();
-        }).await;
+        self.with_handle::<notifications::NotificationDispatcherHandle, _, _>(
+            |handle| async move {
+                handle.shutdown.cancel();
+            },
+        )
+        .await;
         // Abort the voice conversation loop if still running.
         self.with_handle::<crate::plugins::voice::VoiceInitResult, _, _>(|result| async move {
             if let Some(handle) = result.voice_loop_handle.lock().unwrap().take() {
                 handle.abort();
             }
-        }).await;
+        })
+        .await;
         self.shutdown_token.cancel();
         if let Err(e) = self.storage_pool.optimize().await {
             tracing::warn!("SQLite PRAGMA optimize failed: {e}");
@@ -622,7 +672,6 @@ impl AppCore {
             .get_or_init(|| Arc::new(crate::runtime::assistant::AssistantThreadRuntime::new(core)))
             .clone()
     }
-
 }
 
 fn workspace_row_to_dto(row: storage::repos::WorkspaceRow) -> serde_json::Value {
@@ -664,9 +713,12 @@ impl AppCore {
         let handler: Arc<dyn cognitive::services::graph_linker::GraphLinkHandler> = Arc::new(
             agent::cognitive_handlers::LlmGraphLinkHandler::new(provider, params),
         );
-        let cog = self.host
+        let cog = self
+            .host
             .get::<crate::plugins::cognitive::CognitiveInitResult>()
-            .ok_or_else(|| common::KlyntbotError::Storage("cognitive system not initialized".into()))?;
+            .ok_or_else(|| {
+                common::KlyntbotError::Storage("cognitive system not initialized".into())
+            })?;
         let count = cognitive::services::background::run_graph_consolidation(
             &cog.semantic_fact_repo,
             &cog.entity_repo,
@@ -685,14 +737,8 @@ impl AppCore {
         } else if let Ok(home) = std::env::var("KLYNTBOT_HOME") {
             config.data_dir = Some(home);
         }
-        let (core, _channels) = Self::init_with_sender(
-            common::AppMode::Server,
-            Some(config),
-            None,
-            None,
-            None,
-        )
-        .await?;
+        let (core, _channels) =
+            Self::init_with_sender(common::AppMode::Server, Some(config), None, None, None).await?;
         Ok(core)
     }
 

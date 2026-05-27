@@ -79,7 +79,8 @@ impl AppCorePlugin for VoicePlugin {
                 } => Some(Arc::new(voice_engine::CloudAsrEngine::new(
                     api_url.clone(),
                     api_key.expose().to_string(),
-                )) as Arc<dyn voice_engine::TranscriptionEngine>),
+                ))
+                    as Arc<dyn voice_engine::TranscriptionEngine>),
             }
         };
 
@@ -122,15 +123,15 @@ impl AppCorePlugin for VoicePlugin {
                                 qwen3_tts_ref = Some(Arc::clone(&engine));
                                 let manager = voice_engine::TtsEngineManager::new(
                                     engine,
-                                    Some(Arc::clone(&system_tts)
-                                        as Arc<dyn voice_engine::TtsEngine>),
+                                    Some(
+                                        Arc::clone(&system_tts) as Arc<dyn voice_engine::TtsEngine>
+                                    ),
                                 );
                                 Some(Arc::new(manager) as Arc<dyn voice_engine::TtsEngine>)
                             }
                             Err(e) => {
                                 warn!("Qwen3-TTS failed, using system TTS: {e}");
-                                Some(Arc::clone(&system_tts)
-                                    as Arc<dyn voice_engine::TtsEngine>)
+                                Some(Arc::clone(&system_tts) as Arc<dyn voice_engine::TtsEngine>)
                             }
                         }
                     } else {
@@ -151,9 +152,7 @@ impl AppCorePlugin for VoicePlugin {
                 noise_reduction: voice_config.input.noise_reduction,
                 ..Default::default()
             },
-            privacy_mode: crate::handlers::voice::privacy_level(
-                voice_config.input.privacy_mode,
-            ),
+            privacy_mode: crate::handlers::voice::privacy_level(voice_config.input.privacy_mode),
             data_dir: data_dir.clone(),
             native_audio: true,
             output_device: voice_config.output.selected_device.clone(),
@@ -279,12 +278,12 @@ impl AppCorePlugin for VoicePlugin {
 
                     // Hot-swap STT engine after successful download
                     if asr.is_ok() {
-                        if let Ok(engine) = voice_engine::Qwen3AsrEngine::new(
-                            mm.models_dir(),
-                            allowed_langs,
-                        ) {
-                            svc_for_swap.set_local_engine(Arc::new(engine)
-                                as Arc<dyn voice_engine::TranscriptionEngine>);
+                        if let Ok(engine) =
+                            voice_engine::Qwen3AsrEngine::new(mm.models_dir(), allowed_langs)
+                        {
+                            svc_for_swap.set_local_engine(
+                                Arc::new(engine) as Arc<dyn voice_engine::TranscriptionEngine>
+                            );
                             info!("Hot-swapped Qwen3-ASR into live VoiceService");
                         }
                     }
@@ -297,14 +296,12 @@ impl AppCorePlugin for VoicePlugin {
                                     Arc::new(engine),
                                     Some(system_tts_for_swap),
                                 );
-                                svc_for_swap
-                                    .set_tts_engine(Arc::new(manager)
-                                        as Arc<dyn voice_engine::TtsEngine>);
+                                svc_for_swap.set_tts_engine(
+                                    Arc::new(manager) as Arc<dyn voice_engine::TtsEngine>
+                                );
                                 info!("Hot-swapped Qwen3-TTS into live VoiceService");
                             }
-                            Err(e) => warn!(
-                                "Qwen3-TTS engine creation after download failed: {e}"
-                            ),
+                            Err(e) => warn!("Qwen3-TTS engine creation after download failed: {e}"),
                         }
                     }
 
@@ -339,24 +336,22 @@ impl AppCorePlugin for VoicePlugin {
             return Ok(());
         }
 
-        let voice_result = app
-            .host
-            .get::<VoiceInitResult>()
-            .ok_or_else(|| common::KlyntbotError::Config(common::ConfigError::Invalid(
+        let voice_result = app.host.get::<VoiceInitResult>().ok_or_else(|| {
+            common::KlyntbotError::Config(common::ConfigError::Invalid(
                 "VoiceInitResult not found in host".to_string(),
-            )))?;
+            ))
+        })?;
         let service = match voice_result.voice_service {
             Some(ref svc) => Arc::clone(svc),
             None => return Ok(()),
         };
 
         let voice_config_arc = Arc::new(RwLock::new(voice_config));
-        let echo_provider = voice_result
-            .echo_provider
-            .clone()
-            .ok_or_else(|| common::KlyntbotError::Config(common::ConfigError::Invalid(
+        let echo_provider = voice_result.echo_provider.clone().ok_or_else(|| {
+            common::KlyntbotError::Config(common::ConfigError::Invalid(
                 "Voice echo provider not found in host".to_string(),
-            )))?;
+            ))
+        })?;
         let voice_conv_manager = Arc::new(
             crate::handlers::voice_conversation::VoiceConversationManager::new(
                 service,

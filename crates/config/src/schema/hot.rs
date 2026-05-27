@@ -29,7 +29,6 @@ pub struct HotConfigDiff {
     pub max_tool_iterations_changed: bool,
     pub safety_timeout_changed: bool,
     pub budget_changed: bool,
-
 }
 
 impl HotConfigDiff {
@@ -66,7 +65,6 @@ impl HotConfig {
             max_tool_iterations_changed: self.max_tool_iterations != other.max_tool_iterations,
             safety_timeout_changed: self.safety_timeout_secs != other.safety_timeout_secs,
             budget_changed: self.monthly_budget_usd != other.monthly_budget_usd,
-
         }
     }
 }

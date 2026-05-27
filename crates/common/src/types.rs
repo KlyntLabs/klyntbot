@@ -265,5 +265,4 @@ mod tests {
         assert_eq!(parsed_channel, channel);
         assert_eq!(parsed_chat_id, chat_id);
     }
-
 }

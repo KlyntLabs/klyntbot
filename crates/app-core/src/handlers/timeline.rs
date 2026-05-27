@@ -127,7 +127,6 @@ impl AppCore {
                                 | TimelineEntryType::TaskCompleted
                                 | TimelineEntryType::NoteCreated
                                 | TimelineEntryType::NoteUpdated
-
                         )
                     });
                     entries.extend(domain_entries);

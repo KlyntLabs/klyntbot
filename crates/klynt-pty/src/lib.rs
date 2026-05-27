@@ -30,8 +30,8 @@ pub enum ChildHandle {
     /// Send but not Sync.
     Pty {
         master: std::sync::Arc<tokio::sync::Mutex<Box<dyn portable_pty::MasterPty + Send>>>,
-        child:  std::sync::Arc<tokio::sync::Mutex<Box<dyn portable_pty::Child + Send + Sync>>>,
-        pgid:   Option<u32>,
+        child: std::sync::Arc<tokio::sync::Mutex<Box<dyn portable_pty::Child + Send + Sync>>>,
+        pgid: Option<u32>,
     },
 }
 
@@ -176,7 +176,10 @@ mod tests {
                 Ok(n) => s.push_str(&String::from_utf8_lossy(&chunk[..n])),
             }
         }
-        assert!(s.contains("hello"), "pty stdout should contain 'hello', got: {s:?}");
+        assert!(
+            s.contains("hello"),
+            "pty stdout should contain 'hello', got: {s:?}"
+        );
     }
 
     #[tokio::test]
