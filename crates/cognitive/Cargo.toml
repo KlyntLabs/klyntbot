@@ -14,3 +14,18 @@ license.workspace = true
 cognitive-memory = { workspace = true }
 cognitive-reforge = { workspace = true }
 cognitive-mirror = { workspace = true }
+
+# Facade-surface integration tests (tests/) exercise the unified `cognitive::*`
+# re-export, so they live here rather than in the concern crates.
+[dev-dependencies]
+common = { workspace = true }
+storage = { workspace = true }
+ai-core = { workspace = true }
+config = { workspace = true }
+jiff = { workspace = true }
+petgraph = { workspace = true }
+proptest = { workspace = true }
+sqlx = { workspace = true }
+async-trait = { workspace = true }
+tokio = { workspace = true }
+uuid = { workspace = true, features = ["v4"] }
