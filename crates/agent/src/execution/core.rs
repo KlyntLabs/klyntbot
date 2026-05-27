@@ -1205,6 +1205,81 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_streaming_reconstructs_fragmented_tool_call() {
+        use crate::test_utils::StreamScript;
+        use providers::Usage;
+
+        // A tool call whose JSON arguments arrive in TWO fragments at the same
+        // index (id+name only on the first delta) — exactly how Anthropic/OpenAI
+        // stream them. Only call_provider_streaming + PartialToolCall can reassemble
+        // this; the response-queue path (chat()) never exercises it.
+        let cycle1 = StreamScript::new()
+            .text("Let me check that")
+            .tool_call("call_1", "echo", &[r#"{"msg":"#, r#""hi"}"#])
+            .usage(Usage {
+                prompt_tokens: 10,
+                completion_tokens: 4,
+                total_tokens: 14,
+                cache_read_tokens: 0,
+                cache_write_tokens: 0,
+            })
+            .finish("tool_calls");
+
+        let provider = Arc::new(MockProvider::with_streams(vec![cycle1]));
+        let registry = make_registry_with(EchoTool);
+        let core = ExecutionCore::new(provider, registry);
+
+        let mut messages = vec![Message::user("hi")];
+        let params = ExecutionParams::new("mock", 128_000);
+        let tools = vec![];
+
+        // event_tx = Some(..) FORCES the streaming branch.
+        let (tx, mut rx) = tokio::sync::mpsc::channel::<crate::events::AgentEvent>(64);
+
+        let (outcome, usage) = core
+            .run_cycle(
+                &mut messages,
+                &tools,
+                &params,
+                &routing_ctx(),
+                Some(&tx),
+                None,
+                &[],
+            )
+            .await
+            .unwrap();
+
+        // Fragments concatenated into valid JSON -> tool executed with {"msg":"hi"}.
+        match outcome {
+            CycleOutcome::ToolsExecuted { results } => {
+                assert_eq!(results.len(), 1);
+                assert_eq!(results[0].tool_name, "echo");
+                assert!(results[0].success);
+                assert!(results[0].result.contains("\"msg\""));
+                assert!(results[0].result.contains("hi"));
+            }
+            other => panic!("expected ToolsExecuted, got {:?}", other),
+        }
+
+        // Real usage flowed from the stream, not character estimation.
+        assert_eq!(usage.prompt_tokens, 10);
+        assert_eq!(usage.completion_tokens, 4);
+
+        // The streaming branch fanned out a ContentChunk for the text delta.
+        drop(tx);
+        let mut saw_content = false;
+        while let Ok(ev) = rx.try_recv() {
+            if matches!(ev, crate::events::AgentEvent::ContentChunk { .. }) {
+                saw_content = true;
+            }
+        }
+        assert!(
+            saw_content,
+            "expected a ContentChunk fanned out during streaming"
+        );
+    }
+
+    #[tokio::test]
     async fn test_tool_timeout() {
         let provider = Arc::new(MockProvider::with_tool_call(
             "slow_tool",

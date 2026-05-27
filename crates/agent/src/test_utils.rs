@@ -3,8 +3,8 @@
 use std::sync::Mutex;
 
 use providers::{
-    CacheBreakpoint, ChatParams, LlmProvider, LlmResponse, Message, ProviderCapabilities,
-    ProviderHealth, ToolCall, Usage,
+    CacheBreakpoint, ChatParams, LlmProvider, LlmResponse, LlmStream, LlmStreamChunk, Message,
+    ProviderCapabilities, ProviderHealth, ToolCall, ToolCallDelta, Usage,
 };
 use serde_json::Value;
 
@@ -14,6 +14,7 @@ use serde_json::Value;
 /// provider metadata.
 pub struct MockProvider {
     responses: Mutex<Vec<std::result::Result<LlmResponse, String>>>,
+    streams: Mutex<Vec<Vec<LlmStreamChunk>>>,
     context_window: usize,
     capabilities: ProviderCapabilities,
     health: ProviderHealth,
@@ -50,6 +51,7 @@ impl MockProvider {
     pub fn with_response(response: LlmResponse) -> Self {
         Self {
             responses: Mutex::new(vec![Ok(response)]),
+            streams: Mutex::new(Vec::new()),
             context_window: providers::DEFAULT_CONTEXT_WINDOW,
             capabilities: ProviderCapabilities::default(),
             health: ProviderHealth::Healthy,
@@ -60,6 +62,7 @@ impl MockProvider {
     pub fn with_error(msg: &str) -> Self {
         Self {
             responses: Mutex::new(vec![Err(msg.to_string())]),
+            streams: Mutex::new(Vec::new()),
             context_window: providers::DEFAULT_CONTEXT_WINDOW,
             capabilities: ProviderCapabilities::default(),
             health: ProviderHealth::Healthy,
@@ -71,6 +74,19 @@ impl MockProvider {
     pub fn with_responses(responses: Vec<std::result::Result<LlmResponse, String>>) -> Self {
         Self {
             responses: Mutex::new(responses),
+            streams: Mutex::new(Vec::new()),
+            context_window: providers::DEFAULT_CONTEXT_WINDOW,
+            capabilities: ProviderCapabilities::default(),
+            health: ProviderHealth::Healthy,
+        }
+    }
+
+    /// Create a mock that replays a scripted stream per `chat_stream()` call.
+    /// Each call pops the next scripted `Vec<LlmStreamChunk>` from the queue.
+    pub fn with_streams(streams: Vec<Vec<LlmStreamChunk>>) -> Self {
+        Self {
+            responses: Mutex::new(Vec::new()),
+            streams: Mutex::new(streams),
             context_window: providers::DEFAULT_CONTEXT_WINDOW,
             capabilities: ProviderCapabilities::default(),
             health: ProviderHealth::Healthy,
@@ -139,5 +155,182 @@ impl LlmProvider for MockProvider {
 
     async fn health_check(&self) -> common::Result<ProviderHealth> {
         Ok(self.health.clone())
+    }
+
+    async fn chat_stream(
+        &self,
+        messages: &[Message],
+        tools: Option<&[Value]>,
+        params: &ChatParams,
+        cache_breakpoints: &[CacheBreakpoint],
+    ) -> common::Result<LlmStream> {
+        let scripted = {
+            let mut s = self.streams.lock().unwrap();
+            if s.is_empty() {
+                None
+            } else {
+                Some(s.remove(0))
+            }
+        };
+
+        let chunks: Vec<common::Result<LlmStreamChunk>> = match scripted {
+            // Replay the scripted stream verbatim.
+            Some(chunks) => chunks.into_iter().map(Ok).collect(),
+            // No script queued: wrap chat() exactly like the trait default,
+            // so non-streaming mocks keep working when driven via chat_stream.
+            None => {
+                let response = self
+                    .chat(messages, tools, params, cache_breakpoints)
+                    .await?;
+                let mut out = Vec::with_capacity(response.tool_calls.len() + 1);
+                for (i, tc) in response.tool_calls.iter().enumerate() {
+                    out.push(Ok(LlmStreamChunk {
+                        content: None,
+                        tool_call_delta: Some(ToolCallDelta {
+                            index: i,
+                            id: Some(tc.id.clone()),
+                            name: Some(tc.name.clone()),
+                            arguments: Some(
+                                serde_json::to_string(&tc.arguments).unwrap_or_default(),
+                            ),
+                        }),
+                        is_final: false,
+                        finish_reason: None,
+                        reasoning_content: None,
+                        usage: None,
+                    }));
+                }
+                out.push(Ok(LlmStreamChunk {
+                    content: response.content,
+                    tool_call_delta: None,
+                    is_final: true,
+                    finish_reason: Some(response.finish_reason),
+                    reasoning_content: response.reasoning_content,
+                    usage: Some(response.usage),
+                }));
+                out
+            }
+        };
+
+        Ok(Box::pin(futures_util::stream::iter(chunks)))
+    }
+}
+
+/// Builds a scripted `Vec<LlmStreamChunk>` for `MockProvider::with_streams`.
+///
+/// `tool_call` splits a call's JSON arguments across multiple deltas at the
+/// same index (id+name only on the first), which is what forces
+/// `PartialToolCall` in the execution core to concatenate fragments.
+pub struct StreamScript {
+    chunks: Vec<LlmStreamChunk>,
+    next_tool_index: usize,
+}
+
+impl Default for StreamScript {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl StreamScript {
+    pub fn new() -> Self {
+        Self {
+            chunks: Vec::new(),
+            next_tool_index: 0,
+        }
+    }
+
+    /// Append a visible-content (text) delta.
+    pub fn text(mut self, s: &str) -> Self {
+        self.chunks.push(LlmStreamChunk {
+            content: Some(s.to_string()),
+            tool_call_delta: None,
+            is_final: false,
+            finish_reason: None,
+            reasoning_content: None,
+            usage: None,
+        });
+        self
+    }
+
+    /// Append a reasoning (extended-thinking) delta.
+    pub fn reasoning(mut self, s: &str) -> Self {
+        self.chunks.push(LlmStreamChunk {
+            content: None,
+            tool_call_delta: None,
+            is_final: false,
+            finish_reason: None,
+            reasoning_content: Some(s.to_string()),
+            usage: None,
+        });
+        self
+    }
+
+    /// Append a tool call whose `arguments` arrive fragmented across same-index
+    /// deltas. `id`/`name` are sent only on the first fragment.
+    pub fn tool_call(mut self, id: &str, name: &str, arg_fragments: &[&str]) -> Self {
+        let index = self.next_tool_index;
+        self.next_tool_index += 1;
+
+        if arg_fragments.is_empty() {
+            self.chunks.push(LlmStreamChunk {
+                content: None,
+                tool_call_delta: Some(ToolCallDelta {
+                    index,
+                    id: Some(id.to_string()),
+                    name: Some(name.to_string()),
+                    arguments: Some(String::new()),
+                }),
+                is_final: false,
+                finish_reason: None,
+                reasoning_content: None,
+                usage: None,
+            });
+            return self;
+        }
+
+        for (i, frag) in arg_fragments.iter().enumerate() {
+            let first = i == 0;
+            self.chunks.push(LlmStreamChunk {
+                content: None,
+                tool_call_delta: Some(ToolCallDelta {
+                    index,
+                    id: if first { Some(id.to_string()) } else { None },
+                    name: if first { Some(name.to_string()) } else { None },
+                    arguments: Some(frag.to_string()),
+                }),
+                is_final: false,
+                finish_reason: None,
+                reasoning_content: None,
+                usage: None,
+            });
+        }
+        self
+    }
+
+    /// Append a usage-only chunk (mirrors message_start / message_delta).
+    pub fn usage(mut self, usage: Usage) -> Self {
+        self.chunks.push(LlmStreamChunk {
+            content: None,
+            tool_call_delta: None,
+            is_final: false,
+            finish_reason: None,
+            reasoning_content: None,
+            usage: Some(usage),
+        });
+        self
+    }
+
+    /// Terminal chunk carrying the finish reason. Consumes the builder.
+    pub fn finish(mut self, reason: &str) -> Vec<LlmStreamChunk> {
+        self.chunks.push(LlmStreamChunk {
+            content: None,
+            tool_call_delta: None,
+            is_final: true,
+            finish_reason: Some(reason.to_string()),
+            reasoning_content: None,
+            usage: None,
+        });
+        self.chunks
     }
 }
