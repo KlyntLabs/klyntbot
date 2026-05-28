@@ -191,9 +191,14 @@ fn normalize_time_entry(te: storage::TimeEntryWithTask) -> TimelineEntry {
 fn normalize_domain_event(e: cognitive::DomainEventRow) -> Option<TimelineEntry> {
     let payload: serde_json::Value = serde_json::from_str(&e.payload).ok()?;
 
-    // DomainEvent uses serde's externally-tagged format: {"TaskStatusChanged": {..}}
+    // DomainEvent uses serde's externally-tagged format.
+    // For flat variants: {"VariantName": {..}}
+    // For nested variants (post-migration): {"Wrapper": {"kind":"variant_name",..}}
     // Extract the inner object for field access.
-    let inner = payload.get(e.event_type.as_str()).unwrap_or(&payload);
+    let inner = payload
+        .get(e.event_type.as_str())
+        .or_else(|| payload.as_object().and_then(|m| m.values().next()))
+        .unwrap_or(&payload);
 
     /// Extract a string field from a JSON payload.
     fn field<'a>(payload: &'a serde_json::Value, key: &str) -> Option<&'a str> {
@@ -575,7 +580,7 @@ fn compute_summary(entries: &[TimelineEntry]) -> TimelineSummary {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bus::DomainEvent;
+    use bus::{DomainEvent, TaskEvent};
 
     fn make_domain_event_row(event: &DomainEvent, id: &str, ts: &str) -> cognitive::DomainEventRow {
         let event_type = event.variant_name().to_string();
@@ -594,12 +599,12 @@ mod tests {
     /// Round-trip: TaskCreated JSON payload → normalize_domain_event → task_id in entity_id.
     #[test]
     fn task_created_payload_round_trips() {
-        let event = DomainEvent::TaskCreated {
+        let event = DomainEvent::Task(TaskEvent::TaskCreated {
             task_id: "t-roundtrip".to_string(),
             project: None,
             estimate_mins: None,
             task_type: "todo".to_string(),
-        };
+        });
         let row = make_domain_event_row(&event, "evt-rt-1", "2026-04-21T10:00:00Z");
         let entry = normalize_domain_event(row).expect("should normalize");
         assert_eq!(

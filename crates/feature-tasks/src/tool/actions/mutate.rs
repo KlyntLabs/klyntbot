@@ -9,6 +9,7 @@ use super::super::TaskTool;
 use crate::events::TaskEvent;
 use crate::types::Task;
 use bus::DomainEvent;
+use bus::TaskEvent as BusTaskEvent;
 use storage::TaskPatch;
 
 impl TaskTool {
@@ -102,7 +103,7 @@ impl TaskTool {
                 if let (Some(ref old), Some(ref bus)) = (&old_row, &self.domain_bus) {
                     if let (Some(prev), Some(next)) = (old.due_date, task.due_date) {
                         if next > *prev {
-                            bus.publish(DomainEvent::TaskDeferred {
+                            bus.publish_task(BusTaskEvent::TaskDeferred {
                                 task_id: task.id.clone(),
                                 times_deferred: 1,
                             });

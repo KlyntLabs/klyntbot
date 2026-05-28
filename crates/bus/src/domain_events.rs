@@ -166,66 +166,80 @@ pub enum TodoEvent {
     },
 }
 
-/// Events emitted by feature crates for cross-domain communication.
-///
-/// The cognitive layer subscribes to all events to extract facts,
-/// detect patterns, and drive proactive coaching.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum DomainEvent {
-    // -- Productivity --
-    ActivitySessionCompleted {
-        date: String,
-        total_active_secs: i64,
-        productive_secs: i64,
-        distracting_secs: i64,
+/// Notification-domain events. Carried by `DomainEvent::Notification`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum NotificationEvent {
+    HeldNotificationReleased {
+        held_id: String,
+        alarm_id: String,
+        channels: Vec<String>,
     },
-    FocusSessionStarted {
-        session_type: String,
-        target_mins: i64,
+    NotificationDeliveryFailed {
+        alarm_id: String,
+        channel: String,
+        error: String,
+        attempts: u32,
     },
-    FocusSessionEnded {
-        duration_secs: i64,
-        quality: f64,
-        interruptions: i32,
+    TrayNotificationRequested {
+        title: String,
+        body: String,
+        alarm_id: Option<String>,
     },
-    /// Productivity session ended with quality score for focus_quality_trend metric.
-    ProductivitySessionEnded {
-        session_id: String,
-        quality: f64,
-        duration_mins: u32,
-    },
-    DistractionDetected {
-        app: String,
-        duration_secs: Option<i64>,
-        context: String,
-    },
-    ProductivityScoreComputed {
-        date: String,
-        score: f64,
-    },
+}
 
-    // -- Productivity Intelligence Layer --
-    SessionCreated {
-        session_id: String,
-        session_type: String,
-        dominant_category: String,
-        predicted_energy: Option<f64>,
-    },
-    SessionEnded {
-        session_id: String,
-        session_type: String,
-        duration_secs: i64,
-        quality_score: Option<f64>,
-        category_purity: f64,
-    },
-    QualityScored {
-        score_date: String,
-        session_id: Option<String>,
-        overall_score: f64,
-        components: String,
-    },
+impl NotificationEvent {
+    pub fn variant_name(&self) -> &'static str {
+        match self {
+            Self::HeldNotificationReleased { .. } => "HeldNotificationReleased",
+            Self::NotificationDeliveryFailed { .. } => "NotificationDeliveryFailed",
+            Self::TrayNotificationRequested { .. } => "TrayNotificationRequested",
+        }
+    }
+}
 
-    // -- Tasks --
+/// Scheduler alarm events. Carried by `DomainEvent::Alarm`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum AlarmEvent {
+    AlarmFired {
+        fire_id: String,
+        #[serde(rename = "alarm_kind")]
+        kind: String,
+        ref_id: Option<String>,
+        payload_json: String,
+        fired_at_ms: i64,
+    },
+    AlarmSnoozed {
+        fire_id: String,
+        new_fire_at_ms: i64,
+    },
+    AlarmCancelled {
+        fire_id: String,
+        reason: String,
+    },
+    MissedAlarms {
+        fire_ids: Vec<String>,
+        oldest_fire_at_ms: i64,
+        newest_fire_at_ms: i64,
+    },
+}
+
+impl AlarmEvent {
+    pub fn variant_name(&self) -> &'static str {
+        match self {
+            Self::AlarmFired { .. } => "AlarmFired",
+            Self::AlarmSnoozed { .. } => "AlarmSnoozed",
+            Self::AlarmCancelled { .. } => "AlarmCancelled",
+            Self::MissedAlarms { .. } => "MissedAlarms",
+        }
+    }
+}
+
+/// Task-domain events. Carried by `DomainEvent::Task`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum TaskEvent {
     TaskCreated {
         task_id: String,
         project: Option<String>,
@@ -242,55 +256,62 @@ pub enum DomainEvent {
         task_id: String,
         times_deferred: i32,
     },
-
-    /// Emitted when a task is focused/unfocused with a deadline. Consumed by feature_tasks::focus_alarms.
     TaskFocusChanged {
         task_id: String,
-        /// None means unfocused.
         focus_deadline: Option<String>,
     },
-    /// Emitted when a focused task's deadline passes without completion.
     TaskFocusExpired {
         task_id: String,
         title: String,
     },
-
     EstimationRecorded {
         task_id: String,
         estimated_mins: u32,
         actual_mins: u32,
         deviation_pct: f64,
     },
+}
 
-    // -- Notes --
-    NoteCreated {
-        note_id: String,
-        title: String,
-    },
-    NoteUpdated {
-        note_id: String,
-        title: String,
-    },
-    NoteContentChanged {
-        note_id: String,
-    },
-    NoteEditingFinished {
-        note_id: String,
-    },
-    NoteDeleted {
-        note_id: String,
-    },
+impl TaskEvent {
+    pub fn variant_name(&self) -> &'static str {
+        match self {
+            Self::TaskCreated { .. } => "TaskCreated",
+            Self::TaskCompleted { .. } => "TaskCompleted",
+            Self::TaskDeferred { .. } => "TaskDeferred",
+            Self::TaskFocusChanged { .. } => "TaskFocusChanged",
+            Self::TaskFocusExpired { .. } => "TaskFocusExpired",
+            Self::EstimationRecorded { .. } => "EstimationRecorded",
+        }
+    }
+}
 
-    // -- Chat --
-    ChatTurnCompleted {
-        session_key: String,
-        /// The user's message content for cognitive extraction.
-        /// `None` for legacy events or when content is unavailable.
-        #[serde(default)]
-        user_message: Option<String>,
-    },
+/// Note-domain events. Carried by `DomainEvent::Note`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum NoteEvent {
+    NoteCreated { note_id: String, title: String },
+    NoteUpdated { note_id: String, title: String },
+    NoteContentChanged { note_id: String },
+    NoteEditingFinished { note_id: String },
+    NoteDeleted { note_id: String },
+}
 
-    // -- Tool execution --
+impl NoteEvent {
+    pub fn variant_name(&self) -> &'static str {
+        match self {
+            Self::NoteCreated { .. } => "NoteCreated",
+            Self::NoteUpdated { .. } => "NoteUpdated",
+            Self::NoteContentChanged { .. } => "NoteContentChanged",
+            Self::NoteEditingFinished { .. } => "NoteEditingFinished",
+            Self::NoteDeleted { .. } => "NoteDeleted",
+        }
+    }
+}
+
+/// Tool-execution events. Carried by `DomainEvent::ToolExecution`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum ToolExecutionEvent {
     ToolCallExecuted {
         tool_name: String,
         args_preview: Option<String>,
@@ -314,37 +335,26 @@ pub enum DomainEvent {
         decided_by: String,
         occurred_at: i64,
     },
+}
 
-    // -- Cross-domain --
-    UserStatedFact {
-        fact: String,
-        domain: String,
-    },
-    UserCorrectedAI {
-        original: String,
-        correction: String,
-        kind: CorrectionKind,
-        strength: f64,
-        session_key: String,
-        active_skill: Option<String>,
-    },
-    /// Autotuner lifecycle event. `verdict` is one of:
-    /// - `"activated"` — a new trial started running (emitted by `autotuner` at kickoff)
-    /// - `"promoted"` — trial beat champion and became new champion
-    /// - `"reverted"` — previous promotion was rolled back due to regression
-    AutotunerDecision {
-        trial_id: String,
-        verdict: String,
-        improvement_pct: f64,
-        affected_params: Vec<String>,
-    },
+impl ToolExecutionEvent {
+    pub fn variant_name(&self) -> &'static str {
+        match self {
+            Self::ToolCallExecuted { .. } => "ToolCallExecuted",
+            Self::ApprovalRequested { .. } => "ApprovalRequested",
+            Self::ApprovalResolved { .. } => "ApprovalResolved",
+        }
+    }
+}
 
-    // -- Coaching feedback --
+/// Coaching events. Carried by `DomainEvent::Coaching`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum CoachingEvent {
     CoachingFeedback {
         intervention_id: String,
         response: FeedbackResponse,
     },
-    /// Coaching strategy was applied; carries acceptance verdict for `coaching_acceptance_rate`.
     CoachingStrategyApplied {
         strategy_id: String,
         rule_text: String,
@@ -358,16 +368,320 @@ pub enum DomainEvent {
         signal_count: i32,
         rule_text: String,
     },
+    CoachingLearningDigest {
+        fading_count: usize,
+        archived_count: usize,
+        streak_days: usize,
+        strongest_topic: Option<String>,
+        weakest_topic: Option<String>,
+    },
+}
 
-    // -- Behavioral learning --
+impl CoachingEvent {
+    pub fn variant_name(&self) -> &'static str {
+        match self {
+            Self::CoachingFeedback { .. } => "CoachingFeedback",
+            Self::CoachingStrategyApplied { .. } => "CoachingStrategyApplied",
+            Self::CoachingPatternDetected { .. } => "CoachingPatternDetected",
+            Self::CoachingLearningDigest { .. } => "CoachingLearningDigest",
+        }
+    }
+}
+
+/// Cross-domain events. Carried by `DomainEvent::CrossDomain`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum CrossDomainEvent {
+    UserStatedFact {
+        fact: String,
+        domain: String,
+    },
+    UserCorrectedAI {
+        original: String,
+        correction: String,
+        kind: CorrectionKind,
+        strength: f64,
+        session_key: String,
+        active_skill: Option<String>,
+    },
+    AutotunerDecision {
+        trial_id: String,
+        verdict: String,
+        improvement_pct: f64,
+        affected_params: Vec<String>,
+    },
+}
+
+impl CrossDomainEvent {
+    pub fn variant_name(&self) -> &'static str {
+        match self {
+            Self::UserStatedFact { .. } => "UserStatedFact",
+            Self::UserCorrectedAI { .. } => "UserCorrectedAI",
+            Self::AutotunerDecision { .. } => "AutotunerDecision",
+        }
+    }
+}
+
+/// Productivity events. Carried by `DomainEvent::Productivity`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum ProductivityEvent {
+    ActivitySessionCompleted {
+        date: String,
+        total_active_secs: i64,
+        productive_secs: i64,
+        distracting_secs: i64,
+    },
+    FocusSessionStarted {
+        session_type: String,
+        target_mins: i64,
+    },
+    FocusSessionEnded {
+        duration_secs: i64,
+        quality: f64,
+        interruptions: i32,
+    },
+    ProductivitySessionEnded {
+        session_id: String,
+        quality: f64,
+        duration_mins: u32,
+    },
+    DistractionDetected {
+        app: String,
+        duration_secs: Option<i64>,
+        context: String,
+    },
+    ProductivityScoreComputed {
+        date: String,
+        score: f64,
+    },
+    SessionCreated {
+        session_id: String,
+        session_type: String,
+        dominant_category: String,
+        predicted_energy: Option<f64>,
+    },
+    SessionEnded {
+        session_id: String,
+        session_type: String,
+        duration_secs: i64,
+        quality_score: Option<f64>,
+        category_purity: f64,
+    },
+    QualityScored {
+        score_date: String,
+        session_id: Option<String>,
+        overall_score: f64,
+        components: String,
+    },
+}
+
+impl ProductivityEvent {
+    pub fn variant_name(&self) -> &'static str {
+        match self {
+            Self::ActivitySessionCompleted { .. } => "ActivitySessionCompleted",
+            Self::FocusSessionStarted { .. } => "FocusSessionStarted",
+            Self::FocusSessionEnded { .. } => "FocusSessionEnded",
+            Self::ProductivitySessionEnded { .. } => "ProductivitySessionEnded",
+            Self::DistractionDetected { .. } => "DistractionDetected",
+            Self::ProductivityScoreComputed { .. } => "ProductivityScoreComputed",
+            Self::SessionCreated { .. } => "SessionCreated",
+            Self::SessionEnded { .. } => "SessionEnded",
+            Self::QualityScored { .. } => "QualityScored",
+        }
+    }
+}
+
+/// Language-learning events. Carried by `DomainEvent::LanguageLearning`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum LanguageLearningEvent {
+    PronunciationScored {
+        session_id: String,
+        overall_score: f64,
+        weak_phonemes: Vec<String>,
+    },
+    ExamAttempted {
+        exam_id: String,
+        score: u32,
+        passed: bool,
+    },
+    PhoneticMasteryGained {
+        phoneme: String,
+        mastery_level: f64,
+    },
+    LanguagePracticeSessionCompleted {
+        session_id: String,
+        language: String,
+        duration_secs: u64,
+        success_rate: f64,
+    },
+}
+
+impl LanguageLearningEvent {
+    pub fn variant_name(&self) -> &'static str {
+        match self {
+            Self::PronunciationScored { .. } => "PronunciationScored",
+            Self::ExamAttempted { .. } => "ExamAttempted",
+            Self::PhoneticMasteryGained { .. } => "PhoneticMasteryGained",
+            Self::LanguagePracticeSessionCompleted { .. } => "LanguagePracticeSessionCompleted",
+        }
+    }
+}
+
+/// Lifecycle events. Carried by `DomainEvent::Lifecycle`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum LifecycleEvent {
+    SystemWillSleep,
+    SystemDidWake {
+        away_secs: u64,
+        wake_type: WakeType,
+    },
+    UserBecameIdle {
+        idle_secs: u64,
+    },
+    UserReturned {
+        absence_secs: u64,
+        wake_type: WakeType,
+    },
+    FocusSessionSuspended {
+        remaining_secs: u64,
+        phase_name: String,
+    },
+    CronCatchUpReady {
+        immediate_count: usize,
+        deferred_count: usize,
+        expired_count: usize,
+    },
+    WakePanelReady {
+        greeting: String,
+        away_secs: u64,
+    },
+}
+
+impl LifecycleEvent {
+    pub fn variant_name(&self) -> &'static str {
+        match self {
+            Self::SystemWillSleep => "SystemWillSleep",
+            Self::SystemDidWake { .. } => "SystemDidWake",
+            Self::UserBecameIdle { .. } => "UserBecameIdle",
+            Self::UserReturned { .. } => "UserReturned",
+            Self::FocusSessionSuspended { .. } => "FocusSessionSuspended",
+            Self::CronCatchUpReady { .. } => "CronCatchUpReady",
+            Self::WakePanelReady { .. } => "WakePanelReady",
+        }
+    }
+}
+
+/// Community events. Carried by `DomainEvent::Community`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum CommunityEvent {
+    CommunityDiscovered {
+        community_id: String,
+        name: String,
+        member_count: u32,
+    },
+    CommunityUpdated {
+        community_id: String,
+        name: String,
+        reason: String,
+    },
+    CommunityWeakened {
+        community_id: String,
+        name: String,
+        stability: f64,
+    },
+    CoActivationStrengthened {
+        fact_id_a: String,
+        fact_id_b: String,
+        strength: f64,
+    },
+}
+
+impl CommunityEvent {
+    pub fn variant_name(&self) -> &'static str {
+        match self {
+            Self::CommunityDiscovered { .. } => "CommunityDiscovered",
+            Self::CommunityUpdated { .. } => "CommunityUpdated",
+            Self::CommunityWeakened { .. } => "CommunityWeakened",
+            Self::CoActivationStrengthened { .. } => "CoActivationStrengthened",
+        }
+    }
+}
+
+/// Coding-memory events. Carried by `DomainEvent::CodingMemory`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum CodingMemoryEvent {
+    PatternApplied {
+        pattern_id: String,
+        session_id: String,
+        repo: Option<String>,
+        source: String,
+    },
+    PatternOutcome {
+        pattern_id: String,
+        outcome: String,
+        evidence: String,
+        measured_at: String,
+    },
+    FixAttemptFailed {
+        problem_hash: String,
+        repo: Option<String>,
+        attempt_count: u32,
+    },
+    MemoryRetrieved {
+        memory_ids: Vec<String>,
+        query: String,
+        session_id: String,
+        turn_id: Option<String>,
+    },
+    AssistantMsgCompleted {
+        session_id: String,
+        turn_id: Option<String>,
+        cited_memory_ids: Vec<String>,
+    },
+    RetrievalSkillApplied {
+        skill: String,
+        before_score: f32,
+        after_score: f32,
+        budget_used: String,
+        session_id: String,
+    },
+}
+
+impl CodingMemoryEvent {
+    pub fn variant_name(&self) -> &'static str {
+        match self {
+            Self::PatternApplied { .. } => "PatternApplied",
+            Self::PatternOutcome { .. } => "PatternOutcome",
+            Self::FixAttemptFailed { .. } => "FixAttemptFailed",
+            Self::MemoryRetrieved { .. } => "MemoryRetrieved",
+            Self::AssistantMsgCompleted { .. } => "AssistantMsgCompleted",
+            Self::RetrievalSkillApplied { .. } => "RetrievalSkillApplied",
+        }
+    }
+}
+
+/// Learning events. Carried by `DomainEvent::Learning`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum LearningEvent {
     BehavioralPatternDetected {
         pattern_type: String,
         pattern_key: String,
         sample_count: i32,
         detail: String,
     },
-
-    // -- Knowledge Atoms --
+    ContradictionDetected {
+        existing_subject: String,
+        existing_predicate: String,
+        existing_object: String,
+        new_object: String,
+        confidence: f64,
+    },
     KnowledgeAtomCreated {
         atom_id: String,
         atom_type: String,
@@ -468,39 +782,76 @@ pub enum DomainEvent {
         weak_domains: Vec<String>,
         propagation_count: usize,
     },
-    PronunciationScored {
-        session_id: String,
-        overall_score: f64,
-        weak_phonemes: Vec<String>,
-    },
-    ExamAttempted {
-        exam_id: String,
-        score: u32,
-        passed: bool,
-    },
-    PhoneticMasteryGained {
-        phoneme: String,
-        mastery_level: f64,
-    },
-    LanguagePracticeSessionCompleted {
-        session_id: String,
-        language: String,
-        duration_secs: u64,
-        success_rate: f64,
-    },
     KnowledgeTransferDetected {
         atom_id: String,
         from_domain: String,
         to_domain: String,
         confidence: f64,
     },
-    CoachingLearningDigest {
-        fading_count: usize,
-        archived_count: usize,
-        streak_days: usize,
-        strongest_topic: Option<String>,
-        weakest_topic: Option<String>,
+}
+
+impl LearningEvent {
+    pub fn variant_name(&self) -> &'static str {
+        match self {
+            Self::BehavioralPatternDetected { .. } => "BehavioralPatternDetected",
+            Self::ContradictionDetected { .. } => "ContradictionDetected",
+            Self::KnowledgeAtomCreated { .. } => "KnowledgeAtomCreated",
+            Self::KnowledgeAtomAccepted { .. } => "KnowledgeAtomAccepted",
+            Self::KnowledgeAtomArchived { .. } => "KnowledgeAtomArchived",
+            Self::AtomFlashcardReviewed { .. } => "AtomFlashcardReviewed",
+            Self::AtomReinforced { .. } => "AtomReinforced",
+            Self::KnowledgeAtomExtracted { .. } => "KnowledgeAtomExtracted",
+            Self::FlashcardScheduled { .. } => "FlashcardScheduled",
+            Self::AtomRetentionDecayed { .. } => "AtomRetentionDecayed",
+            Self::AtomSemanticFactLinked { .. } => "AtomSemanticFactLinked",
+            Self::AtomInteracted { .. } => "AtomInteracted",
+            Self::RetentionMilestoneReached { .. } => "RetentionMilestoneReached",
+            Self::TranslationCompleted { .. } => "TranslationCompleted",
+            Self::NoteStudied { .. } => "NoteStudied",
+            Self::PracticeUnitCompleted { .. } => "PracticeUnitCompleted",
+            Self::PracticeSessionCompleted { .. } => "PracticeSessionCompleted",
+            Self::FlashcardSessionCompleted { .. } => "FlashcardSessionCompleted",
+            Self::KnowledgeTransferDetected { .. } => "KnowledgeTransferDetected",
+        }
+    }
+}
+
+/// Events emitted by feature crates for cross-domain communication.
+///
+/// The cognitive layer subscribes to all events to extract facts,
+/// detect patterns, and drive proactive coaching.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum DomainEvent {
+    // -- Productivity --
+    Productivity(ProductivityEvent),
+
+    // -- Tasks --
+    Task(TaskEvent),
+
+    // -- Notes --
+    Note(NoteEvent),
+
+    // -- Chat --
+    ChatTurnCompleted {
+        session_key: String,
+        /// The user's message content for cognitive extraction.
+        /// `None` for legacy events or when content is unavailable.
+        #[serde(default)]
+        user_message: Option<String>,
     },
+
+    // -- Tool execution --
+    ToolExecution(ToolExecutionEvent),
+
+    // -- Cross-domain --
+    CrossDomain(CrossDomainEvent),
+
+    // -- Coaching feedback --
+    Coaching(CoachingEvent),
+
+    // -- Learning --
+    Learning(LearningEvent),
+    LanguageLearning(LanguageLearningEvent),
 
     // -- Productivity interventions --
     InterventionTriggered {
@@ -508,15 +859,6 @@ pub enum DomainEvent {
         urgency: String,
         message: String,
         suggested_action: String,
-    },
-
-    // -- Contradiction detection (Phase 3 prep) --
-    ContradictionDetected {
-        existing_subject: String,
-        existing_predicate: String,
-        existing_object: String,
-        new_object: String,
-        confidence: f64,
     },
 
     // -- Agent routing --
@@ -530,39 +872,7 @@ pub enum DomainEvent {
     },
 
     // -- Lifecycle events --
-    /// macOS is about to sleep.
-    SystemWillSleep,
-    /// macOS woke from sleep.
-    SystemDidWake {
-        away_secs: u64,
-        wake_type: WakeType,
-    },
-    /// User became idle (no input for threshold duration).
-    UserBecameIdle {
-        idle_secs: u64,
-    },
-    /// User returned after being idle or after system sleep.
-    UserReturned {
-        absence_secs: u64,
-        wake_type: WakeType,
-    },
-    // -- Wake orchestrator ready signals --
-    /// Focus timer was suspended due to sleep/idle.
-    FocusSessionSuspended {
-        remaining_secs: u64,
-        phase_name: String,
-    },
-    /// Cron service classified missed jobs for catch-up.
-    CronCatchUpReady {
-        immediate_count: usize,
-        deferred_count: usize,
-        expired_count: usize,
-    },
-    /// Wake panel assembled and ready for UI display.
-    WakePanelReady {
-        greeting: String,
-        away_secs: u64,
-    },
+    Lifecycle(LifecycleEvent),
 
     /// Emitted when a cross-domain connection dot is ready for UI display.
     CrossDomainDotReady {
@@ -578,88 +888,13 @@ pub enum DomainEvent {
     },
 
     // -- Community lifecycle --
-    /// A new community was discovered by Phase 6.5 restructuring.
-    CommunityDiscovered {
-        community_id: String,
-        name: String,
-        member_count: u32,
-    },
-    /// A community's composition or metadata changed.
-    CommunityUpdated {
-        community_id: String,
-        name: String,
-        reason: String,
-    },
-    /// A community's stability dropped enough to mark it for deletion on the next sweep.
-    CommunityWeakened {
-        community_id: String,
-        name: String,
-        stability: f64,
-    },
-    /// Co-activation strengthened between two facts.
-    CoActivationStrengthened {
-        fact_id_a: String,
-        fact_id_b: String,
-        strength: f64,
-    },
+    Community(CommunityEvent),
 
     // -- Notifications --
-    /// Emitted when a held notification is released (e.g. quiet hours ended).
-    HeldNotificationReleased {
-        held_id: String,
-        alarm_id: String,
-        channels: Vec<String>,
-    },
-
-    /// Emitted after all retry attempts for a notification delivery have been exhausted.
-    NotificationDeliveryFailed {
-        alarm_id: String,
-        channel: String,
-        error: String,
-        attempts: u32,
-    },
-
-    /// Emitted when a tray (system/menu-bar) notification should be shown.
-    TrayNotificationRequested {
-        title: String,
-        body: String,
-        alarm_id: Option<String>,
-    },
+    Notification(NotificationEvent),
 
     // -- Scheduler alarms --
-    /// A scheduled fire has matured. `kind` identifies which subsystem owns the fire;
-    /// `ref_id` is that subsystem's identifier. Conventions:
-    /// - `kind = "task_alarm"` → `ref_id` is the task id
-    /// - `kind = "cron_job"` → `ref_id` is the cron_jobs.id
-    /// - `kind = "standalone_alarm"` → `ref_id` is the alarm id
-    /// - `kind = "held_release"` → `ref_id` is the held_notifications.id
-    ///
-    /// `payload_json` is the raw `scheduled_fires.payload` string; subscribers
-    /// that need structured data should parse it. This keeps the bus event
-    /// decoupled from the storage schema.
-    AlarmFired {
-        fire_id: String,
-        kind: String,
-        ref_id: Option<String>,
-        payload_json: String,
-        fired_at_ms: i64,
-    },
-    /// Emitted when a fired alarm is snoozed to a later time.
-    AlarmSnoozed {
-        fire_id: String,
-        new_fire_at_ms: i64,
-    },
-    /// Emitted when a scheduled alarm is cancelled.
-    AlarmCancelled {
-        fire_id: String,
-        reason: String,
-    },
-    /// Emitted when alarms were missed (e.g. while app was offline).
-    MissedAlarms {
-        fire_ids: Vec<String>,
-        oldest_fire_at_ms: i64,
-        newest_fire_at_ms: i64,
-    },
+    Alarm(AlarmEvent),
 
     PluginEvent {
         plugin_id: String,
@@ -668,41 +903,8 @@ pub enum DomainEvent {
     },
 
     // -- Coding memory --
-    PatternApplied {
-        pattern_id: String,
-        session_id: String,
-        repo: Option<String>,
-        source: String,
-    },
-    PatternOutcome {
-        pattern_id: String,
-        outcome: String,
-        evidence: String,
-        measured_at: String,
-    },
-    FixAttemptFailed {
-        problem_hash: String,
-        repo: Option<String>,
-        attempt_count: u32,
-    },
-    MemoryRetrieved {
-        memory_ids: Vec<String>,
-        query: String,
-        session_id: String,
-        turn_id: Option<String>,
-    },
-    AssistantMsgCompleted {
-        session_id: String,
-        turn_id: Option<String>,
-        cited_memory_ids: Vec<String>,
-    },
-    RetrievalSkillApplied {
-        skill: String,
-        before_score: f32,
-        after_score: f32,
-        budget_used: String,
-        session_id: String,
-    },
+    CodingMemory(CodingMemoryEvent),
+
     /// Launcher item was executed (opened, run, activated).
     LauncherItemExecuted {
         item_id: String,
@@ -738,88 +940,24 @@ impl DomainEvent {
     pub fn variant_name(&self) -> &'static str {
         // serde tag serialization would work but allocates; a manual match is zero-cost.
         match self {
-            Self::ActivitySessionCompleted { .. } => "ActivitySessionCompleted",
-            Self::FocusSessionStarted { .. } => "FocusSessionStarted",
-            Self::FocusSessionEnded { .. } => "FocusSessionEnded",
-            Self::ProductivitySessionEnded { .. } => "ProductivitySessionEnded",
-            Self::DistractionDetected { .. } => "DistractionDetected",
-            Self::ProductivityScoreComputed { .. } => "ProductivityScoreComputed",
-            Self::SessionCreated { .. } => "SessionCreated",
-            Self::SessionEnded { .. } => "SessionEnded",
-            Self::QualityScored { .. } => "QualityScored",
-            Self::TaskCreated { .. } => "TaskCreated",
-            Self::TaskCompleted { .. } => "TaskCompleted",
-            Self::TaskDeferred { .. } => "TaskDeferred",
-            Self::TaskFocusChanged { .. } => "TaskFocusChanged",
-            Self::TaskFocusExpired { .. } => "TaskFocusExpired",
-            Self::EstimationRecorded { .. } => "EstimationRecorded",
-            Self::NoteCreated { .. } => "NoteCreated",
-            Self::NoteUpdated { .. } => "NoteUpdated",
-            Self::NoteContentChanged { .. } => "NoteContentChanged",
-            Self::NoteEditingFinished { .. } => "NoteEditingFinished",
-            Self::NoteDeleted { .. } => "NoteDeleted",
+            Self::Productivity(e) => e.variant_name(),
+            Self::Task(e) => e.variant_name(),
+            Self::Note(e) => e.variant_name(),
             Self::ChatTurnCompleted { .. } => "ChatTurnCompleted",
-            Self::ToolCallExecuted { .. } => "ToolCallExecuted",
-            Self::ApprovalRequested { .. } => "ApprovalRequested",
-            Self::ApprovalResolved { .. } => "ApprovalResolved",
-            Self::UserStatedFact { .. } => "UserStatedFact",
-            Self::UserCorrectedAI { .. } => "UserCorrectedAI",
-            Self::AutotunerDecision { .. } => "AutotunerDecision",
-            Self::CoachingFeedback { .. } => "CoachingFeedback",
-            Self::CoachingStrategyApplied { .. } => "CoachingStrategyApplied",
-            Self::CoachingPatternDetected { .. } => "CoachingPatternDetected",
-            Self::BehavioralPatternDetected { .. } => "BehavioralPatternDetected",
-            Self::KnowledgeAtomCreated { .. } => "KnowledgeAtomCreated",
-            Self::KnowledgeAtomAccepted { .. } => "KnowledgeAtomAccepted",
-            Self::KnowledgeAtomArchived { .. } => "KnowledgeAtomArchived",
-            Self::AtomFlashcardReviewed { .. } => "AtomFlashcardReviewed",
-            Self::AtomReinforced { .. } => "AtomReinforced",
-            Self::KnowledgeAtomExtracted { .. } => "KnowledgeAtomExtracted",
-            Self::FlashcardScheduled { .. } => "FlashcardScheduled",
-            Self::AtomRetentionDecayed { .. } => "AtomRetentionDecayed",
-            Self::AtomSemanticFactLinked { .. } => "AtomSemanticFactLinked",
-            Self::AtomInteracted { .. } => "AtomInteracted",
-            Self::RetentionMilestoneReached { .. } => "RetentionMilestoneReached",
-            Self::TranslationCompleted { .. } => "TranslationCompleted",
-            Self::NoteStudied { .. } => "NoteStudied",
-            Self::PracticeUnitCompleted { .. } => "PracticeUnitCompleted",
-            Self::PracticeSessionCompleted { .. } => "PracticeSessionCompleted",
-            Self::KnowledgeTransferDetected { .. } => "KnowledgeTransferDetected",
-            Self::CoachingLearningDigest { .. } => "CoachingLearningDigest",
-            Self::FlashcardSessionCompleted { .. } => "FlashcardSessionCompleted",
-            Self::PronunciationScored { .. } => "PronunciationScored",
-            Self::ExamAttempted { .. } => "ExamAttempted",
-            Self::PhoneticMasteryGained { .. } => "PhoneticMasteryGained",
-            Self::LanguagePracticeSessionCompleted { .. } => "LanguagePracticeSessionCompleted",
+            Self::ToolExecution(e) => e.variant_name(),
+            Self::CrossDomain(e) => e.variant_name(),
+            Self::Coaching(e) => e.variant_name(),
+            Self::Learning(e) => e.variant_name(),
+            Self::LanguageLearning(e) => e.variant_name(),
             Self::InterventionTriggered { .. } => "InterventionTriggered",
-            Self::ContradictionDetected { .. } => "ContradictionDetected",
             Self::SkillRouted { .. } => "SkillRouted",
+            Self::Lifecycle(e) => e.variant_name(),
             Self::CrossDomainDotReady { .. } => "CrossDomainDotReady",
-            Self::CommunityDiscovered { .. } => "CommunityDiscovered",
-            Self::CommunityUpdated { .. } => "CommunityUpdated",
-            Self::CommunityWeakened { .. } => "CommunityWeakened",
-            Self::CoActivationStrengthened { .. } => "CoActivationStrengthened",
-            Self::SystemWillSleep => "SystemWillSleep",
-            Self::SystemDidWake { .. } => "SystemDidWake",
-            Self::UserBecameIdle { .. } => "UserBecameIdle",
-            Self::UserReturned { .. } => "UserReturned",
-            Self::FocusSessionSuspended { .. } => "FocusSessionSuspended",
-            Self::CronCatchUpReady { .. } => "CronCatchUpReady",
-            Self::WakePanelReady { .. } => "WakePanelReady",
-            Self::HeldNotificationReleased { .. } => "HeldNotificationReleased",
-            Self::NotificationDeliveryFailed { .. } => "NotificationDeliveryFailed",
-            Self::TrayNotificationRequested { .. } => "TrayNotificationRequested",
-            Self::AlarmFired { .. } => "AlarmFired",
-            Self::AlarmSnoozed { .. } => "AlarmSnoozed",
-            Self::AlarmCancelled { .. } => "AlarmCancelled",
-            Self::MissedAlarms { .. } => "MissedAlarms",
+            Self::Community(e) => e.variant_name(),
+            Self::Notification(e) => e.variant_name(),
+            Self::Alarm(e) => e.variant_name(),
             Self::PluginEvent { .. } => "PluginEvent",
-            Self::PatternApplied { .. } => "PatternApplied",
-            Self::PatternOutcome { .. } => "PatternOutcome",
-            Self::FixAttemptFailed { .. } => "FixAttemptFailed",
-            Self::MemoryRetrieved { .. } => "MemoryRetrieved",
-            Self::AssistantMsgCompleted { .. } => "AssistantMsgCompleted",
-            Self::RetrievalSkillApplied { .. } => "RetrievalSkillApplied",
+            Self::CodingMemory(e) => e.variant_name(),
             Self::LauncherItemExecuted { .. } => Self::KIND_LAUNCHER_ITEM_EXECUTED,
             Self::DataVersionBumped { .. } => Self::KIND_DATA_VERSION_BUMPED,
             Self::Generic { .. } => "Generic",
@@ -991,98 +1129,36 @@ impl DomainEvent {
     pub fn domain(&self) -> crate::EventDomain {
         use crate::EventDomain as D;
         match self {
-            Self::TaskCreated { .. }
-            | Self::TaskCompleted { .. }
-            | Self::TaskDeferred { .. }
-            | Self::EstimationRecorded { .. }
-            | Self::TaskFocusChanged { .. }
-            | Self::TaskFocusExpired { .. } => D::Work,
+            Self::Task(_) => D::Work,
 
-            Self::ActivitySessionCompleted { .. }
-            | Self::FocusSessionStarted { .. }
-            | Self::FocusSessionEnded { .. }
-            | Self::ProductivitySessionEnded { .. }
-            | Self::DistractionDetected { .. }
-            | Self::ProductivityScoreComputed { .. }
-            | Self::SessionCreated { .. }
-            | Self::SessionEnded { .. }
-            | Self::QualityScored { .. } => D::Energy,
+            Self::Productivity(_) => D::Energy,
 
-            Self::UserStatedFact { domain, .. } => D::Custom(domain.clone()),
-            Self::UserCorrectedAI { .. } => D::Learning,
-            Self::CoachingFeedback { .. }
-            | Self::CoachingStrategyApplied { .. }
-            | Self::CoachingPatternDetected { .. } => D::Coaching,
-            Self::ChatTurnCompleted { .. }
-            | Self::ToolCallExecuted { .. }
-            | Self::ApprovalRequested { .. }
-            | Self::ApprovalResolved { .. } => D::General,
+            Self::CrossDomain(CrossDomainEvent::UserStatedFact { domain, .. }) => {
+                D::Custom(domain.clone())
+            }
+            Self::CrossDomain(_) => D::Learning,
+            Self::Coaching(_) => D::Coaching,
+            Self::ChatTurnCompleted { .. } | Self::ToolExecution(_) => D::General,
 
-            Self::NoteCreated { .. }
-            | Self::NoteUpdated { .. }
-            | Self::NoteContentChanged { .. }
-            | Self::NoteDeleted { .. }
-            | Self::NoteEditingFinished { .. } => D::Notes,
+            Self::Note(_) => D::Notes,
 
-            Self::BehavioralPatternDetected { .. }
-            | Self::ContradictionDetected { .. }
-            | Self::AutotunerDecision { .. }
-            | Self::KnowledgeAtomCreated { .. }
-            | Self::KnowledgeAtomAccepted { .. }
-            | Self::KnowledgeAtomArchived { .. }
-            | Self::AtomFlashcardReviewed { .. }
-            | Self::AtomReinforced { .. }
-            | Self::KnowledgeAtomExtracted { .. }
-            | Self::FlashcardScheduled { .. }
-            | Self::AtomRetentionDecayed { .. }
-            | Self::AtomSemanticFactLinked { .. }
-            | Self::AtomInteracted { .. }
-            | Self::RetentionMilestoneReached { .. }
-            | Self::TranslationCompleted { .. }
-            | Self::NoteStudied { .. }
-            | Self::PracticeUnitCompleted { .. }
-            | Self::PracticeSessionCompleted { .. }
-            | Self::KnowledgeTransferDetected { .. }
-            | Self::CoachingLearningDigest { .. }
-            | Self::FlashcardSessionCompleted { .. } => D::Learning,
+            Self::Learning(_) => D::Learning,
 
-            Self::PronunciationScored { .. }
-            | Self::ExamAttempted { .. }
-            | Self::PhoneticMasteryGained { .. }
-            | Self::LanguagePracticeSessionCompleted { .. } => D::LanguageLearning,
+            Self::LanguageLearning(_) => D::LanguageLearning,
 
             Self::InterventionTriggered { .. } => D::Productivity,
             Self::PluginEvent { .. } => D::Plugin,
             Self::SkillRouted { .. } => D::Agent,
             Self::CrossDomainDotReady { .. } => D::Fabric,
-            Self::CommunityDiscovered { .. }
-            | Self::CommunityUpdated { .. }
-            | Self::CommunityWeakened { .. }
-            | Self::CoActivationStrengthened { .. } => D::Community,
+            Self::Community(_) => D::Community,
 
-            Self::SystemWillSleep
-            | Self::SystemDidWake { .. }
-            | Self::UserBecameIdle { .. }
-            | Self::UserReturned { .. }
-            | Self::FocusSessionSuspended { .. }
-            | Self::CronCatchUpReady { .. }
-            | Self::WakePanelReady { .. } => D::Lifecycle,
+            Self::Lifecycle(_) => D::Lifecycle,
 
-            Self::HeldNotificationReleased { .. }
-            | Self::NotificationDeliveryFailed { .. }
-            | Self::TrayNotificationRequested { .. } => D::Notifications,
+            Self::Notification(_) => D::Notifications,
 
-            Self::AlarmFired { .. }
-            | Self::AlarmSnoozed { .. }
-            | Self::AlarmCancelled { .. }
-            | Self::MissedAlarms { .. } => D::Scheduler,
+            Self::Alarm(_) => D::Scheduler,
 
-            Self::PatternApplied { .. }
-            | Self::PatternOutcome { .. }
-            | Self::FixAttemptFailed { .. }
-            | Self::MemoryRetrieved { .. }
-            | Self::AssistantMsgCompleted { .. }
-            | Self::RetrievalSkillApplied { .. } => D::Agent,
+            Self::CodingMemory(_) => D::Agent,
 
             Self::LauncherItemExecuted { .. } => D::Launcher,
 
@@ -1096,7 +1172,7 @@ impl DomainEvent {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum FeedbackResponse {
     Helpful,
     Dismissed,
@@ -1144,6 +1220,48 @@ impl DomainEventBus {
         self.publish(DomainEvent::BashJob(event));
     }
 
+    pub fn publish_notification(&self, event: NotificationEvent) {
+        self.publish(DomainEvent::Notification(event));
+    }
+
+    pub fn publish_alarm(&self, event: AlarmEvent) {
+        self.publish(DomainEvent::Alarm(event));
+    }
+
+    pub fn publish_task(&self, event: TaskEvent) {
+        self.publish(DomainEvent::Task(event));
+    }
+    pub fn publish_note(&self, event: NoteEvent) {
+        self.publish(DomainEvent::Note(event));
+    }
+    pub fn publish_tool_execution(&self, event: ToolExecutionEvent) {
+        self.publish(DomainEvent::ToolExecution(event));
+    }
+    pub fn publish_coaching(&self, event: CoachingEvent) {
+        self.publish(DomainEvent::Coaching(event));
+    }
+    pub fn publish_cross_domain(&self, event: CrossDomainEvent) {
+        self.publish(DomainEvent::CrossDomain(event));
+    }
+    pub fn publish_productivity(&self, event: ProductivityEvent) {
+        self.publish(DomainEvent::Productivity(event));
+    }
+    pub fn publish_language_learning(&self, event: LanguageLearningEvent) {
+        self.publish(DomainEvent::LanguageLearning(event));
+    }
+    pub fn publish_lifecycle(&self, event: LifecycleEvent) {
+        self.publish(DomainEvent::Lifecycle(event));
+    }
+    pub fn publish_community(&self, event: CommunityEvent) {
+        self.publish(DomainEvent::Community(event));
+    }
+    pub fn publish_coding_memory(&self, event: CodingMemoryEvent) {
+        self.publish(DomainEvent::CodingMemory(event));
+    }
+    pub fn publish_learning(&self, event: LearningEvent) {
+        self.publish(DomainEvent::Learning(event));
+    }
+
     /// Number of active subscribers.
     pub fn subscriber_count(&self) -> usize {
         self.tx.receiver_count()
@@ -1159,14 +1277,16 @@ mod tests {
         let bus = DomainEventBus::new(16);
         let mut rx = bus.subscribe();
 
-        bus.publish(DomainEvent::ProductivityScoreComputed {
-            date: "2026-03-06".into(),
-            score: 74.0,
-        });
+        bus.publish(DomainEvent::Productivity(
+            ProductivityEvent::ProductivityScoreComputed {
+                date: "2026-03-06".into(),
+                score: 74.0,
+            },
+        ));
 
         let event = rx.recv().await.unwrap();
         assert!(
-            matches!(event, DomainEvent::ProductivityScoreComputed { score, .. } if score == 74.0)
+            matches!(event, DomainEvent::Productivity(ProductivityEvent::ProductivityScoreComputed { score, .. }) if score == 74.0)
         );
     }
 
@@ -1176,12 +1296,12 @@ mod tests {
         let mut rx1 = bus.subscribe();
         let mut rx2 = bus.subscribe();
 
-        bus.publish(DomainEvent::TaskCompleted {
+        bus.publish(DomainEvent::Task(TaskEvent::TaskCompleted {
             task_id: "t1".into(),
             actual_duration_mins: Some(30),
             estimated_duration_mins: Some(45),
             deviation_pct: None,
-        });
+        }));
 
         assert!(rx1.recv().await.is_ok());
         assert!(rx2.recv().await.is_ok());
@@ -1189,32 +1309,35 @@ mod tests {
 
     #[test]
     fn test_behavioral_pattern_detected_serialization() {
-        let event = DomainEvent::BehavioralPatternDetected {
+        let event = DomainEvent::Learning(LearningEvent::BehavioralPatternDetected {
             pattern_type: "day_of_week".into(),
             pattern_key: "monday_task".into(),
             sample_count: 15,
             detail: "User uses task agent frequently on Mondays (15 interactions)".into(),
-        };
+        });
         let json = serde_json::to_string(&event).unwrap();
         let deserialized: DomainEvent = serde_json::from_str(&json).unwrap();
         assert!(matches!(
             deserialized,
-            DomainEvent::BehavioralPatternDetected {
+            DomainEvent::Learning(LearningEvent::BehavioralPatternDetected {
                 sample_count: 15,
                 ..
-            }
+            })
         ));
     }
 
     #[test]
     fn test_domain_event_serialization() {
-        let event = DomainEvent::UserStatedFact {
+        let event = DomainEvent::CrossDomain(CrossDomainEvent::UserStatedFact {
             fact: "I prefer morning work".into(),
             domain: "productivity".into(),
-        };
+        });
         let json = serde_json::to_string(&event).unwrap();
         let deserialized: DomainEvent = serde_json::from_str(&json).unwrap();
-        assert!(matches!(deserialized, DomainEvent::UserStatedFact { .. }));
+        assert!(matches!(
+            deserialized,
+            DomainEvent::CrossDomain(CrossDomainEvent::UserStatedFact { .. })
+        ));
     }
 
     #[test]
@@ -1236,24 +1359,24 @@ mod tests {
 
     #[test]
     fn user_corrected_ai_with_kind_roundtrip() {
-        let event = DomainEvent::UserCorrectedAI {
+        let event = DomainEvent::CrossDomain(CrossDomainEvent::UserCorrectedAI {
             original: "test".into(),
             correction: "fixed".into(),
             kind: CorrectionKind::Reaction,
             strength: 1.0,
             session_key: "desktop:main".into(),
             active_skill: Some("general".into()),
-        };
+        });
         let json = serde_json::to_string(&event).unwrap();
         let parsed: DomainEvent = serde_json::from_str(&json).unwrap();
         match parsed {
-            DomainEvent::UserCorrectedAI {
+            DomainEvent::CrossDomain(CrossDomainEvent::UserCorrectedAI {
                 kind,
                 strength,
                 session_key,
                 active_skill,
                 ..
-            } => {
+            }) => {
                 assert_eq!(kind, CorrectionKind::Reaction);
                 assert!((strength - 1.0).abs() < f64::EPSILON);
                 assert_eq!(session_key, "desktop:main");
@@ -1267,47 +1390,49 @@ mod tests {
     fn test_note_editing_finished_event() {
         let bus = DomainEventBus::new(32);
         let mut rx = bus.subscribe();
-        bus.publish(DomainEvent::NoteEditingFinished {
+        bus.publish(DomainEvent::Note(NoteEvent::NoteEditingFinished {
             note_id: "note-1".to_string(),
-        });
+        }));
         let event = rx.try_recv().unwrap();
         assert!(
-            matches!(event, DomainEvent::NoteEditingFinished { note_id, .. } if note_id == "note-1")
+            matches!(event, DomainEvent::Note(NoteEvent::NoteEditingFinished { note_id, .. }) if note_id == "note-1")
         );
     }
 
     #[test]
     fn alarm_fired_round_trips_json() {
-        let event = DomainEvent::AlarmFired {
+        let event = DomainEvent::Alarm(AlarmEvent::AlarmFired {
             fire_id: "fire_abc".into(),
             kind: "task_alarm".into(),
             ref_id: Some("task_1".into()),
             payload_json: "{\"msg\":\"hi\"}".into(),
             fired_at_ms: 1_800_000_000_000,
-        };
+        });
         let json = serde_json::to_string(&event).unwrap();
         let parsed: DomainEvent = serde_json::from_str(&json).unwrap();
         match parsed {
-            DomainEvent::AlarmFired { fire_id, .. } => assert_eq!(fire_id, "fire_abc"),
+            DomainEvent::Alarm(AlarmEvent::AlarmFired { fire_id, .. }) => {
+                assert_eq!(fire_id, "fire_abc")
+            }
             _ => panic!("wrong variant"),
         }
     }
 
     #[test]
     fn missed_alarms_round_trips() {
-        let event = DomainEvent::MissedAlarms {
+        let event = DomainEvent::Alarm(AlarmEvent::MissedAlarms {
             fire_ids: vec!["a".into(), "b".into(), "c".into()],
             oldest_fire_at_ms: 1_000,
             newest_fire_at_ms: 2_000,
-        };
+        });
         let json = serde_json::to_string(&event).unwrap();
         let parsed: DomainEvent = serde_json::from_str(&json).unwrap();
         match parsed {
-            DomainEvent::MissedAlarms {
+            DomainEvent::Alarm(AlarmEvent::MissedAlarms {
                 fire_ids,
                 oldest_fire_at_ms,
                 newest_fire_at_ms,
-            } => {
+            }) => {
                 assert_eq!(fire_ids.len(), 3);
                 assert_eq!(oldest_fire_at_ms, 1_000);
                 assert_eq!(newest_fire_at_ms, 2_000);
@@ -1318,77 +1443,83 @@ mod tests {
 
     #[test]
     fn held_notification_released_event_round_trips() {
-        use super::DomainEvent;
-        let e = DomainEvent::HeldNotificationReleased {
+        use super::{DomainEvent, NotificationEvent};
+        let e = DomainEvent::Notification(NotificationEvent::HeldNotificationReleased {
             held_id: "h1".into(),
             alarm_id: "fire_1".into(),
             channels: vec!["telegram".into()],
-        };
+        });
         let s = serde_json::to_string(&e).unwrap();
         let parsed: DomainEvent = serde_json::from_str(&s).unwrap();
         assert!(matches!(
             parsed,
-            DomainEvent::HeldNotificationReleased { .. }
+            DomainEvent::Notification(NotificationEvent::HeldNotificationReleased { .. })
         ));
     }
 
     #[test]
     fn notification_delivery_failed_event_round_trips() {
-        use super::DomainEvent;
-        let e = DomainEvent::NotificationDeliveryFailed {
+        use super::{DomainEvent, NotificationEvent};
+        let e = DomainEvent::Notification(NotificationEvent::NotificationDeliveryFailed {
             alarm_id: "fire_1".into(),
             channel: "discord".into(),
             error: "500".into(),
             attempts: 3,
-        };
+        });
         let s = serde_json::to_string(&e).unwrap();
         let parsed: DomainEvent = serde_json::from_str(&s).unwrap();
         assert!(matches!(
             parsed,
-            DomainEvent::NotificationDeliveryFailed { .. }
+            DomainEvent::Notification(NotificationEvent::NotificationDeliveryFailed { .. })
         ));
     }
 
     #[test]
     fn tray_notification_requested_event_round_trips() {
-        use super::DomainEvent;
-        let e = DomainEvent::TrayNotificationRequested {
+        use super::{DomainEvent, NotificationEvent};
+        let e = DomainEvent::Notification(NotificationEvent::TrayNotificationRequested {
             title: "ping".into(),
             body: "hello".into(),
             alarm_id: Some("fire_1".into()),
-        };
+        });
         let s = serde_json::to_string(&e).unwrap();
         assert!(matches!(
             serde_json::from_str::<DomainEvent>(&s).unwrap(),
-            DomainEvent::TrayNotificationRequested { .. }
+            DomainEvent::Notification(NotificationEvent::TrayNotificationRequested { .. })
         ));
     }
 
     #[test]
     fn pattern_applied_roundtrips() {
-        let e = DomainEvent::PatternApplied {
+        let e = DomainEvent::CodingMemory(CodingMemoryEvent::PatternApplied {
             pattern_id: "fp-1".into(),
             session_id: "s-1".into(),
             repo: Some("github.com/klynt/bot".into()),
             source: "recall_injection".into(),
-        };
+        });
         let json = serde_json::to_string(&e).unwrap();
         let parsed: DomainEvent = serde_json::from_str(&json).unwrap();
-        assert!(matches!(parsed, DomainEvent::PatternApplied { .. }));
+        assert!(matches!(
+            parsed,
+            DomainEvent::CodingMemory(CodingMemoryEvent::PatternApplied { .. })
+        ));
     }
 
     #[test]
     fn retrieval_skill_applied_roundtrips() {
-        let e = DomainEvent::RetrievalSkillApplied {
+        let e = DomainEvent::CodingMemory(CodingMemoryEvent::RetrievalSkillApplied {
             skill: "query_rewriter".into(),
             before_score: 0.1,
             after_score: 0.7,
             budget_used: "deep_think".into(),
             session_id: "s-1".into(),
-        };
+        });
         let json = serde_json::to_string(&e).unwrap();
         let parsed: DomainEvent = serde_json::from_str(&json).unwrap();
-        assert!(matches!(parsed, DomainEvent::RetrievalSkillApplied { .. }));
+        assert!(matches!(
+            parsed,
+            DomainEvent::CodingMemory(CodingMemoryEvent::RetrievalSkillApplied { .. })
+        ));
     }
     #[test]
     fn state_changed_roundtrip() {
@@ -1447,17 +1578,17 @@ mod tests {
 
     #[allow(dead_code)]
     fn autotuner_decision_roundtrip() {
-        let event = DomainEvent::AutotunerDecision {
+        let event = DomainEvent::CrossDomain(CrossDomainEvent::AutotunerDecision {
             trial_id: "abc-123".into(),
             verdict: "promoted".into(),
             improvement_pct: 12.5,
             affected_params: vec!["heuristic_confidence_threshold".into()],
-        };
+        });
         let json = serde_json::to_string(&event).unwrap();
         assert!(json.contains("promoted"));
         let parsed: DomainEvent = serde_json::from_str(&json).unwrap();
         match parsed {
-            DomainEvent::AutotunerDecision { verdict, .. } => {
+            DomainEvent::CrossDomain(CrossDomainEvent::AutotunerDecision { verdict, .. }) => {
                 assert_eq!(verdict, "promoted");
             }
             _ => panic!("Expected AutotunerDecision"),
@@ -1494,3 +1625,6 @@ mod bash_job_event_accessor_tests {
         assert_eq!(lost.agent_id(), "a2");
     }
 }
+
+#[cfg(test)]
+mod string_stability;

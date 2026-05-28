@@ -558,7 +558,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_deferral_publishes_task_deferred() {
-        use bus::{DomainEvent, DomainEventBus};
+        use bus::{DomainEvent, DomainEventBus, TaskEvent};
         use std::sync::Arc;
 
         let pool = storage::StoragePool::connect_in_memory().await.unwrap();
@@ -607,7 +607,7 @@ mod tests {
 
         let mut saw_deferred = false;
         while let Ok(ev) = rx.try_recv() {
-            if matches!(ev, DomainEvent::TaskDeferred { .. }) {
+            if matches!(ev, DomainEvent::Task(TaskEvent::TaskDeferred { .. })) {
                 saw_deferred = true;
                 break;
             }
@@ -620,7 +620,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_pull_forward_does_not_publish_task_deferred() {
-        use bus::{DomainEvent, DomainEventBus};
+        use bus::{DomainEvent, DomainEventBus, TaskEvent};
         use std::sync::Arc;
 
         let pool = storage::StoragePool::connect_in_memory().await.unwrap();
@@ -667,7 +667,7 @@ mod tests {
 
         while let Ok(ev) = rx.try_recv() {
             assert!(
-                !matches!(ev, DomainEvent::TaskDeferred { .. }),
+                !matches!(ev, DomainEvent::Task(TaskEvent::TaskDeferred { .. })),
                 "pulling a task earlier should NOT emit TaskDeferred"
             );
         }

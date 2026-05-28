@@ -52,11 +52,11 @@ impl CoachingService {
                         // Track focus mode state from raw_event
                         if let Some(ref event) = signal.raw_event {
                             match event {
-                                DomainEvent::FocusSessionStarted { .. } => {
+                                DomainEvent::Productivity(bus::ProductivityEvent::FocusSessionStarted { .. }) => {
                                     debug!("Focus session started — coaching delivery paused");
                                     focus_active = true;
                                 }
-                                DomainEvent::FocusSessionEnded { quality, interruptions, duration_secs } => {
+                                DomainEvent::Productivity(bus::ProductivityEvent::FocusSessionEnded { quality, interruptions, duration_secs }) => {
                                     debug!("Focus session ended — draining queued triggers");
                                     let q = *quality;
                                     let i = *interruptions;

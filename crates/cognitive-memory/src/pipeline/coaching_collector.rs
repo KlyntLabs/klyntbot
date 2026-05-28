@@ -2,6 +2,7 @@
 
 use ai_core::{AiSignal, RecallDomain, SignalConsumer};
 use async_trait::async_trait;
+use bus::CoachingEvent;
 
 use super::signal::{CognitiveSignal, SignalContext, SignalSource};
 use super::SignalSender;
@@ -26,11 +27,11 @@ impl SignalConsumer for CoachingCollector {
         if signal.event_kind != "CoachingPatternDetected" {
             return Ok(());
         }
-        let Some(bus::DomainEvent::CoachingPatternDetected {
+        let Some(bus::DomainEvent::Coaching(CoachingEvent::CoachingPatternDetected {
             domain,
             signal_count,
             ..
-        }) = signal.raw_event.as_ref()
+        })) = signal.raw_event.as_ref()
         else {
             return Ok(());
         };
@@ -84,14 +85,16 @@ mod tests {
             event_kind: "CoachingPatternDetected",
             content: "Schedule demanding tasks in the morning".into(),
             importance: 0.85,
-            raw_event: Some(bus::DomainEvent::CoachingPatternDetected {
-                pattern_name: "afternoon_energy_drop".into(),
-                confidence: 0.85,
-                description: "3/4 after 3pm".into(),
-                domain: RecallDomain::Productivity.as_str().into(),
-                signal_count: 4,
-                rule_text: "Schedule demanding tasks in the morning".into(),
-            }),
+            raw_event: Some(bus::DomainEvent::Coaching(
+                CoachingEvent::CoachingPatternDetected {
+                    pattern_name: "afternoon_energy_drop".into(),
+                    confidence: 0.85,
+                    description: "3/4 after 3pm".into(),
+                    domain: RecallDomain::Productivity.as_str().into(),
+                    signal_count: 4,
+                    rule_text: "Schedule demanding tasks in the morning".into(),
+                },
+            )),
             ..coaching_dummy()
         };
         collector.consume(&sig).await.unwrap();

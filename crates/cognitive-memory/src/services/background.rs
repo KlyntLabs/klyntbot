@@ -13,7 +13,10 @@ use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, info, warn};
 
+use bus::domain_events::LearningEvent as BusLearningEvent;
 use bus::DomainEvent;
+use bus::ProductivityEvent;
+use bus::TaskEvent;
 
 use crate::consolidation::ConsolidationHandler;
 use crate::embedder::SemanticFactEmbedder;
@@ -345,7 +348,7 @@ impl BackgroundConsolidationService {
                     let entity_repo = crate::repos::EntityRepo::new(repo.pool().clone());
                     for event in &batch {
                         match event {
-                            DomainEvent::TaskCreated { task_id, .. } => {
+                            DomainEvent::Task(TaskEvent::TaskCreated { task_id, .. }) => {
                                 upsert_domain_entity(&entity_repo, task_id, "task", task_id).await;
                             }
                             _ => {}
@@ -649,13 +652,17 @@ impl BackgroundConsolidationService {
                                                     &session_start,
                                                 )
                                             {
-                                                bus.publish(DomainEvent::ContradictionDetected {
-                                                    existing_subject: old_fact.subject.clone(),
-                                                    existing_predicate: old_fact.predicate.clone(),
-                                                    existing_object: old_fact.object.clone(),
-                                                    new_object: new.object.clone(),
-                                                    confidence: new.confidence,
-                                                });
+                                                bus.publish_learning(
+                                                    BusLearningEvent::ContradictionDetected {
+                                                        existing_subject: old_fact.subject.clone(),
+                                                        existing_predicate: old_fact
+                                                            .predicate
+                                                            .clone(),
+                                                        existing_object: old_fact.object.clone(),
+                                                        new_object: new.object.clone(),
+                                                        confidence: new.confidence,
+                                                    },
+                                                );
                                             }
                                         }
                                     }
@@ -680,13 +687,17 @@ impl BackgroundConsolidationService {
                                                     &session_start,
                                                 )
                                             {
-                                                bus.publish(DomainEvent::ContradictionDetected {
-                                                    existing_subject: existing.subject.clone(),
-                                                    existing_predicate: existing.predicate.clone(),
-                                                    existing_object: existing.object.clone(),
-                                                    new_object: new.object.clone(),
-                                                    confidence: new.confidence,
-                                                });
+                                                bus.publish_learning(
+                                                    BusLearningEvent::ContradictionDetected {
+                                                        existing_subject: existing.subject.clone(),
+                                                        existing_predicate: existing
+                                                            .predicate
+                                                            .clone(),
+                                                        existing_object: existing.object.clone(),
+                                                        new_object: new.object.clone(),
+                                                        confidence: new.confidence,
+                                                    },
+                                                );
                                             }
                                         }
                                     }
@@ -1093,49 +1104,93 @@ pub async fn run_graph_consolidation(
 #[cfg(test)]
 fn event_type_key(event: &DomainEvent) -> &'static str {
     match event {
-        DomainEvent::ActivitySessionCompleted { .. } => "ActivitySessionCompleted",
-        DomainEvent::FocusSessionStarted { .. } => "FocusSessionStarted",
-        DomainEvent::FocusSessionEnded { .. } => "FocusSessionEnded",
-        DomainEvent::DistractionDetected { .. } => "DistractionDetected",
-        DomainEvent::ProductivityScoreComputed { .. } => "ProductivityScoreComputed",
-        DomainEvent::TaskCreated { .. } => "TaskCreated",
-        DomainEvent::TaskCompleted { .. } => "TaskCompleted",
-        DomainEvent::TaskDeferred { .. } => "TaskDeferred",
+        DomainEvent::Productivity(bus::ProductivityEvent::ActivitySessionCompleted { .. }) => {
+            "ActivitySessionCompleted"
+        }
+        DomainEvent::Productivity(bus::ProductivityEvent::FocusSessionStarted { .. }) => {
+            "FocusSessionStarted"
+        }
+        DomainEvent::Productivity(bus::ProductivityEvent::FocusSessionEnded { .. }) => {
+            "FocusSessionEnded"
+        }
+        DomainEvent::Productivity(bus::ProductivityEvent::DistractionDetected { .. }) => {
+            "DistractionDetected"
+        }
+        DomainEvent::Productivity(bus::ProductivityEvent::ProductivityScoreComputed { .. }) => {
+            "ProductivityScoreComputed"
+        }
+        DomainEvent::Task(TaskEvent::TaskCreated { .. }) => "TaskCreated",
+        DomainEvent::Task(TaskEvent::TaskCompleted { .. }) => "TaskCompleted",
+        DomainEvent::Task(TaskEvent::TaskDeferred { .. }) => "TaskDeferred",
 
         DomainEvent::ChatTurnCompleted { .. } => "ChatTurnCompleted",
-        DomainEvent::UserStatedFact { .. } => "UserStatedFact",
-        DomainEvent::UserCorrectedAI { .. } => "UserCorrectedAI",
-        DomainEvent::CoachingFeedback { .. } => "CoachingFeedback",
-        DomainEvent::NoteCreated { .. } => "NoteCreated",
-        DomainEvent::NoteUpdated { .. } => "NoteUpdated",
-        DomainEvent::SessionCreated { .. } => "SessionCreated",
-        DomainEvent::SessionEnded { .. } => "SessionEnded",
-        DomainEvent::QualityScored { .. } => "QualityScored",
-        DomainEvent::ToolCallExecuted { .. } => "ToolCallExecuted",
-        DomainEvent::BehavioralPatternDetected { .. } => "BehavioralPatternDetected",
-        DomainEvent::EstimationRecorded { .. } => "EstimationRecorded",
-        DomainEvent::AutotunerDecision { .. } => "AutotunerDecision",
-        DomainEvent::ContradictionDetected { .. } => "ContradictionDetected",
-        DomainEvent::NoteContentChanged { .. } => "NoteContentChanged",
-        DomainEvent::NoteDeleted { .. } => "NoteDeleted",
-        DomainEvent::KnowledgeAtomCreated { .. } => "KnowledgeAtomCreated",
-        DomainEvent::KnowledgeAtomAccepted { .. } => "KnowledgeAtomAccepted",
-        DomainEvent::KnowledgeAtomArchived { .. } => "KnowledgeAtomArchived",
-        DomainEvent::AtomFlashcardReviewed { .. } => "AtomFlashcardReviewed",
-        DomainEvent::AtomReinforced { .. } => "AtomReinforced",
-        DomainEvent::AtomInteracted { .. } => "AtomInteracted",
-        DomainEvent::RetentionMilestoneReached { .. } => "RetentionMilestoneReached",
-        DomainEvent::TranslationCompleted { .. } => "TranslationCompleted",
-        DomainEvent::NoteStudied { .. } => "NoteStudied",
-        DomainEvent::PracticeUnitCompleted { .. } => "PracticeUnitCompleted",
-        DomainEvent::PracticeSessionCompleted { .. } => "PracticeSessionCompleted",
-        DomainEvent::KnowledgeTransferDetected { .. } => "KnowledgeTransferDetected",
-        DomainEvent::CoachingLearningDigest { .. } => "CoachingLearningDigest",
-        DomainEvent::FlashcardSessionCompleted { .. } => "FlashcardSessionCompleted",
+        DomainEvent::CrossDomain(bus::CrossDomainEvent::UserStatedFact { .. }) => "UserStatedFact",
+        DomainEvent::CrossDomain(bus::CrossDomainEvent::UserCorrectedAI { .. }) => {
+            "UserCorrectedAI"
+        }
+        DomainEvent::Coaching(bus::CoachingEvent::CoachingFeedback { .. }) => "CoachingFeedback",
+        DomainEvent::Note(bus::NoteEvent::NoteCreated { .. }) => "NoteCreated",
+        DomainEvent::Note(bus::NoteEvent::NoteUpdated { .. }) => "NoteUpdated",
+        DomainEvent::Productivity(bus::ProductivityEvent::SessionCreated { .. }) => {
+            "SessionCreated"
+        }
+        DomainEvent::Productivity(bus::ProductivityEvent::SessionEnded { .. }) => "SessionEnded",
+        DomainEvent::Productivity(bus::ProductivityEvent::QualityScored { .. }) => "QualityScored",
+        DomainEvent::ToolExecution(bus::ToolExecutionEvent::ToolCallExecuted { .. }) => {
+            "ToolCallExecuted"
+        }
+        DomainEvent::Learning(BusLearningEvent::BehavioralPatternDetected { .. }) => {
+            "BehavioralPatternDetected"
+        }
+        DomainEvent::Task(TaskEvent::EstimationRecorded { .. }) => "EstimationRecorded",
+        DomainEvent::CrossDomain(bus::CrossDomainEvent::AutotunerDecision { .. }) => {
+            "AutotunerDecision"
+        }
+        DomainEvent::Learning(BusLearningEvent::ContradictionDetected { .. }) => {
+            "ContradictionDetected"
+        }
+        DomainEvent::Note(bus::NoteEvent::NoteContentChanged { .. }) => "NoteContentChanged",
+        DomainEvent::Note(bus::NoteEvent::NoteDeleted { .. }) => "NoteDeleted",
+        DomainEvent::Learning(BusLearningEvent::KnowledgeAtomCreated { .. }) => {
+            "KnowledgeAtomCreated"
+        }
+        DomainEvent::Learning(BusLearningEvent::KnowledgeAtomAccepted { .. }) => {
+            "KnowledgeAtomAccepted"
+        }
+        DomainEvent::Learning(BusLearningEvent::KnowledgeAtomArchived { .. }) => {
+            "KnowledgeAtomArchived"
+        }
+        DomainEvent::Learning(BusLearningEvent::AtomFlashcardReviewed { .. }) => {
+            "AtomFlashcardReviewed"
+        }
+        DomainEvent::Learning(BusLearningEvent::AtomReinforced { .. }) => "AtomReinforced",
+        DomainEvent::Learning(BusLearningEvent::AtomInteracted { .. }) => "AtomInteracted",
+        DomainEvent::Learning(BusLearningEvent::RetentionMilestoneReached { .. }) => {
+            "RetentionMilestoneReached"
+        }
+        DomainEvent::Learning(BusLearningEvent::TranslationCompleted { .. }) => {
+            "TranslationCompleted"
+        }
+        DomainEvent::Learning(BusLearningEvent::NoteStudied { .. }) => "NoteStudied",
+        DomainEvent::Learning(BusLearningEvent::PracticeUnitCompleted { .. }) => {
+            "PracticeUnitCompleted"
+        }
+        DomainEvent::Learning(BusLearningEvent::PracticeSessionCompleted { .. }) => {
+            "PracticeSessionCompleted"
+        }
+        DomainEvent::Learning(BusLearningEvent::KnowledgeTransferDetected { .. }) => {
+            "KnowledgeTransferDetected"
+        }
+        DomainEvent::Coaching(bus::CoachingEvent::CoachingLearningDigest { .. }) => {
+            "CoachingLearningDigest"
+        }
+        DomainEvent::Learning(BusLearningEvent::FlashcardSessionCompleted { .. }) => {
+            "FlashcardSessionCompleted"
+        }
         DomainEvent::InterventionTriggered { .. } => "InterventionTriggered",
         DomainEvent::SkillRouted { .. } => "SkillRouted",
 
-        DomainEvent::NoteEditingFinished { .. } => "NoteEditingFinished",
+        DomainEvent::Note(bus::NoteEvent::NoteEditingFinished { .. }) => "NoteEditingFinished",
         _ => "Unknown",
     }
 }
@@ -1246,19 +1301,21 @@ mod tests {
     #[test]
     fn test_event_type_key() {
         assert_eq!(
-            event_type_key(&DomainEvent::ProductivityScoreComputed {
-                date: "2026-03-06".into(),
-                score: 72.0,
-            }),
+            event_type_key(&DomainEvent::Productivity(
+                ProductivityEvent::ProductivityScoreComputed {
+                    date: "2026-03-06".into(),
+                    score: 72.0,
+                }
+            )),
             "ProductivityScoreComputed"
         );
         assert_eq!(
-            event_type_key(&DomainEvent::TaskCompleted {
+            event_type_key(&DomainEvent::Task(TaskEvent::TaskCompleted {
                 task_id: "t1".into(),
                 actual_duration_mins: None,
                 estimated_duration_mins: None,
                 deviation_pct: None,
-            }),
+            })),
             "TaskCompleted"
         );
     }

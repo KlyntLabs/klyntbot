@@ -329,7 +329,7 @@ mod tests {
         assert!(
             matches!(
                 event,
-                bus::DomainEvent::CoActivationStrengthened { strength, .. } if (strength - 2.0).abs() < f64::EPSILON
+                bus::DomainEvent::Community(bus::CommunityEvent::CoActivationStrengthened { strength, .. }) if (strength - 2.0).abs() < f64::EPSILON
             ),
             "unexpected event: {event:?}"
         );

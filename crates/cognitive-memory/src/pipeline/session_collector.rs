@@ -81,7 +81,10 @@ impl SignalConsumer for SessionCollector {
             return Ok(());
         }
         let session_id = signal.raw_event.as_ref().and_then(|e| match e {
-            bus::DomainEvent::SessionEnded { session_id, .. } => Some(session_id.clone()),
+            bus::DomainEvent::Productivity(bus::ProductivityEvent::SessionEnded {
+                session_id,
+                ..
+            }) => Some(session_id.clone()),
             _ => None,
         });
         let Some(session_id) = session_id else {

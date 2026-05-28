@@ -221,13 +221,13 @@ async fn run_brain_voice(
 
             result = rx.recv() => {
                 match result {
-                    Ok(DomainEvent::FocusSessionStarted { .. }) => {
+                    Ok(DomainEvent::Productivity(bus::ProductivityEvent::FocusSessionStarted { .. })) => {
                         focus_active.store(true, Ordering::Relaxed);
                         focus_start = Some(Instant::now());
                         deferred_msg_count = 0;
                         debug!("BrainVoice: focus session started, deferring signals");
                     }
-                    Ok(DomainEvent::FocusSessionEnded { .. }) => {
+                    Ok(DomainEvent::Productivity(bus::ProductivityEvent::FocusSessionEnded { .. })) => {
                         focus_active.store(false, Ordering::Relaxed);
                         let focus_duration = focus_start
                             .map(|s| s.elapsed())
@@ -513,6 +513,7 @@ pub fn build_debrief_tooltip(msg_count: u32, brain_count: usize, duration: &str)
 mod tests {
     use super::*;
     use crate::events::{NoopEmitter, RecordingEmitter};
+    use bus::{NoteEvent, ProductivityEvent, TaskEvent};
     use storage::StoragePool;
 
     #[test]
@@ -541,24 +542,24 @@ mod tests {
 
     #[test]
     fn test_extract_irrelevant_event_returns_none() {
-        let event = DomainEvent::TaskCreated {
+        let event = DomainEvent::Task(TaskEvent::TaskCreated {
             task_id: "t1".into(),
             project: None,
             estimate_mins: None,
             task_type: "standard".into(),
-        };
+        });
         assert!(extract_signal(&event).is_none());
 
-        let event2 = DomainEvent::NoteCreated {
+        let event2 = DomainEvent::Note(NoteEvent::NoteCreated {
             note_id: "n1".into(),
             title: "Hello".into(),
-        };
+        });
         assert!(extract_signal(&event2).is_none());
 
-        let event3 = DomainEvent::FocusSessionStarted {
+        let event3 = DomainEvent::Productivity(ProductivityEvent::FocusSessionStarted {
             session_type: "deep".into(),
             target_mins: 25,
-        };
+        });
         assert!(extract_signal(&event3).is_none());
     }
 

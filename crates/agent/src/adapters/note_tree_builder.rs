@@ -67,7 +67,7 @@ impl NoteTreeBuilder {
                 }
                 result = rx.recv() => {
                     match result {
-                        Ok(DomainEvent::NoteContentChanged { note_id }) => {
+                        Ok(DomainEvent::Note(bus::NoteEvent::NoteContentChanged { note_id })) => {
                             let now = tokio::time::Instant::now();
                             if let Some(last) = debounce_map.get(&note_id) {
                                 if now.duration_since(*last).as_secs() < DEBOUNCE_SECS {

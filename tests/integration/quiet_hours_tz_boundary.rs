@@ -11,7 +11,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use bus::{DomainEvent, DomainEventBus};
+use bus::{AlarmEvent, DomainEvent, DomainEventBus};
 use config::schema::QuietHoursConfig;
 use notifications::{
     channel::{Channel, ChannelRegistry, NotificationPayload},
@@ -115,7 +115,7 @@ async fn non_utc_quiet_window_holds_alarm() {
     let handle = disp.start();
 
     // Fire the alarm — must be held because the quiet window is always active.
-    bus.publish(DomainEvent::AlarmFired {
+    bus.publish_alarm(AlarmEvent::AlarmFired {
         fire_id: "tz_test_fire_1".into(),
         kind: "task_alarm".into(),
         ref_id: Some("task:tz-test".into()),
@@ -136,7 +136,7 @@ async fn non_utc_quiet_window_holds_alarm() {
 
     // Now simulate release: publish held_release event with the held_id.
     let held_id = held[0].id.clone();
-    bus.publish(DomainEvent::AlarmFired {
+    bus.publish_alarm(AlarmEvent::AlarmFired {
         fire_id: format!("release_{held_id}"),
         kind: "held_release".into(),
         ref_id: None,

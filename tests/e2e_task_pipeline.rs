@@ -5,7 +5,7 @@
 
 use ai_core::{AiSignal, SignalConsumer, SignalRouter};
 use async_trait::async_trait;
-use bus::{DomainEvent, DomainEventBus};
+use bus::{DomainEvent, DomainEventBus, TaskEvent};
 use std::sync::{Arc, Mutex};
 
 struct TestConsumer {
@@ -74,12 +74,12 @@ async fn task_created_event_produces_signal_with_entity() {
     // Publish a TaskCreated domain event (as would happen via TaskTool)
     // Note: DomainEvent::TaskCreated doesn't include title, so the signal
     // content will have empty title. This is the actual production behavior.
-    let event = DomainEvent::TaskCreated {
+    let event = DomainEvent::Task(TaskEvent::TaskCreated {
         task_id: "task-123".into(),
         project: Some("proj-1".into()),
         estimate_mins: Some(120),
         task_type: "manual".into(),
-    };
+    });
 
     bus.publish(event);
     tokio::time::sleep(std::time::Duration::from_millis(50)).await;

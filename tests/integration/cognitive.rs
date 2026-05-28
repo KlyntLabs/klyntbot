@@ -20,7 +20,7 @@ use klyntbot::cognitive::{ConsolidationHandler, ExtractionHandler};
 
 use super::common::test_pool;
 use ai_core::{AiMetrics, AiSignal, MetricRegistry, RecallDomain, SalienceVerdict};
-use bus::{DomainEvent, FeedbackResponse};
+use bus::{DomainEvent, FeedbackResponse, ProductivityEvent};
 use context_engine::source::{ContextSource, SourceContext};
 use feature_coaching::feedback::FeedbackTracker;
 use feature_coaching::reasoner::{CoachingDecision, InterventionType};
@@ -592,11 +592,13 @@ fn test_signal_accumulator_distraction_streak_removed() {
             content: "reddit".into(),
             entity: None,
             timestamp: jiff::Timestamp::now(),
-            raw_event: Some(DomainEvent::DistractionDetected {
-                app: "reddit".into(),
-                duration_secs: None,
-                context: "browsing".into(),
-            }),
+            raw_event: Some(DomainEvent::Productivity(
+                ProductivityEvent::DistractionDetected {
+                    app: "reddit".into(),
+                    duration_secs: None,
+                    context: "browsing".into(),
+                },
+            )),
             metrics: AiMetrics {
                 app: Some("reddit".into()),
                 ..AiMetrics::default()
@@ -631,11 +633,13 @@ fn test_signal_accumulator_cooldown_prevents_refire() {
             content: "Focus alert: session interrupted".into(),
             entity: None,
             timestamp: jiff::Timestamp::now(),
-            raw_event: Some(DomainEvent::DistractionDetected {
-                app: "notification".into(),
-                duration_secs: Some(30),
-                context: "focus session".into(),
-            }),
+            raw_event: Some(DomainEvent::Productivity(
+                ProductivityEvent::DistractionDetected {
+                    app: "notification".into(),
+                    duration_secs: Some(30),
+                    context: "focus session".into(),
+                },
+            )),
             metrics: AiMetrics {
                 category: Some("focus".into()),
                 amount: Some(1.0),
@@ -665,11 +669,13 @@ fn test_signal_accumulator_cooldown_prevents_refire() {
         content: "Focus alert: session interrupted again".into(),
         entity: None,
         timestamp: jiff::Timestamp::now(),
-        raw_event: Some(DomainEvent::DistractionDetected {
-            app: "notification".into(),
-            duration_secs: Some(30),
-            context: "focus session".into(),
-        }),
+        raw_event: Some(DomainEvent::Productivity(
+            ProductivityEvent::DistractionDetected {
+                app: "notification".into(),
+                duration_secs: Some(30),
+                context: "focus session".into(),
+            },
+        )),
         metrics: AiMetrics {
             category: Some("focus".into()),
             amount: Some(290.0),

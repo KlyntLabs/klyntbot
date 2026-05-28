@@ -7,7 +7,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use bus::{DomainEvent, DomainEventBus};
+use bus::{AlarmEvent, DomainEvent, DomainEventBus};
 use notifications::{
     channel::{Channel, ChannelRegistry, NotificationPayload},
     held::HeldReleaseService,
@@ -123,7 +123,7 @@ async fn scheduler_fires_dispatcher_delivers_e2e() {
     // Idempotency gate: publish the same AlarmFired event again with the same
     // fire_id (= alarm_id used by the log repo). The notification_log already
     // has a row for this alarm_id; dispatch_one must suppress the duplicate.
-    bus.publish(DomainEvent::AlarmFired {
+    bus.publish_alarm(AlarmEvent::AlarmFired {
         fire_id: fire_id.clone(),
         kind: "task_alarm".into(),
         ref_id: Some("task_1".into()),

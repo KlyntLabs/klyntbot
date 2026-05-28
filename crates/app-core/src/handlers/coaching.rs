@@ -298,20 +298,24 @@ impl AppCore {
         // Publish domain event so coaching service can react
         if let Ok(bus) = self.domain_event_bus() {
             let accepted = matches!(feedback_response, bus::FeedbackResponse::Helpful);
-            bus.publish(bus::DomainEvent::CoachingFeedback {
-                intervention_id: intervention_id.clone(),
-                response: feedback_response,
-            });
+            bus.publish(bus::DomainEvent::Coaching(
+                bus::CoachingEvent::CoachingFeedback {
+                    intervention_id: intervention_id.clone(),
+                    response: feedback_response,
+                },
+            ));
 
             // Emit strategy-applied event for AI pipeline metrics (coaching_acceptance_rate).
             // strategy_id = trigger_name; rule_text = intervention message.
             // accepted = true only for Helpful; Dismissed and StopSuggesting = false.
             if let (Some(strategy_id), Some(rule_text)) = (trigger_name, intervention_message) {
-                bus.publish(bus::DomainEvent::CoachingStrategyApplied {
-                    strategy_id,
-                    rule_text,
-                    accepted,
-                });
+                bus.publish(bus::DomainEvent::Coaching(
+                    bus::CoachingEvent::CoachingStrategyApplied {
+                        strategy_id,
+                        rule_text,
+                        accepted,
+                    },
+                ));
             }
         }
 

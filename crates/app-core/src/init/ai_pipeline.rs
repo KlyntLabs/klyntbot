@@ -137,11 +137,11 @@ pub fn translate_system_event(event: &DomainEvent) -> Option<AiSignal> {
             importance: 0.6,
             ..base
         }),
-        DomainEvent::SessionEnded {
+        DomainEvent::Productivity(bus::ProductivityEvent::SessionEnded {
             session_id,
             quality_score,
             ..
-        } => Some(AiSignal {
+        }) => Some(AiSignal {
             event_kind: "SessionEnded",
             importance: quality_score.unwrap_or(0.5),
             content: session_id.clone(),
@@ -164,22 +164,22 @@ pub fn translate_system_event(event: &DomainEvent) -> Option<AiSignal> {
             content: skill_name.clone(),
             ..base
         }),
-        DomainEvent::UserCorrectedAI {
+        DomainEvent::CrossDomain(bus::CrossDomainEvent::UserCorrectedAI {
             active_skill,
             strength,
             ..
-        } => Some(AiSignal {
+        }) => Some(AiSignal {
             event_kind: "UserCorrectedAI",
             importance: *strength,
             content: active_skill.clone().unwrap_or_default(),
             ..base
         }),
-        DomainEvent::AutotunerDecision {
+        DomainEvent::CrossDomain(bus::CrossDomainEvent::AutotunerDecision {
             verdict,
             improvement_pct,
             trial_id,
             ..
-        } => Some(AiSignal {
+        }) => Some(AiSignal {
             event_kind: "AutotunerDecision",
             importance: 0.6,
             content: format!("{}: {} ({:.1}%)", trial_id, verdict, improvement_pct),
@@ -189,10 +189,10 @@ pub fn translate_system_event(event: &DomainEvent) -> Option<AiSignal> {
             },
             ..base
         }),
-        DomainEvent::CoachingFeedback {
+        DomainEvent::Coaching(bus::CoachingEvent::CoachingFeedback {
             intervention_id,
             response,
-        } => Some(AiSignal {
+        }) => Some(AiSignal {
             event_kind: "CoachingFeedback",
             importance: 0.5,
             content: intervention_id.clone(),
@@ -295,36 +295,36 @@ mod translate_system_event_tests {
 
     #[test]
     fn user_corrected_translates() {
-        let ev = bus::DomainEvent::UserCorrectedAI {
+        let ev = bus::DomainEvent::CrossDomain(bus::CrossDomainEvent::UserCorrectedAI {
             original: String::new(),
             correction: String::new(),
             kind: bus::CorrectionKind::Reaction,
             strength: 0.8,
             session_key: "s".into(),
             active_skill: Some("general".into()),
-        };
+        });
         let sig = translate_system_event(&ev).expect("should translate");
         assert_eq!(sig.event_kind, "UserCorrectedAI");
     }
 
     #[test]
     fn autotuner_decision_translates_activated() {
-        let ev = bus::DomainEvent::AutotunerDecision {
+        let ev = bus::DomainEvent::CrossDomain(bus::CrossDomainEvent::AutotunerDecision {
             trial_id: "t1".into(),
             verdict: "activated".into(),
             improvement_pct: 0.0,
             affected_params: vec!["x".into()],
-        };
+        });
         let sig = translate_system_event(&ev).expect("should translate");
         assert_eq!(sig.event_kind, "AutotunerDecision");
     }
 
     #[test]
     fn coaching_feedback_translates() {
-        let ev = bus::DomainEvent::CoachingFeedback {
+        let ev = bus::DomainEvent::Coaching(bus::CoachingEvent::CoachingFeedback {
             intervention_id: "i1".into(),
             response: bus::FeedbackResponse::Helpful,
-        };
+        });
         let sig = translate_system_event(&ev).expect("should translate");
         assert_eq!(sig.event_kind, "CoachingFeedback");
         assert!(sig.coaching_signal);

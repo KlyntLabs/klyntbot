@@ -26,7 +26,7 @@ pub fn spawn_focus_end_subscriber(
                 }
                 msg = rx.recv() => {
                     match msg {
-                        Ok(DomainEvent::AlarmFired { kind, .. }) if kind == "focus_end" => {
+                        Ok(DomainEvent::Alarm(bus::AlarmEvent::AlarmFired { kind, .. })) if kind == "focus_end" => {
                             debug!("focus_end_subscriber: focus_end alarm fired — deactivating DND");
                             if let Err(e) = manager.deactivate(FocusMode::Dnd).await {
                                 warn!("focus_end_subscriber: deactivate failed: {e}");

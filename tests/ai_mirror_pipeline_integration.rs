@@ -4,6 +4,7 @@
 //! the expected snapshots.
 
 use ai_core::{MirrorSignalSource, SignalConsumer};
+use bus::{CrossDomainEvent, TaskEvent};
 use std::sync::Arc;
 
 #[tokio::test]
@@ -116,12 +117,14 @@ async fn autotuner_decision_activated_starts_trial_timer() {
         app_core::init::ai_pipeline::translate,
     );
 
-    bus.publish(bus::DomainEvent::AutotunerDecision {
-        trial_id: "t-abc".into(),
-        verdict: "activated".into(),
-        improvement_pct: 0.0,
-        affected_params: vec!["temp".into()],
-    });
+    bus.publish(bus::DomainEvent::CrossDomain(
+        CrossDomainEvent::AutotunerDecision {
+            trial_id: "t-abc".into(),
+            verdict: "activated".into(),
+            improvement_pct: 0.0,
+            affected_params: vec!["temp".into()],
+        },
+    ));
     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 
     assert!(active_timers.contains_key("t-abc"));
@@ -147,10 +150,10 @@ async fn task_focus_changes_produce_focus_snapshot() {
     let runner = ai_core::MirrorSubscriberRunner::new(source.clone(), cancel.clone());
 
     // Debug: check what the translator returns
-    let test_ev = bus::DomainEvent::TaskFocusChanged {
+    let test_ev = bus::DomainEvent::Task(TaskEvent::TaskFocusChanged {
         task_id: "t1".into(),
         focus_deadline: Some("2026-04-22T12:00:00Z".into()),
-    };
+    });
     if let Some(sig) = app_core::init::ai_pipeline::translate(&test_ev) {
         println!(
             "Translated TaskFocusChanged to: event_kind={}, domain={:?}",
@@ -169,20 +172,20 @@ async fn task_focus_changes_produce_focus_snapshot() {
     // Give the router a moment to subscribe
     tokio::time::sleep(std::time::Duration::from_millis(10)).await;
 
-    bus.publish(bus::DomainEvent::TaskFocusChanged {
+    bus.publish(bus::DomainEvent::Task(TaskEvent::TaskFocusChanged {
         task_id: "t1".into(),
         focus_deadline: Some("2026-04-22T12:00:00Z".into()),
-    });
-    bus.publish(bus::DomainEvent::TaskFocusChanged {
+    }));
+    bus.publish(bus::DomainEvent::Task(TaskEvent::TaskFocusChanged {
         task_id: "t1".into(),
         focus_deadline: Some("2026-04-22T14:00:00Z".into()),
-    });
-    bus.publish(bus::DomainEvent::TaskCompleted {
+    }));
+    bus.publish(bus::DomainEvent::Task(TaskEvent::TaskCompleted {
         task_id: "t1".into(),
         actual_duration_mins: Some(45),
         estimated_duration_mins: Some(30),
         deviation_pct: Some(50.0),
-    });
+    }));
 
     tokio::time::sleep(std::time::Duration::from_millis(200)).await;
     source.flush().await.unwrap();

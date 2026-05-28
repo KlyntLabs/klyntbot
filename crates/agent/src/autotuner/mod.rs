@@ -306,7 +306,7 @@ impl AutoTunerOrchestrator {
                         let trial_str = rolled_back_trial_id
                             .map(|id| id.to_string())
                             .unwrap_or_default();
-                        bus.publish(bus::DomainEvent::AutotunerDecision {
+                        bus.publish_cross_domain(bus::CrossDomainEvent::AutotunerDecision {
                             trial_id: trial_str,
                             verdict: autotuner::TrialStatus::Reverted.as_str().to_string(),
                             improvement_pct: rollback_improvement_pct,
@@ -461,7 +461,7 @@ impl AutoTunerOrchestrator {
 
                         // Emit domain event for promotion.
                         if let Some(ref bus) = domain_event_bus {
-                            bus.publish(bus::DomainEvent::AutotunerDecision {
+                            bus.publish_cross_domain(bus::CrossDomainEvent::AutotunerDecision {
                                 trial_id: trial_id.to_string(),
                                 verdict: autotuner::TrialStatus::Promoted.as_str().to_string(),
                                 improvement_pct,
@@ -489,12 +489,14 @@ impl AutoTunerOrchestrator {
                             // Emit AutotunerDecision(activated) for each new trial.
                             if let Some(ref bus) = domain_event_bus {
                                 for trial in &created_trials {
-                                    bus.publish(bus::DomainEvent::AutotunerDecision {
-                                        trial_id: trial.id.clone(),
-                                        verdict: "activated".to_string(),
-                                        improvement_pct: 0.0,
-                                        affected_params: Vec::new(),
-                                    });
+                                    bus.publish_cross_domain(
+                                        bus::CrossDomainEvent::AutotunerDecision {
+                                            trial_id: trial.id.clone(),
+                                            verdict: "activated".to_string(),
+                                            improvement_pct: 0.0,
+                                            affected_params: Vec::new(),
+                                        },
+                                    );
                                 }
                             }
                         }

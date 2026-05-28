@@ -3,7 +3,7 @@
 //! distiller observe MCP-driven tool calls.
 
 use async_trait::async_trait;
-use bus::{DomainEvent, DomainEventBus};
+use bus::{DomainEvent, DomainEventBus, ToolExecutionEvent};
 use klyntbot_server::bridge::registry::ToolRegistryBridge;
 use std::sync::Arc;
 use tools_core::{RoutingContext, Tool};
@@ -49,7 +49,10 @@ async fn mcp_tool_call_publishes_tool_call_executed() {
     // Drain bus — expect at least one ToolCallExecuted event for "echo".
     let mut saw = false;
     while let Ok(ev) = rx.try_recv() {
-        if let DomainEvent::ToolCallExecuted { tool_name, .. } = ev {
+        if let DomainEvent::ToolExecution(ToolExecutionEvent::ToolCallExecuted {
+            tool_name, ..
+        }) = ev
+        {
             if tool_name == "echo" {
                 saw = true;
                 break;

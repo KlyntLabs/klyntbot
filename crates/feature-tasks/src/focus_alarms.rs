@@ -6,6 +6,7 @@
 
 use std::sync::Arc;
 
+use bus::TaskEvent as BusTaskEvent;
 use bus::{DomainEvent, DomainEventBus};
 use jiff::Timestamp;
 use scheduling::temporal::fire_store::{FireSpec, FireStore};
@@ -38,7 +39,7 @@ pub fn spawn(
                 }
                 msg = rx.recv() => {
                     match msg {
-                        Ok(DomainEvent::TaskFocusChanged { task_id, focus_deadline }) => {
+                        Ok(DomainEvent::Task(BusTaskEvent::TaskFocusChanged { task_id, focus_deadline })) => {
                             handle(&fire_store, &task_id, focus_deadline.as_deref()).await;
                         }
                         Ok(_) => {} // ignore other events

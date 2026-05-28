@@ -164,11 +164,11 @@ impl MirrorSignalSource for MetaRuleSignalSource {
     async fn accumulate(&self, signal: &AiSignal) -> common::Result<()> {
         if let Some(raw) = &signal.raw_event {
             match raw {
-                bus::DomainEvent::UserCorrectedAI {
+                bus::DomainEvent::CrossDomain(bus::CrossDomainEvent::UserCorrectedAI {
                     session_key,
                     active_skill,
                     ..
-                } => {
+                }) => {
                     let skill = active_skill.as_deref().unwrap_or("unknown");
                     if let Some(alert) = self.record_correction(session_key, skill) {
                         self.handle_alert(&alert).await;

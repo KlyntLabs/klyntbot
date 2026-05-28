@@ -7,7 +7,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use bus::DomainEventBus;
+use bus::{AlarmEvent, DomainEventBus};
 use storage::repos::cron::CronRepo;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
@@ -110,7 +110,7 @@ impl CronExecutor {
                     result = rx.recv() => {
                         match result {
                             Ok(event) => {
-                                if let bus::DomainEvent::AlarmFired { kind, ref_id, .. } = event {
+                                if let bus::DomainEvent::Alarm(bus::AlarmEvent::AlarmFired { kind, ref_id, .. }) = event {
                                     if kind == "cron_job" {
                                         Self::dispatch(
                                             &cron_repo,
@@ -306,13 +306,13 @@ mod tests {
     }
 
     fn alarm_fired(kind: &str, ref_id: Option<&str>) -> DomainEvent {
-        DomainEvent::AlarmFired {
+        DomainEvent::Alarm(AlarmEvent::AlarmFired {
             fire_id: "fire-test".into(),
             kind: kind.into(),
             ref_id: ref_id.map(|s| s.to_owned()),
             payload_json: "{}".into(),
             fired_at_ms: 0,
-        }
+        })
     }
 
     #[tokio::test]

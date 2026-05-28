@@ -154,12 +154,12 @@ impl AppCore {
 
         // Emit domain events for timeline tracking + tree rebuild
         if let Ok(bus) = self.domain_event_bus() {
-            bus.publish(bus::DomainEvent::TaskCreated {
+            bus.publish(bus::DomainEvent::Task(bus::TaskEvent::TaskCreated {
                 task_id: id.clone(),
                 project: created.project_id.clone(),
                 estimate_mins: created.estimated_minutes.map(|m| m as i64),
                 task_type: created.task_type.clone(),
-            });
+            }));
         }
 
         // Newly created task has no subtasks yet; resolve status label for the response
@@ -233,10 +233,10 @@ impl AppCore {
             };
             if is_deferred {
                 if let Ok(bus) = self.domain_event_bus() {
-                    bus.publish(bus::DomainEvent::TaskDeferred {
+                    bus.publish(bus::DomainEvent::Task(bus::TaskEvent::TaskDeferred {
                         task_id: params.id.clone(),
                         times_deferred: 1,
-                    });
+                    }));
                 }
             }
         }
@@ -289,23 +289,23 @@ impl AppCore {
                     (Some(a), Some(e)) if e > 0 => Some(((a as f64) / (e as f64) - 1.0) * 100.0),
                     _ => None,
                 };
-                bus.publish(bus::DomainEvent::TaskCompleted {
+                bus.publish(bus::DomainEvent::Task(bus::TaskEvent::TaskCompleted {
                     task_id: id.clone(),
                     actual_duration_mins: actual_mins,
                     estimated_duration_mins: estimated_mins,
                     deviation_pct,
-                });
+                }));
 
                 // Emit EstimationRecorded when all three values are present.
                 if let (Some(est_mins), Some(act_mins), Some(dev)) =
                     (estimated_mins, actual_mins, deviation_pct)
                 {
-                    bus.publish(bus::DomainEvent::EstimationRecorded {
+                    bus.publish(bus::DomainEvent::Task(bus::TaskEvent::EstimationRecorded {
                         task_id: id.clone(),
                         estimated_mins: est_mins as u32,
                         actual_mins: act_mins as u32,
                         deviation_pct: dev,
-                    });
+                    }));
                 }
             }
         }

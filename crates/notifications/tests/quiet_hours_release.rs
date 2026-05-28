@@ -2,7 +2,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use bus::{DomainEvent, DomainEventBus};
+use bus::{AlarmEvent, DomainEvent, DomainEventBus};
 use config::schema::QuietHoursConfig;
 use notifications::{
     channel::{Channel, ChannelRegistry, NotificationPayload},
@@ -89,7 +89,7 @@ async fn quiet_hours_holds_then_release_fires_delivery() {
     let handle = dispatcher.start();
 
     // Initial fire — should be held (quiet hours active).
-    bus.publish(DomainEvent::AlarmFired {
+    bus.publish_alarm(AlarmEvent::AlarmFired {
         fire_id: "fire_1".into(),
         kind: "task_alarm".into(),
         ref_id: None,
@@ -106,7 +106,7 @@ async fn quiet_hours_holds_then_release_fires_delivery() {
     let held_id = pending[0].id.clone();
 
     // Simulate the scheduler firing the held_release alarm.
-    bus.publish(DomainEvent::AlarmFired {
+    bus.publish_alarm(AlarmEvent::AlarmFired {
         fire_id: format!("release_{held_id}"),
         kind: "held_release".into(),
         ref_id: None,

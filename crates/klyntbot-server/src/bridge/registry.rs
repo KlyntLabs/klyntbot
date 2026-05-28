@@ -146,12 +146,14 @@ impl ToolRegistryBridge {
         let duration_ms = started_at.elapsed().as_millis() as u64;
 
         if let Some(bus) = &self.domain_bus {
-            bus.publish(bus::DomainEvent::ToolCallExecuted {
-                tool_name: tool_name.to_string(),
-                args_preview: Some(arguments.to_string().chars().take(512).collect::<String>()),
-                session_key: Some(format!("mcp:{session_id}")),
-                duration_ms: Some(duration_ms as i64),
-            });
+            bus.publish(bus::DomainEvent::ToolExecution(
+                bus::ToolExecutionEvent::ToolCallExecuted {
+                    tool_name: tool_name.to_string(),
+                    args_preview: Some(arguments.to_string().chars().take(512).collect::<String>()),
+                    session_key: Some(format!("mcp:{session_id}")),
+                    duration_ms: Some(duration_ms as i64),
+                },
+            ));
         }
 
         match outcome {

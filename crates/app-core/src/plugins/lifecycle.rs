@@ -70,29 +70,37 @@ impl AppCorePlugin for LifecyclePlugin {
                         };
                         match event {
                             LE::SystemWillSleep => {
-                                bus_clone.publish(bus::DomainEvent::SystemWillSleep);
+                                bus_clone.publish(bus::DomainEvent::Lifecycle(
+                                    bus::LifecycleEvent::SystemWillSleep,
+                                ));
                             }
                             LE::SystemDidWake {
                                 away_duration,
                                 wake_type,
                             } => {
                                 let away_secs = away_duration.as_secs();
-                                bus_clone.publish(bus::DomainEvent::SystemDidWake {
-                                    away_secs,
-                                    wake_type: bus_wt(wake_type),
-                                });
+                                bus_clone.publish(bus::DomainEvent::Lifecycle(
+                                    bus::LifecycleEvent::SystemDidWake {
+                                        away_secs,
+                                        wake_type: bus_wt(wake_type),
+                                    },
+                                ));
                             }
                             LE::UserBecameIdle { idle_secs } => {
-                                bus_clone.publish(bus::DomainEvent::UserBecameIdle { idle_secs });
+                                bus_clone.publish(bus::DomainEvent::Lifecycle(
+                                    bus::LifecycleEvent::UserBecameIdle { idle_secs },
+                                ));
                             }
                             LE::UserReturned {
                                 absence_duration,
                                 wake_type,
                             } => {
-                                bus_clone.publish(bus::DomainEvent::UserReturned {
-                                    absence_secs: absence_duration.as_secs(),
-                                    wake_type: bus_wt(wake_type),
-                                });
+                                bus_clone.publish(bus::DomainEvent::Lifecycle(
+                                    bus::LifecycleEvent::UserReturned {
+                                        absence_secs: absence_duration.as_secs(),
+                                        wake_type: bus_wt(wake_type),
+                                    },
+                                ));
                             }
                         }
                     },

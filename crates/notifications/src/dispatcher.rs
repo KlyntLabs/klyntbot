@@ -7,7 +7,7 @@ use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, info, warn};
 
-use bus::{DomainEvent, DomainEventBus};
+use bus::{AlarmEvent, DomainEvent, DomainEventBus, NotificationEvent};
 use storage::repos::held_notifications::HeldNotificationsRepo;
 use storage::repos::notification_log::NotificationLogRepo;
 
@@ -73,13 +73,13 @@ impl NotificationDispatcher {
                     }
                     ev = rx.recv() => {
                         match ev {
-                            Ok(DomainEvent::AlarmFired {
+                            Ok(DomainEvent::Alarm(AlarmEvent::AlarmFired {
                                 fire_id,
                                 kind,
                                 ref_id: _,
                                 payload_json,
                                 fired_at_ms: _,
-                            }) => {
+                            })) => {
                                 let result = if kind == "held_release" {
                                     svc.handle_held_release(&payload_json).await
                                 } else {
@@ -89,7 +89,7 @@ impl NotificationDispatcher {
                                     warn!("dispatch failure for {fire_id}: {e}");
                                 }
                             }
-                            Ok(DomainEvent::HeldNotificationReleased { .. }) => {
+                            Ok(DomainEvent::Notification(NotificationEvent::HeldNotificationReleased { .. })) => {
                                 // observability hook — release dispatch is driven by AlarmFired(kind="held_release")
                             }
                             Ok(_) => {}
@@ -190,11 +190,12 @@ impl NotificationDispatcher {
             self.dispatch_one(ch, &payload).await;
         }
         self.held_release.mark_released(&held_id).await?;
-        self.bus.publish(DomainEvent::HeldNotificationReleased {
-            held_id,
-            alarm_id: row.alarm_id,
-            channels,
-        });
+        self.bus
+            .publish_notification(NotificationEvent::HeldNotificationReleased {
+                held_id,
+                alarm_id: row.alarm_id,
+                channels,
+            });
         Ok(())
     }
 
@@ -257,12 +258,13 @@ impl NotificationDispatcher {
                         .log_repo
                         .record_error(&payload.alarm_id, channel_name, &msg)
                         .await;
-                    self.bus.publish(DomainEvent::NotificationDeliveryFailed {
-                        alarm_id: payload.alarm_id.clone(),
-                        channel: channel_name.to_string(),
-                        error: msg,
-                        attempts: attempt,
-                    });
+                    self.bus
+                        .publish_notification(NotificationEvent::NotificationDeliveryFailed {
+                            alarm_id: payload.alarm_id.clone(),
+                            channel: channel_name.to_string(),
+                            error: msg,
+                            attempts: attempt,
+                        });
                     return;
                 }
             }

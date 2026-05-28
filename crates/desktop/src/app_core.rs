@@ -367,12 +367,12 @@ fn wire_event_channels(
                     _ = token.cancelled() => break,
                     msg = lifecycle_rx.recv() => {
                         match msg {
-                            Ok(bus::DomainEvent::SystemWillSleep) => {
+                            Ok(bus::DomainEvent::Lifecycle(bus::LifecycleEvent::SystemWillSleep)) => {
                                 if let Some(timer) = handle.try_state::<Arc<crate::focus_timer::FocusTimer>>() {
                                     timer.suspend().await;
                                 }
                             }
-                            Ok(bus::DomainEvent::SystemDidWake { .. }) => {
+                            Ok(bus::DomainEvent::Lifecycle(bus::LifecycleEvent::SystemDidWake { .. })) => {
                                 if let Some(timer) = handle.try_state::<Arc<crate::focus_timer::FocusTimer>>() {
                                     timer.resume_suspended().await;
                                 }

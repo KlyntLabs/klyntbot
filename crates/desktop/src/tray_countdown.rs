@@ -102,12 +102,12 @@ pub fn spawn(
 fn is_cache_invalidating(evt: &bus::DomainEvent) -> bool {
     matches!(
         evt,
-        bus::DomainEvent::TaskFocusChanged { .. }
-            | bus::DomainEvent::AlarmFired { .. }
-            | bus::DomainEvent::AlarmSnoozed { .. }
-            | bus::DomainEvent::AlarmCancelled { .. }
-            | bus::DomainEvent::FocusSessionStarted { .. }
-            | bus::DomainEvent::FocusSessionEnded { .. }
+        bus::DomainEvent::Task(bus::TaskEvent::TaskFocusChanged { .. })
+            | bus::DomainEvent::Alarm(bus::AlarmEvent::AlarmFired { .. })
+            | bus::DomainEvent::Alarm(bus::AlarmEvent::AlarmSnoozed { .. })
+            | bus::DomainEvent::Alarm(bus::AlarmEvent::AlarmCancelled { .. })
+            | bus::DomainEvent::Productivity(bus::ProductivityEvent::FocusSessionStarted { .. })
+            | bus::DomainEvent::Productivity(bus::ProductivityEvent::FocusSessionEnded { .. })
     )
 }
 

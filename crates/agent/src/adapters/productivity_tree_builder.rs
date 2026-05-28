@@ -23,6 +23,7 @@ use tokio_util::sync::CancellationToken;
 use tracing::warn;
 use uuid::Uuid;
 
+use bus::ProductivityEvent as BusProductivityEvent;
 use bus::{ContextUpdateReason, DomainEvent};
 
 use context_engine::book_index::types::{SourceType, TreeNode, TreeNodeType};
@@ -92,11 +93,11 @@ impl ProductivityTreeBuilder {
             let this = Arc::clone(&self);
             async move {
                 match event {
-                    DomainEvent::FocusSessionEnded {
+                    DomainEvent::Productivity(BusProductivityEvent::FocusSessionEnded {
                         duration_secs,
                         quality,
                         interruptions,
-                    } => {
+                    }) => {
                         if let Err(e) = this
                             .handle_focus_session_ended(duration_secs, quality, interruptions)
                             .await
@@ -107,12 +108,12 @@ impl ProductivityTreeBuilder {
                             );
                         }
                     }
-                    DomainEvent::ActivitySessionCompleted {
+                    DomainEvent::Productivity(BusProductivityEvent::ActivitySessionCompleted {
                         date,
                         total_active_secs,
                         productive_secs,
                         distracting_secs,
-                    } => {
+                    }) => {
                         if let Err(e) = this
                             .handle_activity_session(
                                 &date,
@@ -128,7 +129,9 @@ impl ProductivityTreeBuilder {
                             );
                         }
                     }
-                    DomainEvent::ProductivityScoreComputed { date, score } => {
+                    DomainEvent::Productivity(
+                        BusProductivityEvent::ProductivityScoreComputed { date, score },
+                    ) => {
                         if let Err(e) = this.handle_productivity_score(&date, score).await {
                             warn!(
                                 date = %date,

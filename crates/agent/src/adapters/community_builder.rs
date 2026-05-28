@@ -69,7 +69,7 @@ impl CommunityBuilder {
                 }
                 result = rx.recv() => {
                     match result {
-                        Ok(DomainEvent::NoteContentChanged { note_id, .. }) => {
+                        Ok(DomainEvent::Note(bus::NoteEvent::NoteContentChanged { note_id, .. })) => {
                             pending_source_ids.insert(note_id);
                             debounce_deadline = Some(Instant::now() + DEBOUNCE_DURATION);
                         }

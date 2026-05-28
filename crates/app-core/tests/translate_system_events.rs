@@ -1,6 +1,7 @@
 use ai_core::{AiEventMeta, RecallDomain};
 use app_core::init::ai_pipeline::{translate_bash_job, translate_system_event};
-use bus::DomainEvent;
+use bus::domain_events::LearningEvent;
+use bus::{CoachingEvent, DomainEvent, ProductivityEvent};
 
 #[test]
 fn chat_turn_completed_translates_to_general_signal() {
@@ -15,27 +16,27 @@ fn chat_turn_completed_translates_to_general_signal() {
 
 #[test]
 fn session_ended_translates() {
-    let e = DomainEvent::SessionEnded {
+    let e = DomainEvent::Productivity(ProductivityEvent::SessionEnded {
         session_id: "s1".into(),
         session_type: "focus".into(),
         duration_secs: 3600,
         quality_score: Some(0.8),
         category_purity: 0.9,
-    };
+    });
     let sig = translate_system_event(&e).expect("should translate");
     assert_eq!(sig.event_kind, "SessionEnded");
 }
 
 #[test]
 fn coaching_pattern_translates() {
-    let e = DomainEvent::CoachingPatternDetected {
+    let e = DomainEvent::Coaching(CoachingEvent::CoachingPatternDetected {
         pattern_name: "afternoon_energy_drop".into(),
         confidence: 0.8,
         description: "desc".into(),
         domain: "productivity".into(),
         signal_count: 3,
         rule_text: "Schedule demanding tasks in the morning".into(),
-    };
+    });
     let coaching_event =
         feature_coaching::events::try_from_domain_event(&e).expect("should parse coaching event");
     let sig = coaching_event.to_signal();
@@ -48,14 +49,14 @@ fn coaching_pattern_translates() {
 
 #[test]
 fn atom_reinforced_translates() {
-    let e = DomainEvent::AtomReinforced {
+    let e = DomainEvent::Learning(LearningEvent::AtomReinforced {
         atom_id: "a1".into(),
         referencing_note_id: "n1".into(),
         new_salience: 0.8,
         subject: "rust errors".into(),
         domain: "learning".into(),
         reinforcement_count: 3,
-    };
+    });
     let learning_event =
         feature_learning::try_from_domain_event(&e).expect("should parse learning event");
     let sig = learning_event.to_signal();

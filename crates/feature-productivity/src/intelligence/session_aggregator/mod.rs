@@ -10,6 +10,7 @@ use std::sync::Arc;
 use jiff::Timestamp;
 use tracing::{debug, info};
 
+use bus::ProductivityEvent as BusProductivityEvent;
 use bus::{DomainEvent, DomainEventBus};
 
 use crate::repos::IntelligenceSessionRepo;
@@ -297,12 +298,14 @@ impl SessionAggregator {
 
             info!(session_id = %session_id, session_type = %session_type, category = %category, "session created");
 
-            self.event_bus.publish(DomainEvent::SessionCreated {
-                session_id: session_id.clone(),
-                session_type: session_type.to_string(),
-                dominant_category: category.clone(),
-                predicted_energy: None,
-            });
+            self.event_bus.publish(DomainEvent::Productivity(
+                BusProductivityEvent::SessionCreated {
+                    session_id: session_id.clone(),
+                    session_type: session_type.to_string(),
+                    dominant_category: category.clone(),
+                    predicted_energy: None,
+                },
+            ));
 
             let mut app_counts = HashMap::new();
             for w in &self.window {
@@ -567,13 +570,15 @@ impl SessionAggregator {
             "session ended"
         );
 
-        self.event_bus.publish(DomainEvent::SessionEnded {
-            session_id: session_id.to_string(),
-            session_type: session_type.to_string(),
-            duration_secs,
-            quality_score: None,
-            category_purity: purity,
-        });
+        self.event_bus.publish(DomainEvent::Productivity(
+            BusProductivityEvent::SessionEnded {
+                session_id: session_id.to_string(),
+                session_type: session_type.to_string(),
+                duration_secs,
+                quality_score: None,
+                category_purity: purity,
+            },
+        ));
 
         self.state = SessionState::Idle;
 
@@ -767,11 +772,11 @@ mod tests {
         // Check DomainEvent was published
         let domain_event = rx.try_recv();
         assert!(domain_event.is_ok());
-        if let Ok(DomainEvent::SessionCreated {
+        if let Ok(DomainEvent::Productivity(BusProductivityEvent::SessionCreated {
             session_type,
             dominant_category,
             ..
-        }) = domain_event
+        })) = domain_event
         {
             assert_eq!(session_type, "focus");
             assert_eq!(dominant_category, "coding");

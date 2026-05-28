@@ -1003,7 +1003,7 @@ impl ExecutionCore {
             // Publish tool execution events to domain bus for unified activity log
             if let Some(ref domain_bus) = self.domain_event_bus {
                 for r in &results {
-                    domain_bus.publish(bus::DomainEvent::ToolCallExecuted {
+                    domain_bus.publish_tool_execution(bus::ToolExecutionEvent::ToolCallExecuted {
                         tool_name: r.tool_name.clone(),
                         args_preview: {
                             let full = r.arguments.to_string();

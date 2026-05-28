@@ -60,7 +60,7 @@ async fn end_to_end_fires_and_emits_event() {
         .unwrap();
 
     match event {
-        DomainEvent::AlarmFired { kind, ref_id, .. } => {
+        DomainEvent::Alarm(bus::AlarmEvent::AlarmFired { kind, ref_id, .. }) => {
             assert_eq!(kind, "test");
             assert_eq!(ref_id.as_deref(), Some("x"));
         }

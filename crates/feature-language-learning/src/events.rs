@@ -1,5 +1,6 @@
 use ai_core_macros::AiEvent;
 use bus::DomainEvent;
+use bus::LanguageLearningEvent as BusLanguageLearningEvent;
 
 #[derive(Debug, Clone, AiEvent)]
 #[ai(domain = "LanguageLearning")]
@@ -74,38 +75,40 @@ impl From<LanguageLearningEvent> for DomainEvent {
                 session_id,
                 overall_score,
                 weak_phonemes,
-            } => DomainEvent::PronunciationScored {
+            } => DomainEvent::LanguageLearning(BusLanguageLearningEvent::PronunciationScored {
                 session_id,
                 overall_score,
                 weak_phonemes,
-            },
+            }),
             LanguageLearningEvent::ExamAttempted {
                 exam_id,
                 score,
                 passed,
-            } => DomainEvent::ExamAttempted {
+            } => DomainEvent::LanguageLearning(BusLanguageLearningEvent::ExamAttempted {
                 exam_id,
                 score,
                 passed,
-            },
+            }),
             LanguageLearningEvent::PhoneticMasteryGained {
                 phoneme,
                 mastery_level,
-            } => DomainEvent::PhoneticMasteryGained {
+            } => DomainEvent::LanguageLearning(BusLanguageLearningEvent::PhoneticMasteryGained {
                 phoneme,
                 mastery_level,
-            },
+            }),
             LanguageLearningEvent::PracticeSessionCompleted {
                 session_id,
                 language,
                 duration_secs,
                 success_rate,
-            } => DomainEvent::LanguagePracticeSessionCompleted {
-                session_id,
-                language,
-                duration_secs,
-                success_rate,
-            },
+            } => DomainEvent::LanguageLearning(
+                BusLanguageLearningEvent::LanguagePracticeSessionCompleted {
+                    session_id,
+                    language,
+                    duration_secs,
+                    success_rate,
+                },
+            ),
         }
     }
 }
@@ -114,37 +117,39 @@ impl From<LanguageLearningEvent> for DomainEvent {
 pub fn try_from_domain_event(e: &bus::DomainEvent) -> Option<LanguageLearningEvent> {
     use bus::DomainEvent;
     match e {
-        DomainEvent::PronunciationScored {
+        DomainEvent::LanguageLearning(BusLanguageLearningEvent::PronunciationScored {
             session_id,
             overall_score,
             weak_phonemes,
-        } => Some(LanguageLearningEvent::PronunciationScored {
+        }) => Some(LanguageLearningEvent::PronunciationScored {
             session_id: session_id.clone(),
             overall_score: *overall_score,
             weak_phonemes: weak_phonemes.clone(),
         }),
-        DomainEvent::ExamAttempted {
+        DomainEvent::LanguageLearning(BusLanguageLearningEvent::ExamAttempted {
             exam_id,
             score,
             passed,
-        } => Some(LanguageLearningEvent::ExamAttempted {
+        }) => Some(LanguageLearningEvent::ExamAttempted {
             exam_id: exam_id.clone(),
             score: *score,
             passed: *passed,
         }),
-        DomainEvent::PhoneticMasteryGained {
+        DomainEvent::LanguageLearning(BusLanguageLearningEvent::PhoneticMasteryGained {
             phoneme,
             mastery_level,
-        } => Some(LanguageLearningEvent::PhoneticMasteryGained {
+        }) => Some(LanguageLearningEvent::PhoneticMasteryGained {
             phoneme: phoneme.clone(),
             mastery_level: *mastery_level,
         }),
-        DomainEvent::LanguagePracticeSessionCompleted {
-            session_id,
-            language,
-            duration_secs,
-            success_rate,
-        } => Some(LanguageLearningEvent::PracticeSessionCompleted {
+        DomainEvent::LanguageLearning(
+            BusLanguageLearningEvent::LanguagePracticeSessionCompleted {
+                session_id,
+                language,
+                duration_secs,
+                success_rate,
+            },
+        ) => Some(LanguageLearningEvent::PracticeSessionCompleted {
             session_id: session_id.clone(),
             language: language.clone(),
             duration_secs: *duration_secs,

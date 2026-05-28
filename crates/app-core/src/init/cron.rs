@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use bus::{DomainEventBus, MessageBus};
+use bus::{AlarmEvent, DomainEventBus, MessageBus};
 use scheduling::temporal::cron_executor::CronExecutor;
 use storage::Repos;
 use tracing::{debug, info, warn};
@@ -22,7 +22,7 @@ pub(crate) fn publish_cron_alarm(
         "priority_override": null,
     })
     .to_string();
-    bus.publish(bus::DomainEvent::AlarmFired {
+    bus.publish_alarm(AlarmEvent::AlarmFired {
         fire_id: uuid::Uuid::new_v4().to_string(),
         kind: "cron".to_string(),
         ref_id: cron_job_id,

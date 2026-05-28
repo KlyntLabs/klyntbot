@@ -1,5 +1,7 @@
 use ai_core_macros::AiEvent;
+use bus::domain_events::LearningEvent as BusLearningEvent;
 use bus::DomainEvent;
+use bus::NoteEvent as BusNoteEvent;
 
 #[derive(Debug, Clone, AiEvent)]
 #[ai(domain = "Notes")]
@@ -125,22 +127,32 @@ pub enum NoteEvent {
 impl From<NoteEvent> for DomainEvent {
     fn from(e: NoteEvent) -> Self {
         match e {
-            NoteEvent::Created { note_id, title } => DomainEvent::NoteCreated { note_id, title },
-            NoteEvent::Updated { note_id, title } => DomainEvent::NoteUpdated { note_id, title },
-            NoteEvent::ContentChanged { note_id } => DomainEvent::NoteContentChanged { note_id },
-            NoteEvent::EditingFinished { note_id } => DomainEvent::NoteEditingFinished { note_id },
-            NoteEvent::Deleted { note_id } => DomainEvent::NoteDeleted { note_id },
+            NoteEvent::Created { note_id, title } => {
+                DomainEvent::Note(BusNoteEvent::NoteCreated { note_id, title })
+            }
+            NoteEvent::Updated { note_id, title } => {
+                DomainEvent::Note(BusNoteEvent::NoteUpdated { note_id, title })
+            }
+            NoteEvent::ContentChanged { note_id } => {
+                DomainEvent::Note(BusNoteEvent::NoteContentChanged { note_id })
+            }
+            NoteEvent::EditingFinished { note_id } => {
+                DomainEvent::Note(BusNoteEvent::NoteEditingFinished { note_id })
+            }
+            NoteEvent::Deleted { note_id } => {
+                DomainEvent::Note(BusNoteEvent::NoteDeleted { note_id })
+            }
             NoteEvent::Studied {
                 note_id,
                 duration_secs,
                 atoms_reviewed,
                 mode,
-            } => DomainEvent::NoteStudied {
+            } => DomainEvent::Learning(BusLearningEvent::NoteStudied {
                 note_id,
                 duration_secs,
                 atoms_reviewed,
                 mode,
-            },
+            }),
             NoteEvent::PracticeUnitCompleted {
                 session_id,
                 note_id,
@@ -149,7 +161,7 @@ impl From<NoteEvent> for DomainEvent {
                 scores,
                 confidence_rating,
                 edited,
-            } => DomainEvent::PracticeUnitCompleted {
+            } => DomainEvent::Learning(BusLearningEvent::PracticeUnitCompleted {
                 session_id,
                 note_id,
                 unit_index,
@@ -157,7 +169,7 @@ impl From<NoteEvent> for DomainEvent {
                 scores,
                 confidence_rating,
                 edited,
-            },
+            }),
             NoteEvent::PracticeSessionCompleted {
                 session_id,
                 note_id,
@@ -166,7 +178,7 @@ impl From<NoteEvent> for DomainEvent {
                 source_lang,
                 target_lang,
                 weak_unit_count,
-            } => DomainEvent::PracticeSessionCompleted {
+            } => DomainEvent::Learning(BusLearningEvent::PracticeSessionCompleted {
                 session_id,
                 note_id,
                 units_completed,
@@ -174,20 +186,20 @@ impl From<NoteEvent> for DomainEvent {
                 source_lang,
                 target_lang,
                 weak_unit_count,
-            },
+            }),
             NoteEvent::TranslationCompleted {
                 note_id,
                 source_lang,
                 target_lang,
                 word_count,
                 is_selection,
-            } => DomainEvent::TranslationCompleted {
+            } => DomainEvent::Learning(BusLearningEvent::TranslationCompleted {
                 note_id,
                 source_lang,
                 target_lang,
                 word_count,
                 is_selection,
-            },
+            }),
         }
     }
 }
@@ -196,35 +208,43 @@ impl From<NoteEvent> for DomainEvent {
 pub fn try_from_domain_event(e: &bus::DomainEvent) -> Option<NoteEvent> {
     use bus::DomainEvent;
     match e {
-        DomainEvent::NoteCreated { note_id, title } => Some(NoteEvent::Created {
+        DomainEvent::Note(BusNoteEvent::NoteCreated { note_id, title }) => {
+            Some(NoteEvent::Created {
+                note_id: note_id.clone(),
+                title: title.clone(),
+            })
+        }
+        DomainEvent::Note(BusNoteEvent::NoteUpdated { note_id, title }) => {
+            Some(NoteEvent::Updated {
+                note_id: note_id.clone(),
+                title: title.clone(),
+            })
+        }
+        DomainEvent::Note(BusNoteEvent::NoteContentChanged { note_id }) => {
+            Some(NoteEvent::ContentChanged {
+                note_id: note_id.clone(),
+            })
+        }
+        DomainEvent::Note(BusNoteEvent::NoteEditingFinished { note_id }) => {
+            Some(NoteEvent::EditingFinished {
+                note_id: note_id.clone(),
+            })
+        }
+        DomainEvent::Note(BusNoteEvent::NoteDeleted { note_id }) => Some(NoteEvent::Deleted {
             note_id: note_id.clone(),
-            title: title.clone(),
         }),
-        DomainEvent::NoteUpdated { note_id, title } => Some(NoteEvent::Updated {
-            note_id: note_id.clone(),
-            title: title.clone(),
-        }),
-        DomainEvent::NoteContentChanged { note_id } => Some(NoteEvent::ContentChanged {
-            note_id: note_id.clone(),
-        }),
-        DomainEvent::NoteEditingFinished { note_id } => Some(NoteEvent::EditingFinished {
-            note_id: note_id.clone(),
-        }),
-        DomainEvent::NoteDeleted { note_id } => Some(NoteEvent::Deleted {
-            note_id: note_id.clone(),
-        }),
-        DomainEvent::NoteStudied {
+        DomainEvent::Learning(BusLearningEvent::NoteStudied {
             note_id,
             duration_secs,
             atoms_reviewed,
             mode,
-        } => Some(NoteEvent::Studied {
+        }) => Some(NoteEvent::Studied {
             note_id: note_id.clone(),
             duration_secs: *duration_secs,
             atoms_reviewed: *atoms_reviewed,
             mode: mode.clone(),
         }),
-        DomainEvent::PracticeUnitCompleted {
+        DomainEvent::Learning(BusLearningEvent::PracticeUnitCompleted {
             session_id,
             note_id,
             unit_index,
@@ -232,7 +252,7 @@ pub fn try_from_domain_event(e: &bus::DomainEvent) -> Option<NoteEvent> {
             scores,
             confidence_rating,
             edited,
-        } => Some(NoteEvent::PracticeUnitCompleted {
+        }) => Some(NoteEvent::PracticeUnitCompleted {
             session_id: session_id.clone(),
             note_id: note_id.clone(),
             unit_index: *unit_index,
@@ -241,7 +261,7 @@ pub fn try_from_domain_event(e: &bus::DomainEvent) -> Option<NoteEvent> {
             confidence_rating: *confidence_rating,
             edited: *edited,
         }),
-        DomainEvent::PracticeSessionCompleted {
+        DomainEvent::Learning(BusLearningEvent::PracticeSessionCompleted {
             session_id,
             note_id,
             units_completed,
@@ -249,7 +269,7 @@ pub fn try_from_domain_event(e: &bus::DomainEvent) -> Option<NoteEvent> {
             source_lang,
             target_lang,
             weak_unit_count,
-        } => Some(NoteEvent::PracticeSessionCompleted {
+        }) => Some(NoteEvent::PracticeSessionCompleted {
             session_id: session_id.clone(),
             note_id: note_id.clone(),
             units_completed: *units_completed,
@@ -258,13 +278,13 @@ pub fn try_from_domain_event(e: &bus::DomainEvent) -> Option<NoteEvent> {
             target_lang: target_lang.clone(),
             weak_unit_count: *weak_unit_count,
         }),
-        DomainEvent::TranslationCompleted {
+        DomainEvent::Learning(BusLearningEvent::TranslationCompleted {
             note_id,
             source_lang,
             target_lang,
             word_count,
             is_selection,
-        } => Some(NoteEvent::TranslationCompleted {
+        }) => Some(NoteEvent::TranslationCompleted {
             note_id: note_id.clone(),
             source_lang: source_lang.clone(),
             target_lang: target_lang.clone(),

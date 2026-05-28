@@ -23,6 +23,7 @@ use tokio::sync::broadcast;
 use tokio_util::sync::CancellationToken;
 use tracing::warn;
 
+use bus::domain_events::LearningEvent as BusLearningEvent;
 use bus::{ContextUpdateReason, DomainEvent};
 
 use context_engine::book_index::types::{SourceType, TreeNode, TreeNodeType};
@@ -89,7 +90,10 @@ impl LearningTreeBuilder {
             let this = Arc::clone(&self);
             async move {
                 match event {
-                    DomainEvent::KnowledgeAtomAccepted { atom_id, atom_type } => {
+                    DomainEvent::Learning(BusLearningEvent::KnowledgeAtomAccepted {
+                        atom_id,
+                        atom_type,
+                    }) => {
                         if let Err(e) = this.handle_atom_accepted(&atom_id, &atom_type, None).await
                         {
                             warn!(
@@ -98,13 +102,13 @@ impl LearningTreeBuilder {
                             );
                         }
                     }
-                    DomainEvent::RetentionMilestoneReached {
+                    DomainEvent::Learning(BusLearningEvent::RetentionMilestoneReached {
                         atom_id,
                         topic_id: _,
                         new_retention_pct,
                         milestone,
                         previous_pct: _,
-                    } => {
+                    }) => {
                         if let Err(e) = this
                             .handle_retention_milestone(&atom_id, &milestone, new_retention_pct)
                             .await

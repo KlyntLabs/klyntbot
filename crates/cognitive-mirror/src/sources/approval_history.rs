@@ -1,5 +1,6 @@
 use ai_core::mirror::{MirrorSignalSource, MirrorSnapshotSpec};
 use bus::DomainEvent;
+use bus::ToolExecutionEvent;
 use futures_util::future::join_all;
 use std::sync::Arc;
 use storage::repos::ApprovalPatternHistoryRepo;
@@ -160,13 +161,13 @@ impl ApprovalHistorySource {
         let mut rx = bus.subscribe();
         while let Ok(evt) = rx.recv().await {
             match evt {
-                DomainEvent::ApprovalRequested {
+                DomainEvent::ToolExecution(ToolExecutionEvent::ApprovalRequested {
                     request_id,
                     tool,
                     args_hash,
                     layer,
                     repo_id,
-                } => {
+                }) => {
                     self.observe_request(
                         &request_id,
                         &tool,
@@ -175,7 +176,7 @@ impl ApprovalHistorySource {
                         repo_id.as_deref().unwrap_or(""),
                     );
                 }
-                DomainEvent::ApprovalResolved {
+                DomainEvent::ToolExecution(ToolExecutionEvent::ApprovalResolved {
                     request_id,
                     user_id,
                     tool_name,
@@ -185,7 +186,7 @@ impl ApprovalHistorySource {
                     occurred_at,
                     decided_by,
                     ..
-                } => {
+                }) => {
                     let _ = self
                         .observe_resolution(&request_id, &decision, &decided_by)
                         .await;

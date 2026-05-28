@@ -7,7 +7,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use bus::{DomainEvent, DomainEventBus};
+use bus::{DomainEventBus, NotificationEvent};
 
 use crate::error::Result;
 
@@ -30,11 +30,12 @@ impl Channel for TrayChannel {
     }
 
     async fn deliver(&self, payload: &NotificationPayload) -> Result<()> {
-        self.bus.publish(DomainEvent::TrayNotificationRequested {
-            title: payload.title.clone(),
-            body: payload.body.clone(),
-            alarm_id: Some(payload.alarm_id.clone()),
-        });
+        self.bus
+            .publish_notification(NotificationEvent::TrayNotificationRequested {
+                title: payload.title.clone(),
+                body: payload.body.clone(),
+                alarm_id: Some(payload.alarm_id.clone()),
+            });
         Ok(())
     }
 }

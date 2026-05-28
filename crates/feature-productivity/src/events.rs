@@ -1,5 +1,6 @@
 use ai_core_macros::AiEvent;
 use bus::DomainEvent;
+use bus::ProductivityEvent as BusProductivityEvent;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, AiEvent, Serialize, Deserialize)]
@@ -104,49 +105,52 @@ impl From<ProductivityEvent> for DomainEvent {
                 session_id,
                 quality,
                 duration_mins,
-            } => DomainEvent::ProductivitySessionEnded {
+            } => DomainEvent::Productivity(BusProductivityEvent::ProductivitySessionEnded {
                 session_id,
                 quality,
                 duration_mins,
-            },
+            }),
             ProductivityEvent::FocusSessionStarted {
                 session_type,
                 target_mins,
-            } => DomainEvent::FocusSessionStarted {
+            } => DomainEvent::Productivity(BusProductivityEvent::FocusSessionStarted {
                 session_type,
                 target_mins,
-            },
+            }),
             ProductivityEvent::FocusSessionEnded {
                 duration_secs,
                 quality,
                 interruptions,
-            } => DomainEvent::FocusSessionEnded {
+            } => DomainEvent::Productivity(BusProductivityEvent::FocusSessionEnded {
                 duration_secs,
                 quality,
                 interruptions,
-            },
+            }),
             ProductivityEvent::DistractionDetected {
                 app,
                 duration_secs,
                 context,
-            } => DomainEvent::DistractionDetected {
+            } => DomainEvent::Productivity(BusProductivityEvent::DistractionDetected {
                 app,
                 duration_secs,
                 context,
-            },
+            }),
             ProductivityEvent::ActivitySessionCompleted {
                 date,
                 total_active_secs,
                 productive_secs,
                 distracting_secs,
-            } => DomainEvent::ActivitySessionCompleted {
+            } => DomainEvent::Productivity(BusProductivityEvent::ActivitySessionCompleted {
                 date,
                 total_active_secs,
                 productive_secs,
                 distracting_secs,
-            },
+            }),
             ProductivityEvent::ProductivityScoreComputed { date, score } => {
-                DomainEvent::ProductivityScoreComputed { date, score }
+                DomainEvent::Productivity(BusProductivityEvent::ProductivityScoreComputed {
+                    date,
+                    score,
+                })
             }
         }
     }
@@ -156,57 +160,58 @@ impl From<ProductivityEvent> for DomainEvent {
 pub fn try_from_domain_event(e: &bus::DomainEvent) -> Option<ProductivityEvent> {
     use bus::DomainEvent;
     match e {
-        DomainEvent::ProductivitySessionEnded {
+        DomainEvent::Productivity(BusProductivityEvent::ProductivitySessionEnded {
             session_id,
             quality,
             duration_mins,
-        } => Some(ProductivityEvent::SessionEnded {
+        }) => Some(ProductivityEvent::SessionEnded {
             session_id: session_id.clone(),
             quality: *quality,
             duration_mins: *duration_mins,
         }),
-        DomainEvent::FocusSessionStarted {
+        DomainEvent::Productivity(BusProductivityEvent::FocusSessionStarted {
             session_type,
             target_mins,
-        } => Some(ProductivityEvent::FocusSessionStarted {
+        }) => Some(ProductivityEvent::FocusSessionStarted {
             session_type: session_type.clone(),
             target_mins: *target_mins,
         }),
-        DomainEvent::FocusSessionEnded {
+        DomainEvent::Productivity(BusProductivityEvent::FocusSessionEnded {
             duration_secs,
             quality,
             interruptions,
-        } => Some(ProductivityEvent::FocusSessionEnded {
+        }) => Some(ProductivityEvent::FocusSessionEnded {
             duration_secs: *duration_secs,
             quality: *quality,
             interruptions: *interruptions,
         }),
-        DomainEvent::DistractionDetected {
+        DomainEvent::Productivity(BusProductivityEvent::DistractionDetected {
             app,
             duration_secs,
             context,
-        } => Some(ProductivityEvent::DistractionDetected {
+        }) => Some(ProductivityEvent::DistractionDetected {
             app: app.clone(),
             duration_secs: *duration_secs,
             context: context.clone(),
         }),
-        DomainEvent::ActivitySessionCompleted {
+        DomainEvent::Productivity(BusProductivityEvent::ActivitySessionCompleted {
             date,
             total_active_secs,
             productive_secs,
             distracting_secs,
-        } => Some(ProductivityEvent::ActivitySessionCompleted {
+        }) => Some(ProductivityEvent::ActivitySessionCompleted {
             date: date.clone(),
             total_active_secs: *total_active_secs,
             productive_secs: *productive_secs,
             distracting_secs: *distracting_secs,
         }),
-        DomainEvent::ProductivityScoreComputed { date, score } => {
-            Some(ProductivityEvent::ProductivityScoreComputed {
-                date: date.clone(),
-                score: *score,
-            })
-        }
+        DomainEvent::Productivity(BusProductivityEvent::ProductivityScoreComputed {
+            date,
+            score,
+        }) => Some(ProductivityEvent::ProductivityScoreComputed {
+            date: date.clone(),
+            score: *score,
+        }),
         _ => None,
     }
 }

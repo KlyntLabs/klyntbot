@@ -5,6 +5,7 @@
 //! - Time-of-day patterns (morning/afternoon/evening usage)
 //! - Agent usage frequency
 
+use bus::domain_events::LearningEvent as BusLearningEvent;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -81,7 +82,7 @@ impl PatternAnalyzer {
         for ((day, agent), count) in &day_agent_counts {
             if *count >= MIN_PATTERN_OCCURRENCES {
                 self.event_bus
-                    .publish(bus::DomainEvent::BehavioralPatternDetected {
+                    .publish_learning(BusLearningEvent::BehavioralPatternDetected {
                         pattern_type: "day_of_week".into(),
                         pattern_key: format!("{}_{}", day, agent),
                         sample_count: *count,
@@ -97,7 +98,7 @@ impl PatternAnalyzer {
         for (period, count) in &time_counts {
             if *count >= MIN_PATTERN_OCCURRENCES {
                 self.event_bus
-                    .publish(bus::DomainEvent::BehavioralPatternDetected {
+                    .publish_learning(BusLearningEvent::BehavioralPatternDetected {
                         pattern_type: "time_of_day".into(),
                         pattern_key: period.clone(),
                         sample_count: *count,
@@ -115,7 +116,7 @@ impl PatternAnalyzer {
             let count_i32 = *count as i32;
             if count_i32 >= MIN_PATTERN_OCCURRENCES {
                 self.event_bus
-                    .publish(bus::DomainEvent::BehavioralPatternDetected {
+                    .publish_learning(BusLearningEvent::BehavioralPatternDetected {
                         pattern_type: "agent_usage".into(),
                         pattern_key: agent.clone(),
                         sample_count: count_i32,
@@ -176,7 +177,7 @@ mod tests {
 
         let has_day = events.iter().any(|e| {
             matches!(
-                e, bus::DomainEvent::BehavioralPatternDetected { pattern_type, .. }
+                e, bus::DomainEvent::Learning(BusLearningEvent::BehavioralPatternDetected { pattern_type, .. })
                 if pattern_type == "day_of_week"
             )
         });
@@ -184,7 +185,7 @@ mod tests {
 
         let has_time = events.iter().any(|e| {
             matches!(
-                e, bus::DomainEvent::BehavioralPatternDetected { pattern_type, .. }
+                e, bus::DomainEvent::Learning(BusLearningEvent::BehavioralPatternDetected { pattern_type, .. })
                 if pattern_type == "time_of_day"
             )
         });
@@ -192,7 +193,7 @@ mod tests {
 
         let has_agent = events.iter().any(|e| {
             matches!(
-                e, bus::DomainEvent::BehavioralPatternDetected { pattern_type, .. }
+                e, bus::DomainEvent::Learning(BusLearningEvent::BehavioralPatternDetected { pattern_type, .. })
                 if pattern_type == "agent_usage"
             )
         });

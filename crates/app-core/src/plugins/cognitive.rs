@@ -378,9 +378,9 @@ impl AppCorePlugin for CognitivePlugin {
                                     Ok(notes) => {
                                         let count = notes.len();
                                         for note_id in notes {
-                                            bus.publish(bus::DomainEvent::NoteEditingFinished {
+                                            bus.publish(bus::DomainEvent::Note(bus::NoteEvent::NoteEditingFinished {
                                                 note_id,
-                                            });
+                                            }));
                                         }
                                         if count > 0 {
                                             tracing::info!(

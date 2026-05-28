@@ -2,6 +2,7 @@
 
 use ai_core::{AiSignal, RecallDomain, SignalConsumer};
 use async_trait::async_trait;
+use bus::domain_events::LearningEvent as BusLearningEvent;
 
 use super::signal::{CognitiveSignal, SignalContext, SignalSource};
 use super::SignalSender;
@@ -29,11 +30,11 @@ impl SignalConsumer for AtomCollector {
             return Ok(());
         }
         let (atom_id, count) = match signal.raw_event.as_ref() {
-            Some(bus::DomainEvent::AtomReinforced {
+            Some(bus::DomainEvent::Learning(BusLearningEvent::AtomReinforced {
                 atom_id,
                 reinforcement_count,
                 ..
-            }) if *reinforcement_count >= MIN_REINFORCEMENT => {
+            })) if *reinforcement_count >= MIN_REINFORCEMENT => {
                 (atom_id.clone(), *reinforcement_count)
             }
             _ => return Ok(()),
@@ -104,14 +105,16 @@ mod tests {
                 category: Some(RecallDomain::Learning.as_str().into()),
                 ..Default::default()
             },
-            raw_event: Some(bus::DomainEvent::AtomReinforced {
-                atom_id: "a1".into(),
-                referencing_note_id: "n1".into(),
-                new_salience: 0.8,
-                subject: "rust errors".into(),
-                domain: RecallDomain::Learning.as_str().into(),
-                reinforcement_count: 3,
-            }),
+            raw_event: Some(bus::DomainEvent::Learning(
+                BusLearningEvent::AtomReinforced {
+                    atom_id: "a1".into(),
+                    referencing_note_id: "n1".into(),
+                    new_salience: 0.8,
+                    subject: "rust errors".into(),
+                    domain: RecallDomain::Learning.as_str().into(),
+                    reinforcement_count: 3,
+                },
+            )),
             ..atom_dummy()
         };
         collector.consume(&sig).await.unwrap();

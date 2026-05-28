@@ -1,4 +1,5 @@
 use ai_core_macros::AiEvent;
+use bus::CoachingEvent as BusCoachingEvent;
 use bus::{DomainEvent, FeedbackResponse};
 use serde::{Deserialize, Serialize};
 
@@ -60,26 +61,26 @@ impl From<CoachingEvent> for DomainEvent {
                 strategy_id,
                 rule_text,
                 accepted,
-            } => DomainEvent::CoachingStrategyApplied {
+            } => DomainEvent::Coaching(BusCoachingEvent::CoachingStrategyApplied {
                 strategy_id,
                 rule_text,
                 accepted,
-            },
+            }),
             CoachingEvent::PatternDetected {
                 pattern_name,
                 severity,
-            } => DomainEvent::CoachingPatternDetected {
+            } => DomainEvent::Coaching(BusCoachingEvent::CoachingPatternDetected {
                 pattern_name,
                 confidence: severity,
                 description: String::new(),
                 domain: String::new(),
                 signal_count: 0,
                 rule_text: String::new(),
-            },
+            }),
             CoachingEvent::FeedbackReceived {
                 strategy_id,
                 response,
-            } => DomainEvent::CoachingFeedback {
+            } => DomainEvent::Coaching(BusCoachingEvent::CoachingFeedback {
                 intervention_id: strategy_id,
                 response: match response.as_str() {
                     "accept" => FeedbackResponse::Helpful,
@@ -87,7 +88,7 @@ impl From<CoachingEvent> for DomainEvent {
                     "stop" => FeedbackResponse::StopSuggesting,
                     _ => FeedbackResponse::Dismissed,
                 },
-            },
+            }),
         }
     }
 }
@@ -96,20 +97,20 @@ impl From<CoachingEvent> for DomainEvent {
 pub fn try_from_domain_event(e: &bus::DomainEvent) -> Option<CoachingEvent> {
     use bus::DomainEvent;
     match e {
-        DomainEvent::CoachingStrategyApplied {
+        DomainEvent::Coaching(BusCoachingEvent::CoachingStrategyApplied {
             strategy_id,
             rule_text,
             accepted,
-        } => Some(CoachingEvent::StrategyApplied {
+        }) => Some(CoachingEvent::StrategyApplied {
             strategy_id: strategy_id.clone(),
             rule_text: rule_text.clone(),
             accepted: *accepted,
         }),
-        DomainEvent::CoachingPatternDetected {
+        DomainEvent::Coaching(BusCoachingEvent::CoachingPatternDetected {
             pattern_name,
             confidence,
             ..
-        } => Some(CoachingEvent::PatternDetected {
+        }) => Some(CoachingEvent::PatternDetected {
             pattern_name: pattern_name.clone(),
             severity: *confidence,
         }),

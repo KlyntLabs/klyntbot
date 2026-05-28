@@ -477,9 +477,9 @@ impl AppCore {
 
                 // Publish domain event so the cognitive pipeline picks up the new note
                 if let Some(bus) = self.domain_event_bus().ok() {
-                    bus.publish(bus::DomainEvent::NoteContentChanged {
+                    bus.publish(bus::DomainEvent::Note(bus::NoteEvent::NoteContentChanged {
                         note_id: note_id.clone(),
-                    });
+                    }));
                 }
 
                 Ok(FabricActionResponse {

@@ -47,12 +47,12 @@ impl CorrectionTracker {
         let mut rx = bus.subscribe();
         tokio::spawn(async move {
             while let Ok(event) = rx.recv().await {
-                if let bus::DomainEvent::UserCorrectedAI {
+                if let bus::DomainEvent::CrossDomain(bus::CrossDomainEvent::UserCorrectedAI {
                     original,
                     correction,
                     session_key,
                     ..
-                } = event
+                }) = event
                 {
                     let ctx = CorrectionContext {
                         rejected_topic: original,
@@ -117,14 +117,16 @@ mod tests {
         // Give the listener task a moment to subscribe before publishing.
         tokio::task::yield_now().await;
 
-        bus.publish(bus::DomainEvent::UserCorrectedAI {
-            original: "memory".into(),
-            correction: "tasks".into(),
-            kind: bus::CorrectionKind::Reaction,
-            strength: 1.0,
-            session_key: "tg:alice".into(),
-            active_skill: None,
-        });
+        bus.publish(bus::DomainEvent::CrossDomain(
+            bus::CrossDomainEvent::UserCorrectedAI {
+                original: "memory".into(),
+                correction: "tasks".into(),
+                kind: bus::CorrectionKind::Reaction,
+                strength: 1.0,
+                session_key: "tg:alice".into(),
+                active_skill: None,
+            },
+        ));
 
         // Allow the spawned task to process the event.
         tokio::task::yield_now().await;

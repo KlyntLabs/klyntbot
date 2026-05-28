@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use tracing::info;
 
+use bus::ProductivityEvent as BusProductivityEvent;
 use bus::{DomainEvent, DomainEventBus};
 
 use crate::repos::{IntelligenceSessionRepo, QualityScoreRepo};
@@ -128,12 +129,14 @@ impl QualityScorer {
             "session quality scored"
         );
 
-        self.event_bus.publish(DomainEvent::QualityScored {
-            score_date,
-            session_id: Some(session_id.to_string()),
-            overall_score: overall_100,
-            components: format_components(&score),
-        });
+        self.event_bus.publish(DomainEvent::Productivity(
+            BusProductivityEvent::QualityScored {
+                score_date,
+                session_id: Some(session_id.to_string()),
+                overall_score: overall_100,
+                components: format_components(&score),
+            },
+        ));
 
         Ok(Some(score))
     }
@@ -193,12 +196,14 @@ impl QualityScorer {
 
         self.score_repo.upsert(&daily).await?;
 
-        self.event_bus.publish(DomainEvent::QualityScored {
-            score_date: date.to_string(),
-            session_id: None,
-            overall_score: daily.overall_score,
-            components: format_components(&daily),
-        });
+        self.event_bus.publish(DomainEvent::Productivity(
+            BusProductivityEvent::QualityScored {
+                score_date: date.to_string(),
+                session_id: None,
+                overall_score: daily.overall_score,
+                components: format_components(&daily),
+            },
+        ));
 
         Ok(Some(daily))
     }

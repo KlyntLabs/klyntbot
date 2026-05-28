@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use bus::{DomainEvent, DomainEventBus};
+use bus::{AlarmEvent, DomainEvent, DomainEventBus};
 use notifications::{
     channel::{os_native::OsNativeChannel, ChannelRegistry},
     held::HeldReleaseService,
@@ -73,7 +73,7 @@ async fn duplicate_alarm_fires_once_per_channel() {
 
     let payload = serde_json::json!({"title": "t", "body": "b"}).to_string();
     for _ in 0..3 {
-        bus.publish(DomainEvent::AlarmFired {
+        bus.publish_alarm(AlarmEvent::AlarmFired {
             fire_id: "fire_1".into(),
             kind: "task_alarm".into(),
             ref_id: None,

@@ -1,4 +1,5 @@
 use ai_core_macros::AiEvent;
+use bus::CommunityEvent as BusCommunityEvent;
 use bus::DomainEvent;
 use serde::{Deserialize, Serialize};
 
@@ -24,11 +25,11 @@ impl From<CoActivationEvent> for DomainEvent {
                 fact_id_a,
                 fact_id_b,
                 strength,
-            } => DomainEvent::CoActivationStrengthened {
+            } => DomainEvent::Community(BusCommunityEvent::CoActivationStrengthened {
                 fact_id_a,
                 fact_id_b,
                 strength,
-            },
+            }),
         }
     }
 }
@@ -37,11 +38,11 @@ impl From<CoActivationEvent> for DomainEvent {
 pub fn try_from_domain_event(e: &bus::DomainEvent) -> Option<CoActivationEvent> {
     use bus::DomainEvent;
     match e {
-        DomainEvent::CoActivationStrengthened {
+        DomainEvent::Community(BusCommunityEvent::CoActivationStrengthened {
             fact_id_a,
             fact_id_b,
             strength,
-        } => Some(CoActivationEvent::Strengthened {
+        }) => Some(CoActivationEvent::Strengthened {
             fact_id_a: fact_id_a.clone(),
             fact_id_b: fact_id_b.clone(),
             strength: *strength,

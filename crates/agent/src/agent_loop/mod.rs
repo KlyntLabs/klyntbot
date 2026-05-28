@@ -256,7 +256,7 @@ impl AgentLoop {
         active_skill: Option<String>,
     ) {
         if let Some(ref bus) = self.domain_event_bus {
-            bus.publish(bus::DomainEvent::UserCorrectedAI {
+            bus.publish_cross_domain(bus::CrossDomainEvent::UserCorrectedAI {
                 original,
                 correction,
                 kind,
@@ -356,13 +356,13 @@ impl AgentLoop {
                     }
                 } => {
                     match result {
-                        Ok(Some(bus::DomainEvent::FocusSessionStarted { .. })) => {
+                        Ok(Some(bus::DomainEvent::Productivity(bus::ProductivityEvent::FocusSessionStarted { .. }))) => {
                             info!("Focus session started — deferring inbound messages");
                             focus_active = true;
                             // Reset per-session dedup state on each new focus session.
                             auto_replied_senders.clear();
                         }
-                        Ok(Some(bus::DomainEvent::FocusSessionEnded { .. })) => {
+                        Ok(Some(bus::DomainEvent::Productivity(bus::ProductivityEvent::FocusSessionEnded { .. }))) => {
                             info!(
                                 deferred = deferred_messages.len(),
                                 "Focus session ended — draining deferred messages"

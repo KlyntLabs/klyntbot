@@ -2,6 +2,8 @@
 //! recomputation to stale knowledge atoms, auto-archiving forgotten ones.
 
 use crate::repos::{KnowledgeAtomRepo, ReviewStatsRepo};
+use bus::domain_events::LearningEvent as BusLearningEvent;
+use bus::CoachingEvent;
 use bus::DomainEventBus;
 use sqlx::SqlitePool;
 use tracing::{info, warn};
@@ -56,7 +58,7 @@ pub async fn run_decay_cycle(pool: &SqlitePool, bus: &DomainEventBus) -> common:
                 warn!("Failed to archive atom {}: {e}", atom.id);
                 continue;
             }
-            bus.publish(bus::DomainEvent::KnowledgeAtomArchived {
+            bus.publish_learning(BusLearningEvent::KnowledgeAtomArchived {
                 atom_id: atom.id.clone(),
                 reason: "decay".to_string(),
             });
@@ -92,7 +94,7 @@ pub async fn run_decay_cycle(pool: &SqlitePool, bus: &DomainEventBus) -> common:
     let review_stats = ReviewStatsRepo::new(pool.clone());
     let streak = review_stats.current_streak().await.unwrap_or(0);
 
-    bus.publish(bus::DomainEvent::CoachingLearningDigest {
+    bus.publish_coaching(CoachingEvent::CoachingLearningDigest {
         fading_count,
         archived_count,
         streak_days: streak,

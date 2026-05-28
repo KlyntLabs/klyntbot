@@ -71,48 +71,60 @@ impl AppCore {
     ) -> Result<bool, ApiError> {
         let bus = self.domain_event_bus()?;
         let event = match event_type.as_str() {
-            bus::DomainEvent::KIND_USER_STATED_FACT => bus::DomainEvent::UserStatedFact {
-                fact: payload["fact"].as_str().unwrap_or("").to_string(),
-                domain: payload["domain"].as_str().unwrap_or("general").to_string(),
-            },
-            bus::DomainEvent::KIND_USER_CORRECTED_AI => bus::DomainEvent::UserCorrectedAI {
-                original: payload["original"].as_str().unwrap_or("").to_string(),
-                correction: payload["correction"].as_str().unwrap_or("").to_string(),
-                kind: serde_json::from_value(payload["kind"].clone())
-                    .unwrap_or(bus::CorrectionKind::KeywordPrefix),
-                strength: payload["strength"].as_f64().unwrap_or(1.0),
-                session_key: payload["session_key"]
-                    .as_str()
-                    .unwrap_or("unknown")
-                    .to_string(),
-                active_skill: payload["active_skill"].as_str().map(|s| s.to_string()),
-            },
-            bus::DomainEvent::KIND_DISTRACTION_DETECTED => bus::DomainEvent::DistractionDetected {
-                app: payload["app"].as_str().unwrap_or("unknown").to_string(),
-                duration_secs: payload["duration_secs"].as_i64(),
-                context: payload["context"].as_str().unwrap_or("").to_string(),
-            },
-            bus::DomainEvent::KIND_FOCUS_SESSION_STARTED => bus::DomainEvent::FocusSessionStarted {
-                session_type: payload["session_type"]
-                    .as_str()
-                    .unwrap_or("Focus")
-                    .to_string(),
-                target_mins: payload["target_mins"].as_i64().unwrap_or(25),
-            },
-            bus::DomainEvent::KIND_FOCUS_SESSION_ENDED => bus::DomainEvent::FocusSessionEnded {
-                quality: payload["quality"].as_f64().unwrap_or(0.5),
-                duration_secs: payload["duration_secs"].as_i64().unwrap_or(1500),
-                interruptions: payload["interruptions"].as_i64().unwrap_or(0) as i32,
-            },
-            bus::DomainEvent::KIND_TASK_DEFERRED => bus::DomainEvent::TaskDeferred {
-                task_id: payload["task_id"]
-                    .as_str()
-                    .unwrap_or("test-task")
-                    .to_string(),
-                times_deferred: payload["times_deferred"].as_i64().unwrap_or(1) as i32,
-            },
+            bus::DomainEvent::KIND_USER_STATED_FACT => {
+                bus::DomainEvent::CrossDomain(bus::CrossDomainEvent::UserStatedFact {
+                    fact: payload["fact"].as_str().unwrap_or("").to_string(),
+                    domain: payload["domain"].as_str().unwrap_or("general").to_string(),
+                })
+            }
+            bus::DomainEvent::KIND_USER_CORRECTED_AI => {
+                bus::DomainEvent::CrossDomain(bus::CrossDomainEvent::UserCorrectedAI {
+                    original: payload["original"].as_str().unwrap_or("").to_string(),
+                    correction: payload["correction"].as_str().unwrap_or("").to_string(),
+                    kind: serde_json::from_value(payload["kind"].clone())
+                        .unwrap_or(bus::CorrectionKind::KeywordPrefix),
+                    strength: payload["strength"].as_f64().unwrap_or(1.0),
+                    session_key: payload["session_key"]
+                        .as_str()
+                        .unwrap_or("unknown")
+                        .to_string(),
+                    active_skill: payload["active_skill"].as_str().map(|s| s.to_string()),
+                })
+            }
+            bus::DomainEvent::KIND_DISTRACTION_DETECTED => {
+                bus::DomainEvent::Productivity(bus::ProductivityEvent::DistractionDetected {
+                    app: payload["app"].as_str().unwrap_or("unknown").to_string(),
+                    duration_secs: payload["duration_secs"].as_i64(),
+                    context: payload["context"].as_str().unwrap_or("").to_string(),
+                })
+            }
+            bus::DomainEvent::KIND_FOCUS_SESSION_STARTED => {
+                bus::DomainEvent::Productivity(bus::ProductivityEvent::FocusSessionStarted {
+                    session_type: payload["session_type"]
+                        .as_str()
+                        .unwrap_or("Focus")
+                        .to_string(),
+                    target_mins: payload["target_mins"].as_i64().unwrap_or(25),
+                })
+            }
+            bus::DomainEvent::KIND_FOCUS_SESSION_ENDED => {
+                bus::DomainEvent::Productivity(bus::ProductivityEvent::FocusSessionEnded {
+                    quality: payload["quality"].as_f64().unwrap_or(0.5),
+                    duration_secs: payload["duration_secs"].as_i64().unwrap_or(1500),
+                    interruptions: payload["interruptions"].as_i64().unwrap_or(0) as i32,
+                })
+            }
+            bus::DomainEvent::KIND_TASK_DEFERRED => {
+                bus::DomainEvent::Task(bus::TaskEvent::TaskDeferred {
+                    task_id: payload["task_id"]
+                        .as_str()
+                        .unwrap_or("test-task")
+                        .to_string(),
+                    times_deferred: payload["times_deferred"].as_i64().unwrap_or(1) as i32,
+                })
+            }
             bus::DomainEvent::KIND_ACTIVITY_SESSION_COMPLETED => {
-                bus::DomainEvent::ActivitySessionCompleted {
+                bus::DomainEvent::Productivity(bus::ProductivityEvent::ActivitySessionCompleted {
                     date: payload["date"]
                         .as_str()
                         .unwrap_or(&jiff::Zoned::now().strftime("%Y-%m-%d").to_string())
@@ -120,16 +132,16 @@ impl AppCore {
                     total_active_secs: payload["total_active_secs"].as_i64().unwrap_or(300),
                     productive_secs: payload["productive_secs"].as_i64().unwrap_or(240),
                     distracting_secs: payload["distracting_secs"].as_i64().unwrap_or(60),
-                }
+                })
             }
             bus::DomainEvent::KIND_PRODUCTIVITY_SCORE_COMPUTED => {
-                bus::DomainEvent::ProductivityScoreComputed {
+                bus::DomainEvent::Productivity(bus::ProductivityEvent::ProductivityScoreComputed {
                     date: payload["date"]
                         .as_str()
                         .unwrap_or(&jiff::Zoned::now().strftime("%Y-%m-%d").to_string())
                         .to_string(),
                     score: payload["score"].as_f64().unwrap_or(0.0),
-                }
+                })
             }
             bus::DomainEvent::KIND_CHAT_TURN_COMPLETED => bus::DomainEvent::ChatTurnCompleted {
                 session_key: payload["session_key"]

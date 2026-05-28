@@ -12,6 +12,8 @@ use sha2::Digest;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, info, warn};
 
+use bus::domain_events::LearningEvent as BusLearningEvent;
+use bus::NoteEvent as BusNoteEvent;
 use bus::{DomainEvent, DomainEventBus};
 use config::schema::AtomExtractionConfig;
 use providers::{ChatParams, DynProvider, Message, UserContent};
@@ -79,7 +81,7 @@ impl AtomExtractionService {
                     }
                     result = rx.recv() => {
                         match result {
-                            Ok(DomainEvent::NoteEditingFinished { note_id }) => {
+                            Ok(DomainEvent::Note(BusNoteEvent::NoteEditingFinished { note_id })) => {
                                 // Debounce: skip if we processed this note recently
                                 let now = tokio::time::Instant::now();
                                 if let Some(last) = debounce_map.get(&note_id) {
@@ -266,7 +268,7 @@ async fn process_note(
                                 })
                                 .map(|v| v.len() as i64)
                                 .unwrap_or(0);
-                            bus.publish(DomainEvent::AtomReinforced {
+                            bus.publish_learning(BusLearningEvent::AtomReinforced {
                                 atom_id: target.id.clone(),
                                 referencing_note_id: note_id.to_string(),
                                 new_salience,
@@ -329,7 +331,7 @@ async fn process_note(
                         domain = row.domain,
                         "created active atom"
                     );
-                    bus.publish(DomainEvent::KnowledgeAtomCreated {
+                    bus.publish_learning(BusLearningEvent::KnowledgeAtomCreated {
                         atom_id: row.id,
                         atom_type: row.atom_type,
                         domain: row.domain,

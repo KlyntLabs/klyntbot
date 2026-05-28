@@ -111,7 +111,7 @@ impl AutotunerBridge for AgentAutotunerBridge {
 
             // Emit domain event for promotion
             if let Some(ref bus) = self.domain_event_bus {
-                bus.publish(bus::DomainEvent::AutotunerDecision {
+                bus.publish_cross_domain(bus::CrossDomainEvent::AutotunerDecision {
                     trial_id: trial_id.to_string(),
                     verdict: autotuner::TrialStatus::Promoted.as_str().to_string(),
                     improvement_pct,

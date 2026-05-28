@@ -1,4 +1,5 @@
 use ai_core_macros::AiEvent;
+use bus::CommunityEvent as BusCommunityEvent;
 use bus::DomainEvent;
 use serde::{Deserialize, Serialize};
 
@@ -46,29 +47,29 @@ impl From<CommunityEvent> for DomainEvent {
                 community_id,
                 name,
                 member_count,
-            } => DomainEvent::CommunityDiscovered {
+            } => DomainEvent::Community(BusCommunityEvent::CommunityDiscovered {
                 community_id,
                 name,
                 member_count,
-            },
+            }),
             CommunityEvent::Updated {
                 community_id,
                 name,
                 reason,
-            } => DomainEvent::CommunityUpdated {
+            } => DomainEvent::Community(BusCommunityEvent::CommunityUpdated {
                 community_id,
                 name,
                 reason,
-            },
+            }),
             CommunityEvent::Weakened {
                 community_id,
                 name,
                 stability,
-            } => DomainEvent::CommunityWeakened {
+            } => DomainEvent::Community(BusCommunityEvent::CommunityWeakened {
                 community_id,
                 name,
                 stability,
-            },
+            }),
         }
     }
 }
@@ -76,29 +77,29 @@ impl From<CommunityEvent> for DomainEvent {
 /// Translate a bus::DomainEvent into the typed CommunityEvent, if applicable.
 pub fn try_from_domain_event(e: &DomainEvent) -> Option<CommunityEvent> {
     match e {
-        DomainEvent::CommunityDiscovered {
+        DomainEvent::Community(BusCommunityEvent::CommunityDiscovered {
             community_id,
             name,
             member_count,
-        } => Some(CommunityEvent::Discovered {
+        }) => Some(CommunityEvent::Discovered {
             community_id: community_id.clone(),
             name: name.clone(),
             member_count: *member_count,
         }),
-        DomainEvent::CommunityUpdated {
+        DomainEvent::Community(BusCommunityEvent::CommunityUpdated {
             community_id,
             name,
             reason,
-        } => Some(CommunityEvent::Updated {
+        }) => Some(CommunityEvent::Updated {
             community_id: community_id.clone(),
             name: name.clone(),
             reason: reason.clone(),
         }),
-        DomainEvent::CommunityWeakened {
+        DomainEvent::Community(BusCommunityEvent::CommunityWeakened {
             community_id,
             name,
             stability,
-        } => Some(CommunityEvent::Weakened {
+        }) => Some(CommunityEvent::Weakened {
             community_id: community_id.clone(),
             name: name.clone(),
             stability: *stability,

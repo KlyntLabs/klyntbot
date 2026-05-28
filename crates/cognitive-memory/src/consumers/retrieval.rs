@@ -75,7 +75,7 @@ impl SignalConsumer for RetrievalIndexer {
 mod tests {
     use super::*;
     use ai_core::{AiSignal, EntityRef, RecallDomain};
-    use bus::DomainEvent;
+    use bus::{DomainEvent, TaskEvent};
 
     fn sample_signal(imp: f64, salience: SalienceVerdict) -> AiSignal {
         AiSignal {
@@ -90,12 +90,12 @@ mod tests {
                 name: "do thing".into(),
             }),
             timestamp: jiff::Timestamp::now(),
-            raw_event: Some(DomainEvent::TaskCreated {
+            raw_event: Some(DomainEvent::Task(TaskEvent::TaskCreated {
                 task_id: "t1".into(),
                 project: None,
                 estimate_mins: None,
                 task_type: "basic".into(),
-            }),
+            })),
             metrics: ai_core::AiMetrics::default(),
             coaching_signal: false,
             coaching_rule: None,

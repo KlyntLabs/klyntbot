@@ -87,7 +87,7 @@ impl AppCorePlugin for TemporalPlugin {
         let wake_subscriber = tokio::spawn(async move {
             loop {
                 match wake_rx.recv().await {
-                    Ok(DomainEvent::SystemDidWake { .. }) => {
+                    Ok(DomainEvent::Lifecycle(bus::LifecycleEvent::SystemDidWake { .. })) => {
                         wake_scheduler.wake();
                     }
                     Ok(_) => {}

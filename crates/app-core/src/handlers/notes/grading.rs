@@ -259,13 +259,15 @@ impl AppCore {
                 }
 
                 if let Some(bus) = self.domain_event_bus().ok() {
-                    bus.publish(bus::DomainEvent::KnowledgeAtomCreated {
-                        atom_id,
-                        atom_type: "flashcard_weak_spot".to_string(),
-                        domain: card.deck.clone(),
-                        source_note_id: card.source_note_id.clone(),
-                        personal_importance: 0.7,
-                    });
+                    bus.publish(bus::DomainEvent::Learning(
+                        bus::domain_events::LearningEvent::KnowledgeAtomCreated {
+                            atom_id,
+                            atom_type: "flashcard_weak_spot".to_string(),
+                            domain: card.deck.clone(),
+                            source_note_id: card.source_note_id.clone(),
+                            personal_importance: 0.7,
+                        },
+                    ));
                 }
             }
         }
@@ -394,13 +396,15 @@ Be concise — 2-4 sentences max."#
         // Always publish bus event (preserves behavior for coaching subscribers
         // even when atom_repo is None).
         let saved = if let Some(bus) = self.domain_event_bus().ok() {
-            bus.publish(bus::DomainEvent::KnowledgeAtomCreated {
-                atom_id: atom_id_for_event,
-                atom_type: "socratic_exchange".to_string(),
-                domain: card.deck.clone(),
-                source_note_id: card.source_note_id.clone(),
-                personal_importance: 0.6,
-            });
+            bus.publish(bus::DomainEvent::Learning(
+                bus::domain_events::LearningEvent::KnowledgeAtomCreated {
+                    atom_id: atom_id_for_event,
+                    atom_type: "socratic_exchange".to_string(),
+                    domain: card.deck.clone(),
+                    source_note_id: card.source_note_id.clone(),
+                    personal_importance: 0.6,
+                },
+            ));
             persisted
         } else {
             false

@@ -1,5 +1,6 @@
 use ai_core_macros::AiEvent;
 use bus::DomainEvent;
+use bus::TaskEvent as BusTaskEvent;
 
 #[derive(Debug, Clone, AiEvent)]
 #[ai(domain = "Tasks")]
@@ -110,54 +111,56 @@ impl From<TaskEvent> for DomainEvent {
                 project_id,
                 priority: _,
                 estimated_minutes,
-            } => DomainEvent::TaskCreated {
+            } => DomainEvent::Task(BusTaskEvent::TaskCreated {
                 task_id,
                 project: project_id,
                 estimate_mins: estimated_minutes.map(|m| m as i64),
                 task_type: "manual".to_string(),
-            },
+            }),
             TaskEvent::Completed {
                 task_id,
                 title: _,
                 deviation_pct,
-            } => DomainEvent::TaskCompleted {
+            } => DomainEvent::Task(BusTaskEvent::TaskCompleted {
                 task_id,
                 actual_duration_mins: None,
                 estimated_duration_mins: None,
                 deviation_pct,
-            },
-            TaskEvent::FocusExpired { task_id, title: _ } => DomainEvent::TaskFocusExpired {
-                task_id,
-                title: String::new(),
-            },
+            }),
+            TaskEvent::FocusExpired { task_id, title: _ } => {
+                DomainEvent::Task(BusTaskEvent::TaskFocusExpired {
+                    task_id,
+                    title: String::new(),
+                })
+            }
             TaskEvent::FocusChanged {
                 task_id,
                 title: _,
                 focus_deadline,
-            } => DomainEvent::TaskFocusChanged {
+            } => DomainEvent::Task(BusTaskEvent::TaskFocusChanged {
                 task_id,
                 focus_deadline: focus_deadline.map(|d| d.to_string()),
-            },
+            }),
             TaskEvent::Deferred {
                 task_id,
                 title: _,
                 previous_due: _,
                 new_due: _,
-            } => DomainEvent::TaskDeferred {
+            } => DomainEvent::Task(BusTaskEvent::TaskDeferred {
                 task_id,
                 times_deferred: 1,
-            },
+            }),
             TaskEvent::EstimationRecorded {
                 task_id,
                 estimated_minutes,
                 actual_minutes,
                 deviation_pct,
-            } => DomainEvent::EstimationRecorded {
+            } => DomainEvent::Task(BusTaskEvent::EstimationRecorded {
                 task_id,
                 estimated_mins: estimated_minutes.unwrap_or(0) as u32,
                 actual_mins: actual_minutes.unwrap_or(0) as u32,
                 deviation_pct,
-            },
+            }),
         }
     }
 }
@@ -165,12 +168,12 @@ impl From<TaskEvent> for DomainEvent {
 /// Translate a bus::DomainEvent into the typed TaskEvent form, if it's a task event.
 pub fn try_from_domain_event(e: &DomainEvent) -> Option<TaskEvent> {
     match e {
-        DomainEvent::TaskCreated {
+        DomainEvent::Task(BusTaskEvent::TaskCreated {
             task_id,
             project,
             estimate_mins,
             ..
-        } => Some(TaskEvent::Created {
+        }) => Some(TaskEvent::Created {
             task_id: task_id.clone(),
             title: String::new(),
             area_id: String::new(),
@@ -178,40 +181,44 @@ pub fn try_from_domain_event(e: &DomainEvent) -> Option<TaskEvent> {
             priority: None,
             estimated_minutes: estimate_mins.map(|m| m as i32),
         }),
-        DomainEvent::TaskCompleted {
+        DomainEvent::Task(BusTaskEvent::TaskCompleted {
             task_id,
             deviation_pct,
             ..
-        } => Some(TaskEvent::Completed {
+        }) => Some(TaskEvent::Completed {
             task_id: task_id.clone(),
             title: String::new(),
             deviation_pct: *deviation_pct,
         }),
-        DomainEvent::TaskFocusChanged {
+        DomainEvent::Task(BusTaskEvent::TaskFocusChanged {
             task_id,
             focus_deadline,
             ..
-        } => Some(TaskEvent::FocusChanged {
+        }) => Some(TaskEvent::FocusChanged {
             task_id: task_id.clone(),
             title: String::new(),
             focus_deadline: focus_deadline.as_ref().and_then(|d| d.parse().ok()),
         }),
-        DomainEvent::TaskFocusExpired { task_id, title } => Some(TaskEvent::FocusExpired {
-            task_id: task_id.clone(),
-            title: title.clone(),
-        }),
-        DomainEvent::TaskDeferred { task_id, .. } => Some(TaskEvent::Deferred {
-            task_id: task_id.clone(),
-            title: String::new(),
-            previous_due: None,
-            new_due: None,
-        }),
-        DomainEvent::EstimationRecorded {
+        DomainEvent::Task(BusTaskEvent::TaskFocusExpired { task_id, title }) => {
+            Some(TaskEvent::FocusExpired {
+                task_id: task_id.clone(),
+                title: title.clone(),
+            })
+        }
+        DomainEvent::Task(BusTaskEvent::TaskDeferred { task_id, .. }) => {
+            Some(TaskEvent::Deferred {
+                task_id: task_id.clone(),
+                title: String::new(),
+                previous_due: None,
+                new_due: None,
+            })
+        }
+        DomainEvent::Task(BusTaskEvent::EstimationRecorded {
             task_id,
             estimated_mins,
             actual_mins,
             ..
-        } => Some(TaskEvent::EstimationRecorded {
+        }) => Some(TaskEvent::EstimationRecorded {
             task_id: task_id.clone(),
             estimated_minutes: Some(*estimated_mins as i32),
             actual_minutes: Some(*actual_mins as i32),

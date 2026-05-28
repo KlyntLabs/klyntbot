@@ -4,6 +4,7 @@
 
 use std::sync::Arc;
 
+use bus::TaskEvent as BusTaskEvent;
 use bus::{DomainEvent, DomainEventBus};
 use storage::repos::task_repo::TaskRepo;
 use tokio::task::JoinHandle;
@@ -59,7 +60,7 @@ async fn check_expired(bus: &DomainEventBus, task_repo: &TaskRepo) {
 
         if deadline <= now {
             // Emit expiry event.
-            bus.publish(DomainEvent::TaskFocusExpired {
+            bus.publish_task(BusTaskEvent::TaskFocusExpired {
                 task_id: row.id.clone(),
                 title: row.title.clone(),
             });

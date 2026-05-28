@@ -39,13 +39,15 @@ impl AppCore {
 
         // Publish domain event
         if let Some(bus) = self.domain_event_bus().ok() {
-            bus.publish(bus::DomainEvent::FlashcardSessionCompleted {
-                session_id: params.session_id,
-                cards_reviewed: params.cards_reviewed as usize,
-                avg_score: params.avg_score,
-                weak_domains: vec![],
-                propagation_count: params.propagation_count as usize,
-            });
+            bus.publish(bus::DomainEvent::Learning(
+                bus::domain_events::LearningEvent::FlashcardSessionCompleted {
+                    session_id: params.session_id,
+                    cards_reviewed: params.cards_reviewed as usize,
+                    avg_score: params.avg_score,
+                    weak_domains: vec![],
+                    propagation_count: params.propagation_count as usize,
+                },
+            ));
         }
 
         Ok(())

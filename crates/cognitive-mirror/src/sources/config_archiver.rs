@@ -89,12 +89,12 @@ impl MirrorSignalSource for ConfigArchiverSource {
     }
 
     async fn accumulate(&self, signal: &AiSignal) -> common::Result<()> {
-        if let Some(bus::DomainEvent::AutotunerDecision {
+        if let Some(bus::DomainEvent::CrossDomain(bus::CrossDomainEvent::AutotunerDecision {
             trial_id,
             verdict,
             improvement_pct,
             ..
-        }) = &signal.raw_event
+        })) = &signal.raw_event
         {
             if verdict == "promoted" {
                 let _ = self

@@ -91,10 +91,10 @@ impl WakeOrchestrator {
                 };
 
                 match event {
-                    DomainEvent::SystemDidWake {
+                    DomainEvent::Lifecycle(bus::LifecycleEvent::SystemDidWake {
                         away_secs,
                         wake_type,
-                    } => {
+                    }) => {
                         if away_secs < self.config.min_absence_for_panel_secs {
                             continue;
                         }
@@ -107,10 +107,10 @@ impl WakeOrchestrator {
                             expired_count: 0,
                         });
                     }
-                    DomainEvent::FocusSessionSuspended {
+                    DomainEvent::Lifecycle(bus::LifecycleEvent::FocusSessionSuspended {
                         remaining_secs,
                         phase_name,
-                    } => {
+                    }) => {
                         if let Some(ref mut ctx) = pending_wake {
                             ctx.focus_suspended = Some(FocusSuspendedInfo {
                                 remaining_secs,
@@ -118,18 +118,18 @@ impl WakeOrchestrator {
                             });
                         }
                     }
-                    DomainEvent::CronCatchUpReady {
+                    DomainEvent::Lifecycle(bus::LifecycleEvent::CronCatchUpReady {
                         immediate_count,
                         deferred_count,
                         expired_count,
-                    } => {
+                    }) => {
                         if let Some(ref mut ctx) = pending_wake {
                             ctx.immediate_count = immediate_count;
                             ctx.deferred_count = deferred_count;
                             ctx.expired_count = expired_count;
                         }
                     }
-                    DomainEvent::UserReturned { .. } => {
+                    DomainEvent::Lifecycle(bus::LifecycleEvent::UserReturned { .. }) => {
                         if let Some(ctx) = pending_wake.take() {
                             // Spawn the quiet-period wait + panel emit so the event
                             // loop keeps processing other events during the delay.
@@ -150,10 +150,12 @@ impl WakeOrchestrator {
                                     ctx.expired_count,
                                 );
 
-                                bus.publish(DomainEvent::WakePanelReady {
-                                    greeting,
-                                    away_secs: ctx.away_secs,
-                                });
+                                bus.publish(DomainEvent::Lifecycle(
+                                    bus::LifecycleEvent::WakePanelReady {
+                                        greeting,
+                                        away_secs: ctx.away_secs,
+                                    },
+                                ));
                             });
                         }
                     }

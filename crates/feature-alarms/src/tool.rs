@@ -8,7 +8,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use bus::{DomainEvent, DomainEventBus};
+use bus::{AlarmEvent, DomainEvent, DomainEventBus};
 use common::{Result, ToolError};
 use jiff::{SignedDuration, Timestamp};
 use notifications::channel::names_to_mask;
@@ -161,7 +161,7 @@ impl AlarmTool {
             );
         }
         if let Some(ref bus) = self.domain_bus {
-            bus.publish(DomainEvent::AlarmCancelled {
+            bus.publish_alarm(AlarmEvent::AlarmCancelled {
                 fire_id: alarm_id.into(),
                 reason: "user_cancel".into(),
             });
@@ -207,7 +207,7 @@ impl AlarmTool {
             .map_err(|e| ToolError::ExecutionFailed(format!("snooze reschedule failed: {e}")))?;
 
         if let Some(ref bus) = self.domain_bus {
-            bus.publish(DomainEvent::AlarmSnoozed {
+            bus.publish_alarm(AlarmEvent::AlarmSnoozed {
                 fire_id: new_fire_id.clone(),
                 new_fire_at_ms: new_fire_at.as_millisecond(),
             });

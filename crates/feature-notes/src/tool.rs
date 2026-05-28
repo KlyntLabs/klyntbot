@@ -5,7 +5,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use serde_json::Value;
 
-use bus::{DomainEvent, DomainEventBus};
+use bus::{DomainEvent, DomainEventBus, NoteEvent as BusNoteEvent};
 use common::{Result, ToolError};
 use tools_core::{approval_class::ApprovalClass, ParamExtractor, RoutingContext, Tool};
 
@@ -172,10 +172,10 @@ impl NotesTool {
         self.repo.create_note(&row).await?;
         self.maybe_set_tags(p, &id).await?;
 
-        self.publish(DomainEvent::NoteCreated {
+        self.publish(DomainEvent::Note(BusNoteEvent::NoteCreated {
             note_id: id.clone(),
             title: title.to_string(),
-        });
+        }));
 
         Ok(format!("Created note \"{title}\" (id: {id})"))
     }
@@ -247,14 +247,14 @@ impl NotesTool {
             .await?;
         self.maybe_set_tags(p, id).await?;
 
-        self.publish(DomainEvent::NoteUpdated {
+        self.publish(DomainEvent::Note(BusNoteEvent::NoteUpdated {
             note_id: updated.id.clone(),
             title: updated.title.clone(),
-        });
+        }));
         if body.is_some() {
-            self.publish(DomainEvent::NoteContentChanged {
+            self.publish(DomainEvent::Note(BusNoteEvent::NoteContentChanged {
                 note_id: updated.id.clone(),
-            });
+            }));
         }
 
         Ok(format!(
@@ -266,9 +266,9 @@ impl NotesTool {
     async fn handle_delete_note(&self, p: &ParamExtractor<'_>) -> Result<String> {
         let id = p.required_str("id")?;
         if self.repo.delete_note(id).await? {
-            self.publish(DomainEvent::NoteDeleted {
+            self.publish(DomainEvent::Note(BusNoteEvent::NoteDeleted {
                 note_id: id.to_string(),
-            });
+            }));
             Ok(format!("Deleted note {id}"))
         } else {
             Err(ToolError::InvalidParams(format!("Note not found: {id}")).into())

@@ -115,9 +115,11 @@ impl MirrorSignalSource for TrialPreviewSource {
     }
 
     async fn accumulate(&self, signal: &AiSignal) -> common::Result<()> {
-        if let Some(bus::DomainEvent::AutotunerDecision {
-            trial_id, verdict, ..
-        }) = &signal.raw_event
+        if let Some(bus::DomainEvent::CrossDomain(bus::CrossDomainEvent::AutotunerDecision {
+            trial_id,
+            verdict,
+            ..
+        })) = &signal.raw_event
         {
             if verdict == "activated" {
                 self.start_preview_timer(trial_id.clone(), String::new());

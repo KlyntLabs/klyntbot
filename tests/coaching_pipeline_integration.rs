@@ -6,7 +6,7 @@
 //! mpsc channel, and a non-coaching signal does not.
 
 use ai_core::{AiSignal, SignalConsumer, SignalRouter};
-use bus::{DomainEvent, DomainEventBus};
+use bus::{CoachingEvent, DomainEvent, DomainEventBus, NoteEvent};
 use std::sync::Arc;
 use tokio::sync::mpsc;
 
@@ -24,10 +24,10 @@ async fn coaching_feedback_reaches_coaching_consumer_via_ai_pipeline() {
         app_core::init::ai_pipeline::translate,
     );
 
-    bus.publish(DomainEvent::CoachingFeedback {
+    bus.publish(DomainEvent::Coaching(CoachingEvent::CoachingFeedback {
         intervention_id: "i1".into(),
         response: bus::FeedbackResponse::Helpful,
-    });
+    }));
 
     let signal = tokio::time::timeout(std::time::Duration::from_secs(2), rx.recv())
         .await
@@ -57,10 +57,10 @@ async fn non_coaching_signals_are_filtered_out() {
     );
 
     // Publish a non-coaching event.
-    bus.publish(DomainEvent::NoteCreated {
+    bus.publish(DomainEvent::Note(NoteEvent::NoteCreated {
         note_id: "n1".into(),
         title: "Test note".into(),
-    });
+    }));
 
     let result = tokio::time::timeout(std::time::Duration::from_millis(200), rx.recv()).await;
     assert!(

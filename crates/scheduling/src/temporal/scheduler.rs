@@ -15,7 +15,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
-use bus::{DomainEvent, DomainEventBus};
+use bus::{AlarmEvent, DomainEvent, DomainEventBus};
 use jiff::Timestamp;
 use storage::rows::scheduled_fire::ScheduledFireRow;
 use tokio::sync::Notify;
@@ -178,7 +178,7 @@ impl TemporalScheduler {
             // Row is already claimed (firing_started_at_ms IS NOT NULL) from a
             // prior session. Publish the event and mark fired; skip begin_firing
             // because begin_firing rejects rows already in firing state.
-            self.bus.publish(DomainEvent::AlarmFired {
+            self.bus.publish_alarm(AlarmEvent::AlarmFired {
                 fire_id: row.id.clone(),
                 kind: row.kind.clone(),
                 ref_id: row.ref_id.clone(),
@@ -306,7 +306,7 @@ impl TemporalScheduler {
         if !self.store.begin_firing(&row.id, now).await? {
             return Ok(()); // already claimed
         }
-        self.bus.publish(DomainEvent::AlarmFired {
+        self.bus.publish_alarm(AlarmEvent::AlarmFired {
             fire_id: row.id.clone(),
             kind: row.kind.clone(),
             ref_id: row.ref_id.clone(),
@@ -340,7 +340,7 @@ impl TemporalScheduler {
         let fire_ids: Vec<String> = rows.iter().map(|r| r.id.clone()).collect();
         let oldest = rows.iter().map(|r| r.fire_at_ms).min().unwrap_or(0);
         let newest = rows.iter().map(|r| r.fire_at_ms).max().unwrap_or(0);
-        self.bus.publish(DomainEvent::MissedAlarms {
+        self.bus.publish_alarm(AlarmEvent::MissedAlarms {
             fire_ids,
             oldest_fire_at_ms: oldest,
             newest_fire_at_ms: newest,
@@ -406,7 +406,10 @@ mod tests {
             .await
             .expect("event not received in time")
             .unwrap();
-        assert!(matches!(event, DomainEvent::AlarmFired { .. }));
+        assert!(matches!(
+            event,
+            DomainEvent::Alarm(AlarmEvent::AlarmFired { .. })
+        ));
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -436,7 +439,10 @@ mod tests {
             .await
             .expect("event not received")
             .unwrap();
-        assert!(matches!(event, DomainEvent::MissedAlarms { .. }));
+        assert!(matches!(
+            event,
+            DomainEvent::Alarm(AlarmEvent::MissedAlarms { .. })
+        ));
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -485,7 +491,7 @@ mod tests {
             .expect("no recovery event within timeout")
             .unwrap();
         match ev {
-            DomainEvent::AlarmFired { fire_id, .. } => assert_eq!(fire_id, id),
+            DomainEvent::Alarm(AlarmEvent::AlarmFired { fire_id, .. }) => assert_eq!(fire_id, id),
             other => panic!("expected AlarmFired, got {other:?}"),
         }
     }
@@ -630,7 +636,7 @@ mod tests {
             .expect("expected an AlarmFired event")
             .unwrap();
         match &event {
-            DomainEvent::AlarmFired { fire_id, .. } => {
+            DomainEvent::Alarm(AlarmEvent::AlarmFired { fire_id, .. }) => {
                 assert_eq!(fire_id, &c3, "winner should be c3 (most recent)");
             }
             other => panic!("expected AlarmFired, got {other:?}"),
@@ -753,7 +759,9 @@ mod tests {
                 .expect("expected an AlarmFired event")
                 .unwrap();
             match event {
-                DomainEvent::AlarmFired { fire_id, .. } => fired_ids.push(fire_id),
+                DomainEvent::Alarm(AlarmEvent::AlarmFired { fire_id, .. }) => {
+                    fired_ids.push(fire_id)
+                }
                 other => panic!("expected AlarmFired, got {other:?}"),
             }
         }

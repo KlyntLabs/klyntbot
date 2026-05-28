@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use bus::{DomainEvent, DomainEventBus};
+use bus::{AlarmEvent, DomainEvent, DomainEventBus};
 use jiff::Timestamp;
 use storage::{TaskPatch, TaskRepo};
 use tokio::task::JoinHandle;
@@ -33,7 +33,7 @@ pub fn spawn(
                 }
                 msg = rx.recv() => {
                     match msg {
-                        Ok(DomainEvent::AlarmFired { kind, ref_id, payload_json, .. }) => {
+                        Ok(DomainEvent::Alarm(AlarmEvent::AlarmFired { kind, ref_id, payload_json, .. })) => {
                             handle(&task_repo, &kind, ref_id.as_deref(), &payload_json).await;
                         }
                         Ok(_) => {}

@@ -609,7 +609,7 @@ impl MemoryTool {
             common::ToolError::InvalidParams("Fact recording not available".to_string())
         })?;
 
-        bus.publish(bus::DomainEvent::UserStatedFact {
+        bus.publish_cross_domain(bus::CrossDomainEvent::UserStatedFact {
             fact: fact.to_string(),
             domain: domain.to_string(),
         });
@@ -975,7 +975,10 @@ mod tests {
 
         let event = rx.try_recv().unwrap();
         match event {
-            bus::DomainEvent::UserStatedFact { fact, domain } => {
+            bus::DomainEvent::CrossDomain(bus::CrossDomainEvent::UserStatedFact {
+                fact,
+                domain,
+            }) => {
                 assert_eq!(fact, "User is a software engineer");
                 assert_eq!(domain, "identity");
             }

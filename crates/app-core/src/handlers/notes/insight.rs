@@ -485,11 +485,13 @@ impl AppCore {
             let atom_repo = cognitive::KnowledgeAtomRepo::new(pool.clone());
             if let Ok(atoms) = atom_repo.list_for_note(&insight.note_id).await {
                 for atom in atoms.iter().filter(|a| a.status == "active") {
-                    bus.publish(bus::DomainEvent::AtomInteracted {
-                        atom_id: atom.id.clone(),
-                        interaction_type: "quiz_answer".to_string(),
-                        note_id: Some(insight.note_id.clone()),
-                    });
+                    bus.publish(bus::DomainEvent::Learning(
+                        bus::domain_events::LearningEvent::AtomInteracted {
+                            atom_id: atom.id.clone(),
+                            interaction_type: "quiz_answer".to_string(),
+                            note_id: Some(insight.note_id.clone()),
+                        },
+                    ));
                 }
             }
         }
@@ -1151,13 +1153,15 @@ async fn create_atoms_from_gaps(
                         .await;
                 }
                 if let Some(bus) = domain_event_bus {
-                    bus.publish(bus::DomainEvent::KnowledgeAtomCreated {
-                        atom_id: atom.id,
-                        atom_type: "concept".to_string(),
-                        domain: "general".to_string(),
-                        source_note_id: Some(note_id.to_string()),
-                        personal_importance: 0.7,
-                    });
+                    bus.publish(bus::DomainEvent::Learning(
+                        bus::domain_events::LearningEvent::KnowledgeAtomCreated {
+                            atom_id: atom.id,
+                            atom_type: "concept".to_string(),
+                            domain: "general".to_string(),
+                            source_note_id: Some(note_id.to_string()),
+                            personal_importance: 0.7,
+                        },
+                    ));
                 }
             }
             Err(e) => {
