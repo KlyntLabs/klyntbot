@@ -105,15 +105,15 @@ export function RequestUserInputMessage({
   };
 
   return (
-    <div className="message request-user-input-message">
-      <fieldset className="bubble request-user-input-card" aria-label="User input requested">
-        <div className="request-user-input-header">
-          <div className="request-user-input-title">Input requested</div>
+    <div className="message items-start">
+      <fieldset className="bubble w-[min(520px,72%)] max-w-full bg-surface-card-strong border border-border-stronger rounded-2xl p-2.5 px-3 flex flex-col gap-2" aria-label="User input requested">
+        <div className="flex justify-between items-baseline gap-2">
+          <div className="text-ui-sm font-semibold text-text-strong">Input requested</div>
           {totalRequests > 1 ? (
-            <div className="request-user-input-queue">{`Request 1 of ${totalRequests}`}</div>
+            <div className="text-ui-xs text-text-subtle">{`Request 1 of ${totalRequests}`}</div>
           ) : null}
         </div>
-        <div className="request-user-input-body">
+        <div className="grid gap-2">
           {questions.length ? (
             questions.map((question, index) => {
               const questionId = question.id || `question-${index}`;
@@ -125,13 +125,13 @@ export function RequestUserInputMessage({
                   ? "Add notes (optional)"
                   : "Type your answer (optional)";
               return (
-                <section key={questionId} className="request-user-input-question">
+                <section key={questionId} className="grid gap-1">
                   {question.header ? (
-                    <div className="request-user-input-question-header">{question.header}</div>
+                    <div className="text-ui-2xs uppercase tracking-[0.06em] text-text-faint">{question.header}</div>
                   ) : null}
-                  <div className="request-user-input-question-text">{question.question}</div>
+                  <div className="text-ui-sm text-text-primary">{question.question}</div>
                   {options.length ? (
-                    <div className="request-user-input-options">
+                    <div className="grid gap-1">
                       {options.map((option, optionIndex) => (
                         <button
                           key={`${questionId}-${option.label}-${option.description ?? ""}`}
@@ -141,9 +141,9 @@ export function RequestUserInputMessage({
                           }`}
                           onClick={() => handleSelect(questionId, optionIndex)}
                         >
-                          <div className="request-user-input-option-label">{option.label}</div>
+                          <div className="text-ui-sm font-semibold text-text-strong">{option.label}</div>
                           {option.description ? (
-                            <div className="request-user-input-option-description">
+                            <div className="text-ui-xs text-text-subtle">
                               {option.description}
                             </div>
                           ) : null}
@@ -152,7 +152,7 @@ export function RequestUserInputMessage({
                     </div>
                   ) : null}
                   <textarea
-                    className="request-user-input-notes"
+                    className="rounded-xl border border-border-subtle bg-surface-card-muted text-text-strong p-1.5 px-2 text-ui-sm leading-snug resize-y outline-none focus:outline focus:outline-2 focus:outline-[rgba(77,163,255,0.35)] focus:outline-offset-1"
                     placeholder={notePlaceholder}
                     value={notes[questionId] ?? ""}
                     onChange={(event) => handleNotesChange(questionId, event.target.value)}
@@ -162,10 +162,10 @@ export function RequestUserInputMessage({
               );
             })
           ) : (
-            <div className="request-user-input-empty">No questions provided.</div>
+            <div className="text-ui-sm text-text-muted">No questions provided.</div>
           )}
         </div>
-        <div className="request-user-input-actions">
+        <div className="flex justify-end gap-2">
           <button type="button" className="primary" onClick={handleSubmit}>
             Submit
           </button>

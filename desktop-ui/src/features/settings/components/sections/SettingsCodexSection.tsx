@@ -2,11 +2,18 @@ import Stethoscope from "lucide-react/dist/esm/icons/stethoscope";
 import type { Dispatch, SetStateAction } from "react";
 import { useEffect, useMemo, useRef } from "react";
 import {
+  SettingsField,
+  SettingsFieldLabel,
+  SettingsFieldRow,
+  SettingsHelpText,
+  SettingsInput,
   SettingsSection,
+  SettingsSelect,
   SettingsToggleRow,
 } from "@/features/design-system/components/settings/SettingsPrimitives";
 import { FileEditorCard } from "@/features/shared/components/FileEditorCard";
 import type { AppSettings, CodexDoctorResult, CodexUpdateResult, ModelOption } from "@/types";
+import { cn } from "@/utils/cn";
 
 type SettingsCodexSectionProps = {
   appSettings: AppSettings;
@@ -223,14 +230,11 @@ export function SettingsCodexSection({
       title="Codex"
       subtitle="Configure the Codex CLI used by Klynt and validate the install."
     >
-      <div className="settings-field">
-        <label className="settings-field-label" htmlFor="codex-path">
-          Default Codex path
-        </label>
-        <div className="settings-field-row">
-          <input
+      <SettingsField>
+        <SettingsFieldLabel htmlFor="codex-path">Default Codex path</SettingsFieldLabel>
+        <SettingsFieldRow>
+          <SettingsInput
             id="codex-path"
-            className="settings-input"
             value={codexPathDraft}
             placeholder="codex"
             onChange={(event) => onSetCodexPathDraft(event.target.value)}
@@ -247,15 +251,12 @@ export function SettingsCodexSection({
           <button type="button" className="ghost" onClick={() => onSetCodexPathDraft("")}>
             Use PATH
           </button>
-        </div>
-        <div className="settings-help">Leave empty to use the system PATH resolution.</div>
-        <label className="settings-field-label" htmlFor="codex-args">
-          Default Codex args
-        </label>
-        <div className="settings-field-row">
-          <input
+        </SettingsFieldRow>
+        <SettingsHelpText>Leave empty to use the system PATH resolution.</SettingsHelpText>
+        <SettingsFieldLabel htmlFor="codex-args">Default Codex args</SettingsFieldLabel>
+        <SettingsFieldRow>
+          <SettingsInput
             id="codex-args"
-            className="settings-input"
             value={codexArgsDraft}
             placeholder="--profile personal"
             onChange={(event) => onSetCodexArgsDraft(event.target.value)}
@@ -263,21 +264,21 @@ export function SettingsCodexSection({
           <button type="button" className="ghost" onClick={() => onSetCodexArgsDraft("")}>
             Clear
           </button>
-        </div>
-        <div className="settings-help">
+        </SettingsFieldRow>
+        <SettingsHelpText>
           Extra flags passed before <code>app-server</code>. Use quotes for values with spaces.
-        </div>
-        <div className="settings-help">
+        </SettingsHelpText>
+        <SettingsHelpText>
           These settings apply to the shared Codex app-server used across all connected workspaces.
-        </div>
-        <div className="settings-help">
+        </SettingsHelpText>
+        <SettingsHelpText>
           Per-thread override processing ignores unsupported flags: <code>-m</code>/
           <code>--model</code>, <code>-a</code>/<code>--ask-for-approval</code>, <code>-s</code>/
           <code>--sandbox</code>, <code>--full-auto</code>,{" "}
           <code>--dangerously-bypass-approvals-and-sandbox</code>, <code>--oss</code>,{" "}
           <code>--local-provider</code>, and <code>--no-alt-screen</code>.
-        </div>
-        <div className="settings-field-actions">
+        </SettingsHelpText>
+        <div className="flex gap-2.5 items-center">
           {codexDirty && (
             <button
               type="button"
@@ -292,7 +293,7 @@ export function SettingsCodexSection({
           )}
           <button
             type="button"
-            className="ghost settings-button-compact"
+            className="ghost py-1.5 px-2.5 text-ui-sm"
             onClick={() => {
               void onRunDoctor();
             }}
@@ -303,7 +304,7 @@ export function SettingsCodexSection({
           </button>
           <button
             type="button"
-            className="ghost settings-button-compact"
+            className="ghost py-1.5 px-2.5 text-ui-sm"
             onClick={() => {
               void onRunCodexUpdate();
             }}
@@ -316,11 +317,18 @@ export function SettingsCodexSection({
         </div>
 
         {doctorState.result && (
-          <div className={`settings-doctor ${doctorState.result.ok ? "ok" : "error"}`}>
-            <div className="settings-doctor-title">
+          <div
+            className={cn(
+              "mt-2 p-3 px-3.5 rounded-xl border text-ui-xs",
+              doctorState.result.ok
+                ? "border-[rgba(120,235,190,0.4)] text-text-strong bg-surface-card"
+                : "border-[rgba(255,120,120,0.45)] text-text-strong bg-surface-card",
+            )}
+          >
+            <div className="font-semibold mb-1.5">
               {doctorState.result.ok ? "Codex looks good" : "Codex issue detected"}
             </div>
-            <div className="settings-doctor-body">
+            <div className="flex flex-col gap-1">
               <div>Version: {doctorState.result.version ?? "unknown"}</div>
               <div>App-server: {doctorState.result.appServerOk ? "ok" : "failed"}</div>
               <div>
@@ -332,22 +340,31 @@ export function SettingsCodexSection({
               {doctorState.result.details && <div>{doctorState.result.details}</div>}
               {doctorState.result.nodeDetails && <div>{doctorState.result.nodeDetails}</div>}
               {doctorState.result.path && (
-                <div className="settings-doctor-path">PATH: {doctorState.result.path}</div>
+                <div className="break-all [overflow-wrap:anywhere]">
+                  PATH: {doctorState.result.path}
+                </div>
               )}
             </div>
           </div>
         )}
 
         {codexUpdateState.result && (
-          <div className={`settings-doctor ${codexUpdateState.result.ok ? "ok" : "error"}`}>
-            <div className="settings-doctor-title">
+          <div
+            className={cn(
+              "mt-2 p-3 px-3.5 rounded-xl border text-ui-xs",
+              codexUpdateState.result.ok
+                ? "border-[rgba(120,235,190,0.4)] text-text-strong bg-surface-card"
+                : "border-[rgba(255,120,120,0.45)] text-text-strong bg-surface-card",
+            )}
+          >
+            <div className="font-semibold mb-1.5">
               {codexUpdateState.result.ok
                 ? codexUpdateState.result.upgraded
                   ? "Codex updated"
                   : "Codex already up-to-date"
                 : "Codex update failed"}
             </div>
-            <div className="settings-doctor-body">
+            <div className="flex flex-col gap-1">
               <div>Method: {codexUpdateState.result.method}</div>
               {codexUpdateState.result.package && (
                 <div>Package: {codexUpdateState.result.package}</div>
@@ -368,10 +385,10 @@ export function SettingsCodexSection({
             </div>
           </div>
         )}
-      </div>
+      </SettingsField>
 
-      <div className="settings-divider" />
-      <div className="settings-field-label settings-field-label--section">Default parameters</div>
+      <div className="h-px bg-border-muted my-4 rounded-full" />
+      <div className="text-ui-sm font-semibold text-text-strong mb-2.5">Default parameters</div>
 
       <SettingsToggleRow
         title={<label htmlFor="default-model">Model</label>}
@@ -385,10 +402,9 @@ export function SettingsCodexSection({
                 : "Sourced from the first workspace and used when there is no thread-specific override."
         }
       >
-        <div className="settings-field-row">
-          <select
+        <SettingsFieldRow>
+          <SettingsSelect
             id="default-model"
-            className="settings-select"
             value={selectedModelSlug}
             disabled={!defaultModels.length || defaultModelsLoading}
             onChange={(event) =>
@@ -404,7 +420,7 @@ export function SettingsCodexSection({
                 {model.displayName?.trim() || model.model}
               </option>
             ))}
-          </select>
+          </SettingsSelect>
           <button
             type="button"
             className="ghost"
@@ -413,7 +429,7 @@ export function SettingsCodexSection({
           >
             Refresh
           </button>
-        </div>
+        </SettingsFieldRow>
       </SettingsToggleRow>
 
       <SettingsToggleRow
@@ -424,9 +440,8 @@ export function SettingsCodexSection({
             : "The selected model does not expose reasoning effort options."
         }
       >
-        <select
+        <SettingsSelect
           id="default-effort"
-          className="settings-select"
           value={selectedEffort}
           onChange={(event) =>
             void onUpdateAppSettings({
@@ -443,16 +458,15 @@ export function SettingsCodexSection({
               {effort}
             </option>
           ))}
-        </select>
+        </SettingsSelect>
       </SettingsToggleRow>
 
       <SettingsToggleRow
         title={<label htmlFor="default-access">Access mode</label>}
         subtitle="Used when there is no thread-specific override."
       >
-        <select
+        <SettingsSelect
           id="default-access"
-          className="settings-select"
           value={appSettings.defaultAccessMode}
           onChange={(event) =>
             void onUpdateAppSettings({
@@ -464,15 +478,12 @@ export function SettingsCodexSection({
           <option value="read-only">Read only</option>
           <option value="current">On-request</option>
           <option value="full-access">Full access</option>
-        </select>
+        </SettingsSelect>
       </SettingsToggleRow>
-      <div className="settings-field">
-        <label className="settings-field-label" htmlFor="review-delivery">
-          Review mode
-        </label>
-        <select
+      <SettingsField>
+        <SettingsFieldLabel htmlFor="review-delivery">Review mode</SettingsFieldLabel>
+        <SettingsSelect
           id="review-delivery"
-          className="settings-select"
           value={appSettings.reviewDeliveryMode}
           onChange={(event) =>
             void onUpdateAppSettings({
@@ -483,12 +494,12 @@ export function SettingsCodexSection({
         >
           <option value="inline">Inline (same thread)</option>
           <option value="detached">Detached (new review thread)</option>
-        </select>
-        <div className="settings-help">
+        </SettingsSelect>
+        <SettingsHelpText>
           Choose whether <code>/review</code> runs in the current thread or a detached review
           thread.
-        </div>
-      </div>
+        </SettingsHelpText>
+      </SettingsField>
 
       <FileEditorCard
         title="Global AGENTS.md"
@@ -509,15 +520,17 @@ export function SettingsCodexSection({
           </>
         }
         classNames={{
-          container: "settings-field settings-agents",
-          header: "settings-agents-header",
-          title: "settings-field-label",
-          actions: "settings-agents-actions",
-          meta: "settings-help settings-help-inline",
-          iconButton: "ghost settings-icon-button",
-          error: "settings-agents-error",
-          textarea: "settings-agents-textarea",
-          help: "settings-help",
+          container: "flex flex-col gap-2.5 mb-4.5",
+          header: "flex items-center justify-between gap-2.5",
+          title: "text-ui-sm font-semibold text-text-strong",
+          actions: "inline-flex items-center flex-wrap gap-1.5",
+          meta: "text-ui-xs text-text-subtle mr-1",
+          iconButton: "ghost w-7 h-7 p-0 inline-flex items-center justify-center rounded-lg",
+          error:
+            "text-ui-sm text-status-error bg-[rgba(236,72,153,0.08)] rounded-xl px-2.5 py-2 border border-[rgba(236,72,153,0.2)]",
+          textarea:
+            "w-full min-h-[150px] resize-y rounded-xl border border-border-muted bg-surface-1 text-text-strong font-code text-ui-sm leading-relaxed px-3 py-2.5 outline-none focus:border-border-strong focus:shadow-[0_0_0_3px_rgba(99,102,241,0.16)]",
+          help: "text-ui-xs text-text-subtle",
         }}
       />
 
@@ -540,15 +553,17 @@ export function SettingsCodexSection({
           </>
         }
         classNames={{
-          container: "settings-field settings-agents",
-          header: "settings-agents-header",
-          title: "settings-field-label",
-          actions: "settings-agents-actions",
-          meta: "settings-help settings-help-inline",
-          iconButton: "ghost settings-icon-button",
-          error: "settings-agents-error",
-          textarea: "settings-agents-textarea",
-          help: "settings-help",
+          container: "flex flex-col gap-2.5 mb-4.5",
+          header: "flex items-center justify-between gap-2.5",
+          title: "text-ui-sm font-semibold text-text-strong",
+          actions: "inline-flex items-center flex-wrap gap-1.5",
+          meta: "text-ui-xs text-text-subtle mr-1",
+          iconButton: "ghost w-7 h-7 p-0 inline-flex items-center justify-center rounded-lg",
+          error:
+            "text-ui-sm text-status-error bg-[rgba(236,72,153,0.08)] rounded-xl px-2.5 py-2 border border-[rgba(236,72,153,0.2)]",
+          textarea:
+            "w-full min-h-[150px] resize-y rounded-xl border border-border-muted bg-surface-1 text-text-strong font-code text-ui-sm leading-relaxed px-3 py-2.5 outline-none focus:border-border-strong focus:shadow-[0_0_0_3px_rgba(99,102,241,0.16)]",
+          help: "text-ui-xs text-text-subtle",
         }}
       />
     </SettingsSection>

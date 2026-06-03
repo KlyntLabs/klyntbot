@@ -1,6 +1,10 @@
 import { formatDownloadSize } from "@utils/formatting";
 import {
+  SettingsField,
+  SettingsFieldLabel,
+  SettingsHelpText,
   SettingsSection,
+  SettingsSelect,
   SettingsToggleRow,
   SettingsToggleSwitch,
 } from "@/features/design-system/components/settings/SettingsPrimitives";
@@ -76,13 +80,10 @@ export function SettingsDictationSection({
           }}
         />
       </SettingsToggleRow>
-      <div className="settings-field">
-        <label className="settings-field-label" htmlFor="dictation-model">
-          Dictation model
-        </label>
-        <select
+      <SettingsField>
+        <SettingsFieldLabel htmlFor="dictation-model">Dictation model</SettingsFieldLabel>
+        <SettingsSelect
           id="dictation-model"
-          className="settings-select"
           value={appSettings.dictationModelId}
           onChange={(event) =>
             void onUpdateAppSettings({
@@ -96,18 +97,17 @@ export function SettingsDictationSection({
               {model.label} ({model.size})
             </option>
           ))}
-        </select>
-        <div className="settings-help">
+        </SettingsSelect>
+        <SettingsHelpText>
           {selectedDictationModel.note} Download size: {selectedDictationModel.size}.
-        </div>
-      </div>
-      <div className="settings-field">
-        <label className="settings-field-label" htmlFor="dictation-language">
+        </SettingsHelpText>
+      </SettingsField>
+      <SettingsField>
+        <SettingsFieldLabel htmlFor="dictation-language">
           Preferred dictation language
-        </label>
-        <select
+        </SettingsFieldLabel>
+        <SettingsSelect
           id="dictation-language"
-          className="settings-select"
           value={appSettings.dictationPreferredLanguage ?? ""}
           onChange={(event) =>
             void onUpdateAppSettings({
@@ -135,18 +135,15 @@ export function SettingsDictationSection({
           <option value="ja">Japanese</option>
           <option value="ko">Korean</option>
           <option value="zh">Chinese</option>
-        </select>
-        <div className="settings-help">
+        </SettingsSelect>
+        <SettingsHelpText>
           Auto-detect stays on; this nudges the decoder toward your preference.
-        </div>
-      </div>
-      <div className="settings-field">
-        <label className="settings-field-label" htmlFor="dictation-hold-key">
-          Hold-to-dictate key
-        </label>
-        <select
+        </SettingsHelpText>
+      </SettingsField>
+      <SettingsField>
+        <SettingsFieldLabel htmlFor="dictation-hold-key">Hold-to-dictate key</SettingsFieldLabel>
+        <SettingsSelect
           id="dictation-hold-key"
-          className="settings-select"
           value={appSettings.dictationHoldKey ?? ""}
           onChange={(event) =>
             void onUpdateAppSettings({
@@ -160,26 +157,28 @@ export function SettingsDictationSection({
           <option value="shift">Shift</option>
           <option value="control">Control</option>
           <option value="meta">{metaKeyLabel}</option>
-        </select>
-        <div className="settings-help">
+        </SettingsSelect>
+        <SettingsHelpText>
           Hold the key to start dictation, release to stop and process.
-        </div>
-      </div>
+        </SettingsHelpText>
+      </SettingsField>
       {dictationModelStatus && (
-        <div className="settings-field">
-          <div className="settings-field-label">Model status ({selectedDictationModel.label})</div>
-          <div className="settings-help">
+        <SettingsField>
+          <SettingsFieldLabel>
+            Model status ({selectedDictationModel.label})
+          </SettingsFieldLabel>
+          <SettingsHelpText>
             {dictationModelStatus.state === "ready" && "Ready for dictation."}
             {dictationModelStatus.state === "missing" && "Model not downloaded yet."}
             {dictationModelStatus.state === "downloading" && "Downloading model..."}
             {dictationModelStatus.state === "error" &&
               (dictationModelStatus.error ?? "Download error.")}
-          </div>
+          </SettingsHelpText>
           {dictationProgress && (
-            <div className="settings-download-progress">
-              <div className="settings-download-bar">
+            <div className="flex flex-col gap-1.5">
+              <div className="h-1.5 rounded-full bg-surface-control border border-border-muted overflow-hidden">
                 <div
-                  className="settings-download-fill"
+                  className="h-full bg-gradient-to-r from-[rgba(100,200,255,0.7)] to-[rgba(120,235,190,0.8)]"
                   style={{
                     width: dictationProgress.totalBytes
                       ? `${Math.min(
@@ -190,12 +189,12 @@ export function SettingsDictationSection({
                   }}
                 />
               </div>
-              <div className="settings-download-meta">
+              <div className="text-ui-xs text-text-muted">
                 {formatDownloadSize(dictationProgress.downloadedBytes)}
               </div>
             </div>
           )}
-          <div className="settings-field-actions">
+          <div className="flex gap-2.5 items-center">
             {dictationModelStatus.state === "missing" && (
               <button
                 type="button"
@@ -209,7 +208,7 @@ export function SettingsDictationSection({
             {dictationModelStatus.state === "downloading" && (
               <button
                 type="button"
-                className="ghost settings-button-compact"
+                className="ghost py-1.5 px-2.5 text-ui-sm"
                 onClick={onCancelDictationDownload}
                 disabled={!onCancelDictationDownload}
               >
@@ -219,7 +218,7 @@ export function SettingsDictationSection({
             {dictationReady && (
               <button
                 type="button"
-                className="ghost settings-button-compact"
+                className="ghost py-1.5 px-2.5 text-ui-sm"
                 onClick={onRemoveDictationModel}
                 disabled={!onRemoveDictationModel}
               >
@@ -227,7 +226,7 @@ export function SettingsDictationSection({
               </button>
             )}
           </div>
-        </div>
+        </SettingsField>
       )}
     </SettingsSection>
   );

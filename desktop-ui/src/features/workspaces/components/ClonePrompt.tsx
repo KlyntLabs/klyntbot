@@ -82,7 +82,7 @@ export function ClonePrompt({
       <div className="clone-modal-folder-row">
         <textarea
           id="clone-copies-folder"
-          className="ds-modal-input clone-modal-input clone-modal-input--path"
+          className="ds-modal-input clone-modal-input resize-none overflow-x-auto overflow-y-hidden [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:w-0 [&::-webkit-scrollbar]:h-0"
           value={copiesFolder}
           placeholder="Not set"
           readOnly
@@ -130,7 +130,7 @@ export function ClonePrompt({
           <div className="clone-modal-suggested-label">Suggested</div>
           <div className="clone-modal-suggested-row">
             <textarea
-              className="ds-modal-input clone-modal-suggested-path clone-modal-input--path"
+              className="ds-modal-input clone-modal-suggested-path resize-none overflow-x-auto overflow-y-hidden [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:w-0 [&::-webkit-scrollbar]:h-0"
               value={suggestedCopiesFolder ?? ""}
               readOnly
               rows={1}

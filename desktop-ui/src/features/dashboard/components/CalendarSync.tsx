@@ -34,12 +34,12 @@ export function CalendarSync() {
       type="button"
       onClick={() => void mutate()}
       disabled={isLoading}
-      className="dashboard__calendar-sync"
+      className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-ui-xs text-text-muted bg-transparent border-none cursor-pointer transition-colors duration-ui-fast ease-out hover:text-text-strong hover:bg-surface-hover disabled:opacity-50 disabled:cursor-not-allowed"
       title={title}
     >
-      {isLoading ? <Loader2 className="lc-spin" /> : <Calendar />}
+      {isLoading ? <Loader2 className="lc-spin w-3.5 h-3.5" /> : <Calendar className="w-3.5 h-3.5" />}
       <span>Sync</span>
-      {lastSynced && !isLoading && <RefreshCw />}
+      {lastSynced && !isLoading && <RefreshCw className="w-3.5 h-3.5" />}
     </button>
   );
 }

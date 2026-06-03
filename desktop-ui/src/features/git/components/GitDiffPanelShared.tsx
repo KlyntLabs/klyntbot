@@ -6,6 +6,7 @@ import RotateCcw from "lucide-react/dist/esm/icons/rotate-ccw";
 import Upload from "lucide-react/dist/esm/icons/upload";
 import X from "lucide-react/dist/esm/icons/x";
 import type { MouseEvent as ReactMouseEvent } from "react";
+import { cn } from "@/utils/cn";
 import { MagicSparkleIcon } from "@/features/shared/components/MagicSparkleIcon";
 import type { GitLogEntry } from "@/types";
 import {
@@ -55,10 +56,10 @@ export function CommitButton({
   };
 
   return (
-    <div className="commit-button-container">
+    <div className="commit-button-container mt-0">
       <button
         type="button"
-        className="commit-button"
+        className="commit-button w-full flex items-center justify-center gap-[6px] px-[14px] py-[10px] text-ui-sm font-semibold text-text-emphasis bg-surface-control border border-border-default rounded-[14px] cursor-pointer shadow-none transition-[background,border-color,color] duration-ui-fast"
         onClick={handleCommit}
         disabled={!canCommit}
         title={
@@ -72,7 +73,7 @@ export function CommitButton({
         }
       >
         {commitLoading ? (
-          <span className="commit-button-spinner" aria-hidden />
+          <span className="commit-button-spinner w-[14px] h-[14px] rounded-full border-2 border-border-subtle border-t-text-emphasis animate-spin" aria-hidden />
         ) : (
           <svg
             width={14}
@@ -104,26 +105,35 @@ type SidebarErrorProps = {
 
 export function SidebarError({ variant = "diff", message, action, onDismiss }: SidebarErrorProps) {
   return (
-    <div className={`sidebar-error sidebar-error-${variant}`}>
-      <div className="sidebar-error-body">
-        <div className={variant === "commit" ? "commit-message-error" : "diff-error"}>
+    <div className="sidebar-error flex items-start gap-[6px]">
+      <div className="sidebar-error-body flex flex-col gap-[6px] min-w-0 flex-1">
+        <div
+          className={cn(
+            "text-ui-sm",
+            variant === "commit"
+              ? "commit-message-error text-[rgba(255,160,160,0.9)] py-[2px]"
+              : "diff-error text-[rgba(255,160,160,0.9)] whitespace-pre-wrap",
+          )}
+        >
           {message}
         </div>
         {action && (
           <button
             type="button"
-            className="ghost sidebar-error-action"
+            className="ghost sidebar-error-action self-start inline-flex items-center gap-[6px] px-[10px] py-1 text-ui-sm rounded-lg"
             onClick={() => void action.onAction()}
             disabled={action.disabled || action.loading}
           >
-            {action.loading && <span className="commit-button-spinner" aria-hidden />}
+            {action.loading && (
+              <span className="commit-button-spinner w-[14px] h-[14px] rounded-full border-2 border-border-subtle border-t-text-emphasis animate-spin" aria-hidden />
+            )}
             <span>{action.label}</span>
           </button>
         )}
       </div>
       <button
         type="button"
-        className="ghost icon-button sidebar-error-dismiss"
+        className="ghost icon-button sidebar-error-dismiss shrink-0 w-[18px] h-[18px] p-0 rounded text-text-faint hover:text-text-emphasis transition-colors"
         onClick={onDismiss}
         aria-label="Dismiss error"
         title="Dismiss error"
@@ -170,7 +180,12 @@ function DiffFileRow({
   return (
     <button
       type="button"
-      className={`diff-row ${isActive ? "active" : ""} ${isSelected ? "selected" : ""}`}
+      className={cn(
+        "diff-row grid items-center gap-x-2 py-2 px-[10px] rounded-xl cursor-pointer border-0 bg-transparent transition-[background,box-shadow] duration-ui-fast",
+        isActive && "active",
+        isSelected && "selected",
+      )}
+      style={{ gridTemplateColumns: "16px minmax(0, 1fr) auto" }}
       onClick={onClick}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") {
@@ -180,33 +195,37 @@ function DiffFileRow({
       }}
       onContextMenu={onContextMenu}
     >
-      <span className={`diff-icon ${statusClass}`} aria-hidden>
+      <span className={cn("diff-icon w-4 h-4 grid place-items-center rounded-full text-ui-2xs font-bold border border-transparent leading-none pb-[1px]", statusClass)} aria-hidden>
         {statusSymbol}
       </span>
-      <div className="diff-file">
-        <div className="diff-path">
-          <span className="diff-name">
-            <span className="diff-name-base">{base}</span>
-            {extension && <span className="diff-name-ext">.{extension}</span>}
+      <div className="diff-file flex flex-col gap-[2px] min-w-0">
+        <div className="diff-path flex items-baseline gap-[6px] text-ui-xs font-semibold text-text-strong min-w-0">
+          <span className="diff-name flex min-w-0 flex-1">
+            <span className="diff-name-base min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
+              {base}
+            </span>
+            {extension && (
+              <span className="diff-name-ext shrink-0 whitespace-nowrap">.{extension}</span>
+            )}
           </span>
         </div>
-        {dir && <div className="diff-dir">{dir}</div>}
+        {dir && <div className="diff-dir text-ui-2xs text-text-faint whitespace-nowrap overflow-hidden text-ellipsis">{dir}</div>}
       </div>
-      <div className="diff-row-meta">
+      <div className="diff-row-meta inline-flex items-center justify-end justify-self-end min-w-0">
         <span
-          className="diff-counts-inline"
+          className="diff-counts-inline text-[11px] font-code whitespace-nowrap inline-flex items-center gap-[3px] px-[7px] py-[2px] rounded-full border border-border-subtle bg-surface-control tabular-nums text-text-muted"
           role="img"
           aria-label={`+${file.additions} -${file.deletions}`}
         >
-          <span className="diff-add">+{file.additions}</span>
-          <span className="diff-sep">/</span>
-          <span className="diff-del">-{file.deletions}</span>
+          <span className="diff-add text-[#47d488]">+{file.additions}</span>
+          <span className="diff-sep text-text-dim">/</span>
+          <span className="diff-del text-[#ff6b6b]">-{file.deletions}</span>
         </span>
-        <fieldset className="diff-row-actions" aria-label="File actions">
+        <fieldset className="diff-row-actions inline-flex items-center gap-[3px]" aria-label="File actions">
           {showStage && (
             <button
               type="button"
-              className="diff-row-action diff-row-action--stage ds-tooltip-trigger"
+              className="diff-row-action ds-tooltip-trigger w-[22px] h-[22px] rounded-full p-0 border border-transparent bg-transparent text-text-faint inline-flex items-center justify-center cursor-pointer transition-[background,border-color,color] duration-ui-fast relative hover:!bg-[rgba(71,212,136,0.14)] hover:!border-[rgba(71,212,136,0.35)] hover:!text-[#47d488]"
               onClick={(event) => {
                 event.stopPropagation();
                 void onStageFile?.(file.path);
@@ -221,7 +240,7 @@ function DiffFileRow({
           {showUnstage && (
             <button
               type="button"
-              className="diff-row-action diff-row-action--unstage ds-tooltip-trigger"
+              className="diff-row-action ds-tooltip-trigger w-[22px] h-[22px] rounded-full p-0 border border-transparent bg-transparent text-text-faint inline-flex items-center justify-center cursor-pointer transition-[background,border-color,color] duration-ui-fast relative hover:!bg-[rgba(245,195,99,0.14)] hover:!border-[rgba(245,195,99,0.35)] hover:!text-[#f5c363]"
               onClick={(event) => {
                 event.stopPropagation();
                 void onUnstageFile?.(file.path);
@@ -236,7 +255,7 @@ function DiffFileRow({
           {showDiscard && (
             <button
               type="button"
-              className="diff-row-action diff-row-action--discard ds-tooltip-trigger"
+              className="diff-row-action ds-tooltip-trigger w-[22px] h-[22px] rounded-full p-0 border border-transparent bg-transparent text-text-faint inline-flex items-center justify-center cursor-pointer transition-[background,border-color,color] duration-ui-fast relative hover:!bg-[rgba(255,107,107,0.14)] hover:!border-[rgba(255,107,107,0.35)] hover:!text-[#ff6b6b]"
               onClick={(event) => {
                 event.stopPropagation();
                 void onDiscardFile?.(file.path);
@@ -320,18 +339,22 @@ export function DiffSection({
     canApplyWorktree || canStageAll || canUnstageAll || canDiscardAll || canReviewUncommitted;
 
   return (
-    <div className="diff-section">
-      <div className="diff-section-title diff-section-title--row">
-        <div className="diff-section-heading">
-          <span className="diff-section-label">{title}</span>
-          <span className="diff-section-count">{files.length}</span>
+    <div className="diff-section flex flex-col gap-2 p-0 rounded-0 bg-transparent border-0">
+      <div className="diff-section-title flex items-center justify-between gap-[10px]">
+        <div className="diff-section-heading inline-flex items-center gap-2 min-w-0">
+          <span className="diff-section-label text-ui-xs font-bold tracking-[0.08em] uppercase text-text-faint">
+            {title}
+          </span>
+          <span className="diff-section-count inline-flex items-center justify-center min-w-[24px] h-6 px-2 rounded-full border border-border-subtle bg-surface-control font-code text-[11px] tabular-nums text-text-muted">
+            {files.length}
+          </span>
         </div>
         {showSectionActions && (
-          <fieldset className="diff-section-actions" aria-label={`${title} actions`}>
+          <fieldset className="diff-section-actions inline-flex items-center gap-[6px] ml-2" aria-label={`${title} actions`}>
             {canApplyWorktree && (
               <button
                 type="button"
-                className="diff-row-action diff-row-action--apply ds-tooltip-trigger"
+                className="diff-row-action ds-tooltip-trigger w-[22px] h-[22px] rounded-full p-0 border border-transparent bg-transparent text-text-faint inline-flex items-center justify-center cursor-pointer transition-[background,border-color,color] duration-ui-fast relative hover:!bg-[rgba(90,169,255,0.14)] hover:!border-[rgba(90,169,255,0.35)] hover:!text-[#5aa9ff]"
                 onClick={() => {
                   void onApplyWorktreeChanges?.();
                 }}
@@ -346,7 +369,7 @@ export function DiffSection({
             {canReviewUncommitted && (
               <button
                 type="button"
-                className="diff-row-action diff-row-action--review ds-tooltip-trigger"
+                className="diff-row-action ds-tooltip-trigger w-[22px] h-[22px] rounded-full p-0 border border-transparent bg-transparent text-text-faint inline-flex items-center justify-center cursor-pointer transition-[background,border-color,color] duration-ui-fast relative hover:!bg-[rgba(90,169,255,0.14)] hover:!border-[rgba(90,169,255,0.35)] hover:!text-[#5aa9ff]"
                 onClick={() => {
                   void onReviewUncommittedChanges?.();
                 }}
@@ -360,7 +383,7 @@ export function DiffSection({
             {canStageAll && (
               <button
                 type="button"
-                className="diff-row-action diff-row-action--stage ds-tooltip-trigger"
+                className="diff-row-action ds-tooltip-trigger w-[22px] h-[22px] rounded-full p-0 border border-transparent bg-transparent text-text-faint inline-flex items-center justify-center cursor-pointer transition-[background,border-color,color] duration-ui-fast relative hover:!bg-[rgba(71,212,136,0.14)] hover:!border-[rgba(71,212,136,0.35)] hover:!text-[#47d488]"
                 onClick={() => {
                   if (onStageAllChanges) {
                     void onStageAllChanges();
@@ -378,7 +401,7 @@ export function DiffSection({
             {canUnstageAll && (
               <button
                 type="button"
-                className="diff-row-action diff-row-action--unstage ds-tooltip-trigger"
+                className="diff-row-action ds-tooltip-trigger w-[22px] h-[22px] rounded-full p-0 border border-transparent bg-transparent text-text-faint inline-flex items-center justify-center cursor-pointer transition-[background,border-color,color] duration-ui-fast relative hover:!bg-[rgba(245,195,99,0.14)] hover:!border-[rgba(245,195,99,0.35)] hover:!text-[#f5c363]"
                 onClick={() => {
                   void Promise.all(filePaths.map((path) => onUnstageFile?.(path)));
                 }}
@@ -392,7 +415,7 @@ export function DiffSection({
             {canDiscardAll && (
               <button
                 type="button"
-                className="diff-row-action diff-row-action--discard ds-tooltip-trigger"
+                className="diff-row-action ds-tooltip-trigger w-[22px] h-[22px] rounded-full p-0 border border-transparent bg-transparent text-text-faint inline-flex items-center justify-center cursor-pointer transition-[background,border-color,color] duration-ui-fast relative hover:!bg-[rgba(255,107,107,0.14)] hover:!border-[rgba(255,107,107,0.35)] hover:!text-[#ff6b6b]"
                 onClick={() => {
                   void onDiscardFiles?.(filePaths);
                 }}
@@ -406,7 +429,7 @@ export function DiffSection({
           </fieldset>
         )}
       </div>
-      <div className="diff-section-list">
+      <div className="diff-section-list flex flex-col gap-[2px]">
         {files.map((file) => {
           const isSelected = selectedFiles.size > 1 && selectedFiles.has(file.path);
           const isActive = selectedPath === file.path;
@@ -449,7 +472,11 @@ export function GitLogEntryRow({
   return (
     <button
       type="button"
-      className={`git-log-entry ${compact ? "git-log-entry-compact" : ""} ${isSelected ? "active" : ""}`}
+      className={cn(
+        "git-log-entry flex flex-col gap-[6px] px-[10px] py-[9px] border-0 rounded-xl bg-transparent text-inherit no-underline text-left cursor-pointer shadow-none outline-none transition-[background,box-shadow] duration-ui-fast min-w-0",
+        compact && "git-log-entry-compact py-[9px]",
+        isSelected && "active",
+      )}
       onClick={() => onSelect?.(entry)}
       onContextMenu={onContextMenu}
       onKeyDown={(event) => {
@@ -459,13 +486,15 @@ export function GitLogEntryRow({
         }
       }}
     >
-      <div className="git-log-summary">{entry.summary || "No message"}</div>
-      <div className="git-log-meta">
-        <span className="git-log-sha">{entry.sha.slice(0, 7)}</span>
-        <span className="git-log-sep">·</span>
-        <span className="git-log-author">{entry.author || "Unknown"}</span>
-        <span className="git-log-sep">·</span>
-        <span className="git-log-date">{formatRelativeTime(entry.timestamp * 1000)}</span>
+      <div className="git-log-summary text-ui-sm font-semibold text-text-strong">
+        {entry.summary || "No message"}
+      </div>
+      <div className="git-log-meta flex flex-wrap gap-[6px] text-ui-xs text-text-faint">
+        <span className="git-log-sha font-code text-[11px]">{entry.sha.slice(0, 7)}</span>
+        <span className="git-log-sep text-text-dim">·</span>
+        <span>{entry.author || "Unknown"}</span>
+        <span className="git-log-sep text-text-dim">·</span>
+        <span>{formatRelativeTime(entry.timestamp * 1000)}</span>
       </div>
     </button>
   );

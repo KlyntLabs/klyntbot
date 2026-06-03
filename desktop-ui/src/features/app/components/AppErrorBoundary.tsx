@@ -79,32 +79,38 @@ function AppErrorBoundaryFallback({ surface, error, componentStack, resetError }
   }, [copied]);
 
   return (
-    <div className="app-error-boundary" role="alert" aria-live="assertive">
-      <div className="app-error-boundary__card">
-        <div className="app-error-boundary__icon" aria-hidden="true">
+    <div
+      className="fixed inset-0 z-ui-modal flex items-center justify-center p-6 bg-surface-context-core text-foreground [-webkit-app-region:drag]"
+      role="alert"
+      aria-live="assertive"
+    >
+      <div className="max-w-[520px] w-full p-7 px-8 rounded-xl bg-ds-surface-card border border-ds-border-strong shadow-[0_24px_48px_rgba(0,0,0,0.35)] [-webkit-app-region:no-drag]">
+        <div className="text-ui-display-md leading-none text-status-error mb-3" aria-hidden="true">
           ⚠
         </div>
-        <h1 className="app-error-boundary__title">Something went wrong</h1>
-        <p className="app-error-boundary__subtitle">
+        <h1 className="text-ui-xl font-semibold mb-1.5 text-ds-text-strong">Something went wrong</h1>
+        <p className="text-ui-sm text-ds-text-subtle mb-4 leading-relaxed">
           The {surface} window hit an unrecoverable error and was prevented from disappearing.
         </p>
-        <pre className="app-error-boundary__message">{message}</pre>
-        <div className="app-error-boundary__actions">
+        <pre className="font-code text-ui-xs text-ds-text-subtle bg-ds-surface-muted border border-ds-border-subtle rounded-lg px-3 py-2.5 mb-4.5 max-h-40 overflow-auto whitespace-pre-wrap break-words">
+          {message}
+        </pre>
+        <div className="flex gap-2 flex-wrap">
           <button
             type="button"
-            className="primary app-error-boundary__button"
+            className="primary text-ui-sm"
             onClick={() => window.location.reload()}
           >
             Reload app
           </button>
           <button
             type="button"
-            className="secondary app-error-boundary__button"
+            className="secondary text-ui-sm"
             onClick={resetError}
           >
             Try again
           </button>
-          <button type="button" className="ghost app-error-boundary__button" onClick={copyDetails}>
+          <button type="button" className="ghost text-ui-sm" onClick={copyDetails}>
             {copied ? "Copied" : "Copy details"}
           </button>
         </div>

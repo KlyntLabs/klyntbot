@@ -446,7 +446,7 @@ export function PromptPanel({
                 <button
                   key={file.path}
                   type="button"
-                  className="prompt-row prompt-row--file"
+                  className="prompt-row !flex-row items-center gap-[10px] text-left cursor-pointer [font:inherit] text-inherit hover:!bg-surface-control-hover hover:!border-border-strong"
                   onClick={() => {
                     void invoke("plugin:opener|open_path", { path: file.path }).catch((error) =>
                       window.alert(error instanceof Error ? error.message : String(error)),
@@ -454,7 +454,7 @@ export function PromptPanel({
                   }}
                   title={`Open ${file.path}`}
                 >
-                  <FileText className="prompt-row__file-icon" aria-hidden />
+                  <FileText className="shrink-0 w-4 h-4 opacity-70" aria-hidden />
                   <div className="prompt-row-header">
                     <div className="prompt-name">{file.label}</div>
                     <div className="prompt-description">{file.path}</div>

@@ -238,7 +238,7 @@ export function WorkspaceHomeRunControls({
               </svg>
             </span>
             <select
-              className="composer-select composer-select--model"
+              className="composer-select w-[var(--composer-model-select-width,auto)] max-w-none"
               aria-label="Collaboration mode"
               value={selectedCollaborationModeId ?? ""}
               onChange={(event) => onSelectCollaborationMode(event.target.value || null)}
@@ -275,7 +275,7 @@ export function WorkspaceHomeRunControls({
             </svg>
           </span>
           <select
-            className="composer-select composer-select--effort"
+            className="composer-select w-20 max-w-20"
             aria-label="Thinking mode"
             value={selectedEffort ?? ""}
             onChange={(event) => onSelectEffort(event.target.value)}

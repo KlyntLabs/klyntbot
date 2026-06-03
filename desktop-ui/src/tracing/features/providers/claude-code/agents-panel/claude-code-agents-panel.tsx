@@ -7,15 +7,15 @@ interface Props {
 
 export function ClaudeCodeAgentsPanel({ agents, onSelect }: Props) {
   if (agents.length === 0) {
-    return <div className="cm-state cm-state--empty">No subagents in this session.</div>;
+    return <div className="cm-state p-6 text-text-faint text-ui-xs text-center">No subagents in this session.</div>;
   }
   return (
     <ul className="cc-agents-list">
       {agents.map((a) => (
-        <li key={a.agent_id} className="cc-agents-list__item">
+        <li key={a.agent_id} className="rounded-md border border-[var(--color-border)] p-3 hover:bg-[var(--color-accent)] cursor-pointer">
           <button type="button" onClick={() => onSelect(a.agent_id)}>
-            <span className="cc-agents-list__type">{a.subagent_type}</span>
-            <span className="cc-agents-list__desc">{a.description}</span>
+            <span className="text-xs font-mono text-[var(--color-muted-foreground)]">{a.subagent_type}</span>
+            <span className="text-sm">{a.description}</span>
           </button>
         </li>
       ))}

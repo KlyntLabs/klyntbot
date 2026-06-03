@@ -47,19 +47,19 @@ export function ChatErrorBanner() {
     <div className="chat-error-banner-stack" role="region" aria-label="Chat errors">
       {visible.map((zombie) => (
         <div key={zombie.key} className="chat-error-banner" role="alert">
-          <span className="chat-error-banner__msg">
+          <span className="flex-1">
             Thread <code>{zombie.key}</code> appears stuck (no response).
           </span>
           <button
             type="button"
-            className="chat-error-banner__btn"
+            className="px-2 py-0.5 rounded border border-current bg-transparent cursor-pointer text-inherit text-ui-xs"
             onClick={() => handleReset(zombie.key)}
           >
             Force Reset
           </button>
           <button
             type="button"
-            className="chat-error-banner__dismiss"
+            className="bg-transparent border-none cursor-pointer text-inherit text-[length:var(--fs-md)] leading-none px-0.5 py-1.5 hover:opacity-70"
             onClick={() =>
               setDismissed((prev) => new Set([...prev, zombie.key]))
             }

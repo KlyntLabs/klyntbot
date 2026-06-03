@@ -18,22 +18,22 @@ export function WorkspaceGroup({
   const isToggleable = Boolean(toggleId);
   const headerContent = (
     <>
-      <div className="workspace-group-label">{name}</div>
+      <div className="text-ui-sm font-semibold tracking-wide text-text-strong">{name}</div>
       {isToggleable && (
         <span className={`group-toggle ${isCollapsed ? "" : "expanded"}`} aria-hidden>
-          <span className="group-toggle-icon">›</span>
+          <span className="inline-block transition-transform duration-150">›</span>
         </span>
       )}
     </>
   );
 
   return (
-    <div className="workspace-group">
+    <div className="flex flex-col">
       {showHeader &&
         (isToggleable ? (
           <button
             type="button"
-            className="workspace-group-header is-toggleable"
+            className="flex items-center justify-between gap-2 px-1 pb-0.5 cursor-pointer focus-visible:outline focus-visible:outline-1 focus-visible:outline-border-subtle focus-visible:outline-offset-1 focus-visible:rounded-md"
             onClick={() => {
               if (toggleId) {
                 onToggleCollapse(toggleId);
@@ -45,7 +45,7 @@ export function WorkspaceGroup({
             {headerContent}
           </button>
         ) : (
-          <div className="workspace-group-header">{headerContent}</div>
+          <div className="flex items-center justify-between gap-2 px-1 pb-0.5">{headerContent}</div>
         ))}
       <div className={`workspace-group-list ${isCollapsed ? "collapsed" : ""}`}>
         <div className="workspace-group-content">{children}</div>

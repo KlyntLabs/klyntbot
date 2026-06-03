@@ -150,7 +150,7 @@ export function InitGitRepoPrompt({
             }}
           />
 
-          <label className="git-init-modal-checkbox-row git-init-modal-checkbox-row--nested">
+          <label className="git-init-modal-checkbox-row mt-0.5 pl-[22px]">
             <input
               type="checkbox"
               className="git-init-modal-checkbox"

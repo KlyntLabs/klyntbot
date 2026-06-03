@@ -65,7 +65,7 @@ export const PinnedThreadList = memo(function PinnedThreadList({
   };
 
   return (
-    <div className="thread-list pinned-thread-list">
+    <div className="thread-list flex flex-col gap-2 ml-0">
       {visibility.visibleRows.map((row) => {
         const { thread, depth, workspaceId } = row;
         const threadKey = `${workspaceId}:${thread.id}`;

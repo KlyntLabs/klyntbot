@@ -48,8 +48,8 @@ export function LaunchScriptEntryButton({
   const iconLabel = getLaunchScriptIconLabel(entry.icon);
 
   return (
-    <div className="launch-script-menu" ref={popoverRef}>
-      <div className="launch-script-buttons">
+    <div className="relative" ref={popoverRef}>
+      <div className="inline-flex items-center gap-0.5">
         <button
           type="button"
           className="ghost main-header-action launch-script-run ds-tooltip-trigger"
@@ -68,11 +68,11 @@ export function LaunchScriptEntryButton({
         </button>
       </div>
       {editorOpen && (
-        <PopoverSurface className="launch-script-popover" role="dialog">
-          <div className="launch-script-title">{entry.label?.trim() || "Launch script"}</div>
+        <PopoverSurface className="absolute right-0 top-[calc(100%+8px)] min-w-[240px] p-3 z-5" role="dialog">
+          <div className="text-ui-sm font-semibold text-text-stronger mb-2">{entry.label?.trim() || "Launch script"}</div>
           <LaunchScriptIconPicker value={draftIcon} onChange={onDraftIconChange} />
           <input
-            className="launch-script-input"
+            className="w-full rounded-lg border border-border-muted bg-surface-control text-text-strong text-ui-sm px-2 py-1.5 outline-none mb-2 [-webkit-app-region:no-drag]"
             type="text"
             placeholder="Optional label"
             value={draftLabel}
@@ -80,15 +80,15 @@ export function LaunchScriptEntryButton({
             data-tauri-drag-region="false"
           />
           <textarea
-            className="launch-script-textarea"
+            className="w-full rounded-lg border border-border-muted bg-surface-control text-text-strong text-ui-sm p-2 outline-none resize-y min-h-[96px] [-webkit-app-region:no-drag]"
             placeholder="e.g. npm run dev"
             value={draftScript}
             onChange={(event) => onDraftChange(event.target.value)}
             rows={6}
             data-tauri-drag-region="false"
           />
-          {error && <div className="launch-script-error">{error}</div>}
-          <div className="launch-script-actions">
+          {error && <div className="mt-2 text-ui-xs text-status-error">{error}</div>}
+          <div className="mt-2.5 flex justify-end gap-2">
             <button
               type="button"
               className="ghost"
@@ -99,7 +99,7 @@ export function LaunchScriptEntryButton({
             </button>
             <button
               type="button"
-              className="ghost launch-script-delete"
+              className="ghost text-status-error"
               onClick={onDelete}
               data-tauri-drag-region="false"
             >

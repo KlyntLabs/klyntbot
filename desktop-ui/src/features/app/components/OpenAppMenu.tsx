@@ -160,12 +160,12 @@ export function OpenAppMenu({
   return (
     <SplitActionMenu
       containerRef={openMenuRef}
-      className="open-app-menu"
+      className="relative"
       buttonGroupClassName="open-app-button"
       actionButton={
         <button
           type="button"
-          className="ghost main-header-action open-app-action ds-tooltip-trigger"
+          className="ghost main-header-action ds-tooltip-trigger flex items-center justify-center px-2.5 py-1.5 border-none bg-transparent shadow-none"
           onClick={handleOpen}
           disabled={!selectedCanOpen}
           data-tauri-drag-region="false"
@@ -174,8 +174,8 @@ export function OpenAppMenu({
           data-tooltip={openLabel}
           data-tooltip-placement="bottom"
         >
-          <span className="open-app-label">
-            <img className="open-app-icon" src={selectedOpenTarget.icon} alt="" aria-hidden />
+          <span className="inline-flex items-center gap-1.5 text-ui-sm">
+            <img className="w-3.5 h-3.5 rounded-[3px] shrink-0" src={selectedOpenTarget.icon} alt="" aria-hidden />
             {selectedOpenTarget.label}
           </span>
         </button>
@@ -195,12 +195,12 @@ export function OpenAppMenu({
         // Keep entries visible but disable ones missing required config.
         <PopoverMenuItem
           key={target.id}
-          className="open-app-option"
+          className="w-full justify-start"
           onClick={() => handleSelectOpenTarget(target)}
           disabled={!canOpenTarget(target)}
           role="menuitem"
           data-tauri-drag-region="false"
-          icon={<img className="open-app-icon" src={target.icon} alt="" aria-hidden />}
+          icon={<img className="w-3.5 h-3.5 rounded-[3px] shrink-0" src={target.icon} alt="" aria-hidden />}
           active={target.id === resolvedOpenAppId}
         >
           {target.label}

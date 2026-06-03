@@ -47,10 +47,6 @@ export function HourlyHeatmap({ startDate, endDate }: Props) {
   const firstDataHour = dataHours.length > 0 ? Math.min(...dataHours) : null;
   const lastDataHour = dataHours.length > 0 ? Math.max(...dataHours) : null;
 
-  // Today: from first hour with activity → current hour (so the list grows
-  // through the day and motivates filling more hours). Before any activity,
-  // show a single row at the current hour as a starting point.
-  // Past days: span first→last hour with activity (or nothing if none).
   let startHour: number | null;
   let endHour: number | null;
   if (isToday) {
@@ -89,21 +85,21 @@ export function HourlyHeatmap({ startDate, endDate }: Props) {
     : null;
 
   return (
-    <div className="dashboard__hourly" role="img" aria-label="Hourly productivity breakdown">
-      <div className="dashboard__hourly-title">
+    <div className="px-1 py-2 flex flex-col gap-1" role="img" aria-label="Hourly productivity breakdown">
+      <div className="text-ui-2xs font-medium text-ds-text-strong">
         Hourly Productivity
-        {peakHour && <span className="dashboard__hourly-peak"> Peak: {peakHour.hour}:00</span>}
+        {peakHour && <span className="font-normal text-[color-mix(in_srgb,var(--ds-text-subtle)_60%,transparent)] ml-1"> Peak: {peakHour.hour}:00</span>}
       </div>
       {working.length > 0 ? (
         <div>
           {working.map((h) => {
             const width = (h.productiveRatio / maxRatio) * 100;
             return (
-              <div key={h.hour} className="dashboard__hourly-row">
-                <span className="dashboard__hourly-hour-label">{h.hour}</span>
-                <div className="dashboard__hourly-bar-track">
+              <div key={h.hour} className="flex items-center gap-1">
+                <span className="text-ui-2xs text-[color-mix(in_srgb,var(--ds-text-subtle)_60%,transparent)] w-4 text-right tabular-nums">{h.hour}</span>
+                <div className="flex-1 h-1 rounded-full bg-surface-control overflow-hidden">
                   <div
-                    className="dashboard__hourly-bar-fill"
+                    className="h-full rounded-full dashboard__hourly-bar-fill"
                     style={{ width: `${width}%`, backgroundColor: heatColor(h.productiveRatio) }}
                   />
                 </div>
@@ -112,7 +108,7 @@ export function HourlyHeatmap({ startDate, endDate }: Props) {
           })}
         </div>
       ) : (
-        <div className="dashboard__hourly-empty-msg">No tracked hours for this day.</div>
+        <div className="text-ui-2xs italic text-[color-mix(in_srgb,var(--ds-text-subtle)_70%,transparent)]">No tracked hours for this day.</div>
       )}
     </div>
   );

@@ -382,10 +382,6 @@
   border-color: transparent;
 }
 
-.composer-action--mobile-menu {
-  display: none;
-}
-
 :root[data-theme="light"] .composer-action {
   border-color: var(--border-strong);
   color: var(--text-strong);
@@ -411,20 +407,6 @@
   :root:not([data-theme]) .composer-action:hover {
     color: var(--text-strong);
   }
-}
-
-.composer-action--mic.is-active {
-  border-color: rgba(120, 235, 190, 0.6);
-  background: rgba(120, 235, 190, 0.12);
-}
-
-.composer-action--mic.is-active:hover {
-  background: rgba(120, 235, 190, 0.18);
-}
-
-.composer-action--mic.is-processing {
-  border-color: rgba(160, 200, 255, 0.6);
-  background: rgba(160, 200, 255, 0.12);
 }
 
 .composer-waveform {
@@ -880,21 +862,6 @@
   height: 14px;
 }
 
-.composer-icon--model {
-  width: 16px;
-  height: 16px;
-}
-
-.composer-icon--model svg {
-  width: 16px;
-  height: 16px;
-}
-
-.composer-icon--model,
-.composer-icon--effort {
-  transform: translateY(1px);
-}
-
 .composer-fast-indicator {
   display: inline-flex;
   align-items: center;
@@ -920,26 +887,6 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   background-image: none;
-}
-
-.composer-select--model {
-  width: var(--composer-model-select-width, auto);
-  max-width: none;
-}
-
-.composer-select--collab {
-  width: 78px;
-  max-width: 78px;
-}
-
-.composer-select--effort {
-  width: 80px;
-  max-width: 80px;
-}
-
-.composer-select--approval {
-  width: 90px;
-  max-width: 90px;
 }
 
 .composer-select:focus {
@@ -982,20 +929,6 @@
     margin-top: 0;
   }
 
-  .app.layout-phone .composer-action--mobile-menu {
-    align-self: flex-start;
-  }
-
-  .app.layout-phone .composer-input.is-phone-tall .composer-action--mobile-menu {
-    align-self: flex-end;
-  }
-
-  .app.layout-phone .composer-attach,
-  .app.layout-phone .composer-action--expand,
-  .app.layout-phone .composer-action--mic {
-    display: none;
-  }
-
   .app.layout-phone .composer-mobile-menu {
     display: inline-flex;
     align-self: flex-start;
@@ -1005,10 +938,6 @@
   .app.layout-phone .composer-input.is-phone-tall .composer-mobile-menu {
     align-self: flex-end;
     margin-top: 0;
-  }
-
-  .app.layout-phone .composer-action--mobile-menu {
-    display: inline-flex;
   }
 
   .app.layout-phone .composer textarea {

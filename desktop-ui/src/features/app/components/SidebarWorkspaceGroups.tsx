@@ -210,7 +210,7 @@ function SidebarWorkspaceEntry({
         addMenuAnchor &&
         createPortal(
           <PopoverSurface
-            className="workspace-add-menu"
+            className="fixed isolate rounded-xl p-1.5 flex flex-col gap-1 min-w-[160px] z-[9999]"
             ref={addMenuRef}
             style={{
               top: addMenuAnchor.top,
@@ -219,7 +219,7 @@ function SidebarWorkspaceEntry({
             }}
           >
             <PopoverMenuItem
-              className="workspace-add-option"
+              className="border-none bg-transparent text-text-strong text-ui-sm text-left px-2 py-1.5 rounded-md cursor-pointer hover:bg-surface-hover"
               onClick={(event) => {
                 event.stopPropagation();
                 onToggleAddMenu(null);
@@ -230,7 +230,7 @@ function SidebarWorkspaceEntry({
               New agent
             </PopoverMenuItem>
             <PopoverMenuItem
-              className="workspace-add-option"
+              className="border-none bg-transparent text-text-strong text-ui-sm text-left px-2 py-1.5 rounded-md cursor-pointer hover:bg-surface-hover"
               onClick={(event) => {
                 event.stopPropagation();
                 onToggleAddMenu(null);
@@ -241,7 +241,7 @@ function SidebarWorkspaceEntry({
               New worktree agent
             </PopoverMenuItem>
             <PopoverMenuItem
-              className="workspace-add-option"
+              className="border-none bg-transparent text-text-strong text-ui-sm text-left px-2 py-1.5 rounded-md cursor-pointer hover:bg-surface-hover"
               onClick={(event) => {
                 event.stopPropagation();
                 onToggleAddMenu(null);
@@ -262,8 +262,8 @@ function SidebarWorkspaceEntry({
         >
           <span className={`thread-status ${draftStatusClass}`} aria-hidden />
           <div className="thread-content">
-            <div className="thread-headline">
-              <span className="thread-name">New Agent</span>
+            <div className="text-ui-2xs text-text-muted whitespace-nowrap overflow-hidden text-ellipsis">
+              <span className="text-ui-sm text-text-strong whitespace-nowrap overflow-hidden text-ellipsis">New Agent</span>
             </div>
           </div>
         </button>
@@ -298,8 +298,8 @@ function SidebarWorkspaceEntry({
           searchQuery={normalizedQuery}
           isSearchActive={isSearchActive}
           sectionLabel="Clone agents"
-          sectionIcon={<Copy className="worktree-header-icon" aria-hidden />}
-          className="clone-section"
+          sectionIcon={<Copy className="w-4 h-4 text-text-muted" aria-hidden />}
+          className="flex flex-col gap-2 p-2 rounded-lg bg-surface-card border border-border-subtle"
         />
       )}
       {worktrees.length > 0 && (

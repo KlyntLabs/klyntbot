@@ -4,6 +4,7 @@ import type { TimelineEntry } from "@/bindings";
 import { useTauriQuery } from "@/lib/query";
 import { qk } from "@/lib/query/queryKeys";
 import { formatHumanDuration, TZ_OFFSET_MINS, todayISO, toLocalISO } from "@/utils/dashboardDates";
+import { cn } from "@/utils/cn";
 import { useDashboardState } from "../../hooks/useDashboardState";
 import { useEnabledLayers, useSidebarOpen } from "../../lib/layers";
 import { computeDayStats, DAY_LABELS } from "../../lib/timeline-utils";
@@ -155,15 +156,15 @@ export function MonthView() {
   }, [weeks]);
 
   return (
-    <div style={{ display: "flex", gap: 8, height: "100%", width: "100%" }}>
-      <div className="dashboard__month-grid" style={{ flex: 1 }}>
-        <div className="dashboard__month-grid-inner">
-          {isLoading && <div className="dashboard__month-loading">Loading...</div>}
+    <div className="flex gap-2 h-full w-full">
+      <div className="flex gap-2 h-full flex-1">
+        <div className="flex-1 flex flex-col overflow-hidden bg-transparent border-none rounded-none p-3">
+          {isLoading && <div className="text-ui-2xs text-ds-text-subtle mb-1 px-2 py-1">Loading...</div>}
 
           {/* Day-of-week header */}
-          <div className="dashboard__month-dow-header">
+          <div className="grid grid-cols-7 mb-1">
             {DAY_LABELS.map((label) => (
-              <div key={label} className="dashboard__month-dow-label">
+              <div key={label} className="text-center text-ui-2xs text-text-muted font-medium py-1">
                 {label}
               </div>
             ))}
@@ -172,41 +173,30 @@ export function MonthView() {
           {/* Calendar grid */}
           {/* biome-ignore lint/a11y/useSemanticElements: CSS grid layout requires div, not table */}
           <div
-            style={{
-              flex: 1,
-              display: "grid",
-              gridTemplateRows: "repeat(6, 1fr)",
-              gap: 1,
-              outline: "none",
-            }}
+            className="flex-1 grid grid-rows-6 gap-px outline-none"
             role="grid"
             aria-label="Month calendar"
             tabIndex={0}
             onKeyDown={handleGridKeyDown}
           >
             {weeks.map((week) => (
-              <div key={week[0].date} className="dashboard__month-week">
+              <div key={week[0].date} className="grid grid-cols-7 gap-px">
                 {week.map((cell) => {
                   const stats = dayStats.get(cell.date) || { activeSecs: 0, focusSecs: 0 };
                   const aRatio = activeRatio(stats.activeSecs, maxActiveSecs);
 
                   const isToday = cell.date === today;
-                  const isFocused = cell.date === focusedDate && cell.date !== today;
-
-                  const dayClasses = [
-                    "dashboard__month-day",
-                    isToday && "dashboard__month-day--today",
-                    isFocused && "dashboard__month-day--focused",
-                    !cell.isCurrentMonth && "dashboard__month-day--other",
-                  ]
-                    .filter(Boolean)
-                    .join(" ");
-
                   return (
                     <button
                       type="button"
                       key={cell.date}
-                      className={dayClasses}
+                      className={cn(
+                        "rounded-lg p-1.5 flex flex-col items-start text-left transition-colors duration-ui-fast ease-out cursor-pointer min-h-16 border-none bg-transparent hover:bg-surface-hover",
+                        isToday && "outline outline-1 outline-[color-mix(in_oklch,var(--border-accent)_50%,transparent)]",
+                        !cell.isCurrentMonth && "text-[color-mix(in_srgb,var(--text-muted)_40%,transparent)]",
+                      )}
+                      data-today={isToday || undefined}
+                      data-focused={cell.date === focusedDate || undefined}
                       onClick={() => {
                         setDate(cell.date);
                         setMode("day");
@@ -216,19 +206,17 @@ export function MonthView() {
                       }}
                     >
                       {/* Date + focus time */}
-                      <div className="dashboard__month-day-header">
+                      <div className="flex items-center justify-between w-full">
                         <span
-                          className={[
-                            "dashboard__month-day-number",
-                            isToday && "dashboard__month-day-number--today",
-                          ]
-                            .filter(Boolean)
-                            .join(" ")}
+                          className={cn(
+                            "text-ui-xs font-medium",
+                            isToday && "text-border-accent",
+                          )}
                         >
                           {cell.day}
                         </span>
                         {stats.focusSecs > 0 && (
-                          <span className="dashboard__month-day-focus">
+                          <span className="text-ui-2xs text-[color-mix(in_srgb,var(--text-muted)_60%,transparent)]">
                             {formatHumanDuration(stats.focusSecs)}
                           </span>
                         )}
@@ -236,25 +224,17 @@ export function MonthView() {
 
                       {/* Activity bar — proportional to active time */}
                       {stats.activeSecs > 0 && (
-                        <div
-                          style={{
-                            width: "100%",
-                            marginTop: "auto",
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: 2,
-                          }}
-                        >
-                          <div className="dashboard__month-activity-track">
+                        <div className="w-full mt-auto flex flex-col gap-0.5">
+                          <div className="w-full h-[3px] rounded-full bg-surface-hover overflow-hidden">
                             <div
-                              className="dashboard__month-activity-fill"
+                              className="h-full rounded-full bg-success"
                               style={{
                                 width: `${Math.max(aRatio * 100, 8)}%`,
                                 opacity: 0.7 + aRatio * 0.3,
                               }}
                             />
                           </div>
-                          <span className="dashboard__month-activity-label">
+                          <span className="text-ui-2xs text-[color-mix(in_srgb,var(--text-muted)_50%,transparent)]">
                             {formatHumanDuration(stats.activeSecs)}
                           </span>
                         </div>

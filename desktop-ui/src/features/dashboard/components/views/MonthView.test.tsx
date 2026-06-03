@@ -171,7 +171,7 @@ describe("MonthView", () => {
     await waitFor(() => {
       expect(screen.getAllByRole("button").length).toBe(42);
     });
-    const todayCell = document.querySelector(".dashboard__month-day--today");
+    const todayCell = document.querySelector('[data-today="true"]');
     expect(todayCell).toBeTruthy();
     expect(todayCell?.textContent).toContain("15");
   });
@@ -184,10 +184,10 @@ describe("MonthView", () => {
     });
     const grid = screen.getByRole("grid");
     // Today (15th) gets --today, not --focused
-    expect(document.querySelector(".dashboard__month-day--focused")).toBeNull();
+    expect(document.querySelector('[data-focused="true"]')).toBeNull();
     fireEvent.keyDown(grid, { key: "ArrowRight" });
     await waitFor(() => {
-      const focused = document.querySelector(".dashboard__month-day--focused");
+      const focused = document.querySelector('[data-focused="true"]');
       expect(focused).toBeTruthy();
       expect(focused?.textContent).toContain("16");
     });

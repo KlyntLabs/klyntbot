@@ -6,6 +6,7 @@ import Settings from "lucide-react/dist/esm/icons/settings";
 import X from "lucide-react/dist/esm/icons/x";
 import XCircle from "lucide-react/dist/esm/icons/x-circle";
 import { useCallback, useMemo, useRef } from "react";
+import { cn } from "@/utils/cn";
 import { useTransparentBackground } from "@/hooks/window/useTransparentBackground";
 import { useWindowAutoResize } from "@/hooks/window/useWindowAutoResize";
 import { qk, useTauriMutation, useTauriQuery } from "@/lib/query";
@@ -23,14 +24,6 @@ import "../tray.css";
 const MAX_TRAY_HEIGHT = 800;
 const TRAY_WIDTH = 320;
 const TRAY_MIN_HEIGHT = 360;
-
-function taskIndicatorClass(task: TodayTask, isCompleted: boolean): string {
-  if (isCompleted) return "is-dim";
-  if (task.isOverdue) return "is-overdue";
-  if (task.isDueToday) return "is-today";
-  if (task.status === "doing") return "is-doing";
-  return "";
-}
 
 export function Tray() {
   const todayTasksQuery = useTauriQuery<TodayTask[]>({
@@ -131,30 +124,30 @@ export function Tray() {
   });
 
   return (
-    <div className="tray-root">
-      <div ref={contentRef} className="tray-shell">
-        <div ref={bodyRef} className="tray-body">
+    <div className="w-full h-full flex text-text-primary font-ui text-ui-sm">
+      <div ref={contentRef} className="w-full flex-1 flex flex-col overflow-hidden">
+        <div ref={bodyRef} className="overflow-visible">
           {coachingNudge && (
-            <div className="tray-nudge">
-              <div className="tray-nudge-row">
-                <Lightbulb className="tray-icon-xs is-info" strokeWidth={1.5} />
-                <p className="tray-nudge-text">{coachingNudge.message}</p>
+            <div className="py-3 px-4">
+              <div className="flex items-start gap-2.5">
+                <Lightbulb className="w-3.5 h-3.5 text-[var(--tray-info)]" strokeWidth={1.5} />
+                <p className="flex-1 text-ui-xs font-light leading-normal text-text-muted m-0">{coachingNudge.message}</p>
               </div>
-              <div className="tray-nudge-actions">
+              <div className="flex gap-1 mt-2 ml-6">
                 <button
                   type="button"
                   onClick={() => handleCoachingFeedback(coachingNudge.id, "helpful")}
                   className="tray-nudge-action is-success"
                 >
-                  <Check className="tray-icon-xs" strokeWidth={2} />
+                  <Check className="w-3.5 h-3.5" strokeWidth={2} />
                   Helpful
                 </button>
                 <button
                   type="button"
                   onClick={() => handleCoachingFeedback(coachingNudge.id, "dismissed")}
-                  className="tray-nudge-action"
+                  className="h-6 px-2 flex items-center gap-1 rounded-md bg-transparent border-none text-text-muted text-ui-3xs cursor-pointer"
                 >
-                  <X className="tray-icon-xs" strokeWidth={2} />
+                  <X className="w-3.5 h-3.5" strokeWidth={2} />
                   Dismiss
                 </button>
                 <button
@@ -162,11 +155,11 @@ export function Tray() {
                   onClick={() => handleCoachingFeedback(coachingNudge.id, "stop")}
                   className="tray-nudge-action is-danger"
                 >
-                  <XCircle className="tray-icon-xs" strokeWidth={2} />
+                  <XCircle className="w-3.5 h-3.5" strokeWidth={2} />
                   Stop
                 </button>
               </div>
-              <div className="tray-divider" />
+              <div className="mx-4 h-px" />
             </div>
           )}
 
@@ -174,17 +167,17 @@ export function Tray() {
 
           {sortedTasks.length > 0 && (
             <>
-              <div className="tray-divider" />
-              <div className="tray-section tray-tasks">
-                <div className="tray-section-header">
-                  <span className="tray-section-title">Today</span>
+              <div className="mx-4 h-px" />
+              <div className="py-3 px-4 overflow-visible">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-ui-2xs font-light text-text-muted uppercase tracking-[0.08em]">Today</span>
                   {activeCount > 0 && <Badge variant="muted">{activeCount}</Badge>}
                 </div>
-                <div className="tray-task-list">
+                <div className="flex flex-col gap-0.5">
                   {sortedTasks.map((task) => {
                     const done = isTaskCompleted(task);
                     return (
-                      <div key={task.id} className={`tray-task ${taskIndicatorClass(task, done)}`}>
+                      <div key={task.id} className={cn("flex items-center gap-2.5 py-1.5 px-2 rounded-lg border-l-2 border-transparent", done && "border-[var(--text-dim)]", task.isOverdue && !done && "border-[var(--tray-destructive)]", task.isDueToday && !done && "border-[var(--tray-brand)]", task.status === "doing" && !done && "border-[var(--tray-info)]")}>
                         <Checkbox
                           checked={done}
                           onCheckedChange={() => handleToggleTask(task.id)}
@@ -200,7 +193,7 @@ export function Tray() {
                         </button>
                         {!done && task.priority && <Badge variant="brand">{task.priority}</Badge>}
                         {!done && task.dueDisplay && (
-                          <span className={`tray-task-due${task.isOverdue ? " is-overdue" : ""}`}>
+                          <span className={cn("text-ui-3xs font-light text-text-muted shrink-0", task.isOverdue && "text-[var(--tray-destructive)]")}>
                             {task.dueDisplay}
                           </span>
                         )}
@@ -214,22 +207,22 @@ export function Tray() {
 
           {calendarEvents.length > 0 && (
             <>
-              <div className="tray-divider" />
-              <div className="tray-section">
-                <span className="tray-section-title">Upcoming</span>
-                <div className="tray-event-list">
+              <div className="mx-4 h-px" />
+              <div className="py-3 px-4">
+                <span className="text-ui-2xs font-light text-text-muted uppercase tracking-[0.08em]">Upcoming</span>
+                <div className="flex flex-col gap-2 mt-2">
                   {calendarEvents.map((event) => (
-                    <div key={event.id} className="tray-event">
+                    <div key={event.id} className="flex items-center gap-2.5">
                       <div
-                        className="tray-event-color"
+                        className="w-1 h-6 rounded-sm shrink-0"
                         style={{
                           backgroundColor: event.color ?? "var(--tray-brand)",
                         }}
                       />
-                      <div className="tray-event-body">
-                        <p className="tray-event-title">{event.title}</p>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-ui-xs font-light text-text-muted whitespace-nowrap overflow-hidden text-ellipsis m-0">{event.title}</p>
                       </div>
-                      <span className="tray-event-time">
+                      <span className="text-ui-2xs font-light text-text-dim shrink-0">
                         {new Date(event.startedAt).toLocaleTimeString([], {
                           hour: "numeric",
                           minute: "2-digit",
@@ -242,33 +235,33 @@ export function Tray() {
             </>
           )}
 
-          <div className="tray-divider" />
+          <div className="mx-4 h-px" />
 
-          <div className="tray-footer">
+          <div className="flex items-center justify-end gap-0.5 py-1.5 px-2.5">
             <button
               type="button"
               onClick={handleOpenDashboard}
               title="Open Dashboard"
-              className="tray-footer-btn"
+              className="w-[30px] h-[30px] flex items-center justify-center rounded-lg bg-transparent border-none text-text-faint cursor-pointer"
             >
-              <Monitor className="tray-icon-xs" strokeWidth={1.5} />
+              <Monitor className="w-3.5 h-3.5" strokeWidth={1.5} />
             </button>
             <button
               type="button"
               onClick={handleOpenSettings}
               title="Settings"
-              className="tray-footer-btn"
+              className="w-[30px] h-[30px] flex items-center justify-center rounded-lg bg-transparent border-none text-text-faint cursor-pointer"
             >
-              <Settings className="tray-icon-xs" strokeWidth={1.5} />
+              <Settings className="w-3.5 h-3.5" strokeWidth={1.5} />
             </button>
             <button
               type="button"
               onClick={handleOpenGitHub}
               title="GitHub"
-              className="tray-footer-btn"
+              className="w-[30px] h-[30px] flex items-center justify-center rounded-lg bg-transparent border-none text-text-faint cursor-pointer"
             >
               <svg
-                className="tray-icon-xs"
+                className="w-3.5 h-3.5"
                 viewBox="0 0 24 24"
                 fill="currentColor"
                 aria-hidden="true"
@@ -280,9 +273,9 @@ export function Tray() {
               type="button"
               onClick={handleQuit}
               title="Quit Klynt"
-              className="tray-footer-btn is-danger"
+              className="w-[30px] h-[30px] flex items-center justify-center rounded-lg bg-transparent border-none text-text-faint cursor-pointer hover:text-[var(--tray-destructive)] hover:bg-[var(--tray-destructive-bg)]"
             >
-              <LogOut className="tray-icon-xs" strokeWidth={1.5} />
+              <LogOut className="w-3.5 h-3.5" strokeWidth={1.5} />
             </button>
           </div>
         </div>

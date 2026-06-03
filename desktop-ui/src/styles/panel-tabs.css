@@ -48,21 +48,7 @@
   height: 12px;
 }
 
-.panel-tab--text {
-  padding: 6px 12px;
-  font-size: var(--fs-sm);
-  font-weight: 500;
-  gap: 6px;
-}
-
 .panel-tab:disabled {
   opacity: 0.55;
   cursor: not-allowed;
-}
-
-.panel-tab__badge {
-  font-size: var(--fs-2xs);
-  font-weight: 500;
-  color: var(--text-faint);
-  letter-spacing: 0.02em;
 }

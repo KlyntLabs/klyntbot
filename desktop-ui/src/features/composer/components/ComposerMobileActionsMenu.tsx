@@ -6,6 +6,7 @@ import Plus from "lucide-react/dist/esm/icons/plus";
 import Square from "lucide-react/dist/esm/icons/square";
 import X from "lucide-react/dist/esm/icons/x";
 import type { Dispatch, RefObject, SetStateAction } from "react";
+import { cn } from "@/utils/cn";
 import {
   PopoverMenuItem,
   PopoverSurface,
@@ -48,12 +49,12 @@ export function ComposerMobileActionsMenu({
 }: ComposerMobileActionsMenuProps) {
   return (
     <div
-      className={`composer-mobile-menu${mobileActionsOpen ? " is-open" : ""}`}
+      className={cn("composer-mobile-menu relative", mobileActionsOpen && "is-open")}
       ref={mobileActionsRef}
     >
       <button
         type="button"
-        className="composer-action composer-action--mobile-menu"
+        className="composer-action hidden max-[720px]:inline-flex items-center justify-center w-[30px] h-[30px] rounded-full border border-[var(--cm-border-emphasis)] bg-[var(--cm-surface-panel-strong)] text-text-strong text-ui-sm p-0 cursor-pointer relative"
         onClick={() => setMobileActionsOpen((prev) => !prev)}
         disabled={disabled}
         aria-expanded={mobileActionsOpen}
@@ -64,7 +65,7 @@ export function ComposerMobileActionsMenu({
         <Plus size={14} aria-hidden />
       </button>
       {mobileActionsOpen && (
-        <PopoverSurface className="composer-mobile-actions-popover" role="menu">
+        <PopoverSurface className="absolute left-0 bottom-[calc(100%+8px)] min-w-[170px] p-[6px] grid gap-1 z-30" role="menu">
           <PopoverMenuItem
             onClick={handleMobileAttachClick}
             disabled={disabled || !onAddAttachment}

@@ -331,7 +331,7 @@ export const Sidebar = memo(function Sidebar({
           parts.push(name.slice(cursor, matchIndex));
         }
         parts.push(
-          <span key={`${matchIndex}-${cursor}`} className="workspace-name-match">
+          <span key={`${matchIndex}-${cursor}`} className="text-text-strong bg-border-accent-soft rounded px-0.5">
             {name.slice(matchIndex, matchIndex + normalizedQuery.length)}
           </span>,
         );
@@ -863,7 +863,7 @@ export const Sidebar = memo(function Sidebar({
       onDragLeave={onWorkspaceDragLeave}
       onDrop={onWorkspaceDrop}
     >
-      <div className="sidebar-drag-strip" />
+      <div className="w-full h-1.5 shrink-0" />
       <SidebarHeader
         onSelectHome={onSelectHome}
         onAddWorkspace={onAddWorkspace}
@@ -893,7 +893,7 @@ export const Sidebar = memo(function Sidebar({
           }`}
         >
           {workspaceDropText === "Drop Project Here" && (
-            <FolderOpen className="workspace-drop-overlay-icon" aria-hidden />
+            <FolderOpen className="w-[18px] h-[18px] opacity-80" aria-hidden />
           )}
           {workspaceDropText}
         </div>
@@ -905,12 +905,12 @@ export const Sidebar = memo(function Sidebar({
         onScroll={updateScrollFade}
         ref={sidebarBodyRef}
       >
-        <div className="workspace-list">
+        <div className="flex flex-col gap-3.5 [-webkit-app-region:no-drag]">
           {pinnedThreadRows.length > 0 && (
-            <div className="pinned-section">
-              <div className="sidebar-section-header">
-                <div className="sidebar-section-title">Pinned conversations</div>
-                <div className="sidebar-section-count">{pinnedRootCount}</div>
+            <div className="flex flex-col gap-2.5 mb-2">
+              <div className="flex items-center justify-between gap-2.5 px-1">
+                <div className="text-ui-sm font-semibold tracking-wide text-text-strong">Pinned conversations</div>
+                <div className="min-w-[22px] h-[22px] px-2 rounded-full bg-cm-surface-panel-quiet border border-border-subtle text-text-muted inline-flex items-center justify-center text-ui-xs leading-none">{pinnedRootCount}</div>
               </div>
               <PinnedThreadList
                 rows={pinnedThreadRows}

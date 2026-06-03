@@ -1,6 +1,7 @@
 import { getThreadStatusClass, type ThreadStatusById } from "@utils/threadStatus";
 import type { CSSProperties, MouseEvent } from "react";
 import { memo } from "react";
+import { cn } from "@/utils/cn";
 import type { ThreadSummary } from "@/types";
 
 function hashString(value: string) {
@@ -131,13 +132,15 @@ export const ThreadRow = memo(function ThreadRow({
   return (
     <button
       type="button"
-      className={`thread-row ${
-        workspaceId === activeWorkspaceId && thread.id === activeThreadId ? "active" : ""
-      }${hasDetails ? " has-details" : ""}${
-        hasDetails ? " has-secondary-line" : ""
-      }${canToggleSubagents ? " has-subagent-children" : ""}${
-        depth > 0 ? " is-nested" : ""
-      }${isPinned ? " is-pinned" : ""}`}
+      className={cn(
+        "thread-row flex items-center gap-[10px] py-[9px] pr-3 pb-[10px] pl-[calc(10px+var(--thread-indent,0px))] rounded-[14px] bg-[var(--cm-surface-row)] border border-transparent text-text-quiet text-ui-sm text-left cursor-pointer [webkit-app-region:no-drag] min-w-0 relative shadow-[inset_0_1px_0_rgba(255,255,255,0.02),inset_0_0_0_0_rgba(255,255,255,0)] transition-[background-color,border-color,box-shadow,transform] duration-[180ms] ease-out",
+        workspaceId === activeWorkspaceId && thread.id === activeThreadId && "active",
+        hasDetails && "has-details",
+        hasDetails && "has-secondary-line",
+        canToggleSubagents && "has-subagent-children",
+        depth > 0 && "is-nested",
+        isPinned && "is-pinned",
+      )}
       style={indentStyle}
       data-status={dataStatus}
       data-active={dataActive ? "true" : undefined}
@@ -150,21 +153,21 @@ export const ThreadRow = memo(function ThreadRow({
         }
       }}
     >
-      <span className={`thread-status ${statusClass}`} aria-hidden />
-      <div className="thread-content">
-        <div className="thread-headline">
-          <span className="thread-name">{thread.name}</span>
+      <span className={cn("thread-status", statusClass)} aria-hidden />
+      <div className="thread-content flex-1 min-w-0 flex flex-col gap-1">
+        <div className="thread-headline flex items-center gap-2 min-w-0">
+          <span className="thread-name flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-ui-sm font-medium leading-tight">{thread.name}</span>
         </div>
         {hasDetails && (
-          <div className="thread-details">
+          <div className="thread-details flex items-center gap-[6px] min-w-0 flex-wrap">
             {effectiveWorkspaceLabel && (
-              <span className="thread-workspace-label" title={effectiveWorkspaceLabel}>
+              <span className="thread-workspace-label text-text-muted text-ui-2xs max-w-[140px] overflow-hidden text-ellipsis whitespace-nowrap" title={effectiveWorkspaceLabel}>
                 {effectiveWorkspaceLabel}
               </span>
             )}
             {subagentLabel && (
               <span
-                className="thread-subagent-pill"
+                className="thread-subagent-pill max-w-[140px] overflow-hidden text-ellipsis whitespace-nowrap"
                 title={subagentTitle ?? undefined}
                 style={subagentPillStyle}
               >
@@ -172,27 +175,30 @@ export const ThreadRow = memo(function ThreadRow({
               </span>
             )}
             {subagentRoleLabel && (
-              <span className="thread-subagent-role" title={thread.subagentRole ?? undefined}>
+              <span className="thread-subagent-role text-text-faint text-ui-2xs leading-tight font-mono tracking-[0.03em] uppercase" title={thread.subagentRole ?? undefined}>
                 {subagentRoleLabel}
               </span>
             )}
             {statusLabel && (
-              <span className={`thread-state-chip ${statusClass}`}>{statusLabel}</span>
+              <span className={cn("thread-state-chip", statusClass)}>{statusLabel}</span>
             )}
             {contextLabel && (
-              <span className="thread-context-label" title={contextLabel}>
+              <span className="thread-context-label max-w-[140px] overflow-hidden text-ellipsis whitespace-nowrap px-[7px] py-0.5 border border-[var(--cm-border-elevated)] rounded-full bg-[var(--cm-surface-panel-solid)] text-text-muted text-ui-2xs leading-tight" title={contextLabel}>
                 {contextLabel}
               </span>
             )}
-            {showPinnedLabel && isPinned && <span className="thread-pinned-label">Pinned</span>}
+            {showPinnedLabel && isPinned && <span className="thread-pinned-label max-w-[140px] overflow-hidden text-ellipsis whitespace-nowrap px-[7px] py-0.5 border border-[var(--cm-border-elevated)] rounded-full bg-[var(--cm-surface-panel-solid)] text-text-muted text-ui-2xs leading-tight">Pinned</span>}
           </div>
         )}
       </div>
-      <div className="thread-meta">
+      <div className="thread-meta ml-auto inline-flex items-center gap-[6px] shrink-0">
         {canToggleSubagents ? (
           <button
             type="button"
-            className={`thread-subagent-time-toggle ${subagentsExpanded ? "expanded" : ""}`}
+            className={cn(
+              "thread-subagent-time-toggle border-0 bg-transparent text-text-faint inline-flex items-center justify-end text-ui-2xs leading-tight p-0 [webkit-app-region:no-drag] cursor-pointer min-w-[3ch] relative whitespace-nowrap transition-colors duration-[150ms] ease-out hover:text-text-strong",
+              subagentsExpanded && "expanded",
+            )}
             onClick={(event) => {
               event.stopPropagation();
               onToggleSubagents?.(workspaceId, thread.id);
@@ -201,13 +207,13 @@ export const ThreadRow = memo(function ThreadRow({
             aria-label={subagentsExpanded ? "Hide sub-agents" : "Show sub-agents"}
             aria-expanded={subagentsExpanded}
           >
-            <span className="thread-subagent-time-label">{relativeTime ?? "Now"}</span>
-            <span className="thread-subagent-toggle-icon" aria-hidden>
+            <span className="thread-subagent-time-label inline-block pt-0.5">{relativeTime ?? "Now"}</span>
+            <span className="thread-subagent-toggle-icon absolute right-0 inline-flex items-center justify-center opacity-0 pointer-events-none transition-[transform,opacity] duration-[150ms] ease-out" aria-hidden>
               ›
             </span>
           </button>
         ) : (
-          relativeTime && <span className="thread-time">{relativeTime}</span>
+          relativeTime && <span className="thread-time text-text-faint text-ui-2xs whitespace-nowrap pt-0.5">{relativeTime}</span>
         )}
       </div>
     </button>

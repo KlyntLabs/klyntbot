@@ -55,12 +55,12 @@ export function SidebarThreadsOnlySection({
   onCreateThreadInProject,
 }: SidebarThreadsOnlySectionProps) {
   return (
-    <div className="workspace-group">
-      <div className="sidebar-section-header workspace-group-header-all-threads">
-        <div className="sidebar-section-title">Recent conversations</div>
+    <div className="flex flex-col">
+      <div className="flex items-center justify-between gap-2 px-1 pb-1 pt-0">
+        <div className="text-ui-sm font-semibold tracking-wide text-text-strong">Recent conversations</div>
         <button
           type="button"
-          className="ghost all-threads-add"
+          className="ghost w-6 h-6 rounded-full border border-border-stronger bg-cm-surface-panel-loud text-text-muted inline-flex items-center justify-center p-0 [-webkit-app-region:no-drag] opacity-60 hover:opacity-100 hover:text-text-strong hover:bg-surface-card-strong"
           onClick={onToggleAddMenu}
           data-tauri-drag-region="false"
           aria-label="New thread in project"
@@ -72,9 +72,9 @@ export function SidebarThreadsOnlySection({
         </button>
       </div>
       {threadBuckets.map((bucket) => (
-        <div key={bucket.id} className="thread-bucket">
-          <div className="thread-bucket-header">
-            <div className="thread-bucket-label">{bucket.label}</div>
+        <div key={bucket.id} className="flex flex-col gap-2.5">
+          <div className="flex items-center justify-between gap-2">
+            <div className="text-ui-xs uppercase tracking-[0.08em] text-text-faint">{bucket.label}</div>
           </div>
           <PinnedThreadList
             rows={bucket.rows}
@@ -94,7 +94,7 @@ export function SidebarThreadsOnlySection({
       {addMenuAnchor &&
         createPortal(
           <PopoverSurface
-            className="workspace-add-menu all-threads-add-menu"
+            className="fixed isolate rounded-xl p-1.5 flex flex-col gap-1 min-w-[160px] z-[9999] max-h-[320px] overflow-y-auto"
             ref={addMenuRef}
             style={{
               top: addMenuAnchor.top,
@@ -105,7 +105,7 @@ export function SidebarThreadsOnlySection({
             {projectOptionsForNewThread.map((workspace) => (
               <PopoverMenuItem
                 key={workspace.id}
-                className="workspace-add-option"
+                className="border-none bg-transparent text-text-strong text-ui-sm text-left px-2 py-1.5 rounded-md cursor-pointer hover:bg-surface-hover"
                 onClick={(event) => {
                   event.stopPropagation();
                   onCreateThreadInProject(workspace);

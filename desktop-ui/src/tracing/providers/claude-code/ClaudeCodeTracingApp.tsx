@@ -31,6 +31,7 @@ import {
   type SubagentInfo,
   type WireEvent,
 } from "@/tracing/lib/api";
+import { cn } from "@/utils/cn";
 
 const PROVIDER_ID = "claudeCode";
 type Tab = "wire" | "agents";
@@ -134,10 +135,10 @@ export function ClaudeCodeTracingApp() {
 
   return (
     <TooltipProvider>
-      <div className="cc-app tracing-root flex h-full min-h-0 flex-1 flex-col">
-        <header className="cc-app__header">
+      <div className="tracing-root flex h-full min-h-0 flex-1 flex-col">
+        <header className="flex items-center justify-between border-b border-border-subtle py-3 px-4">
           <h1
-            className={`cc-app__title${sessionId ? " cc-app__title--clickable" : ""}`}
+            className={cn("flex items-center gap-2 text-lg font-semibold tracking-[-0.01em] m-0 bg-transparent border-0 text-inherit p-0", sessionId && "cursor-pointer hover:text-text-accent-cyan")}
             onClick={() => sessionId && goToSession(null)}
             onKeyDown={(e) => {
               if (e.key === "Enter" && sessionId) goToSession(null);
@@ -151,7 +152,7 @@ export function ClaudeCodeTracingApp() {
           <button
             type="button"
             onClick={toggleTheme}
-            className="cc-app__theme-toggle"
+            className="bg-transparent border-0 text-inherit p-2 rounded-md cursor-pointer hover:bg-surface-control-hover"
             title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
           >
             {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
@@ -207,15 +208,15 @@ function SessionDetailView({
   const bareId = sessionId.split("/").pop() ?? sessionId;
   return (
     <>
-      <div className="cc-app__session-bar">
+      <div className="flex items-center gap-2 border-b border-border-subtle py-1.5 px-4 text-xs text-text-muted">
         <SessionIdPill bareId={bareId} />
         {summary && layout && <CcHeaderChips chips={layout.chips} stats={summary} />}
-        <div className="cc-app__session-actions">
+        <div className="flex items-center gap-1 ml-auto">
           {session && <SessionDirActions session={session} />}
           <a
             href={getSessionDownloadUrl(PROVIDER_ID, sessionId)}
             download
-            className="cc-app__icon-btn"
+            className="inline-flex items-center gap-1 bg-transparent border-0 text-text-muted py-1.5 px-2 text-xs rounded-md cursor-pointer no-underline hover:bg-surface-control-hover hover:text-text-strong"
             title="Download session as ZIP"
           >
             <Download size={14} />
@@ -223,15 +224,15 @@ function SessionDetailView({
           <button
             type="button"
             onClick={onRefresh}
-            className="cc-app__icon-btn"
+            className="inline-flex items-center gap-1 bg-transparent border-0 text-text-muted py-1.5 px-2 text-xs rounded-md cursor-pointer no-underline hover:bg-surface-control-hover hover:text-text-strong"
             title="Refresh session"
           >
-            <RefreshCw size={14} className={refreshing ? "cc-spin" : ""} />
+            <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
           </button>
         </div>
       </div>
 
-      <div className="cc-app__tabs">
+      <div className="flex border-b border-border-subtle px-4">
         <TabButton
           label="Wire Events"
           active={activeTab === "wire"}
@@ -246,7 +247,7 @@ function SessionDetailView({
         />
       </div>
 
-      <div className="cc-app__content">
+      <div className="flex-1 min-h-0 overflow-auto">
         {activeTab === "wire" && <ClaudeCodeWireViewer events={wireEvents} />}
         {activeTab === "agents" && <ClaudeCodeAgentsPanel agents={subagents} onSelect={() => {}} />}
       </div>
@@ -268,7 +269,7 @@ function SessionIdPill({ bareId }: { bareId: string }) {
       <TooltipTrigger asChild>
         <button
           type="button"
-          className="cc-app__id-pill"
+          className="font-code bg-transparent border-0 text-inherit p-0 cursor-pointer hover:text-text-strong"
           onClick={() => {
             navigator.clipboard.writeText(bareId).catch(() => {});
             setCopied(true);
@@ -297,7 +298,7 @@ function SessionDirActions({ session }: { session: SessionInfo }) {
     <>
       <button
         type="button"
-        className="cc-app__icon-btn"
+        className="inline-flex items-center gap-1 bg-transparent border-0 text-text-muted py-1.5 px-2 text-xs rounded-md cursor-pointer no-underline hover:bg-surface-control-hover hover:text-text-strong"
         title={`Open ${session.session_dir}`}
         onClick={async () => {
           try {
@@ -311,7 +312,7 @@ function SessionDirActions({ session }: { session: SessionInfo }) {
       </button>
       <button
         type="button"
-        className="cc-app__icon-btn"
+        className="inline-flex items-center gap-1 bg-transparent border-0 text-text-muted py-1.5 px-2 text-xs rounded-md cursor-pointer no-underline hover:bg-surface-control-hover hover:text-text-strong"
         title={copied ? "Copied" : "Copy directory path"}
         onClick={async () => {
           try {
@@ -348,11 +349,11 @@ function TabButton({
     <button
       type="button"
       onClick={onClick}
-      className={`cc-app__tab${active ? " cc-app__tab--active" : ""}`}
+      className={cn("relative inline-flex items-center gap-1.5 bg-transparent border-0 text-text-muted py-2.5 px-4 text-sm font-medium cursor-pointer hover:text-text-strong", active && "text-text-strong after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-text-accent-cyan after:content-['']")}
     >
       {icon}
       {label}
-      {badge !== undefined && <span className="cc-app__tab-badge">{badge}</span>}
+      {badge !== undefined && <span className="inline-flex items-center justify-center min-w-5 h-[1.125rem] px-1.5 rounded-full bg-surface-card-muted text-[0.6875rem] font-semibold">{badge}</span>}
     </button>
   );
 }
@@ -367,10 +368,10 @@ function CcHeaderChips({
   stats: SessionSummary;
 }) {
   return (
-    <div className="cc-app__chips">
+    <div className="flex flex-1 flex-wrap items-center gap-1.5 ml-2 pl-2 border-l border-border-subtle">
       {chips.map((c) => (
-        <span key={c} className="cc-app__chip">
-          <span className="cc-app__chip-label">{chipLabel(c)}</span>
+        <span key={c} className="inline-flex items-center gap-1 rounded-full bg-surface-card-muted py-0.5 px-2 text-xs">
+          <span className="text-text-muted">{chipLabel(c)}</span>
           <strong>{chipValue(c, stats)}</strong>
         </span>
       ))}
@@ -459,10 +460,10 @@ function SessionListView({
 
   if (sessions.length === 0) {
     return (
-      <div className="cc-app__empty">
+      <div className="flex-1 flex flex-col items-center justify-center gap-2 text-text-muted text-sm py-12 px-4">
         <span>No Claude Code sessions found.</span>
-        <span className="cc-app__empty-hint">
-          Sessions are auto-discovered from <code>~/.claude/projects/</code>.
+        <span className="text-xs opacity-70">
+          Sessions are auto-discovered from <code className="bg-surface-card-muted py-0.5 px-1.5 rounded font-code">~/.claude/projects/</code>.
         </span>
       </div>
     );

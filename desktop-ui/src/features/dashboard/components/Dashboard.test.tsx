@@ -38,7 +38,7 @@ describe("Dashboard", () => {
   it("active view-pill defaults to Day", () => {
     render(wrap(<Dashboard />));
     const dayPill = screen.getByText("Day").closest("button");
-    expect(dayPill?.className).toContain("dashboard__view-pill--active");
+    expect(dayPill?.getAttribute("aria-pressed")).toBe("true");
   });
 
   it("renders week view when Week pill is clicked", () => {
@@ -48,7 +48,7 @@ describe("Dashboard", () => {
     expect(screen.getAllByTestId("week-day-header").length).toBe(7);
   });
 
-  it("mounts FocusStateIndicator as a sibling of dashboard__content", () => {
+  it("mounts FocusStateIndicator", () => {
     render(wrap(<Dashboard />));
     expect(screen.getByTestId("focus-state-indicator")).toBeTruthy();
   });

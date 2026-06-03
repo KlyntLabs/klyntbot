@@ -97,7 +97,7 @@ export const ImageDiffCard = memo(function ImageDiffCard({
         {showRevert && (
           <button
             type="button"
-            className="diff-viewer-header-action diff-viewer-header-action--discard"
+            className="w-6 h-6 rounded-md p-0 border border-transparent bg-transparent text-text-faint inline-flex items-center justify-center cursor-pointer shrink-0 transition-[background,border-color,color] duration-ui-fast hover:!bg-[rgba(255,107,107,0.14)] hover:!border-[rgba(255,107,107,0.35)] hover:!text-[#ff6b6b] focus-visible:outline-2 focus-visible:outline-border-accent-soft focus-visible:outline-offset-2"
             title="Discard changes in this file"
             aria-label="Discard changes in this file"
             onClick={(event) => {

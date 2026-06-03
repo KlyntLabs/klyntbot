@@ -1,6 +1,14 @@
 import { pushErrorToast } from "@services/toasts";
 import type { Dispatch, SetStateAction } from "react";
-import { SettingsSection } from "@/features/design-system/components/settings/SettingsPrimitives";
+import {
+  SettingsField,
+  SettingsFieldLabel,
+  SettingsFieldRow,
+  SettingsHelpText,
+  SettingsInput,
+  SettingsSection,
+  SettingsSelect,
+} from "@/features/design-system/components/settings/SettingsPrimitives";
 import type { WorkspaceInfo } from "@/types";
 
 type SettingsEnvironmentsSectionProps = {
@@ -52,19 +60,18 @@ export function SettingsEnvironmentsSection({
       title="Environments"
       subtitle="Configure per-project setup scripts and worktree locations."
     >
-      <div className="settings-field">
-        <label className="settings-field-label" htmlFor="settings-global-worktrees-folder">
+      <SettingsField>
+        <SettingsFieldLabel htmlFor="settings-global-worktrees-folder">
           Global worktrees root
-        </label>
-        <div className="settings-help">
+        </SettingsFieldLabel>
+        <SettingsHelpText>
           Default location for new worktrees when a project does not override it. Each project gets
           its own subfolder under this root.
-        </div>
-        <div className="settings-field-row">
-          <input
+        </SettingsHelpText>
+        <SettingsFieldRow>
+          <SettingsInput
             id="settings-global-worktrees-folder"
             type="text"
-            className="settings-input"
             value={globalWorktreesFolderDraft}
             onChange={(event) => onSetGlobalWorktreesFolderDraft(event.target.value)}
             placeholder="/path/to/worktrees-root"
@@ -72,7 +79,7 @@ export function SettingsEnvironmentsSection({
           />
           <button
             type="button"
-            className="ghost settings-button-compact"
+            className="ghost py-1.5 px-2.5 text-ui-sm"
             onClick={async () => {
               try {
                 const { open } = await import("@tauri-apps/plugin-dialog");
@@ -95,12 +102,12 @@ export function SettingsEnvironmentsSection({
           >
             Browse
           </button>
-        </div>
+        </SettingsFieldRow>
         {!hasProjects ? (
-          <div className="settings-field-actions">
+          <div className="flex gap-2.5 items-center">
             <button
               type="button"
-              className="ghost settings-button-compact"
+              className="ghost py-1.5 px-2.5 text-ui-sm"
               onClick={() => onSetGlobalWorktreesFolderDraft(_globalWorktreesFolderSaved ?? "")}
               disabled={environmentSaving || !globalWorktreesFolderDirty}
             >
@@ -108,7 +115,7 @@ export function SettingsEnvironmentsSection({
             </button>
             <button
               type="button"
-              className="primary settings-button-compact"
+              className="primary py-1.5 px-2.5 text-ui-sm"
               onClick={() => {
                 void onSaveEnvironmentSetup();
               }}
@@ -119,21 +126,22 @@ export function SettingsEnvironmentsSection({
           </div>
         ) : null}
         {!hasProjects && environmentError ? (
-          <div className="settings-agents-error">{environmentError}</div>
+          <div className="text-ui-sm text-status-error bg-[rgba(236,72,153,0.08)] rounded-xl px-2.5 py-2 border border-[rgba(236,72,153,0.2)]">
+            {environmentError}
+          </div>
         ) : null}
-      </div>
+      </SettingsField>
 
       {!hasProjects ? (
-        <div className="settings-empty">No projects yet.</div>
+        <div className="text-text-faint text-ui-sm">No projects yet.</div>
       ) : (
         <>
-          <div className="settings-field">
-            <label className="settings-field-label" htmlFor="settings-environment-project">
+          <SettingsField>
+            <SettingsFieldLabel htmlFor="settings-environment-project">
               Project
-            </label>
-            <select
+            </SettingsFieldLabel>
+            <SettingsSelect
               id="settings-environment-project"
-              className="settings-select"
               value={environmentWorkspace?.id ?? ""}
               onChange={(event) => onSetEnvironmentWorkspaceId(event.target.value)}
               disabled={environmentSaving}
@@ -143,32 +151,34 @@ export function SettingsEnvironmentsSection({
                   {workspace.name}
                 </option>
               ))}
-            </select>
+            </SettingsSelect>
             {environmentWorkspace ? (
-              <div className="settings-help">{environmentWorkspace.path}</div>
+              <SettingsHelpText>{environmentWorkspace.path}</SettingsHelpText>
             ) : null}
-          </div>
+          </SettingsField>
 
-          <div className="settings-field">
-            <div className="settings-field-label">Setup script</div>
-            <div className="settings-help">
+          <SettingsField>
+            <SettingsFieldLabel>Setup script</SettingsFieldLabel>
+            <SettingsHelpText>
               Runs once in a dedicated terminal after each new worktree is created.
-            </div>
+            </SettingsHelpText>
             {environmentError ? (
-              <div className="settings-agents-error">{environmentError}</div>
+              <div className="text-ui-sm text-status-error bg-[rgba(236,72,153,0.08)] rounded-xl px-2.5 py-2 border border-[rgba(236,72,153,0.2)]">
+                {environmentError}
+              </div>
             ) : null}
             <textarea
-              className="settings-agents-textarea"
+              className="w-full min-h-[150px] resize-y rounded-xl border border-border-muted bg-surface-1 text-text-strong font-code text-ui-sm leading-relaxed px-3 py-2.5 outline-none focus:border-border-strong focus:shadow-[0_0_0_3px_rgba(99,102,241,0.16)]"
               value={environmentDraftScript}
               onChange={(event) => onSetEnvironmentDraftScript(event.target.value)}
               placeholder="pnpm install"
               spellCheck={false}
               disabled={environmentSaving}
             />
-            <div className="settings-field-actions">
+            <div className="flex gap-2.5 items-center">
               <button
                 type="button"
-                className="ghost settings-button-compact"
+                className="ghost py-1.5 px-2.5 text-ui-sm"
                 onClick={() => {
                   const clipboard = typeof navigator === "undefined" ? null : navigator.clipboard;
                   if (!clipboard?.writeText) {
@@ -194,7 +204,7 @@ export function SettingsEnvironmentsSection({
               </button>
               <button
                 type="button"
-                className="ghost settings-button-compact"
+                className="ghost py-1.5 px-2.5 text-ui-sm"
                 onClick={() => onSetEnvironmentDraftScript(environmentSavedScript ?? "")}
                 disabled={environmentSaving || !environmentDirty}
               >
@@ -202,7 +212,7 @@ export function SettingsEnvironmentsSection({
               </button>
               <button
                 type="button"
-                className="primary settings-button-compact"
+                className="primary py-1.5 px-2.5 text-ui-sm"
                 onClick={() => {
                   void onSaveEnvironmentSetup();
                 }}
@@ -211,21 +221,20 @@ export function SettingsEnvironmentsSection({
                 {environmentSaving ? "Saving..." : "Save"}
               </button>
             </div>
-          </div>
+          </SettingsField>
 
-          <div className="settings-field">
-            <label className="settings-field-label" htmlFor="settings-worktrees-folder">
+          <SettingsField>
+            <SettingsFieldLabel htmlFor="settings-worktrees-folder">
               Worktrees folder
-            </label>
-            <div className="settings-help">
-              Custom location for this project's worktrees. Leave empty to use the global root or
-              the built-in default.
-            </div>
-            <div className="settings-field-row">
-              <input
+            </SettingsFieldLabel>
+            <SettingsHelpText>
+              Custom location for this project&apos;s worktrees. Leave empty to use the global root
+              or the built-in default.
+            </SettingsHelpText>
+            <SettingsFieldRow>
+              <SettingsInput
                 id="settings-worktrees-folder"
                 type="text"
-                className="settings-input"
                 value={worktreesFolderDraft}
                 onChange={(event) => onSetWorktreesFolderDraft(event.target.value)}
                 placeholder="/path/to/worktrees"
@@ -233,7 +242,7 @@ export function SettingsEnvironmentsSection({
               />
               <button
                 type="button"
-                className="ghost settings-button-compact"
+                className="ghost py-1.5 px-2.5 text-ui-sm"
                 onClick={async () => {
                   try {
                     const { open } = await import("@tauri-apps/plugin-dialog");
@@ -256,8 +265,8 @@ export function SettingsEnvironmentsSection({
               >
                 Browse
               </button>
-            </div>
-          </div>
+            </SettingsFieldRow>
+          </SettingsField>
         </>
       )}
     </SettingsSection>

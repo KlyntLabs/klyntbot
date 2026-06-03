@@ -9,6 +9,7 @@ import {
   todayISO,
   toLocalISO,
 } from "@/utils/dashboardDates";
+import { cn } from "@/utils/cn";
 import { useDashboardState } from "../../hooks/useDashboardState";
 import { useEnabledLayers, useSidebarOpen } from "../../lib/layers";
 import { SummaryPanel } from "../SummaryPanel";
@@ -92,26 +93,26 @@ export function YearView() {
   const today = todayISO();
 
   return (
-    <div style={{ display: "flex", gap: 8, height: "100%", width: "100%" }}>
-      <div className="dashboard__year-grid" style={{ flex: 1 }}>
-        <div className="dashboard__year-grid-inner">
-          {isLoading && <div className="dashboard__year-loading">Loading...</div>}
+    <div className="flex gap-2 h-full w-full">
+      <div className="flex gap-2 h-full flex-1">
+        <div className="flex-1 bg-transparent border-none rounded-none p-4 overflow-y-auto">
+          {isLoading && <div className="text-ui-2xs text-ds-text-subtle mb-1 px-2 py-1">Loading...</div>}
 
-          <div className="dashboard__year-months">
+          <div className="grid grid-cols-3 gap-4">
             {Array.from({ length: 12 }, (_, monthIdx) => {
               const weeks = buildMonthGrid(year, monthIdx);
               const monthName = SHORT_MONTHS[monthIdx];
               return (
                 <div key={monthName}>
-                  <div className="dashboard__year-month-name">{monthName}</div>
+                  <div className="text-ui-xs font-medium text-text-muted mb-1.5">{monthName}</div>
 
                   {/* Day-of-week labels */}
-                  <div className="dashboard__year-week" style={{ marginBottom: 2 }}>
+                  <div className="grid grid-cols-7 gap-0.5 mb-0.5">
                     {DAY_LABELS.map((label, i) => (
                       <div
                         // biome-ignore lint/suspicious/noArrayIndexKey: static 7 day-of-week labels with duplicates
                         key={`${monthName}-label-${i}`}
-                        className="dashboard__year-dow-label"
+                        className="text-ui-3xs text-[color-mix(in_oklch,var(--text-muted)_50%,transparent)] text-center"
                       >
                         {label}
                       </div>
@@ -123,7 +124,7 @@ export function YearView() {
                     <div
                       // biome-ignore lint/suspicious/noArrayIndexKey: week rows within month have no unique ID
                       key={`${monthName}-w${wi}`}
-                      className="dashboard__year-week"
+                      className="grid grid-cols-7 gap-0.5 mb-0.5"
                     >
                       {week.map((day, di) =>
                         day ? (
@@ -134,15 +135,14 @@ export function YearView() {
                               setDate(day);
                               setMode("day");
                             }}
-                            className={
-                              day === today
-                                ? "dashboard__year-day dashboard__year-day--today"
-                                : "dashboard__year-day"
-                            }
+                            className={cn(
+                              "aspect-square rounded-sm transition-colors duration-150 ease-out cursor-pointer border-none p-0.5 flex items-start justify-start hover:brightness-[1.2]",
+                              day === today && "outline outline-1 outline-[color-mix(in_oklch,var(--border-accent)_60%,transparent)]",
+                            )}
                             style={intensityStyle(dayMap.get(day) || 0, maxSecs)}
                             title={`${day}: ${formatHumanDuration(dayMap.get(day) || 0)}`}
                           >
-                            <span className="dashboard__year-day-num">
+                            <span className="text-ui-2xs text-[color-mix(in_oklch,var(--text-muted)_80%,transparent)] leading-none tabular-nums">
                               {parseInt(day.slice(8, 10), 10)}
                             </span>
                           </button>
@@ -150,7 +150,7 @@ export function YearView() {
                           <div
                             // biome-ignore lint/suspicious/noArrayIndexKey: empty calendar padding cells
                             key={`empty-${monthName}-${wi}-${di}`}
-                            className="dashboard__year-day-pad"
+                            className="aspect-square rounded-sm bg-transparent"
                           />
                         ),
                       )}
@@ -162,29 +162,29 @@ export function YearView() {
           </div>
 
           {/* Legend */}
-          <div className="dashboard__year-legend">
-            <span className="dashboard__year-legend-label">Less focus</span>
+          <div className="flex items-center gap-2 mt-4 justify-center">
+            <span className="text-ui-2xs text-text-muted">Less focus</span>
             <div
-              className="dashboard__year-legend-swatch"
+              className="w-3 h-3 rounded-sm"
               style={{ background: "color-mix(in oklch, var(--text-muted) 10%, transparent)" }}
             />
             <div
-              className="dashboard__year-legend-swatch"
+              className="w-3 h-3 rounded-sm"
               style={{ background: "color-mix(in oklch, var(--timeline-focus) 10%, transparent)" }}
             />
             <div
-              className="dashboard__year-legend-swatch"
+              className="w-3 h-3 rounded-sm"
               style={{ background: "color-mix(in oklch, var(--timeline-focus) 25%, transparent)" }}
             />
             <div
-              className="dashboard__year-legend-swatch"
+              className="w-3 h-3 rounded-sm"
               style={{ background: "color-mix(in oklch, var(--timeline-focus) 40%, transparent)" }}
             />
             <div
-              className="dashboard__year-legend-swatch"
+              className="w-3 h-3 rounded-sm"
               style={{ background: "color-mix(in oklch, var(--timeline-focus) 60%, transparent)" }}
             />
-            <span className="dashboard__year-legend-label">More focus</span>
+            <span className="text-ui-2xs text-text-muted">More focus</span>
           </div>
         </div>
       </div>

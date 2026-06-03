@@ -54,25 +54,25 @@ const AttachmentItem = memo(function AttachmentItem({
   }, [onRemoveAttachment, path]);
 
   return (
-    <div className="composer-attachment" title={titleAttr}>
+    <div className="composer-attachment inline-flex items-center gap-1.5 py-0.5 px-2 rounded-full bg-surface-card border border-border-muted text-text-muted text-ui-xs max-w-full relative" title={titleAttr}>
       {previewSrc && (
-        <span className="composer-attachment-preview" aria-hidden>
+        <span className="composer-attachment-preview absolute left-1/2 bottom-[calc(100%+8px)] w-60 h-[180px] rounded-xl overflow-hidden border border-border-subtle bg-surface-quiet shadow-xl opacity-0 -translate-x-1/2 -translate-y-[2px] scale-[0.98] pointer-events-none z-20" aria-hidden>
           <img src={previewSrc} alt="" />
         </span>
       )}
       {previewSrc ? (
-        <span className="composer-attachment-thumb" aria-hidden>
+        <span className="composer-attachment-thumb w-5 h-5 rounded-md overflow-hidden border border-border-subtle bg-surface-item flex-shrink-0" aria-hidden>
           <img src={previewSrc} alt="" />
         </span>
       ) : (
-        <span className="composer-icon" aria-hidden>
+        <span className="composer-icon inline-flex w-3.5 h-3.5 text-text-muted" aria-hidden>
           <Image size={14} />
         </span>
       )}
-      <span className="composer-attachment-name">{title}</span>
+      <span className="overflow-hidden text-ellipsis whitespace-nowrap max-w-[180px]">{title}</span>
       <button
         type="button"
-        className="composer-attachment-remove"
+        className="composer-attachment-remove inline-flex border-0 bg-transparent text-text-faint p-0 cursor-pointer"
         onClick={handleRemove}
         aria-label={`Remove ${title}`}
         disabled={disabled}
@@ -93,7 +93,7 @@ export const ComposerAttachments = memo(function ComposerAttachments({
   }
 
   return (
-    <div className="composer-attachments">
+    <div className="flex flex-wrap gap-2 mb-2">
       {attachments.map((path) => (
         <AttachmentItem
           key={path}

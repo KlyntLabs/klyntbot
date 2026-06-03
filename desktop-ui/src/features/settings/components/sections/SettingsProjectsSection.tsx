@@ -3,10 +3,13 @@ import ChevronUp from "lucide-react/dist/esm/icons/chevron-up";
 import Trash2 from "lucide-react/dist/esm/icons/trash-2";
 import type { Dispatch, SetStateAction } from "react";
 import {
+  SettingsInput,
   SettingsSection,
+  SettingsSelect,
   SettingsSubsection,
 } from "@/features/design-system/components/settings/SettingsPrimitives";
 import type { WorkspaceGroup, WorkspaceInfo } from "@/types";
+import { cn } from "@/utils/cn";
 
 type GroupedWorkspaces = Array<{
   id: string | null;
@@ -63,10 +66,10 @@ export function SettingsProjectsSection({
       subtitle="Group related workspaces and reorder projects within each group."
     >
       <SettingsSubsection title="Groups" subtitle="Create group labels for related repositories." />
-      <div className="settings-groups">
-        <div className="settings-group-create">
-          <input
-            className="settings-input settings-input--compact"
+      <div className="flex flex-col gap-2.5">
+        <div className="flex items-center gap-2">
+          <SettingsInput
+            compact
             value={newGroupName}
             placeholder="New group name"
             onChange={(event) => onSetNewGroupName(event.target.value)}
@@ -79,7 +82,7 @@ export function SettingsProjectsSection({
           />
           <button
             type="button"
-            className="ghost settings-button-compact"
+            className="ghost py-1.5 px-2.5 text-ui-sm"
             onClick={() => {
               void onCreateGroup();
             }}
@@ -88,14 +91,14 @@ export function SettingsProjectsSection({
             Add group
           </button>
         </div>
-        {groupError && <div className="settings-group-error">{groupError}</div>}
+        {groupError && <div className="text-ui-xs text-status-error">{groupError}</div>}
         {workspaceGroups.length > 0 ? (
-          <div className="settings-group-list">
+          <div className="flex flex-col gap-2">
             {workspaceGroups.map((group, index) => (
-              <div key={group.id} className="settings-group-row">
-                <div className="settings-group-fields">
-                  <input
-                    className="settings-input settings-input--compact"
+              <div key={group.id} className="flex items-start justify-between gap-2">
+                <div className="flex flex-col gap-2">
+                  <SettingsInput
+                    compact
                     value={groupDrafts[group.id] ?? group.name}
                     onChange={(event) =>
                       onSetGroupDrafts((prev) => ({
@@ -113,18 +116,21 @@ export function SettingsProjectsSection({
                       }
                     }}
                   />
-                  <div className="settings-group-copies">
-                    <div className="settings-group-copies-label">Copies folder</div>
-                    <div className="settings-group-copies-row">
+                  <div className="flex flex-col gap-1.5">
+                    <div className="text-ui-xs text-text-faint">Copies folder</div>
+                    <div className="flex items-center gap-2">
                       <div
-                        className={`settings-group-copies-path${group.copiesFolder ? "" : " empty"}`}
+                        className={cn(
+                          "flex-1 min-w-0 px-2.5 py-2 rounded-xl border border-border-muted bg-surface-control text-text-strong text-ui-xs whitespace-nowrap overflow-hidden text-ellipsis",
+                          !group.copiesFolder && "text-text-faint",
+                        )}
                         title={group.copiesFolder ?? ""}
                       >
                         {group.copiesFolder ?? "Not set"}
                       </div>
                       <button
                         type="button"
-                        className="ghost settings-button-compact"
+                        className="ghost py-1.5 px-2.5 text-ui-sm"
                         onClick={() => {
                           void onChooseGroupCopiesFolder(group);
                         }}
@@ -133,7 +139,7 @@ export function SettingsProjectsSection({
                       </button>
                       <button
                         type="button"
-                        className="ghost settings-button-compact"
+                        className="ghost py-1.5 px-2.5 text-ui-sm"
                         onClick={() => {
                           void onClearGroupCopiesFolder(group);
                         }}
@@ -144,7 +150,7 @@ export function SettingsProjectsSection({
                     </div>
                   </div>
                 </div>
-                <div className="settings-group-actions">
+                <div className="inline-flex items-center gap-1.5">
                   <button
                     type="button"
                     className="ghost icon-button"
@@ -182,17 +188,19 @@ export function SettingsProjectsSection({
             ))}
           </div>
         ) : (
-          <div className="settings-empty">No groups yet.</div>
+          <div className="text-text-faint text-ui-sm">No groups yet.</div>
         )}
       </div>
       <SettingsSubsection
         title="Projects"
         subtitle="Assign projects to groups and adjust their order."
       />
-      <div className="settings-projects">
+      <div className="flex flex-col gap-2.5">
         {groupedWorkspaces.map((group) => (
-          <div key={group.id ?? "ungrouped"} className="settings-project-group">
-            <div className="settings-project-group-label">{group.name}</div>
+          <div key={group.id ?? "ungrouped"} className="flex flex-col gap-2.5 first:mt-0 mt-3">
+            <div className="uppercase text-ui-xs tracking-widest text-text-faint pl-1">
+              {group.name}
+            </div>
             {group.workspaces.map((workspace, index) => {
               const groupValue = workspaceGroups.some(
                 (entry) => entry.id === workspace.settings.groupId,
@@ -200,14 +208,17 @@ export function SettingsProjectsSection({
                 ? (workspace.settings.groupId ?? "")
                 : "";
               return (
-                <div key={workspace.id} className="settings-project-row">
-                  <div className="settings-project-info">
-                    <div className="settings-project-name">{workspace.name}</div>
-                    <div className="settings-project-path">{workspace.path}</div>
+                <div
+                  key={workspace.id}
+                  className="flex items-center justify-between gap-3 p-3 px-3.5 rounded-xl bg-surface-card border border-border-muted"
+                >
+                  <div className="flex flex-col gap-1 min-w-0">
+                    <div className="text-ui-sm font-semibold text-text-strong">{workspace.name}</div>
+                    <div className="text-ui-xs text-text-subtle">{workspace.path}</div>
                   </div>
-                  <div className="settings-project-actions">
-                    <select
-                      className="settings-select settings-select--compact"
+                  <div className="inline-flex gap-1.5">
+                    <SettingsSelect
+                      className="py-1.5 px-2 text-ui-xs"
                       value={groupValue}
                       onChange={(event) => {
                         const nextGroupId = event.target.value || null;
@@ -220,7 +231,7 @@ export function SettingsProjectsSection({
                           {entry.name}
                         </option>
                       ))}
-                    </select>
+                    </SettingsSelect>
                     <button
                       type="button"
                       className="ghost icon-button"
@@ -253,7 +264,7 @@ export function SettingsProjectsSection({
             })}
           </div>
         ))}
-        {projects.length === 0 && <div className="settings-empty">No projects yet.</div>}
+        {projects.length === 0 && <div className="text-text-faint text-ui-sm">No projects yet.</div>}
       </div>
     </SettingsSection>
   );

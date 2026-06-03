@@ -1,7 +1,3 @@
-// Phase 1: removed queries pending Phase 3 wiring:
-// - productivity_activity_sessions  → ActivityTrack
-// - productivity_calendar_events    → CalendarTrack
-
 import type { QueryKey } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { productivitySummaryRangeQuery, productivityTodayQuery } from "@/api/endpoints/dashboard";
@@ -58,7 +54,7 @@ const COLUMNS: ColumnDef[] = [
     icon: "calendar",
     color: "var(--timeline-focus)",
     flex: 1.4,
-    filter: () => false, // Calendar uses its own data source
+    filter: () => false,
   },
   {
     key: "timeEntries",
@@ -140,7 +136,7 @@ export function DayColumns({
   const pxPerMin = hourHeight / 60;
   const totalHeight = 24 * hourHeight;
 
-  // Scroll to current hour on mount (intentionally excludes hourHeight — don't re-scroll on zoom)
+  // Scroll to current hour on mount
   useEffect(() => {
     if (scrollRef.current) {
       const targetHour = isToday ? new Date().getHours() - 1 : 8;
@@ -148,7 +144,7 @@ export function DayColumns({
     }
   }, [isToday]);
 
-  // Zoom via Ctrl/Cmd + mouse wheel (preserves scroll position under cursor)
+  // Zoom via Ctrl/Cmd + mouse wheel
   useEffect(() => {
     const container = scrollRef.current;
     if (!container) return;
@@ -169,7 +165,6 @@ export function DayColumns({
       hourHeightRef.current = next;
       setHourHeight(next);
 
-      // Keep the minute under cursor at the same screen position
       requestAnimationFrame(() => {
         container.scrollTop = Math.max(0, minuteAtCursor * (next / 60) - offsetFromTop);
       });
@@ -187,7 +182,7 @@ export function DayColumns({
 
     const handleMouseMove = (me: MouseEvent) => {
       if (!gutterDragRef.current) return;
-      const dy = gutterDragRef.current.startY - me.clientY; // drag up = zoom in
+      const dy = gutterDragRef.current.startY - me.clientY;
       const next = Math.min(
         MAX_HOUR_HEIGHT,
         Math.max(MIN_HOUR_HEIGHT, gutterDragRef.current.startHH + dy * 0.5),
@@ -233,7 +228,7 @@ export function DayColumns({
     };
   }, [isDragging, onDragMouseMove, onDragMouseUp]);
 
-  // Group entries by column (skip activity — it has its own track) and compute overlap layouts
+  // Group entries by column and compute overlap layouts
   const { columnEntries, columnLayouts } = useMemo(() => {
     const entryMap = new Map<LayerKey, TimelineEntry[]>();
     for (const col of COLUMNS) entryMap.set(col.key, []);
@@ -245,7 +240,6 @@ export function DayColumns({
         }
       }
     }
-    // Compute overlap layout for each column
     const layoutMap = new Map<LayerKey, Map<string, { colIndex: number; totalCols: number }>>();
     for (const [key, colEntries] of entryMap) {
       layoutMap.set(key, computeOverlapLayout(colEntries));
@@ -253,7 +247,7 @@ export function DayColumns({
     return { columnEntries: entryMap, columnLayouts: layoutMap };
   }, [entries]);
 
-  // Split task entries into scheduled (timeline blocks) and unscheduled (tray chips)
+  // Split task entries into scheduled and unscheduled
   const { scheduledTaskEntries, trayTaskEntries } = useMemo(() => {
     const taskEntries = columnEntries.get("tasks") ?? [];
     const scheduled: TimelineEntry[] = [];
@@ -263,8 +257,6 @@ export function DayColumns({
       if (meta?.scheduled === true) {
         scheduled.push(entry);
       } else {
-        // Tasks with a specific due time (non-midnight) show on the timeline;
-        // date-only tasks (midnight) go to the drag-and-drop tray.
         const dueMin = minutesSinceMidnight(entry.startedAt);
         if (dueMin > 0) scheduled.push(entry);
         else tray.push(entry);
@@ -273,10 +265,8 @@ export function DayColumns({
     return { scheduledTaskEntries: scheduled, trayTaskEntries: tray };
   }, [columnEntries]);
 
-  // Only show columns whose layer is enabled
   const visibleColumns = useMemo(() => COLUMNS.filter((col) => enabled.has(col.key)), [enabled]);
 
-  // Shared grid template so header and tracks have identical column widths
   const gridTemplate = useMemo(() => {
     const totalFlex = visibleColumns.reduce((s, c) => s + c.flex, 0);
     const cols = visibleColumns.map((c) => `${(c.flex / totalFlex) * 100}%`).join(" ");
@@ -288,49 +278,23 @@ export function DayColumns({
   };
 
   return (
-    <div style={{ display: "flex", gap: 8, height: "100%", width: "100%" }}>
-      <div className="dashboard__day-grid" style={{ flex: 1, flexDirection: "column" }}>
-        {/* Context color ribbon — subtle work context indicator per hour */}
+    <div className="flex gap-2 h-full w-full">
+      <div className="flex-1 flex flex-col overflow-hidden">
         <ContextRibbon date={date} />
 
         {loading && (
-          <div
-            style={{
-              padding: "8px 16px",
-              fontSize: "var(--fs-sm)",
-              color: "var(--ds-text-subtle)",
-            }}
-          >
-            Loading...
-          </div>
+          <div className="px-4 py-2 text-[var(--fs-sm)] text-ds-text-subtle">Loading...</div>
         )}
 
-        {/* Zoom indicator — shown when zoomed away from default */}
         {hourHeight !== DEFAULT_HOUR_HEIGHT && (
-          <div
-            style={{
-              padding: "4px 12px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              borderBottom: "1px solid var(--ds-border-subtle)",
-              fontSize: "var(--fs-2xs)",
-              color: "var(--ds-text-subtle)",
-            }}
-          >
-            <span style={{ fontVariantNumeric: "tabular-nums" }}>
+          <div className="px-3 py-1 flex items-center justify-between border-b border-ds-border-subtle text-ui-2xs text-ds-text-subtle">
+            <span className="tabular-nums">
               Zoom: {Math.round((hourHeight / DEFAULT_HOUR_HEIGHT) * 100)}%
             </span>
             <button
               type="button"
               onClick={resetZoom}
-              style={{
-                color: "var(--border-accent)",
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-                fontSize: "inherit",
-              }}
+              className="text-border-accent bg-transparent border-none cursor-pointer text-inherit"
               aria-label="Reset zoom to default level"
             >
               Reset
@@ -338,33 +302,26 @@ export function DayColumns({
           </div>
         )}
 
-        {/* Scrollable timeline area (headers inside for scrollbar-width alignment) */}
-        <div ref={scrollRef} style={{ flex: 1, overflowY: "auto" }}>
-          {/* Sticky column headers — CSS grid ensures pixel-perfect alignment with tracks */}
-          <div className="dashboard__column-header" style={{ gridTemplateColumns: gridTemplate }}>
+        <div ref={scrollRef} className="flex-1 overflow-y-auto">
+          <div
+            className="sticky top-0 z-20 grid bg-surface-messages rounded-none border-b-none"
+            style={{ gridTemplateColumns: gridTemplate }}
+          >
             <div />
             {visibleColumns.map((col) => (
-              <div key={col.key} className="dashboard__column-header-cell">
+              <div key={col.key} className="text-ui-xs text-text-muted font-medium px-1.5 py-1.5 border-r border-border-subtle last:border-r-0 flex items-center gap-1.5 whitespace-nowrap overflow-hidden text-ellipsis min-w-0">
                 <span
-                  style={{
-                    width: 6,
-                    height: 6,
-                    borderRadius: "50%",
-                    flexShrink: 0,
-                    backgroundColor: col.color,
-                  }}
+                  className="shrink-0 rounded-full"
+                  style={{ width: 6, height: 6, backgroundColor: col.color }}
                 />
                 {col.label}
               </div>
             ))}
           </div>
 
-          <div style={{ position: "relative", height: totalHeight }}>
-            {/* Hour lines + labels (gutter is draggable for zoom) */}
+          <div className="relative" style={{ height: totalHeight }}>
             {HOURS.map((h) => (
-              <div key={h} className="dashboard__hour-row" style={{ top: h * hourHeight }}>
-                {/* biome-ignore lint/a11y/noStaticElementInteractions: drag-to-zoom gutter; first cell is an accessible slider, rest are presentation */}
-                {/* biome-ignore lint/a11y/useAriaPropsSupportedByRole: aria attrs are only rendered for h===0 (slider role) */}
+              <div key={h} className="absolute w-full flex items-start" style={{ top: h * hourHeight }}>
                 <div
                   role={h === 0 ? "slider" : "presentation"}
                   aria-label={h === 0 ? "Timeline zoom level" : undefined}
@@ -372,8 +329,8 @@ export function DayColumns({
                   aria-valuemax={h === 0 ? MAX_HOUR_HEIGHT : undefined}
                   aria-valuenow={h === 0 ? hourHeight : undefined}
                   tabIndex={h === 0 ? 0 : undefined}
-                  className="dashboard__day-hour-label"
-                  style={{ width: HOUR_GUTTER, cursor: "ns-resize", userSelect: "none" }}
+                  className="text-ui-2xs text-text-muted text-right pr-1.5 select-none"
+                  style={{ width: HOUR_GUTTER, cursor: "ns-resize" }}
                   onMouseDown={handleGutterMouseDown}
                   onKeyDown={
                     h === 0
@@ -395,28 +352,21 @@ export function DayColumns({
                 >
                   {h === 0 ? "" : formatHour(h)}
                 </div>
-                <div className="dashboard__hour-line" />
+                <div className="flex-1 border-t border-border-subtle" />
               </div>
             ))}
 
-            {/* Now line */}
             {isToday && <NowLine pxPerMin={pxPerMin} />}
 
-            {/* Column tracks — same CSS grid as header */}
             <div
-              style={{
-                position: "absolute",
-                inset: 0,
-                display: "grid",
-                gridTemplateColumns: gridTemplate,
-              }}
+              className="absolute inset-0 grid"
+              style={{ gridTemplateColumns: gridTemplate }}
             >
               <div />
               {visibleColumns.map((col) => {
-                // Activity column: merged app sessions with unified focus rendering
                 if (col.key === "activity") {
                   return (
-                    <div key={col.key} className="dashboard__day-column">
+                    <div key={col.key} className="flex-1 relative border-r border-border-subtle last:border-r-0">
                       <ActivityTrack
                         date={date}
                         hourHeight={hourHeight}
@@ -430,14 +380,9 @@ export function DayColumns({
                   );
                 }
 
-                // Calendar column: fetches its own data
                 if (col.key === "calendar") {
                   return (
-                    <div
-                      key={col.key}
-                      className="dashboard__day-column"
-                      style={{ position: "relative" }}
-                    >
+                    <div key={col.key} className="flex-1 relative border-r border-border-subtle last:border-r-0">
                       <CalendarTrack
                         date={date}
                         hourHeight={hourHeight}
@@ -445,7 +390,6 @@ export function DayColumns({
                         onSelectEvent={(event) => {
                           setSelectedCalendarEvent(event);
                           if (!event) return;
-                          // Convert calendar event to TimelineEntry-shape so SummaryPanel's EntryDetail can render it
                           const startedAt = event.startedAt;
                           const endedAt = event.endedAt;
                           const durationSecs =
@@ -478,22 +422,17 @@ export function DayColumns({
                   );
                 }
 
-                // Tasks column: split into tray (unscheduled) and draggable blocks (scheduled)
                 if (col.key === "tasks") {
                   const layouts = columnLayouts.get(col.key);
                   return (
-                    <div
-                      key={col.key}
-                      className="dashboard__day-column"
-                      style={{ display: "flex", flexDirection: "column" }}
-                    >
+                    <div key={col.key} className="flex-1 relative border-r border-border-subtle last:border-r-0 flex flex-col">
                       <DueTodayTray
                         entries={trayTaskEntries}
                         onStartDrag={startTrayDrag}
                         onSelect={handleSelectEntry}
                         selectedEntryId={selectedEntry?.id ?? null}
                       />
-                      <div style={{ position: "relative", flex: 1 }}>
+                      <div className="relative flex-1">
                         {scheduledTaskEntries.map((entry) => {
                           const meta = entry.metadata as Record<string, unknown> | undefined;
                           const taskId = (meta?.taskId as string) ?? entry.entityId ?? entry.id;
@@ -526,7 +465,7 @@ export function DayColumns({
                 const colEntries = columnEntries.get(col.key) ?? [];
                 const layouts = columnLayouts.get(col.key);
                 return (
-                  <div key={col.key} className="dashboard__day-column">
+                  <div key={col.key} className="flex-1 relative border-r border-border-subtle last:border-r-0">
                     {colEntries.map((entry) => (
                       <ColumnEntry
                         key={entry.id}
@@ -584,18 +523,15 @@ function ColumnEntry({
   const dur = entry.durationSecs ?? 0;
   const height = Math.max(dur > 0 ? (dur / 60) * pxPerMin : MIN_BLOCK_HEIGHT, MIN_BLOCK_HEIGHT);
 
-  // Overlap layout: compute left/width percentages
   const colIndex = layout?.colIndex ?? 0;
   const totalCols = layout?.totalCols ?? 1;
   const leftPct = totalCols > 1 ? `${(colIndex / totalCols) * 100}%` : undefined;
   const widthPct = totalCols > 1 ? `${(1 / totalCols) * 100}%` : undefined;
 
-  // Shared positioning style for overlap layout
   const posStyle: React.CSSProperties = leftPct
     ? { top, left: leftPct, width: widthPct, paddingLeft: 4, paddingRight: 2 }
     : { top, left: 4, right: 4 };
 
-  // Time entries — rich blocks with title + time
   if (column.key === "timeEntries") {
     const timeStr = new Date(entry.startedAt).toLocaleTimeString([], {
       hour: "numeric",
@@ -605,7 +541,7 @@ function ColumnEntry({
       <button
         type="button"
         onClick={onClick}
-        className="dashboard__entry-block"
+        className="absolute rounded-md px-1.5 py-0.5 text-ui-xs leading-tight overflow-hidden cursor-pointer transition-colors duration-ui-fast ease-out text-left"
         style={{
           ...posStyle,
           height,
@@ -615,28 +551,11 @@ function ColumnEntry({
         }}
         title={entry.title}
       >
-        <span
-          style={{
-            color: "var(--ds-text-subtle)",
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            display: "block",
-          }}
-        >
+        <span className="block text-ds-text-subtle whitespace-nowrap overflow-hidden text-ellipsis">
           {entry.title}
         </span>
         {height > 28 && (
-          <span
-            style={{
-              color: "var(--ds-text-subtle)",
-              fontSize: "var(--fs-2xs)",
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              display: "block",
-            }}
-          >
+          <span className="block text-ds-text-subtle text-ui-2xs whitespace-nowrap overflow-hidden text-ellipsis">
             {dur > 0 && `${formatHumanDuration(dur)} · `}
             {timeStr}
           </span>
@@ -645,7 +564,6 @@ function ColumnEntry({
     );
   }
 
-  // Tasks — due/created/completed
   if (column.key === "tasks") {
     const isDue = entry.entryType === "taskDue";
     const isCompleted = entry.entryType === "taskCompleted";
@@ -654,7 +572,7 @@ function ColumnEntry({
       <button
         type="button"
         onClick={onClick}
-        className="dashboard__entry-block"
+        className="absolute rounded-md px-1.5 py-0.5 text-ui-xs leading-tight overflow-hidden cursor-pointer transition-colors duration-ui-fast ease-out text-left"
         style={{
           ...posStyle,
           height: Math.max(height, 20),
@@ -668,29 +586,11 @@ function ColumnEntry({
         }}
         title={entry.title}
       >
-        <span
-          style={{
-            color: "var(--ds-text-subtle)",
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            display: "block",
-          }}
-        >
+        <span className="block text-ds-text-subtle whitespace-nowrap overflow-hidden text-ellipsis">
           {entry.title}
         </span>
         {isDue && status && height > 28 && (
-          <span
-            style={{
-              color: "var(--ds-text-subtle)",
-              fontSize: "var(--fs-2xs)",
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              display: "block",
-              textTransform: "capitalize",
-            }}
-          >
+          <span className="block text-ds-text-subtle text-ui-2xs whitespace-nowrap overflow-hidden text-ellipsis capitalize">
             {status}
           </span>
         )}
@@ -698,14 +598,13 @@ function ColumnEntry({
     );
   }
 
-  // Transactions — expense/income
   if (column.key === "transactions") {
     const isExpense = entry.entryType === "expenseRecorded";
     return (
       <button
         type="button"
         onClick={onClick}
-        className="dashboard__entry-block"
+        className="absolute rounded-md px-1.5 py-0.5 text-ui-xs leading-tight overflow-hidden cursor-pointer transition-colors duration-ui-fast ease-out text-left"
         style={{
           ...posStyle,
           height: Math.max(height, 18),
@@ -715,29 +614,20 @@ function ColumnEntry({
         }}
         title={entry.title}
       >
-        <span
-          style={{
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            display: "block",
-            fontWeight: 500,
-            color: `var(--timeline-finance-${isExpense ? "expense" : "income"})`,
-          }}
-        >
+        <span className="block whitespace-nowrap overflow-hidden text-ellipsis font-medium"
+          style={{ color: `var(--timeline-finance-${isExpense ? "expense" : "income"})` }}>
           {entry.title}
         </span>
       </button>
     );
   }
 
-  // Notes — colored box like tasks
   if (column.key === "notes") {
     return (
       <button
         type="button"
         onClick={onClick}
-        className="dashboard__entry-block"
+        className="absolute rounded-md px-1.5 py-0.5 text-ui-xs leading-tight overflow-hidden cursor-pointer transition-colors duration-ui-fast ease-out text-left"
         style={{
           ...posStyle,
           height: Math.max(height, 18),
@@ -747,42 +637,26 @@ function ColumnEntry({
         }}
         title={entry.title}
       >
-        <span
-          style={{
-            color: "var(--ds-text-subtle)",
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            display: "block",
-          }}
-        >
+        <span className="block text-ds-text-subtle whitespace-nowrap overflow-hidden text-ellipsis">
           {entry.title}
         </span>
       </button>
     );
   }
 
-  // Fallback — dot + label
   return (
     <button
       type="button"
       onClick={onClick}
-      className="dashboard__entry-dot"
+      className="absolute flex items-center gap-1 text-ui-2xs text-text-muted cursor-pointer transition-colors duration-ui-fast ease-out"
       style={posStyle}
       title={entry.title}
     >
       <span
-        style={{
-          width: 8,
-          height: 8,
-          borderRadius: "50%",
-          flexShrink: 0,
-          backgroundColor: column.color,
-        }}
+        className="shrink-0 rounded-full"
+        style={{ width: 8, height: 8, backgroundColor: column.color }}
       />
-      <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-        {entry.title}
-      </span>
+      <span className="whitespace-nowrap overflow-hidden text-ellipsis">{entry.title}</span>
     </button>
   );
 }
@@ -796,18 +670,12 @@ function NowLine({ pxPerMin }: { pxPerMin: number }) {
   const mins = now.getHours() * 60 + now.getMinutes();
   const top = mins * pxPerMin;
   return (
-    <div className="dashboard__now-line" style={{ top, left: HOUR_GUTTER }}>
-      <div style={{ display: "flex", alignItems: "center" }}>
+    <div className="absolute w-full pointer-events-none dashboard__now-line" style={{ top, left: HOUR_GUTTER }}>
+      <div className="flex items-center">
         <div
-          style={{
-            width: 8,
-            height: 8,
-            borderRadius: "50%",
-            background: "var(--destructive, #f87171)",
-            marginLeft: -4,
-          }}
+          className="w-2 h-2 rounded-full bg-destructive -ml-1"
         />
-        <div style={{ flex: 1, borderTop: "1px solid var(--destructive, #f87171)" }} />
+        <div className="flex-1 border-t border-destructive" />
       </div>
     </div>
   );

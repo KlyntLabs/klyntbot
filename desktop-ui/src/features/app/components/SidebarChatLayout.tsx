@@ -6,6 +6,7 @@ import Search from "lucide-react/dist/esm/icons/search";
 import Settings from "lucide-react/dist/esm/icons/settings";
 import SquarePen from "lucide-react/dist/esm/icons/square-pen";
 import { memo } from "react";
+import { cn } from "@/utils/cn";
 import type { ChatThread } from "@/features/chat/types";
 type SidebarChatLayoutProps = {
   onOpenSettings: () => void;
@@ -65,42 +66,62 @@ export const SidebarChatLayout = memo(function SidebarChatLayout({
   ];
 
   return (
-    <aside className="sidebar-chat">
-      <div className="sidebar-chat__drag-strip" />
-      <div className="sidebar-chat__topbar">
-        <div className="sidebar-chat__topbar-traffic-reserve" aria-hidden />
-        <div className="sidebar-chat__topbar-spacer" />
+    <aside className="flex flex-col h-full min-h-0 py-2 px-3 bg-transparent text-text-strong relative">
+      <div
+        className="absolute top-0 left-0 right-0 z-[1] pointer-events-auto"
+        style={{
+          height: "var(--side-panel-drag-strip-height, 28px)",
+          WebkitAppRegion: "drag",
+        } as React.CSSProperties}
+      />
+      <div className="h-8 shrink-0 flex items-center justify-end gap-2 pr-1 relative z-[2]">
+        <div className="w-[72px] h-[22px] shrink-0" aria-hidden />
+        <div className="flex-1" />
       </div>
 
-      <nav className="sidebar-chat__nav" aria-label="Primary">
+      <nav className="flex flex-col gap-0.5 py-0.5 pb-3" aria-label="Primary">
         {allNavItems.map((item) => {
           const isActive = activeNavId === item.id;
-          const cls = `sidebar-chat__nav-item${isActive ? " sidebar-chat__nav-item--active" : ""}`;
           return (
-            <button key={item.id} type="button" className={cls} onClick={item.onClick}>
-              <span className="sidebar-chat__nav-icon">{item.icon}</span>
-              <span className="sidebar-chat__nav-label">{item.label}</span>
+            <button
+              key={item.id}
+              type="button"
+              className={cn(
+                "flex items-center gap-2.5 w-full px-2 py-1.5 bg-transparent border-0 rounded-md text-text-strong cursor-pointer text-ui-sm font-medium text-left transition-colors duration-100",
+                "hover:bg-surface-hover",
+                isActive && "bg-surface-active text-text-stronger",
+              )}
+              onClick={item.onClick}
+            >
+              <span className="inline-flex items-center justify-center w-3.5 h-3.5 text-text-muted shrink-0">
+                {item.icon}
+              </span>
+              <span className="flex-1 min-w-0 whitespace-nowrap overflow-hidden text-ellipsis">
+                {item.label}
+              </span>
             </button>
           );
         })}
       </nav>
 
-      <div className="sidebar-chat__chats">
-        <div className="sidebar-chat__section-title">Chats</div>
+      <div className="flex flex-col gap-2 pt-2.5 px-2.5">
+        <div className="px-3 py-1.5 text-ui-2xs uppercase tracking-[0.08em] text-text-faint">
+          Chats
+        </div>
         {threads.length === 0 ? (
-          <div className="sidebar-chat__chats-empty">No chats</div>
+          <div className="text-ui-xs text-text-faint opacity-70">No chats</div>
         ) : (
-          <ul className="sidebar-chat__thread-list">
+          <ul className="flex-1 overflow-y-auto min-h-0 flex flex-col gap-0.5 list-none m-0 p-0">
             {threads.map((t) => (
               <li key={t.sessionKey}>
                 <button
                   type="button"
-                  className={
-                    "sidebar-chat__thread-item" +
-                    (t.sessionKey === selectedSessionKey
-                      ? " sidebar-chat__thread-item--active"
-                      : "")
-                  }
+                  className={cn(
+                    "block w-full text-left bg-transparent border-0 text-inherit text-ui-xs px-2.5 py-1.5 rounded-md cursor-pointer whitespace-nowrap overflow-hidden text-ellipsis transition-colors duration-100",
+                    "hover:bg-surface-hover",
+                    t.sessionKey === selectedSessionKey &&
+                      "bg-surface-hover font-medium",
+                  )}
                   onClick={() => onSelectThread(t.sessionKey)}
                   title={t.title}
                 >
@@ -112,14 +133,23 @@ export const SidebarChatLayout = memo(function SidebarChatLayout({
         )}
       </div>
 
-      <div className="sidebar-chat__spacer" />
+      <div className="flex-1 min-h-0" />
 
-      <div className="sidebar-chat__footer">
-        <button type="button" className="sidebar-chat__settings" onClick={onOpenSettings}>
-          <Settings aria-hidden />
+      <div className="flex items-center justify-between gap-2 px-1 pt-2 pb-1">
+        <button
+          type="button"
+          className="inline-flex items-center gap-2 bg-transparent border-0 text-text-strong text-ui-sm font-medium px-2 py-1 rounded-md cursor-pointer transition-colors duration-100 hover:bg-surface-hover"
+          onClick={onOpenSettings}
+        >
+          <span className="inline-flex items-center justify-center w-3.5 h-3.5 text-text-muted">
+            <Settings aria-hidden />
+          </span>
           <span>Settings</span>
         </button>
-        <button type="button" className="sidebar-chat__upgrade">
+        <button
+          type="button"
+          className="bg-transparent border border-border-subtle text-text-strong text-ui-xs font-medium px-3 py-1 rounded-full cursor-pointer transition-colors duration-100 hover:bg-surface-hover hover:border-border-strong"
+        >
           Upgrade
         </button>
       </div>

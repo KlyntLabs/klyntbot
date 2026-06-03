@@ -10,6 +10,7 @@ import RotateCcw from "lucide-react/dist/esm/icons/rotate-ccw";
 import ScrollText from "lucide-react/dist/esm/icons/scroll-text";
 import Wrench from "lucide-react/dist/esm/icons/wrench";
 import { type CSSProperties, memo, type RefObject, useEffect } from "react";
+import { cn } from "@/utils/cn";
 import { PopoverSurface } from "@/features/design-system/components/popover/PopoverPrimitives";
 import type { AutocompleteItem } from "../hooks/useComposerAutocomplete";
 import { ReviewInlinePrompt } from "./ReviewInlinePrompt";
@@ -151,7 +152,10 @@ export const ComposerSuggestionsPopover = memo(function ComposerSuggestionsPopov
 
   return (
     <PopoverSurface
-      className={`composer-suggestions${reviewPromptOpen ? " review-inline-suggestions" : ""}`}
+      className={cn(
+        "absolute left-[-12px] right-[-12px] bottom-[calc(100%+8px)] top-auto z-10 grid gap-[2px] p-[6px] border border-[var(--cm-border-heavy)] bg-[var(--cm-surface-panel-elevated)] rounded-[20px] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] max-h-[280px] overflow-y-auto overflow-x-hidden",
+        reviewPromptOpen && "review-inline-suggestions",
+      )}
       role="listbox"
       ref={suggestionListRef}
       style={suggestionsStyle}
@@ -211,10 +215,13 @@ export const ComposerSuggestionsPopover = memo(function ComposerSuggestionsPopov
 
           return (
             <div key={item.id}>
-              {showGroup && <div className="composer-suggestion-section">{item.group}</div>}
+              {showGroup && <div className="text-ui-2xs font-bold tracking-[0.08em] uppercase text-text-faint px-2 pt-1.5 pb-0.5">{item.group}</div>}
               <button
                 type="button"
-                className={`composer-suggestion${index === highlightIndex ? " is-active" : ""}`}
+                className={cn(
+                  "composer-suggestion flex flex-col gap-0 text-left border border-transparent rounded-md px-2 py-1 bg-transparent text-text-strong cursor-pointer w-full min-w-0",
+                  index === highlightIndex && "is-active",
+                )}
                 role="option"
                 aria-selected={index === highlightIndex}
                 ref={(node) => {
@@ -224,11 +231,11 @@ export const ComposerSuggestionsPopover = memo(function ComposerSuggestionsPopov
                 onClick={() => onSelectSuggestion(item)}
                 onMouseEnter={() => onHighlightIndex(index)}
               >
-                <span className="composer-suggestion-row">
-                  <span className="composer-suggestion-icon" aria-hidden>
+                <span className="flex items-center gap-2 min-w-0">
+                  <span className="composer-suggestion-icon inline-flex w-4 h-4 text-text-muted flex-shrink-0 mt-0" aria-hidden>
                     {fileTypeIconUrl ? (
                       <img
-                        className="composer-suggestion-icon-image"
+                        className="w-3.5 h-3.5 block"
                         src={fileTypeIconUrl}
                         alt=""
                         loading="lazy"
@@ -238,19 +245,20 @@ export const ComposerSuggestionsPopover = memo(function ComposerSuggestionsPopov
                       <Icon size={14} />
                     )}
                   </span>
-                  <span className="composer-suggestion-content composer-suggestion-content--inline">
-                    <span className="composer-suggestion-title">{title}</span>
+                  <span className="flex flex-row items-baseline gap-2 min-w-0 flex-1">
+                    <span className="text-ui-sm font-semibold whitespace-nowrap overflow-hidden text-ellipsis flex-shrink-0 w-auto">{title}</span>
                     {description && (
                       <span
-                        className={`composer-suggestion-description${
-                          skillSuggestion ? " composer-suggestion-description--skill" : ""
-                        }`}
+                        className={cn(
+                          "text-ui-xs text-text-faint font-normal whitespace-nowrap overflow-hidden text-ellipsis flex-1 min-w-0 w-auto",
+                          skillSuggestion && "line-clamp-2",
+                        )}
                       >
                         {description}
                       </span>
                     )}
                     {!fileSuggestion && item.hint && (
-                      <span className="composer-suggestion-description">{item.hint}</span>
+                      <span className="text-ui-xs text-text-faint font-normal whitespace-nowrap overflow-hidden text-ellipsis flex-1 min-w-0 w-auto">{item.hint}</span>
                     )}
                   </span>
                 </span>

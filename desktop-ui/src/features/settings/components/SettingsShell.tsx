@@ -1,6 +1,7 @@
 import type { SettingsDomain } from "@settings/registry/settingsDomains";
 import { settingsDomains as defaultDomains } from "@settings/registry/settingsDomains";
 import { useState } from "react";
+import { cn } from "@/utils/cn";
 
 type Props = {
   domains?: SettingsDomain[];
@@ -13,17 +14,18 @@ export function SettingsShell({ domains = defaultDomains }: Props) {
 
   return (
     <div className="flex h-full">
-      <nav className="flex w-[200px] flex-col gap-0.5 border-r border-[var(--border-subtle)] p-3">
+      <nav className="flex w-[200px] flex-col gap-0.5 border-r border-border-subtle p-3">
         {domains.map((domain) => (
           <button
             key={domain.id}
             type="button"
             onClick={() => setActiveId(domain.id)}
-            className={`flex items-center gap-2 rounded-md px-3 py-2 text-left text-[var(--fs-sm)] transition-colors ${
+            className={cn(
+              "flex items-center gap-2 rounded-md px-3 py-2 text-left text-ui-sm transition-colors",
               activeId === domain.id
-                ? "bg-[var(--surface-active)] text-[var(--text-strong)]"
-                : "text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-strong)]"
-            }`}
+                ? "bg-surface-active text-text-strong"
+                : "text-text-muted hover:bg-surface-hover hover:text-text-strong",
+            )}
           >
             {domain.icon && <span className="shrink-0">{domain.icon}</span>}
             <span className="truncate">{domain.label}</span>
@@ -35,9 +37,7 @@ export function SettingsShell({ domains = defaultDomains }: Props) {
         {activeDomain ? (
           <activeDomain.Component />
         ) : (
-          <div className="text-[var(--fs-sm)] text-[var(--text-subtle)]">
-            Select a setting from the sidebar.
-          </div>
+          <div className="text-ui-sm text-text-subtle">Select a setting from the sidebar.</div>
         )}
       </div>
     </div>

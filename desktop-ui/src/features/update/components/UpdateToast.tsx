@@ -44,23 +44,27 @@ export function UpdateToast({
 }: UpdateToastProps) {
   if (postUpdateNotice) {
     return (
-      <ToastViewport className="update-toasts" role="region" ariaLive="polite">
-        <ToastCard className="update-toast" role="status">
-          <ToastHeader className="update-toast-header">
-            <ToastTitle className="update-toast-title">What's New</ToastTitle>
-            <div className="update-toast-version">v{postUpdateNotice.version}</div>
+      <ToastViewport
+        className="absolute bottom-9 right-5 w-[min(360px,calc(100vw-40px))] z-[5]"
+        role="region"
+        ariaLive="polite"
+      >
+        <ToastCard className="[--ds-toast-enter-duration:0.2s]" role="status">
+          <ToastHeader className="mb-1.5">
+            <ToastTitle className="text-ui-sm tracking-widest uppercase">What&apos;s New</ToastTitle>
+            <div className="text-ui-sm text-text-faint">v{postUpdateNotice.version}</div>
           </ToastHeader>
           {postUpdateNotice.stage === "loading" ? (
-            <ToastBody className="update-toast-body">
+            <ToastBody className="text-ui-sm mb-2.5">
               Updated successfully. Loading release notes...
             </ToastBody>
           ) : null}
           {postUpdateNotice.stage === "ready" ? (
             <>
-              <ToastBody className="update-toast-body">
+              <ToastBody className="text-ui-sm mb-2.5">
                 Updated successfully. Here is what is new:
               </ToastBody>
-              <div className="update-toast-notes" role="document">
+              <div className="text-ui-sm text-text-muted mb-2.5 max-h-[40vh] overflow-y-auto" role="document">
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
                   rehypePlugins={[rehypeSanitize]}
@@ -91,11 +95,11 @@ export function UpdateToast({
             </>
           ) : null}
           {postUpdateNotice.stage === "fallback" ? (
-            <ToastBody className="update-toast-body">
+            <ToastBody className="text-ui-sm mb-2.5">
               Updated to v{postUpdateNotice.version}. Release notes could not be loaded.
             </ToastBody>
           ) : null}
-          <ToastActions className="update-toast-actions">
+          <ToastActions className="flex gap-2 justify-end flex-wrap">
             {postUpdateNotice.stage !== "loading" ? (
               <button
                 type="button"
@@ -130,19 +134,23 @@ export function UpdateToast({
     totalBytes && totalBytes > 0 ? Math.min(100, (downloadedBytes / totalBytes) * 100) : null;
 
   return (
-    <ToastViewport className="update-toasts" role="region" ariaLive="polite">
-      <ToastCard className="update-toast" role="status">
-        <ToastHeader className="update-toast-header">
-          <ToastTitle className="update-toast-title">Update</ToastTitle>
-          {state.version ? <div className="update-toast-version">v{state.version}</div> : null}
+    <ToastViewport
+      className="absolute bottom-9 right-5 w-[min(360px,calc(100vw-40px))] z-[5]"
+      role="region"
+      ariaLive="polite"
+    >
+      <ToastCard className="[--ds-toast-enter-duration:0.2s]" role="status">
+        <ToastHeader className="mb-1.5">
+          <ToastTitle className="text-ui-sm tracking-widest uppercase">Update</ToastTitle>
+          {state.version ? <div className="text-ui-sm text-text-faint">v{state.version}</div> : null}
         </ToastHeader>
         {state.stage === "checking" && (
-          <ToastBody className="update-toast-body">Checking for updates...</ToastBody>
+          <ToastBody className="text-ui-sm mb-2.5">Checking for updates...</ToastBody>
         )}
         {state.stage === "available" && (
           <>
-            <ToastBody className="update-toast-body">A new version is available.</ToastBody>
-            <ToastActions className="update-toast-actions">
+            <ToastBody className="text-ui-sm mb-2.5">A new version is available.</ToastBody>
+            <ToastActions className="flex gap-2 justify-end flex-wrap">
               <button type="button" className="secondary" onClick={onDismiss}>
                 Later
               </button>
@@ -153,10 +161,8 @@ export function UpdateToast({
           </>
         )}
         {state.stage === "latest" && (
-          <div className="update-toast-inline">
-            <ToastBody className="update-toast-body update-toast-body-inline">
-              You’re up to date.
-            </ToastBody>
+          <div className="flex items-center gap-2">
+            <ToastBody className="text-ui-sm mb-0">You&apos;re up to date.</ToastBody>
             <button type="button" className="secondary" onClick={onDismiss}>
               Dismiss
             </button>
@@ -164,15 +170,15 @@ export function UpdateToast({
         )}
         {state.stage === "downloading" && (
           <>
-            <ToastBody className="update-toast-body">Downloading update…</ToastBody>
-            <div className="update-toast-progress">
-              <div className="update-toast-progress-bar">
+            <ToastBody className="text-ui-sm mb-2.5">Downloading update…</ToastBody>
+            <div className="grid gap-1.5 mb-1">
+              <div className="h-1.5 rounded-full bg-surface-card-muted overflow-hidden">
                 <span
-                  className="update-toast-progress-fill"
+                  className="block h-full bg-gradient-to-r from-[#4fb8ff] to-[#3be082]"
                   style={{ width: percent ? `${percent}%` : "24%" }}
                 />
               </div>
-              <div className="update-toast-progress-meta">
+              <div className="text-ui-xs text-text-muted">
                 {totalBytes
                   ? `${formatBytes(downloadedBytes)} / ${formatBytes(totalBytes)}`
                   : `${formatBytes(downloadedBytes)} downloaded`}
@@ -181,18 +187,18 @@ export function UpdateToast({
           </>
         )}
         {state.stage === "installing" && (
-          <ToastBody className="update-toast-body">Installing update…</ToastBody>
+          <ToastBody className="text-ui-sm mb-2.5">Installing update…</ToastBody>
         )}
         {state.stage === "restarting" && (
-          <ToastBody className="update-toast-body">Restarting…</ToastBody>
+          <ToastBody className="text-ui-sm mb-2.5">Restarting…</ToastBody>
         )}
         {state.stage === "error" && (
           <>
-            <ToastBody className="update-toast-body">Update failed.</ToastBody>
+            <ToastBody className="text-ui-sm mb-2.5">Update failed.</ToastBody>
             {state.error ? (
-              <ToastError className="update-toast-error">{state.error}</ToastError>
+              <ToastError className="mb-2.5">{state.error}</ToastError>
             ) : null}
-            <ToastActions className="update-toast-actions">
+            <ToastActions className="flex gap-2 justify-end flex-wrap">
               <button type="button" className="secondary" onClick={onDismiss}>
                 Dismiss
               </button>

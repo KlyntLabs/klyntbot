@@ -810,7 +810,7 @@ describe("Messages", () => {
     );
 
     expect(container.querySelector(".reasoning-inline")).toBeTruthy();
-    const reasoningDetail = container.querySelector(".reasoning-inline-detail");
+    const reasoningDetail = container.querySelector(".reasoning-inline-body");
     expect(reasoningDetail?.textContent ?? "").toContain("Looking for entry points");
     const workingText = container.querySelector(".working-text");
     expect(workingText?.textContent ?? "").toContain("Scanning repository");
@@ -840,7 +840,7 @@ describe("Messages", () => {
 
     const workingText = container.querySelector(".working-text");
     expect(workingText?.textContent ?? "").toContain("Plan from content");
-    const reasoningDetail = container.querySelector(".reasoning-inline-detail");
+    const reasoningDetail = container.querySelector(".reasoning-inline-body");
     expect(reasoningDetail?.textContent ?? "").toContain("More detail here");
     expect(reasoningDetail?.textContent ?? "").not.toContain("Plan from content");
   });
@@ -1040,7 +1040,7 @@ describe("Messages", () => {
 
     await waitFor(() => {
       // Each explore item renders as its own row
-      expect(container.querySelectorAll(".tool-row--search").length).toBe(2);
+      expect(container.querySelectorAll('[data-testid="explore-row"]').length).toBe(2);
     });
     expect(screen.getByText("Find routes")).toBeTruthy();
     expect(screen.getByText("routes.ts")).toBeTruthy();
@@ -1075,7 +1075,7 @@ describe("Messages", () => {
 
     await waitFor(() => {
       // Each explore item renders as its own row
-      expect(container.querySelectorAll(".tool-row--search").length).toBe(2);
+      expect(container.querySelectorAll('[data-testid="explore-row"]').length).toBe(2);
     });
     // First is exploring (spinner), second is explored
     expect(screen.getByText("Exploring:")).toBeTruthy();
@@ -1119,10 +1119,10 @@ describe("Messages", () => {
     );
 
     await waitFor(() => {
-      const exploreBlocks = container.querySelectorAll(".tool-row--search");
+      const exploreBlocks = container.querySelectorAll('[data-testid="explore-row"]');
       expect(exploreBlocks.length).toBe(2);
     });
-    const exploreItems = container.querySelectorAll(".tool-row__explore-item");
+    const exploreItems = container.querySelectorAll('[data-testid="explore-item"]');
     expect(exploreItems.length).toBe(2);
     expect(screen.getByText(/rg reducers/i)).toBeTruthy();
   });
@@ -1161,10 +1161,10 @@ describe("Messages", () => {
     );
 
     await waitFor(() => {
-      expect(container.querySelectorAll(".tool-row--search").length).toBe(2);
+      expect(container.querySelectorAll('[data-testid="explore-row"]').length).toBe(2);
     });
-    const exploreBlocks = Array.from(container.querySelectorAll(".tool-row--search"));
-    const reasoningDetail = container.querySelector(".reasoning-inline-detail");
+    const exploreBlocks = Array.from(container.querySelectorAll('[data-testid="explore-row"]'));
+    const reasoningDetail = container.querySelector(".reasoning-inline-body");
     expect(exploreBlocks.length).toBe(2);
     expect(reasoningDetail).toBeTruthy();
     const [firstExploreBlock, secondExploreBlock] = exploreBlocks;
@@ -1212,7 +1212,7 @@ describe("Messages", () => {
     );
 
     await waitFor(() => {
-      const exploreBlocks = container.querySelectorAll(".tool-row--search");
+      const exploreBlocks = container.querySelectorAll('[data-testid="explore-row"]');
       expect(exploreBlocks.length).toBe(2);
     });
     expect(screen.getByText("A message between explore blocks")).toBeTruthy();
@@ -1267,8 +1267,7 @@ describe("Messages", () => {
     );
 
     await waitFor(() => {
-      // Explore items should be rendered as tool-row--search
-      const exploreRows = container.querySelectorAll(".tool-row--search");
+      const exploreRows = container.querySelectorAll('[data-testid="explore-row"]');
       expect(exploreRows.length).toBe(2);
     });
     // Check that explore entries are rendered
@@ -1297,7 +1296,7 @@ describe("Messages", () => {
       />,
     );
 
-    const messagesNode = container.querySelector(".messages.messages-full");
+    const messagesNode = container.querySelector('[data-testid="messages-container"]');
     expect(messagesNode).toBeTruthy();
     const scrollNode = messagesNode as HTMLDivElement;
 
@@ -1680,7 +1679,7 @@ describe("Messages", () => {
 
     // Failed rows auto-expand (via useMessagesViewState effect)
     // So the body should already be visible
-    expect(container.querySelector(".tool-row--failed")).toBeTruthy();
+    expect(container.querySelector('[data-testid="tool-row-body"]')).toBeTruthy();
   });
 
   it("applies the family modifier class for shell tools", () => {
@@ -1697,7 +1696,7 @@ describe("Messages", () => {
       },
     ];
 
-    const { container } = render(
+    render(
       <Messages
         items={items}
         threadId="thread-1"
@@ -1708,7 +1707,7 @@ describe("Messages", () => {
       />,
     );
 
-    expect(container.querySelector(".tool-row--shell")).not.toBeNull();
+    expect(screen.getByText("Bash:")).toBeTruthy();
   });
 
   it("shows spinner when tool is running", () => {
@@ -1735,7 +1734,7 @@ describe("Messages", () => {
       />,
     );
 
-    expect(container.querySelector(".tool-row__spinner")).not.toBeNull();
+    expect(container.querySelector('[data-testid="tool-spinner"]')).not.toBeNull();
   });
 
   it("does not call onToggle on click while running", () => {
@@ -1751,7 +1750,7 @@ describe("Messages", () => {
       },
     ];
 
-    const { container } = render(
+    render(
       <Messages
         items={items}
         threadId="thread-1"
@@ -1762,7 +1761,7 @@ describe("Messages", () => {
       />,
     );
 
-    const toggle = container.querySelector(".tool-row__toggle") as HTMLButtonElement;
+    const toggle = screen.getByLabelText(/Toggle/i) as HTMLButtonElement;
     expect(toggle).toBeTruthy();
     expect(toggle.disabled).toBe(true);
   });
@@ -1792,12 +1791,12 @@ describe("Messages", () => {
       />,
     );
 
-    const toggle = container.querySelector(".tool-row__toggle") as HTMLButtonElement;
+    const toggle = screen.getByLabelText(/Toggle/i) as HTMLButtonElement;
     expect(toggle.disabled).toBe(false);
     fireEvent.click(toggle);
 
     await waitFor(() => {
-      expect(container.querySelector(".tool-row__body")).toBeTruthy();
+      expect(container.querySelector('[data-testid="tool-row-body"]')).toBeTruthy();
     });
   });
 });

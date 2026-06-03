@@ -19,8 +19,8 @@ describe("ChatErrorBanner", () => {
 
   it("invokes onDismiss when the dismiss button is clicked", () => {
     const onDismiss = vi.fn();
-    const { container } = render(<ChatErrorBanner error="boom" onDismiss={onDismiss} />);
-    const btn = container.querySelector(".chat-error-banner__dismiss");
+    render(<ChatErrorBanner error="boom" onDismiss={onDismiss} />);
+    const btn = screen.getByLabelText("Dismiss error");
     expect(btn).not.toBeNull();
     fireEvent.click(btn as HTMLElement);
     expect(onDismiss).toHaveBeenCalledTimes(1);

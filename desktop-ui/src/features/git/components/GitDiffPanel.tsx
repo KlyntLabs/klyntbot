@@ -627,13 +627,13 @@ export function GitDiffPanel({
       onFilePanelModeChange={onFilePanelModeChange}
       headerClassName="git-panel-header"
       headerRight={
-        <fieldset className="git-panel-actions" aria-label="Git panel">
-          <div className="git-panel-select">
-            <span className="git-panel-select-icon" aria-hidden>
+        <fieldset className="git-panel-actions inline-flex items-center gap-2" aria-label="Git panel">
+          <div className="git-panel-select inline-flex items-center relative">
+            <span className="git-panel-select-icon inline-flex items-center justify-center text-text-faint absolute left-3 pointer-events-none" aria-hidden>
               <ModeIcon />
             </span>
             <select
-              className="git-panel-select-input"
+              className="git-panel-select-input appearance-none cursor-pointer min-h-[34px] px-[34px] py-[9px] text-ui-sm font-semibold text-text-emphasis bg-surface-control border border-border-default rounded-full transition-[background,border-color,color] duration-ui-fast"
               value={mode}
               onChange={(event) => onModeChange(event.target.value as GitDiffPanelProps["mode"])}
               aria-label="Git panel view"
@@ -648,8 +648,8 @@ export function GitDiffPanel({
         </fieldset>
       }
     >
-      <div className="git-panel-overview">
-        <div className="git-panel-overview-status">
+      <div className="git-panel-overview flex flex-col gap-[10px] pb-3 border-b border-border-subtle bg-transparent">
+        <div className="git-panel-overview-status flex flex-col gap-[2px]">
           <GitPanelModeStatus
             mode={mode}
             diffStatusLabel={diffStatusLabel}

@@ -15,6 +15,7 @@ import { useComposerInputLayout } from "../hooks/useComposerInputLayout";
 import { useComposerMobileActions } from "../hooks/useComposerMobileActions";
 import { ComposerAttachments } from "./ComposerAttachments";
 import { ComposerMobileActionsMenu } from "./ComposerMobileActionsMenu";
+import { cn } from "@/utils/cn";
 import { ComposerSuggestionsPopover } from "./ComposerSuggestionsPopover";
 
 type ComposerInputProps = {
@@ -226,9 +227,9 @@ export function ComposerInput({
   }, [handleMicClick, setMobileActionsOpen]);
 
   return (
-    <div className={`composer-input${isPhoneLayout && isPhoneTallInput ? " is-phone-tall" : ""}`}>
+    <div className={cn("composer-input", isPhoneLayout && isPhoneTallInput && "is-phone-tall")}>
       <div
-        className={`composer-input-area${isDragOver ? " is-drag-over" : ""}`}
+        className={cn("composer-input-area relative min-w-0 pt-1 px-1", isDragOver && "is-drag-over")}
         ref={dropTargetRef}
         role="application"
         aria-label="Drop images here"
@@ -242,10 +243,10 @@ export function ComposerInput({
           disabled={disabled}
           onRemoveAttachment={onRemoveAttachment}
         />
-        <div className="composer-input-row">
+        <div className="composer-input-row flex items-start gap-[10px]">
           <button
             type="button"
-            className="composer-attach"
+            className="composer-attach inline-flex items-center justify-center self-start mt-[5px] w-7 h-7 rounded-full border border-[var(--cm-border-strong)] bg-[var(--cm-surface-panel-solid)] text-text-muted p-0 cursor-pointer"
             onClick={onAddAttachment}
             disabled={disabled || !onAddAttachment}
             aria-label="Add image"
@@ -290,13 +291,14 @@ export function ComposerInput({
             onDrop={handleDrop}
             onPaste={handleTextareaPaste}
           />
-          <div className="composer-input-actions">
+          <div className="composer-input-actions inline-flex items-center gap-[10px] self-center flex-shrink-0 pl-2 pr-0.5">
             {onToggleExpand && (
               <button
                 type="button"
-                className={`composer-action composer-action--expand${
-                  isExpanded ? " is-active" : ""
-                }`}
+                className={cn(
+                  "composer-action inline-flex items-center justify-center w-[30px] h-[30px] rounded-full border border-[var(--cm-border-emphasis)] bg-[var(--cm-surface-panel-strong)] text-text-strong text-ui-sm p-0 cursor-pointer relative max-[720px]:hidden",
+                  isExpanded && "is-active",
+                )}
                 onClick={onToggleExpand}
                 disabled={disabled}
                 aria-label={isExpanded ? "Collapse input" : "Expand input"}
@@ -307,11 +309,12 @@ export function ComposerInput({
             )}
             <button
               type="button"
-              className={`composer-action composer-action--mic${
-                isDictationBusy ? " is-active" : ""
-              }${isDictationProcessing ? " is-processing is-stop" : ""}${
-                micDisabled ? " is-disabled" : ""
-              }`}
+              className={cn(
+                "composer-action inline-flex items-center justify-center w-[30px] h-[30px] rounded-full border border-[var(--cm-border-emphasis)] bg-[var(--cm-surface-panel-strong)] text-text-strong text-ui-sm p-0 cursor-pointer relative max-[720px]:hidden",
+                isDictationBusy && "border-[rgba(120,235,190,0.6)] bg-[rgba(120,235,190,0.12)] hover:bg-[rgba(120,235,190,0.18)]",
+                isDictationProcessing && "border-[rgba(160,200,255,0.6)] bg-[rgba(160,200,255,0.12)] is-stop",
+                micDisabled && "is-disabled",
+              )}
               onClick={handleMicClick}
               disabled={micDisabled}
               aria-label={micAriaLabel}
@@ -326,15 +329,17 @@ export function ComposerInput({
               )}
             </button>
             <span
-              className="composer-send-ring"
+              className="composer-send-ring relative inline-flex items-center justify-center rounded-full p-0.5"
               data-tooltip={contextFreeLabel ?? "Context free --"}
               style={{ ["--context-free" as string]: contextFreePercent ?? 0 }}
             >
               <button
                 type="button"
-                className={`composer-action${canStop ? " is-stop" : " is-send"}${
-                  canStop && isProcessing ? " is-loading" : ""
-                }`}
+                className={cn(
+                  "composer-action inline-flex items-center justify-center w-[30px] h-[30px] rounded-full border border-[var(--cm-border-emphasis)] bg-[var(--cm-surface-panel-strong)] text-text-strong text-ui-sm p-0 cursor-pointer relative",
+                  canStop ? "is-stop" : "is-send",
+                  canStop && isProcessing && "is-loading",
+                )}
                 onClick={handleActionClick}
                 disabled={(disabled && !canStop) || isDictationBusy || (!canStop && !canSend)}
                 aria-label={canStop ? "Stop" : sendLabel}
@@ -342,8 +347,8 @@ export function ComposerInput({
               >
                 {canStop ? (
                   <>
-                    <span className="composer-action-stop-square" aria-hidden />
-                    {isProcessing && <span className="composer-action-spinner" aria-hidden />}
+                    <span className="block w-1.5 h-1.5 rounded-sm bg-current" aria-hidden />
+                    {isProcessing && <span className="composer-action-spinner absolute w-[18px] h-[18px] rounded-full border-2 border-[rgba(255,120,120,0.35)] border-t-[rgba(255,120,120,0.9)]" aria-hidden />}
                   </>
                 ) : (
                   <svg viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -369,11 +374,11 @@ export function ComposerInput({
           />
         )}
         {dictationError && (
-          <div className="composer-dictation-error" role="status">
+          <div className="mt-2 px-2.5 py-2 rounded-[10px] border border-[rgba(255,120,120,0.4)] bg-[rgba(255,120,120,0.08)] text-text-strong text-ui-sm flex items-center justify-between gap-[10px]" role="status">
             <span>{dictationError}</span>
             <button
               type="button"
-              className="ghost composer-dictation-error-dismiss"
+              className="ghost text-ui-xs px-2 py-1"
               onClick={onDismissDictationError}
             >
               Dismiss
@@ -381,12 +386,12 @@ export function ComposerInput({
           </div>
         )}
         {dictationHint && (
-          <div className="composer-dictation-hint" role="status">
+          <div className="mt-2 px-2.5 py-2 rounded-[10px] border border-[rgba(120,190,255,0.4)] bg-[rgba(120,190,255,0.12)] text-text-strong text-ui-sm flex items-center justify-between gap-[10px]" role="status">
             <span>{dictationHint}</span>
             {onDismissDictationHint && (
               <button
                 type="button"
-                className="ghost composer-dictation-error-dismiss"
+                className="ghost text-ui-xs px-2 py-1"
                 onClick={onDismissDictationHint}
               >
                 Dismiss

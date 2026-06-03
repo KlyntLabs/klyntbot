@@ -41,11 +41,17 @@ export function Dashboard() {
       <DataModeContext.Provider value={{ dataMode, setDataMode }}>
         <LayerContext.Provider value={{ enabled, enabledSources, toggle, reset }}>
           <SidebarContext.Provider value={{ sidebarOpen, toggleSidebar }}>
-            <div className="dashboard">
+            <div
+              className="flex flex-col gap-2 min-w-0 flex-1 h-full overflow-hidden"
+              style={{
+                background:
+                  "linear-gradient(180deg, color-mix(in srgb, var(--surface-messages) 94%, transparent) 0%, color-mix(in srgb, var(--surface-messages) 100%, transparent) 100%)",
+              }}
+            >
               <h1 className="sr-only">Dashboard</h1>
               <DashboardTopbar />
               <FocusStateIndicator />
-              <div className="dashboard__content">{view}</div>
+              <div className="flex-1 overflow-hidden relative">{view}</div>
             </div>
           </SidebarContext.Provider>
         </LayerContext.Provider>

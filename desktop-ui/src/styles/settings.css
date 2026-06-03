@@ -647,27 +647,6 @@
     box-shadow var(--ds-dur-normal) var(--ds-ease-out-soft);
 }
 
-.settings-input--compact {
-  padding: 8px 10px;
-  font-size: var(--fs-xs);
-}
-
-.settings-input--scale {
-  flex: 0 0 auto;
-  width: 88px;
-  text-align: right;
-}
-
-.settings-input--range {
-  width: 160px;
-  accent-color: var(--border-accent);
-}
-
-.settings-input--shortcut {
-  font-family: var(--code-font-family);
-  letter-spacing: 0.02em;
-}
-
 .settings-scale-controls {
   display: flex;
   align-items: center;
@@ -696,11 +675,6 @@
 .settings-select option {
   background-color: var(--surface-popover);
   color: var(--text-strong);
-}
-
-.settings-select--compact {
-  padding: 6px 8px;
-  font-size: var(--fs-xs);
 }
 
 .settings-segmented {

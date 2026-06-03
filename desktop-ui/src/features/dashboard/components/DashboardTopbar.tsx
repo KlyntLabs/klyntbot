@@ -6,6 +6,7 @@ import PanelRight from "lucide-react/dist/esm/icons/panel-right";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { formatFullDate, formatMonthLabel } from "@/utils/dashboardDates";
+import { cn } from "@/utils/cn";
 import { type DashboardViewMode, useDashboardState } from "../hooks/useDashboardState";
 import { LAYERS, useEnabledLayers, useSidebarOpen } from "../lib/layers";
 import { CalendarSync } from "./CalendarSync";
@@ -109,18 +110,24 @@ export function DashboardTopbar() {
   };
 
   return (
-    <div className="dashboard__topbar">
-      <span className="dashboard__topbar-date">{formatDateDisplay(mode, date)}</span>
+    <div className="flex items-center gap-4 px-4 py-2 bg-transparent border-none rounded-none">
+      <span className="text-[var(--fs-base)] font-medium text-text-strong whitespace-nowrap">
+        {formatDateDisplay(mode, date)}
+      </span>
       <FocusTrayIndicator />
 
       {/* View-pill switcher */}
-      <div className="dashboard__view-switcher">
+      <div className="flex items-center bg-surface-hover rounded-full p-0.5">
         {VIEWS.map((v) => (
           <button
             key={v.key}
             type="button"
             onClick={() => setMode(v.key)}
-            className={`dashboard__view-pill${mode === v.key ? " dashboard__view-pill--active" : ""}`}
+            className={cn(
+              "bg-transparent border-none px-3.5 py-1 rounded-full text-ui-xs font-medium text-text-muted cursor-pointer transition-colors duration-ui-fast ease-out hover:text-text-strong",
+              mode === v.key && "bg-surface-active text-text-strong",
+            )}
+            aria-pressed={mode === v.key}
           >
             {v.label}
           </button>
@@ -136,22 +143,25 @@ export function DashboardTopbar() {
         aria-expanded={layersOpen}
         aria-label="Toggle layers"
         title="Toggle layers"
-        className={`dashboard__icon-button${layersOpen ? " dashboard__icon-button--active" : ""}`}
+        className={cn(
+          "bg-transparent border-none p-1.5 rounded-full text-text-muted cursor-pointer transition-colors duration-ui-fast ease-out inline-flex items-center justify-center hover:text-text-strong hover:bg-surface-active",
+          layersOpen && "bg-surface-active text-text-strong",
+        )}
       >
-        <Layers />
+        <Layers className="w-4 h-4" />
       </button>
 
       <CalendarSync />
 
       {/* Prev / date-picker / next */}
-      <div className="dashboard__nav-pills">
+      <div className="flex items-center bg-surface-hover rounded-full p-0.5 ml-auto">
         <button
           type="button"
           onClick={navigatePrev}
           aria-label="Previous"
-          className="dashboard__icon-button"
+          className="bg-transparent border-none p-1.5 rounded-full text-text-muted cursor-pointer transition-colors duration-ui-fast ease-out inline-flex items-center justify-center hover:text-text-strong hover:bg-surface-active"
         >
-          <ChevronLeft />
+          <ChevronLeft className="w-4 h-4" />
         </button>
         <button
           ref={calTriggerRef}
@@ -161,17 +171,20 @@ export function DashboardTopbar() {
           aria-expanded={calOpen}
           aria-label="Pick date"
           title="Pick date"
-          className={`dashboard__icon-button${calOpen ? " dashboard__icon-button--active" : ""}`}
+          className={cn(
+            "bg-transparent border-none p-1.5 rounded-full text-text-muted cursor-pointer transition-colors duration-ui-fast ease-out inline-flex items-center justify-center hover:text-text-strong hover:bg-surface-active",
+            calOpen && "bg-surface-active text-text-strong",
+          )}
         >
-          <Calendar />
+          <Calendar className="w-4 h-4" />
         </button>
         <button
           type="button"
           onClick={navigateNext}
           aria-label="Next"
-          className="dashboard__icon-button"
+          className="bg-transparent border-none p-1.5 rounded-full text-text-muted cursor-pointer transition-colors duration-ui-fast ease-out inline-flex items-center justify-center hover:text-text-strong hover:bg-surface-active"
         >
-          <ChevronRight />
+          <ChevronRight className="w-4 h-4" />
         </button>
       </div>
 
@@ -181,9 +194,12 @@ export function DashboardTopbar() {
         onClick={toggleSidebar}
         title={sidebarOpen ? "Hide summary" : "Show summary"}
         aria-label={sidebarOpen ? "Hide summary" : "Show summary"}
-        className={`dashboard__icon-button${sidebarOpen ? " dashboard__icon-button--active" : ""}`}
+        className={cn(
+          "bg-transparent border-none p-1.5 rounded-full text-text-muted cursor-pointer transition-colors duration-ui-fast ease-out inline-flex items-center justify-center hover:text-text-strong hover:bg-surface-active",
+          sidebarOpen && "bg-surface-active text-text-strong",
+        )}
       >
-        <PanelRight />
+        <PanelRight className="w-4 h-4" />
       </button>
 
       {/* Layers popover */}
@@ -191,11 +207,14 @@ export function DashboardTopbar() {
         createPortal(
           <div
             ref={layersDropdownRef}
-            className="dashboard__popover"
+            className="fixed z-ui-modal bg-surface-popover border border-border-subtle shadow-ds-popover rounded-ui-lg p-1.5 min-w-[180px]"
             style={{ top: layersPos.top, right: layersPos.right }}
           >
             {LAYERS.map((layer) => (
-              <label key={layer.key} className="dashboard__popover-item">
+              <label
+                key={layer.key}
+                className="flex items-center gap-2 px-2.5 py-1.5 text-ui-xs text-text-muted cursor-pointer rounded-md transition-colors duration-ui-fast ease-out hover:bg-surface-hover"
+              >
                 <input
                   type="checkbox"
                   checked={enabled.has(layer.key)}
@@ -203,13 +222,17 @@ export function DashboardTopbar() {
                   style={{ accentColor: "var(--border-accent)", width: 12, height: 12 }}
                 />
                 <span
-                  className="dashboard__layer-swatch"
+                  className="w-2 h-2 rounded-full inline-block"
                   style={{ backgroundColor: layer.color }}
                 />
                 {layer.label}
               </label>
             ))}
-            <button type="button" onClick={reset} className="dashboard__popover-reset">
+            <button
+              type="button"
+              onClick={reset}
+              className="w-full text-left mt-1 px-2.5 py-1.5 text-ui-2xs text-text-muted bg-transparent border-none cursor-pointer rounded-md transition-colors duration-ui-fast ease-out hover:bg-surface-hover hover:text-text-strong"
+            >
               Reset to defaults
             </button>
           </div>,
@@ -221,8 +244,8 @@ export function DashboardTopbar() {
         createPortal(
           <div
             ref={calDropdownRef}
-            className="dashboard__popover"
-            style={{ top: calPos.top, right: calPos.right, padding: 10 }}
+            className="fixed z-ui-modal bg-surface-popover border border-border-subtle shadow-ds-popover rounded-ui-lg p-2.5"
+            style={{ top: calPos.top, right: calPos.right }}
           >
             <MiniCalendar
               value={mode === "year" ? null : date}

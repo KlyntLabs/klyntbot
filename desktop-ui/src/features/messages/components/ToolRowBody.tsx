@@ -1,4 +1,5 @@
 import { memo } from "react";
+import { cn } from "@/utils/cn";
 import { PierreDiffBlock } from "@/features/git/components/PierreDiffBlock";
 import type { ConversationItem } from "@/types";
 import { Markdown } from "./Markdown";
@@ -6,6 +7,7 @@ import { SubagentChip } from "./SubagentChip";
 
 type ToolRowBodyProps = {
   item: Extract<ConversationItem, { kind: "tool" }>;
+  isFailed?: boolean;
 };
 
 function tryParseSubagentOutput(output: string): { agentId?: string; sessionId?: string; description?: string } | null {
@@ -24,27 +26,58 @@ function tryParseSubagentOutput(output: string): { agentId?: string; sessionId?:
   return null;
 }
 
-export const ToolRowBody = memo(function ToolRowBody({ item }: ToolRowBodyProps) {
+const bodyBaseClass =
+  "mb-1 ml-3.5 py-2 px-3 bg-surface-command rounded-r-[6px] text-ui-xs text-text-quiet max-h-[360px] overflow-auto";
+
+export const ToolRowBody = memo(function ToolRowBody({ item, isFailed }: ToolRowBodyProps) {
   if (item.toolType === "commandExecution") {
     const output = item.output ?? "";
     if (!output.trim()) {
-      return <div className="tool-row__body">No output.</div>;
+      return (
+        <div
+          className={cn(bodyBaseClass, isFailed && "text-[var(--cm-color-danger-fg)]")}
+          data-testid="tool-row-body"
+
+        style={{ borderLeft: "2px solid var(--tool-row-bar, var(--border-subtle))" }}
+        >
+          No output.
+        </div>
+      );
     }
-    return <div className="tool-row__body tool-row__body--code">{output}</div>;
+    return (
+      <div
+        className={cn(bodyBaseClass, "font-code text-[11px] whitespace-pre-wrap leading-[1.55]", isFailed && "text-[var(--cm-color-danger-fg)]")}
+        data-testid="tool-row-body"
+        style={{ borderLeft: "2px solid var(--tool-row-bar, var(--border-subtle))" }}
+      >
+        {output}
+      </div>
+    );
   }
 
   if (item.toolType === "fileChange") {
     const changes = item.changes ?? [];
     if (changes.length === 0) {
       return item.detail ? (
-        <div className="tool-row__body tool-row__body--code">{item.detail}</div>
+        <div
+          className={cn(bodyBaseClass, "font-code text-[11px] whitespace-pre-wrap leading-[1.55]", isFailed && "text-[var(--cm-color-danger-fg)]")}
+          data-testid="tool-row-body"
+
+        style={{ borderLeft: "2px solid var(--tool-row-bar, var(--border-subtle))" }}
+        >
+          {item.detail}
+        </div>
       ) : null;
     }
     return (
-      <div className="tool-row__body tool-row__body--diff">
+      <div
+        className={cn(bodyBaseClass, "p-0", isFailed && "text-[var(--cm-color-danger-fg)]")}
+        data-testid="tool-row-body"
+        style={{ borderLeft: "2px solid var(--tool-row-bar, var(--border-subtle))" }}
+      >
         {changes.map((c) => (
           <div key={`${c.path}-${c.kind ?? ""}`}>
-            <div className="tool-row__body--diff-path">{c.path}</div>
+            <div className="text-ui-xs font-semibold text-text-strong px-3 pt-2 pb-1">{c.path}</div>
             {c.diff && <PierreDiffBlock diff={c.diff} displayPath={c.path} />}
           </div>
         ))}
@@ -56,7 +89,11 @@ export const ToolRowBody = memo(function ToolRowBody({ item }: ToolRowBodyProps)
     const text = (item.output ?? "").trim();
     if (!text) return null;
     return (
-      <div className="tool-row__body">
+      <div
+        className={cn(bodyBaseClass, isFailed && "text-[var(--cm-color-danger-fg)]")}
+        data-testid="tool-row-body"
+        style={{ borderLeft: "2px solid var(--tool-row-bar, var(--border-subtle))" }}
+      >
         <Markdown value={text} className="markdown" />
       </div>
     );
@@ -70,9 +107,23 @@ export const ToolRowBody = memo(function ToolRowBody({ item }: ToolRowBodyProps)
   return (
     <>
       {output ? (
-        <div className="tool-row__body tool-row__body--code">{output}</div>
+        <div
+          className={cn(bodyBaseClass, "font-code text-[11px] whitespace-pre-wrap leading-[1.55]", isFailed && "text-[var(--cm-color-danger-fg)]")}
+          data-testid="tool-row-body"
+
+        style={{ borderLeft: "2px solid var(--tool-row-bar, var(--border-subtle))" }}
+        >
+          {output}
+        </div>
       ) : item.detail ? (
-        <div className="tool-row__body tool-row__body--code">{item.detail}</div>
+        <div
+          className={cn(bodyBaseClass, "font-code text-[11px] whitespace-pre-wrap leading-[1.55]", isFailed && "text-[var(--cm-color-danger-fg)]")}
+          data-testid="tool-row-body"
+
+        style={{ borderLeft: "2px solid var(--tool-row-bar, var(--border-subtle))" }}
+        >
+          {item.detail}
+        </div>
       ) : null}
       {subagentInfo && (
         <SubagentChip

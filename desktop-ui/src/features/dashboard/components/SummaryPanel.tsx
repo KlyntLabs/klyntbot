@@ -17,6 +17,7 @@ import type {
 import { useTauriQuery } from "@/lib/query";
 import { qk } from "@/lib/query/queryKeys";
 import { formatHumanDuration, TZ_OFFSET_MINS, todayISO } from "@/utils/dashboardDates";
+import { cn } from "@/utils/cn";
 import { getAppColor, resolveActivityColor, resolveCategoryLabel } from "../lib/productivity";
 import { GoalsProgress } from "./productivity/GoalsProgress";
 import { HourlyHeatmap } from "./productivity/HourlyHeatmap";
@@ -87,14 +88,14 @@ function DaySummary({
   });
 
   return (
-    <aside className="dashboard__summary-panel">
+    <aside className="w-80 shrink-0 px-4 py-3 flex flex-col gap-3 overflow-y-auto bg-surface-messages border-l border-border-subtle text-[var(--fs-base)]">
       {hasProductivity && ps.productivityScore != null && (
-        <section className="dashboard__summary-section">
-          <div className="dashboard__summary-score-row">
+        <section className="flex flex-col gap-1.5">
+          <div className="flex items-start gap-3">
             <ProductivityScoreRing score={ps.productivityScore} size={72} />
-            <div className="dashboard__summary-score-meta">
-              <div className="dashboard__summary-active">
-                <span className="dashboard__summary-active-time">
+            <div className="flex-1 min-w-0 flex flex-col gap-1.5">
+              <div className="flex items-center gap-1.5">
+                <span className="text-ui-sm font-semibold text-ds-text-strong tabular-nums">
                   {formatHumanDuration(ps.totalActiveSecs)}
                 </span>
                 <TrendArrow
@@ -108,31 +109,31 @@ function DaySummary({
                       : null
                   }
                 />
-                <span className="dashboard__summary-dim">active</span>
+                <span className="text-ui-2xs text-ds-text-subtle">active</span>
               </div>
-              <div className="dashboard__summary-bar">
+              <div className="flex h-1 rounded-full overflow-hidden bg-surface-control">
                 {ps.productiveSecs > 0 && (
                   <div
-                    className="dashboard__summary-bar-seg dashboard__summary-bar-seg--productive"
+                    className="h-full bg-success"
                     style={{ width: `${(ps.productiveSecs / ps.totalActiveSecs) * 100}%` }}
                   />
                 )}
                 {ps.neutralSecs > 0 && (
                   <div
-                    className="dashboard__summary-bar-seg dashboard__summary-bar-seg--neutral"
+                    className="h-full bg-ds-text-subtle"
                     style={{ width: `${(ps.neutralSecs / ps.totalActiveSecs) * 100}%` }}
                   />
                 )}
                 {ps.distractingSecs > 0 && (
                   <div
-                    className="dashboard__summary-bar-seg dashboard__summary-bar-seg--distracting"
+                    className="h-full bg-destructive"
                     style={{ width: `${(ps.distractingSecs / ps.totalActiveSecs) * 100}%` }}
                   />
                 )}
               </div>
-              <span className="dashboard__summary-productive-pct">{productivePct}% productive</span>
+              <span className="text-ui-2xs text-success">{productivePct}% productive</span>
               {ps.totalActiveSecs > 0 && (
-                <div className="dashboard__summary-metrics">
+                <div className="flex flex-col gap-0.5 mt-1">
                   <ScoreBar label="Deep focus" value={ps.productiveSecs / ps.totalActiveSecs} />
                   <ScoreBar label="Quality" value={ps.avgSessionQuality ?? 0} />
                   <ScoreBar
@@ -146,7 +147,7 @@ function DaySummary({
                 </div>
               )}
               {ps.deepWorkBlocks > 0 && (
-                <div className="dashboard__summary-stat-row">
+                <div className="flex justify-between text-ui-2xs text-ds-text-subtle px-1">
                   <span>
                     {ps.deepWorkBlocks} deep work block{ps.deepWorkBlocks !== 1 ? "s" : ""}
                   </span>
@@ -154,7 +155,7 @@ function DaySummary({
                 </div>
               )}
               {ps.avgRecoverySecs != null && (
-                <div className="dashboard__summary-stat-row">
+                <div className="flex justify-between text-ui-2xs text-ds-text-subtle px-1">
                   <span>Avg recovery</span>
                   <span>{Math.round(ps.avgRecoverySecs)}s</span>
                 </div>
@@ -165,25 +166,25 @@ function DaySummary({
       )}
 
       {!hasProductivity && (
-        <section className="dashboard__summary-section">
-          <div className="dashboard__summary-active">
-            <span className="dashboard__summary-active-time">
+        <section className="flex flex-col gap-1.5">
+          <div className="flex items-center gap-1.5">
+            <span className="text-ui-sm font-semibold text-ds-text-strong tabular-nums">
               {formatHumanDuration(summary.totalTrackedSecs)}
             </span>
-            <span className="dashboard__summary-dim">tracked</span>
+            <span className="text-ui-2xs text-ds-text-subtle">tracked</span>
           </div>
         </section>
       )}
 
       {intel?.focusRecommendation && (
-        <p className="dashboard__summary-recommendation">{intel.focusRecommendation}</p>
+        <p className="text-ui-2xs italic text-ds-text-subtle leading-relaxed">{intel.focusRecommendation}</p>
       )}
 
       {weeklyData && weeklyData.length >= 2 ? (
         <WeeklySparkline data={weeklyData} />
       ) : (
-        <div className="dashboard__sparkline dashboard__sparkline--empty">
-          <span className="dashboard__sparkline-empty-msg">
+        <div className="flex items-center gap-3 opacity-70">
+          <span className="text-ui-2xs italic text-[color-mix(in_srgb,var(--ds-text-subtle)_70%,transparent)]">
             Weekly trend appears after 2+ days of tracking.
           </span>
         </div>
@@ -194,15 +195,15 @@ function DaySummary({
       <HourlyHeatmap startDate={date} endDate={date} />
 
       {hasProductivity && ps.topApps.length > 0 && (
-        <section className="dashboard__summary-section">
-          <h3 className="dashboard__summary-heading">Top Apps</h3>
+        <section className="flex flex-col gap-1.5">
+          <h3 className="text-ui-2xs font-medium text-ds-text-subtle uppercase tracking-wider mb-1.5">Top Apps</h3>
           <TopAppsChart apps={ps.topApps} />
         </section>
       )}
 
       {!hasProductivity && summary.topApps.length > 0 && (
-        <section className="dashboard__summary-section">
-          <h3 className="dashboard__summary-heading">Top Apps</h3>
+        <section className="flex flex-col gap-1.5">
+          <h3 className="text-ui-2xs font-medium text-ds-text-subtle uppercase tracking-wider mb-1.5">Top Apps</h3>
           <TopAppsChart
             apps={summary.topApps.map((a) => ({
               appName: a.appName,
@@ -213,29 +214,29 @@ function DaySummary({
         </section>
       )}
 
-      <section className="dashboard__summary-section">
-        <h3 className="dashboard__summary-heading">Insights</h3>
+      <section className="flex flex-col gap-1.5">
+        <h3 className="text-ui-2xs font-medium text-ds-text-subtle uppercase tracking-wider mb-1.5">Insights</h3>
         {intel && (intel.patterns.length > 0 || intel.nudges.length > 0) ? (
-          <div className="dashboard__summary-insights">
+          <div className="flex flex-col gap-2">
             {intel.patterns.map((p) => (
-              <div key={`p-${p}`} className="dashboard__summary-insight-item">
-                <Brain aria-hidden />
+              <div key={`p-${p}`} className="flex items-start gap-1.5 text-ui-2xs text-ds-text-subtle">
+                <Brain aria-hidden className="w-3 h-3 mt-0.5 shrink-0" />
                 <span>{p}</span>
               </div>
             ))}
             {intel.nudges.map((n) => (
               <div
                 key={`n-${n.nudgeType}-${n.message}`}
-                className="dashboard__summary-insight-item"
+                className="flex items-start gap-1.5 text-ui-2xs text-ds-text-subtle"
               >
-                <Lightbulb aria-hidden />
+                <Lightbulb aria-hidden className="w-3 h-3 mt-0.5 shrink-0" />
                 <span>{n.message}</span>
               </div>
             ))}
           </div>
         ) : (
-          <div className="dashboard__summary-insights dashboard__summary-insights--empty">
-            <span className="dashboard__sparkline-empty-msg">
+          <div className="opacity-70">
+            <span className="text-ui-2xs italic text-[color-mix(in_srgb,var(--ds-text-subtle)_70%,transparent)]">
               Insights appear once we detect patterns and nudges.
             </span>
           </div>
@@ -243,8 +244,8 @@ function DaySummary({
       </section>
 
       {ps?.aiSummary && (
-        <section className="dashboard__summary-aibox">
-          <p>{ps.aiSummary}</p>
+        <section className="border border-[color-mix(in_srgb,var(--brand)_15%,transparent)] rounded-lg px-2.5 py-2 bg-[color-mix(in_srgb,var(--brand)_6%,transparent)]">
+          <p className="text-ui-2xs text-ds-text-subtle leading-relaxed m-0">{ps.aiSummary}</p>
         </section>
       )}
 
@@ -260,18 +261,18 @@ function TopAppsChart({
 }) {
   const maxSecs = apps[0]?.durationSecs ?? 1;
   return (
-    <div className="dashboard__summary-apps">
+    <div className="flex flex-col gap-1">
       {apps.slice(0, 5).map((app) => {
         const pct = maxSecs > 0 ? (app.durationSecs / maxSecs) * 100 : 0;
         const color = getAppColor(app.appName, app.category ?? null);
         return (
-          <div key={app.appName} className="dashboard__summary-app-row">
-            <span className="dashboard__summary-app-name" title={app.appName}>
+          <div key={app.appName} className="flex items-center gap-1.5">
+            <span className="text-ui-2xs text-ds-text-subtle w-16 shrink-0 whitespace-nowrap overflow-hidden text-ellipsis" title={app.appName}>
               {app.appName}
             </span>
-            <div className="dashboard__summary-app-track">
+            <div className="flex-1 h-1 rounded-full bg-surface-control overflow-hidden">
               <div
-                className="dashboard__summary-app-fill"
+                className="h-full rounded-full"
                 style={{
                   width: `${Math.max(pct, 4)}%`,
                   backgroundColor: color,
@@ -279,7 +280,7 @@ function TopAppsChart({
                 }}
               />
             </div>
-            <span className="dashboard__summary-app-dur">
+            <span className="text-ui-2xs text-ds-text-subtle tabular-nums text-right shrink-0 whitespace-nowrap">
               {formatHumanDuration(app.durationSecs)}
             </span>
           </div>
@@ -316,17 +317,12 @@ function WeeklySparkline({ data }: { data: ProductivitySummaryResponse[] }) {
   const lastX = w - pad;
   const lastY = h - pad - ((scores[scores.length - 1] - min) / range) * (h - pad * 2);
 
-  const trendClass =
-    changePct > 0
-      ? "dashboard__sparkline-trend dashboard__sparkline-trend--up"
-      : "dashboard__sparkline-trend dashboard__sparkline-trend--down";
-
   return (
-    <div className="dashboard__sparkline">
+    <div className="flex items-center gap-3">
       <svg
         width={w}
         height={h}
-        className="dashboard__sparkline-svg"
+        className="flex-1"
         role="img"
         aria-label="Weekly productivity trend"
       >
@@ -341,7 +337,7 @@ function WeeklySparkline({ data }: { data: ProductivitySummaryResponse[] }) {
         <circle cx={lastX} cy={lastY} r="2.5" fill="var(--brand)" />
       </svg>
       {changePct !== 0 && (
-        <span className={trendClass}>
+        <span className={cn("text-ui-2xs font-medium shrink-0", changePct > 0 ? "text-success" : "text-destructive")}>
           {changePct > 0 ? "↑" : "↓"}
           {Math.abs(changePct)}%
         </span>
@@ -363,35 +359,35 @@ function SessionDetail({ session, onClose }: { session: SessionBlock; onClose: (
   const matched = session.intelligence;
 
   return (
-    <aside className="dashboard__summary-panel">
-      <div className="dashboard__summary-detail-header">
-        <h2 className="dashboard__summary-heading">Activity Session</h2>
+    <aside className="w-80 shrink-0 px-4 py-3 flex flex-col gap-3 overflow-y-auto bg-surface-messages border-l border-border-subtle text-[var(--fs-base)]">
+      <div className="flex items-center justify-between">
+        <h2 className="text-ui-2xs font-medium text-ds-text-subtle uppercase tracking-wider mb-1.5">Activity Session</h2>
         <button
           type="button"
           onClick={onClose}
-          className="dashboard__summary-close"
+          className="bg-none border-none text-ds-text-subtle cursor-pointer p-1 hover:text-ds-text-strong"
           aria-label="Close details"
         >
-          <X aria-hidden />
+          <X aria-hidden className="w-3.5 h-3.5" />
         </button>
       </div>
 
-      <div className="dashboard__summary-session-header">
+      <div className="flex items-center gap-2 text-[var(--fs-base)] font-medium text-ds-text-strong">
         <div
-          className="dashboard__summary-entry-swatch"
+          className="w-3 h-3 rounded-sm shrink-0"
           style={{ backgroundColor: session.color }}
         />
         <span>{session.label}</span>
       </div>
 
       {matched?.description && (
-        <p className="dashboard__summary-entry-desc">{matched.description}</p>
+        <p className="text-ui-2xs text-ds-text-subtle leading-relaxed m-0">{matched.description}</p>
       )}
 
-      <div className="dashboard__summary-session-stats">
+      <div className="flex items-center gap-1.5 flex-wrap">
         {matched?.qualityScore != null && (
           <div
-            className="dashboard__summary-session-quality-badge"
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-ui-2xs font-medium"
             style={{
               backgroundColor: `color-mix(in oklch, ${session.color} 20%, transparent)`,
               color: session.color,
@@ -402,20 +398,20 @@ function SessionDetail({ session, onClose }: { session: SessionBlock; onClose: (
           </div>
         )}
         <div
-          className="dashboard__summary-session-category-badge"
+          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-ui-2xs font-medium"
           style={{
             backgroundColor: `color-mix(in oklch, ${categoryColor} 15%, transparent)`,
             color: categoryColor,
             border: `1px solid color-mix(in oklch, ${categoryColor} 25%, transparent)`,
           }}
         >
-          <span style={{ backgroundColor: categoryColor }} />
+          <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: categoryColor }} />
           {categoryLabel}
         </div>
       </div>
 
       {matched && (
-        <div className="dashboard__summary-entry-meta">
+        <div className="flex flex-col gap-0.5 text-ui-2xs text-ds-text-subtle">
           {matched.categoryPurity != null && (
             <div>Focus purity: {Math.round(matched.categoryPurity * 100)}%</div>
           )}
@@ -424,7 +420,7 @@ function SessionDetail({ session, onClose }: { session: SessionBlock; onClose: (
         </div>
       )}
 
-      <div className="dashboard__summary-entry-meta">
+      <div className="flex flex-col gap-0.5 text-ui-2xs text-ds-text-subtle">
         <div>
           {fmt(startH, startM)} – {fmt(endH, endM)}
         </div>
@@ -433,15 +429,15 @@ function SessionDetail({ session, onClose }: { session: SessionBlock; onClose: (
 
       {session.appBreakdown.length > 0 && (
         <div>
-          <h3 className="dashboard__summary-heading">Apps in this session</h3>
+          <h3 className="text-ui-2xs font-medium text-ds-text-subtle uppercase tracking-wider mb-1.5">Apps in this session</h3>
           <div>
             {session.appBreakdown.map((app) => {
               const appCatColor = resolveActivityColor(app.catType, false);
               return (
-                <div key={app.app} className="dashboard__summary-session-app-row">
-                  <span style={{ backgroundColor: appCatColor }} />
-                  <span>{app.app}</span>
-                  <span>{formatHumanDuration(app.dur)}</span>
+                <div key={app.app} className="flex items-center gap-1.5 mb-1">
+                  <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: appCatColor }} />
+                  <span className="text-ui-2xs text-ds-text-subtle flex-1 whitespace-nowrap overflow-hidden text-ellipsis">{app.app}</span>
+                  <span className="text-ui-2xs text-ds-text-subtle tabular-nums">{formatHumanDuration(app.dur)}</span>
                 </div>
               );
             })}
@@ -454,45 +450,45 @@ function SessionDetail({ session, onClose }: { session: SessionBlock; onClose: (
 
 function EntryDetail({ entry, onClose }: { entry: TimelineEntry; onClose: () => void }) {
   return (
-    <aside className="dashboard__summary-panel">
-      <div className="dashboard__summary-detail-header">
-        <h2 className="dashboard__summary-heading">Details</h2>
+    <aside className="w-80 shrink-0 px-4 py-3 flex flex-col gap-3 overflow-y-auto bg-surface-messages border-l border-border-subtle text-[var(--fs-base)]">
+      <div className="flex items-center justify-between">
+        <h2 className="text-ui-2xs font-medium text-ds-text-subtle uppercase tracking-wider mb-1.5">Details</h2>
         <button
           type="button"
           onClick={onClose}
-          className="dashboard__summary-close"
+          className="bg-none border-none text-ds-text-subtle cursor-pointer p-1 hover:text-ds-text-strong"
           aria-label="Close details"
         >
-          <X aria-hidden />
+          <X aria-hidden className="w-3.5 h-3.5" />
         </button>
       </div>
 
-      <div className="dashboard__summary-entry-title">
-        <span
-          className="dashboard__summary-entry-swatch"
+      <div className="flex items-center gap-1.5 text-[var(--fs-base)] font-medium text-ds-text-strong">
+        <div
+          className="w-3 h-3 rounded-sm shrink-0"
           style={{ backgroundColor: entry.color }}
         />
         <span>{entry.title}</span>
       </div>
 
-      {entry.description && <p className="dashboard__summary-entry-desc">{entry.description}</p>}
+      {entry.description && <p className="text-ui-2xs text-ds-text-subtle leading-relaxed m-0">{entry.description}</p>}
 
-      <div className="dashboard__summary-entry-meta">
+      <div className="flex flex-col gap-0.5 text-ui-2xs text-ds-text-subtle">
         <div>Started: {new Date(entry.startedAt).toLocaleTimeString()}</div>
         {entry.endedAt && <div>Ended: {new Date(entry.endedAt).toLocaleTimeString()}</div>}
         {entry.durationSecs != null && entry.durationSecs > 0 && (
           <div>Duration: {formatHumanDuration(entry.durationSecs)}</div>
         )}
-        <div className="dashboard__summary-entry-source">Source: {entry.source}</div>
+        <div className="capitalize">Source: {entry.source}</div>
       </div>
 
       {entry.entityRoute && (
         <a
           href={entry.entityRoute}
-          className="dashboard__summary-entry-link"
+          className="inline-flex items-center gap-1.5 text-ui-2xs text-brand no-underline mt-1 hover:underline"
           onClick={(e) => e.preventDefault()}
         >
-          <ExternalLink aria-hidden />
+          <ExternalLink aria-hidden className="w-3 h-3" />
           <span>Open {entry.source}</span>
         </a>
       )}
@@ -504,13 +500,10 @@ function TrendArrow({ value, label }: { value?: number | null; label?: string })
   if (value == null || Math.abs(value) < 0.5) return null;
   const isUp = value > 0;
   const pct = Math.round(Math.abs(value));
-  const cls = isUp
-    ? "dashboard__sparkline-trend dashboard__sparkline-trend--up"
-    : "dashboard__sparkline-trend dashboard__sparkline-trend--down";
   const ariaLabel = `${isUp ? "Up" : "Down"} ${pct}%${label ? ` ${label}` : ""}`;
   return (
     <span
-      className={cls}
+      className={cn("text-ui-2xs font-medium", isUp ? "text-success" : "text-destructive")}
       title={label ? `${isUp ? "+" : "-"}${pct}% ${label}` : undefined}
       aria-label={ariaLabel}
     >

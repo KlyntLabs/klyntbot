@@ -7,6 +7,11 @@ import { isMacPlatform } from "@utils/platformPaths";
 import { formatShortcut, getDefaultInterruptShortcut } from "@utils/shortcuts";
 import { type KeyboardEvent, useMemo, useState } from "react";
 import {
+  SettingsField,
+  SettingsFieldLabel,
+  SettingsFieldRow,
+  SettingsHelpText,
+  SettingsInput,
   SettingsSection,
   SettingsSubsection,
 } from "@/features/design-system/components/settings/SettingsPrimitives";
@@ -42,11 +47,11 @@ function ShortcutField({
   onClearShortcut: (key: ShortcutSettingKey) => void;
 }) {
   return (
-    <div className="settings-field">
-      <div className="settings-field-label">{item.label}</div>
-      <div className="settings-field-row">
-        <input
-          className="settings-input settings-input--shortcut"
+    <SettingsField>
+      <SettingsFieldLabel>{item.label}</SettingsFieldLabel>
+      <SettingsFieldRow>
+        <SettingsInput
+          className="font-code tracking-wide"
           value={formatShortcut(shortcutDrafts[item.draftKey])}
           onKeyDown={(event) => onShortcutKeyDown(event, item.settingKey)}
           placeholder="Type shortcut"
@@ -54,14 +59,14 @@ function ShortcutField({
         />
         <button
           type="button"
-          className="ghost settings-button-compact"
+          className="ghost py-1.5 px-2.5 text-ui-sm"
           onClick={() => onClearShortcut(item.settingKey)}
         >
           Clear
         </button>
-      </div>
-      <div className="settings-help">{item.help}</div>
-    </div>
+      </SettingsFieldRow>
+      <SettingsHelpText>{item.help}</SettingsHelpText>
+    </SettingsField>
   );
 }
 
@@ -233,14 +238,13 @@ export function SettingsShortcutsSection({
       title="Shortcuts"
       subtitle="Customize keyboard shortcuts for file actions, composer, panels, and navigation."
     >
-      <div className="settings-field settings-shortcuts-search">
-        <label className="settings-field-label" htmlFor="settings-shortcuts-search">
+      <SettingsField className="mb-5">
+        <SettingsFieldLabel htmlFor="settings-shortcuts-search">
           Search shortcuts
-        </label>
-        <div className="settings-field-row">
-          <input
+        </SettingsFieldLabel>
+        <SettingsFieldRow>
+          <SettingsInput
             id="settings-shortcuts-search"
-            className="settings-input"
             placeholder="Search shortcuts"
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
@@ -248,18 +252,18 @@ export function SettingsShortcutsSection({
           {searchQuery && (
             <button
               type="button"
-              className="ghost settings-button-compact"
+              className="ghost py-1.5 px-2.5 text-ui-sm"
               onClick={() => setSearchQuery("")}
             >
               Clear
             </button>
           )}
-        </div>
-        <div className="settings-help">Filter by section name, action, or default shortcut.</div>
-      </div>
+        </SettingsFieldRow>
+        <SettingsHelpText>Filter by section name, action, or default shortcut.</SettingsHelpText>
+      </SettingsField>
       {filteredGroups.map((group, index) => (
         <div key={group.title}>
-          {index > 0 && <div className="settings-divider" />}
+          {index > 0 && <div className="h-px bg-border-muted my-4 rounded-full" />}
           <SettingsSubsection title={group.title} subtitle={group.subtitle} />
           {group.items.map((item) => (
             <ShortcutField
@@ -273,7 +277,7 @@ export function SettingsShortcutsSection({
         </div>
       ))}
       {filteredGroups.length === 0 && (
-        <div className="settings-empty">
+        <div className="text-text-faint text-ui-sm">
           No shortcuts match {normalizedSearchQuery ? `"${searchQuery.trim()}"` : "your search"}.
         </div>
       )}

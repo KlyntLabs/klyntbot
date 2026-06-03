@@ -1,5 +1,6 @@
 import type { TimelineEntry } from "@/bindings";
 import { minutesSinceMidnight } from "@/utils/dashboardDates";
+import { cn } from "@/utils/cn";
 import type { OverlapLayout } from "../../lib/timeline-utils";
 
 const MIN_BLOCK_HEIGHT = 14;
@@ -50,29 +51,16 @@ export function DraggableTaskBlock({
 
   const status = (entry.metadata as { status?: string } | null)?.status;
 
-  const blockClass = [
-    "dashboard__task-block",
-    isDragging ? "dashboard__task-block--dragging" : "",
-    selected ? "dashboard__task-block--selected" : "",
-  ]
-    .filter(Boolean)
-    .join(" ");
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" || e.key === " ") {
-      e.preventDefault();
-      onClick();
-    }
-    // Note: ArrowUp/ArrowDown keyboard nudge for drag-and-drop would require
-    // parent callback support (onKeyboardMove). Enter/Space opens the detail panel.
-  };
-
   return (
     <>
       <button
         type="button"
-        className={blockClass}
-        style={{ ...posStyle, height, textAlign: "left" }}
+        className={cn(
+          "absolute rounded-md px-1.5 py-0.5 text-ui-2xs leading-snug overflow-hidden cursor-grab transition-colors duration-ui-fast ease-out text-left dashboard__task-block",
+          isDragging && "opacity-50 cursor-grabbing",
+          selected && "outline outline-1 outline-border-accent",
+        )}
+        style={{ ...posStyle, height }}
         title={entry.title}
         onMouseDown={(e) => {
           const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
@@ -85,12 +73,23 @@ export function DraggableTaskBlock({
             onClick();
           }
         }}
-        onKeyDown={handleKeyDown}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onClick();
+          }
+        }}
       >
-        <span className="dashboard__task-block-title">{entry.title}</span>
-        {status && height > 28 && <span className="dashboard__task-block-status">{status}</span>}
+        <span className="block text-text-muted whitespace-nowrap overflow-hidden text-ellipsis">
+          {entry.title}
+        </span>
+        {status && height > 28 && (
+          <span className="block text-text-muted text-ui-2xs capitalize whitespace-nowrap overflow-hidden text-ellipsis">
+            {status}
+          </span>
+        )}
         <div
-          className="dashboard__task-block-resize-handle"
+          className="absolute bottom-0 left-0 right-0 h-1.5 cursor-ns-resize"
           onMouseDown={(e) => {
             e.stopPropagation();
             onMouseDownResize(e);
@@ -102,7 +101,7 @@ export function DraggableTaskBlock({
 
       {isDragging && ghostTopMin != null && ghostEndMin != null && (
         <div
-          className="dashboard__task-ghost"
+          className="absolute border-2 border-border-accent bg-[color-mix(in_srgb,var(--border-accent)_10%,transparent)] rounded-md pointer-events-none z-10"
           style={{
             top: ghostTopMin * pxPerMin,
             left: leftPct ?? 4,

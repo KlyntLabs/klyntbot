@@ -13,6 +13,7 @@ import type {
 import { useTauriQuery } from "@/lib/query";
 import { qk } from "@/lib/query/queryKeys";
 import { formatHumanDuration, minutesSinceMidnight, TZ_OFFSET_MINS } from "@/utils/dashboardDates";
+import { cn } from "@/utils/cn";
 import { type MergeableEvent, mergeActivitySessions } from "../../lib/activity-sessions";
 import { purityToOpacity, qualityToColor, resolveActivityColor } from "../../lib/productivity";
 
@@ -173,19 +174,15 @@ export function ActivityTrack({
           ? `${matched.title} · ${formatHumanDuration(session.duration)}${qualityLabel}${session.duringFocus ? " (focus)" : ""}`
           : `${session.label} · ${formatHumanDuration(session.duration)}${session.duringFocus ? " (focus)" : ""}`;
 
-        const cls = [
-          "dashboard__activity-block",
-          isSelected && "dashboard__activity-block--selected",
-          matched && "dashboard__activity-block--shadow",
-        ]
-          .filter(Boolean)
-          .join(" ");
-
         return (
           <button
             type="button"
             key={`${session.label}-${session.startMin}`}
-            className={cls}
+            className={cn(
+              "absolute left-0.5 right-0.5 rounded overflow-hidden border-none text-left transition-opacity duration-200 ease-out min-h-4 cursor-pointer px-1 py-0.5",
+              isSelected && "outline outline-1 outline-border-accent",
+              matched && "shadow-[0_1px_3px_rgba(0,0,0,0.1)]",
+            )}
             style={{
               top,
               height,
@@ -198,20 +195,22 @@ export function ActivityTrack({
             title={tooltip}
           >
             {matched?.qualityScore != null && height > 24 && (
-              <span className="dashboard__activity-block-quality-badge">
+              <span className="absolute top-0.5 right-0.5 text-ui-3xs font-bold rounded-full px-1 bg-black/40 text-white leading-tight">
                 {Math.round(matched.qualityScore)}
               </span>
             )}
             {height > 18 && (
-              <span className="dashboard__activity-block-title">{session.label}</span>
+              <span className="block text-ui-3xs font-medium whitespace-nowrap overflow-hidden text-ellipsis mt-0.5 text-white">
+                {session.label}
+              </span>
             )}
             {height > 32 && (
-              <span className="dashboard__activity-block-desc">
+              <span className="block text-ui-3xs whitespace-nowrap overflow-hidden text-ellipsis text-white/60">
                 {matched?.description || formatHumanDuration(session.duration)}
               </span>
             )}
             {height > 48 && matched?.description && (
-              <span className="dashboard__activity-block-duration">
+              <span className="block text-ui-3xs whitespace-nowrap overflow-hidden text-ellipsis text-white/40">
                 {formatHumanDuration(session.duration)}
               </span>
             )}

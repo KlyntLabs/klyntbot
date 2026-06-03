@@ -9,6 +9,7 @@ import { type ParsedDiffLine, parseDiff } from "@utils/diff";
 import { highlightLine, languageFromPath } from "@utils/syntax";
 import RotateCcw from "lucide-react/dist/esm/icons/rotate-ccw";
 import { memo, useMemo } from "react";
+import { cn } from "@/utils/cn";
 import { DIFF_VIEWER_SCROLL_CSS } from "@/features/design-system/diff/diffViewerTheme";
 import type { PullRequestReviewAction, PullRequestReviewIntent } from "@/types";
 import { splitPath } from "./GitDiffPanel.utils";
@@ -172,19 +173,34 @@ export const DiffCard = memo(function DiffCard({
   );
 
   return (
-    <div data-diff-path={entry.path} className={`diff-viewer-item ${isSelected ? "active" : ""}`}>
-      <div className="diff-viewer-header">
-        <span className="diff-viewer-status" data-status={entry.status}>
+    <div
+      data-diff-path={entry.path}
+      className={cn(
+        "diff-viewer-item rounded-0 border-none bg-transparent p-0 w-full border-b border-border-subtle relative isolate",
+        isSelected && "active",
+      )}
+    >
+      <div className="diff-viewer-header flex items-center gap-2 text-ui-sm text-text-muted px-3 py-[10px] m-0 border-b border-border-subtle">
+        <span
+          className="diff-viewer-status font-bold text-ui-xs px-[6px] py-[2px] rounded-full border border-border-stronger text-text-stronger bg-surface-control uppercase"
+          data-status={entry.status}
+        >
           {entry.status}
         </span>
-        <span className="diff-viewer-path" title={displayPath}>
-          <span className="diff-viewer-name">{fileName}</span>
-          {displayDir && <span className="diff-viewer-dir">{displayDir}</span>}
+        <span className="diff-viewer-path inline-flex items-baseline gap-[6px] flex-1 min-w-0 break-words" title={displayPath}>
+          <span className="diff-viewer-name text-text-emphasis font-semibold min-w-0 shrink-[1] grow-0 basis-auto overflow-hidden text-ellipsis whitespace-nowrap">
+            {fileName}
+          </span>
+          {displayDir && (
+            <span className="diff-viewer-dir text-text-faint flex-1 overflow-hidden text-ellipsis whitespace-nowrap min-w-0">
+              {displayDir}
+            </span>
+          )}
         </span>
         {showRevert && (
           <button
             type="button"
-            className="diff-viewer-header-action diff-viewer-header-action--discard"
+            className="w-6 h-6 rounded-md p-0 border border-transparent bg-transparent text-text-faint inline-flex items-center justify-center cursor-pointer shrink-0 transition-[background,border-color,color] duration-ui-fast hover:!bg-[rgba(255,107,107,0.14)] hover:!border-[rgba(255,107,107,0.35)] hover:!text-[#ff6b6b] focus-visible:outline-2 focus-visible:outline-border-accent-soft focus-visible:outline-offset-2"
             title="Discard changes in this file"
             aria-label="Discard changes in this file"
             onClick={(event) => {
@@ -199,7 +215,7 @@ export const DiffCard = memo(function DiffCard({
       </div>
       {useInteractiveDiff && selectedLines && reviewActions.length > 0 ? (
         <div
-          className="diff-viewer-review-actions"
+          className="diff-viewer-review-actions flex flex-wrap items-center gap-[6px] px-3 py-2 border-b border-border-subtle"
           role="toolbar"
           aria-label="PR selection actions"
         >
@@ -207,7 +223,7 @@ export const DiffCard = memo(function DiffCard({
             <button
               key={action.id}
               type="button"
-              className="ghost diff-viewer-review-action"
+              className="ghost diff-viewer-review-action text-ui-xs px-[10px] py-1 rounded-full border border-border-muted"
               disabled={pullRequestReviewLaunching}
               onClick={() => {
                 if (!onRunReviewAction) {
@@ -221,20 +237,20 @@ export const DiffCard = memo(function DiffCard({
           ))}
           <button
             type="button"
-            className="ghost diff-viewer-review-action"
+            className="ghost diff-viewer-review-action text-ui-xs px-[10px] py-1 rounded-full border border-border-muted"
             onClick={onClearSelection}
           >
             Clear
           </button>
           {pullRequestReviewThreadId ? (
-            <span className="diff-viewer-review-thread">
+            <span className="diff-viewer-review-thread ml-auto text-text-faint text-ui-xs font-code">
               Last review thread: {pullRequestReviewThreadId}
             </span>
           ) : null}
         </div>
       ) : null}
       {entry.diff.trim().length > 0 && fileDiff ? (
-        <div className="diff-viewer-output diff-viewer-output-flat">
+        <div className="diff-viewer-output diff-viewer-output-flat relative overflow-visible max-w-full min-w-0 w-full">
           <FileDiff
             fileDiff={fileDiff}
             options={diffOptions}
@@ -273,7 +289,7 @@ export const DiffCard = memo(function DiffCard({
           />
         </div>
       ) : entry.diff.trim().length > 0 && parsedLines.length > 0 ? (
-        <div className="diff-viewer-output diff-viewer-output-flat diff-viewer-output-raw">
+        <div className="diff-viewer-output diff-viewer-output-flat diff-viewer-output-raw px-[10px] py-[6px]">
           {parsedLines.map((line) => {
             const highlighted = highlightLine(
               line.text,
@@ -283,20 +299,24 @@ export const DiffCard = memo(function DiffCard({
             return (
               <div
                 key={`${line.type}-${line.text.slice(0, 20)}`}
-                className={`diff-viewer-raw-line diff-viewer-raw-line-${line.type}`}
+                className={cn(
+                  "diff-viewer-raw-line whitespace-pre-wrap",
+                  line.type === "add" && "diff-viewer-raw-line-add",
+                  line.type === "del" && "diff-viewer-raw-line-del",
+                )}
               >
                 <span
                   ref={(el) => {
                     if (el) el.innerHTML = highlighted;
                   }}
-                  className="diff-line-content"
+                  className="diff-line-content min-w-0 whitespace-pre-wrap"
                 />
               </div>
             );
           })}
         </div>
       ) : (
-        <div className="diff-viewer-placeholder">{placeholder}</div>
+        <div className="text-text-subtle text-ui-sm py-2">{placeholder}</div>
       )}
     </div>
   );

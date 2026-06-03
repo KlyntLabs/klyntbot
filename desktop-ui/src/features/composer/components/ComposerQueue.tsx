@@ -1,6 +1,7 @@
 import { useMenuController } from "@app/hooks/useMenuController";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import { memo, useCallback } from "react";
+import { cn } from "@/utils/cn";
 import {
   PopoverMenuItem,
   PopoverSurface,
@@ -25,13 +26,13 @@ export const ComposerQueue = memo(function ComposerQueue({
   }
 
   return (
-    <div className="composer-queue">
-      <div className="composer-queue-title">Queued</div>
-      {pausedReason ? <div className="composer-queue-hint">{pausedReason}</div> : null}
-      <div className="composer-queue-list">
+    <div className="flex flex-col gap-2 p-[10px_12px] rounded-[16px] bg-[var(--cm-surface-panel)] border border-[var(--cm-border-emphasis)]">
+      <div className="text-ui-2xs uppercase tracking-[0.1em] text-text-fainter">Queued</div>
+      {pausedReason ? <div className="text-ui-xs leading-[1.4] text-text-faint">{pausedReason}</div> : null}
+      <div className="flex flex-col gap-1">
         {queuedMessages.map((item) => (
-          <div key={item.id} className="composer-queue-item">
-            <span className="composer-queue-text">
+          <div key={item.id} className="flex items-center gap-2 p-1 px-1.5 rounded-lg bg-surface-item text-text-quiet text-ui-xs">
+            <span className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
               {item.text ||
                 (item.images?.length ? (item.images.length === 1 ? "Image" : "Images") : "")}
               {item.images?.length
@@ -82,10 +83,10 @@ const QueueMenuButton = memo(function QueueMenuButton({
   }, [item.id, menu, onDeleteQueued]);
 
   return (
-    <div className="composer-queue-menu-wrap" ref={menu.containerRef}>
+    <div className="relative flex-shrink-0" ref={menu.containerRef}>
       <button
         type="button"
-        className={`composer-queue-menu${menu.isOpen ? " is-open" : ""}`}
+        className={cn("composer-queue-menu text-text-faint text-ui-xs px-1 py-0.5 cursor-pointer border-0 bg-transparent", menu.isOpen && "is-open")}
         onClick={handleToggleMenu}
         aria-label="Queue item menu"
         aria-haspopup="menu"
@@ -94,7 +95,7 @@ const QueueMenuButton = memo(function QueueMenuButton({
         ...
       </button>
       {menu.isOpen && (
-        <PopoverSurface className="composer-queue-item-popover" role="menu">
+        <PopoverSurface className="absolute right-0 bottom-[calc(100%+4px)] min-w-[110px] p-1 z-40" role="menu">
           <PopoverMenuItem onClick={handleEdit}>Edit</PopoverMenuItem>
           <PopoverMenuItem onClick={handleDelete}>Delete</PopoverMenuItem>
         </PopoverSurface>

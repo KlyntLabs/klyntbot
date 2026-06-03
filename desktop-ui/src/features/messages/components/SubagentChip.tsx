@@ -20,10 +20,10 @@ export function SubagentChip({ agentId, sessionId, description }: Props) {
       }}
       title={`Open subagent ${agentId}`}
     >
-      <span className="subagent-chip__arrow">↳</span>
-      <span className="subagent-chip__id">{agentId}</span>
-      {description && <span className="subagent-chip__sep">—</span>}
-      {description && <span className="subagent-chip__desc">{description}</span>}
+      <span className="opacity-60">↳</span>
+      <span className="font-mono">{agentId}</span>
+      {description && <span className="opacity-50">—</span>}
+      {description && <span className="italic">{description}</span>}
     </button>
   );
 }

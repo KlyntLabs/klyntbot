@@ -32,6 +32,7 @@ import { useComposerKeyDown } from "../hooks/useComposerKeyDown";
 import { useComposerSuggestionStyle } from "../hooks/useComposerSuggestionStyle";
 import { usePromptHistory } from "../hooks/usePromptHistory";
 import { ComposerInput } from "./ComposerInput";
+import { cn } from "@/utils/cn";
 import { ComposerMetaBar } from "./ComposerMetaBar";
 import { ComposerQueue } from "./ComposerQueue";
 
@@ -577,7 +578,7 @@ export const Composer = memo(function Composer({
   });
 
   return (
-    <footer className={`composer${disabled ? " is-disabled" : ""}`}>
+    <footer className={cn("composer flex flex-col gap-[10px] py-[10px] px-[var(--main-panel-padding)] pb-5 col-start-1 row-start-3 [-webkit-app-region:no-drag]", disabled && "is-disabled")}>
       <ComposerQueue
         queuedMessages={queuedMessages}
         pausedReason={queuePausedReason}
@@ -585,9 +586,9 @@ export const Composer = memo(function Composer({
         onDeleteQueued={onDeleteQueued}
       />
       {isProcessing && composerFollowUpHintEnabled && (
-        <div className="composer-followup-hint" role="status" aria-live="polite">
-          <div className="composer-followup-title">Follow-up behavior</div>
-          <div className="composer-followup-copy">
+        <div className="flex flex-col gap-1 p-[10px_12px] rounded-[16px] border border-[var(--cm-border-emphasis)] bg-[var(--cm-surface-panel)]" role="status" aria-live="polite">
+          <div className="text-ui-2xs uppercase tracking-[0.08em] text-text-fainter">Follow-up behavior</div>
+          <div className="text-ui-xs leading-[1.4] text-text-subtle">
             {oppositeFallsBackToQueue ? (
               <>
                 Default: Queue (Steer unavailable). Both Enter and {followUpShortcutLabel} will
@@ -604,12 +605,12 @@ export const Composer = memo(function Composer({
         </div>
       )}
       {contextActions.length > 0 ? (
-        <div className="composer-context-actions" role="toolbar" aria-label="Review tools">
+        <div className="flex flex-wrap gap-2" role="toolbar" aria-label="Review tools">
           {contextActions.map((action) => (
             <button
               key={action.id}
               type="button"
-              className="ghost composer-context-action"
+              className="ghost composer-context-action text-ui-xs px-[11px] py-1.5 rounded-full border border-[var(--cm-border-emphasis)] bg-[var(--cm-surface-panel-strong)] text-text-muted"
               title={action.title}
               disabled={disabled || Boolean(action.disabled)}
               onClick={() => {
@@ -621,7 +622,7 @@ export const Composer = memo(function Composer({
           ))}
         </div>
       ) : null}
-      <div className="composer-shell">
+      <div className="flex flex-col gap-1.5 border border-[var(--cm-border-heavy)] bg-[var(--cm-surface-panel-elevated)] rounded-[20px] p-[6px_8px] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
         <ComposerInput
           text={text}
           disabled={disabled}

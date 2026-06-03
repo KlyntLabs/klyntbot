@@ -8,6 +8,7 @@ import Sparkles from "lucide-react/dist/esm/icons/sparkles";
 import Square from "lucide-react/dist/esm/icons/square";
 import X from "lucide-react/dist/esm/icons/x";
 import { useEffect, useRef, useState } from "react";
+import { cn } from "@/utils/cn";
 import { qk, useTauriQuery } from "@/lib/query";
 import { emit, getCurrentWindow, getWindowByLabel, isTauri } from "@/utils/tauri-bridge";
 import { FOCUS_PRESETS, type useFocusTimer } from "../hooks/useFocusTimer";
@@ -28,15 +29,15 @@ function PauseResumeButton({ timer }: { timer: Timer }) {
   return (
     <button
       type="button"
-      className="tc-icon-btn"
+      className="w-8 h-8 rounded-full bg-transparent flex items-center justify-center text-text-muted cursor-pointer"
       onClick={timer.paused ? timer.resume : timer.pause}
       disabled={timer.isLoading}
       title={timer.paused ? "Resume" : "Pause"}
     >
       {timer.paused ? (
-        <Play className="tc-icon-sm" strokeWidth={1.5} />
+        <Play className="w-3.5 h-3.5" strokeWidth={1.5} />
       ) : (
-        <Pause className="tc-icon-sm" strokeWidth={1.5} />
+        <Pause className="w-3.5 h-3.5" strokeWidth={1.5} />
       )}
     </button>
   );
@@ -44,8 +45,8 @@ function PauseResumeButton({ timer }: { timer: Timer }) {
 
 function SettingsButton({ onClick }: { onClick: () => void }) {
   return (
-    <button type="button" className="tc-icon-btn" onClick={onClick} title="Settings">
-      <Settings className="tc-icon-sm" strokeWidth={1.5} />
+    <button type="button" className="w-8 h-8 rounded-full bg-transparent flex items-center justify-center text-text-muted cursor-pointer" onClick={onClick} title="Settings">
+      <Settings className="w-3.5 h-3.5" strokeWidth={1.5} />
     </button>
   );
 }
@@ -60,13 +61,13 @@ const DISTRACTION_CATEGORIES = [
 
 function QuickDistractionLog({ onLog }: { onLog: (cat: string) => void }) {
   return (
-    <div className="tc-distraction-row">
+    <div className="flex gap-1 justify-center flex-wrap px-2 mt-3">
       {DISTRACTION_CATEGORIES.map((c) => (
         <button
           key={c.value}
           type="button"
           onClick={() => onLog(c.value)}
-          className="tc-distraction-chip"
+          className="py-0.5 px-2 rounded-md bg-surface-control border-none text-text-muted text-ui-3xs cursor-pointer"
         >
           {c.label}
         </button>
@@ -83,7 +84,7 @@ function TodayStats({
   if (stats.sessions === 0) return null;
   const timeStr = formatHumanDuration(stats.totalMins * 60);
   return (
-    <div className="tc-today-stats">
+    <div className="text-ui-3xs text-center text-text-muted mb-1">
       Today: {stats.sessions} session{stats.sessions !== 1 ? "s" : ""} · {timeStr}
       {stats.avgQuality != null && <span> · {(stats.avgQuality * 100).toFixed(0)}% quality</span>}
     </div>
@@ -217,11 +218,11 @@ function TimerView({ timer, onOpenSettings }: { timer: Timer; onOpenSettings: ()
   };
 
   return (
-    <div className="tc-timer">
+    <div className="flex flex-col items-center p-4">
       {phase === "idle" && <TodayStats stats={timer.todayStats} />}
 
-      <div className="tc-ring-wrap" style={{ width: RING_SIZE, height: RING_SIZE }}>
-        <svg viewBox={`0 0 ${RING_SIZE} ${RING_SIZE}`} className="tc-ring-svg" aria-hidden="true">
+      <div className="relative" style={{ width: RING_SIZE, height: RING_SIZE }}>
+        <svg viewBox={`0 0 ${RING_SIZE} ${RING_SIZE}`} className="w-full h-full" aria-hidden="true">
           <circle
             cx={CENTER}
             cy={CENTER}
@@ -249,9 +250,9 @@ function TimerView({ timer, onOpenSettings }: { timer: Timer; onOpenSettings: ()
           )}
         </svg>
 
-        <div className="tc-ring-content">
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
           {isBreak || isBreakPending ? (
-            <Coffee className="tc-mode-icon is-info" strokeWidth={1.5} />
+            <Coffee className="w-4 h-4 mb-2 text-[var(--tray-info)]" strokeWidth={1.5} />
           ) : (
             <Eye
               className={`tc-mode-icon${settings.dndEnabled ? " is-brand" : " is-dim"}`}
@@ -266,7 +267,7 @@ function TimerView({ timer, onOpenSettings }: { timer: Timer; onOpenSettings: ()
                 handleEditSave();
               }}
             >
-              <div className="tc-time-edit-row">
+              <div className="flex items-baseline justify-center gap-1">
                 <input
                   ref={inputRef}
                   type="number"
@@ -275,9 +276,9 @@ function TimerView({ timer, onOpenSettings }: { timer: Timer; onOpenSettings: ()
                   onBlur={handleEditSave}
                   min={1}
                   max={480}
-                  className="tc-time-edit-input"
+                  className="w-16 text-center text-[36px] font-extralight text-text-primary bg-transparent border-none outline-none tabular-nums"
                 />
-                <span className="tc-time-edit-unit">min</span>
+                <span className="text-ui-2xs text-text-dim font-light">min</span>
               </div>
             </form>
           ) : (
@@ -285,30 +286,30 @@ function TimerView({ timer, onOpenSettings }: { timer: Timer; onOpenSettings: ()
               type="button"
               onClick={handleEditStart}
               disabled={isActive || isBreakPending}
-              className={`tc-time-button${paused ? " is-paused" : ""}`}
+              className={cn("bg-transparent border-none text-inherit cursor-pointer p-0", paused && "animate-[tray-pulse_1.2s_ease-in-out_infinite]")}
             >
-              <span className="tc-time-display">{timeDisplay}</span>
+              <span className="text-[36px] font-extralight text-text-primary tabular-nums leading-none">{timeDisplay}</span>
             </button>
           )}
 
-          <div className="tc-dots">
+          <div className="flex gap-1.5 mt-2.5">
             {Array.from({ length: dotsCount }, (_, i) => `dot-${i}`).map((key, i) => (
               <div key={key} className={`tc-dot${i < filledDots ? " is-filled" : ""}`} />
             ))}
           </div>
 
-          <span className="tc-phase-label">{phaseLabel}</span>
+          <span className="text-ui-3xs text-text-muted uppercase tracking-[0.2em] mt-1.5 font-light">{phaseLabel}</span>
 
           {timer.actionTitle && phase === "working" && (
-            <p className="tc-action-title">{timer.actionTitle}</p>
+            <p className="text-ui-3xs text-text-muted max-w-[120px] mt-0.5 whitespace-nowrap overflow-hidden text-ellipsis">{timer.actionTitle}</p>
           )}
 
-          {showLearningLine && <p className="tc-learning-banner">Learning how you focus best...</p>}
+          {showLearningLine && <p className="text-ui-2xs mt-1.5">Learning how you focus best...</p>}
         </div>
       </div>
 
       {phase === "idle" && (
-        <div className="tc-presets">
+        <div className="flex gap-1.5 justify-center mt-1">
           {FOCUS_PRESETS.map((preset) => (
             <button
               key={preset.label}
@@ -323,7 +324,7 @@ function TimerView({ timer, onOpenSettings }: { timer: Timer; onOpenSettings: ()
       )}
 
       {phase === "idle" && !reviewPromptDismissed && (dueCount ?? 0) > 0 && (
-        <div className="tc-review-wrap">
+        <div className="mt-3 px-1 w-full">
           <MicroReviewPrompt
             dueCount={dueCount ?? 0}
             onAccept={handleReviewAccept}
@@ -343,29 +344,29 @@ function TimerView({ timer, onOpenSettings }: { timer: Timer; onOpenSettings: ()
       )}
 
       {!isBreak && !isBreakPending && !showWarning && (
-        <div className="tc-dnd-row">
+        <div className="flex items-center gap-2 mt-3 cursor-pointer select-none">
           <Checkbox
             id="tc-dnd"
             checked={settings.dndEnabled}
             onCheckedChange={(v) => timer.updateSettings({ dndEnabled: v })}
           />
-          <label htmlFor="tc-dnd" className="tc-dnd-label">
+          <label htmlFor="tc-dnd" className="text-ui-2xs text-text-muted font-light">
             Do Not Disturb
           </label>
         </div>
       )}
 
       {dndHint && (
-        <div className="tc-dnd-hint">
-          <p className="tc-dnd-hint-text">{dndHint}</p>
-          <button type="button" onClick={timer.dismissDndHint} className="tc-dnd-hint-close">
-            <X className="tc-icon-xs" />
+        <div className="flex items-center gap-2 mt-2 px-2">
+          <p className="text-ui-3xs font-light leading-[1.3] flex-1 m-0">{dndHint}</p>
+          <button type="button" onClick={timer.dismissDndHint} className="bg-transparent border-none text-text-muted cursor-pointer shrink-0">
+            <X className="w-3 h-3" />
           </button>
         </div>
       )}
 
       {!isBreakPending && !showWarning && (
-        <div className="tc-controls">
+        <div className="flex items-center justify-between w-full mt-4">
           {isBreak ? (
             <>
               <PauseResumeButton timer={timer} />
@@ -373,7 +374,7 @@ function TimerView({ timer, onOpenSettings }: { timer: Timer; onOpenSettings: ()
                 type="button"
                 onClick={timer.skipBreak}
                 disabled={loading}
-                className="tc-pill"
+                className="py-1.5 px-4 rounded-full bg-surface-control border-none text-text-primary text-ui-2xs font-light uppercase tracking-[0.12em] cursor-pointer inline-flex items-center gap-1"
               >
                 Skip
               </button>
@@ -381,7 +382,7 @@ function TimerView({ timer, onOpenSettings }: { timer: Timer; onOpenSettings: ()
                 type="button"
                 onClick={() => timer.stop()}
                 disabled={loading}
-                className="tc-pill is-danger"
+                className="py-1.5 px-4 rounded-full bg-surface-control border-none text-text-primary text-ui-2xs font-light uppercase tracking-[0.12em] cursor-pointer inline-flex items-center gap-1 text-[var(--tray-destructive)]"
               >
                 Stop
               </button>
@@ -394,7 +395,7 @@ function TimerView({ timer, onOpenSettings }: { timer: Timer; onOpenSettings: ()
                 type="button"
                 onClick={timer.takeBreak}
                 disabled={loading}
-                className="tc-pill"
+                className="py-1.5 px-4 rounded-full bg-surface-control border-none text-text-primary text-ui-2xs font-light uppercase tracking-[0.12em] cursor-pointer inline-flex items-center gap-1"
               >
                 Break
               </button>
@@ -402,19 +403,19 @@ function TimerView({ timer, onOpenSettings }: { timer: Timer; onOpenSettings: ()
                 type="button"
                 onClick={() => timer.stop()}
                 disabled={loading}
-                className="tc-pill is-danger"
+                className="py-1.5 px-4 rounded-full bg-surface-control border-none text-text-primary text-ui-2xs font-light uppercase tracking-[0.12em] cursor-pointer inline-flex items-center gap-1 text-[var(--tray-destructive)]"
               >
                 Stop
               </button>
               <SettingsButton onClick={onOpenSettings} />
             </>
           ) : (
-            <div className="tc-idle-controls">
+            <div className="flex items-center justify-center gap-3 w-full">
               <button
                 type="button"
                 onClick={timer.start}
                 disabled={loading}
-                className="tc-pill is-wide"
+                className="py-2 px-8 rounded-full bg-surface-control border-none text-text-primary text-ui-2xs font-light uppercase tracking-[0.12em] cursor-pointer inline-flex items-center gap-1"
               >
                 Start
               </button>
@@ -429,12 +430,12 @@ function TimerView({ timer, onOpenSettings }: { timer: Timer; onOpenSettings: ()
 
 function CoachingDebrief({ message, onDismiss }: { message: string; onDismiss: () => void }) {
   return (
-    <div className="tc-coaching">
-      <div className="tc-coaching-row">
-        <Sparkles className="tc-coaching-icon" strokeWidth={1.5} />
-        <p className="tc-coaching-text">{message}</p>
-        <button type="button" onClick={onDismiss} className="tc-coaching-close">
-          <X className="tc-icon-xs" />
+    <div className="m-2 p-2.5 rounded-lg">
+      <div className="flex items-start gap-2">
+        <Sparkles className="w-3.5 h-3.5 mt-0.5 shrink-0" strokeWidth={1.5} />
+        <p className="flex-1 text-ui-xs text-text-primary leading-normal m-0">{message}</p>
+        <button type="button" onClick={onDismiss} className="bg-transparent border-none text-text-muted cursor-pointer shrink-0">
+          <X className="w-3 h-3" />
         </button>
       </div>
     </div>
@@ -455,16 +456,16 @@ function WarningBanner({ timer, isWorking }: { timer: Timer; isWorking: boolean 
       ];
 
   return (
-    <div className="tc-warning">
-      <p className="tc-warning-text">{isWorking ? "Focus ending soon" : "Break ending soon"}</p>
-      <div className="tc-warning-actions">
+    <div className="flex flex-col items-center gap-2 mt-3">
+      <p className="text-ui-2xs font-light text-center">{isWorking ? "Focus ending soon" : "Break ending soon"}</p>
+      <div className="flex gap-1.5 flex-wrap justify-center">
         {extendOptions.map((opt) => (
           <button
             key={opt.secs}
             type="button"
             onClick={() => timer.extend(opt.secs)}
             disabled={timer.isLoading}
-            className="tc-pill is-warning"
+            className="py-1.5 px-4 rounded-full bg-surface-control border-none text-text-primary text-ui-2xs font-light uppercase tracking-[0.12em] cursor-pointer inline-flex items-center gap-1 bg-[var(--tray-warning-bg)] text-[var(--tray-warning)]"
           >
             {opt.label}
           </button>
@@ -473,7 +474,7 @@ function WarningBanner({ timer, isWorking }: { timer: Timer; isWorking: boolean 
           type="button"
           onClick={() => timer.stop()}
           disabled={timer.isLoading}
-          className="tc-pill"
+          className="py-1.5 px-4 rounded-full bg-surface-control border-none text-text-primary text-ui-2xs font-light uppercase tracking-[0.12em] cursor-pointer inline-flex items-center gap-1"
         >
           End now
         </button>
@@ -484,38 +485,38 @@ function WarningBanner({ timer, isWorking }: { timer: Timer; isWorking: boolean 
 
 function BreakPendingActions({ timer }: { timer: Timer }) {
   return (
-    <div className="tc-break-pending">
-      <p className="tc-break-pending-text">Break starting soon</p>
-      <div className="tc-warning-actions">
+    <div className="flex flex-col items-center gap-2 mt-3">
+      <p className="text-ui-2xs text-text-muted font-light">Break starting soon</p>
+      <div className="flex gap-1.5 flex-wrap justify-center">
         {[5, 10, 15].map((mins) => (
           <button
             key={mins}
             type="button"
             onClick={() => timer.extendWork(mins)}
             disabled={timer.isLoading}
-            className="tc-pill"
+            className="py-1.5 px-4 rounded-full bg-surface-control border-none text-text-primary text-ui-2xs font-light uppercase tracking-[0.12em] cursor-pointer inline-flex items-center gap-1"
           >
             +{mins}m work
           </button>
         ))}
       </div>
-      <div className="tc-warning-actions">
+      <div className="flex gap-1.5 flex-wrap justify-center">
         <button
           type="button"
           onClick={timer.startBreak}
           disabled={timer.isLoading}
-          className="tc-pill"
+          className="py-1.5 px-4 rounded-full bg-surface-control border-none text-text-primary text-ui-2xs font-light uppercase tracking-[0.12em] cursor-pointer inline-flex items-center gap-1"
         >
-          <Coffee className="tc-icon-xs" strokeWidth={1.5} />
+          <Coffee className="w-3 h-3" strokeWidth={1.5} />
           Start Break
         </button>
         <button
           type="button"
           onClick={() => timer.stop()}
           disabled={timer.isLoading}
-          className="tc-pill"
+          className="py-1.5 px-4 rounded-full bg-surface-control border-none text-text-primary text-ui-2xs font-light uppercase tracking-[0.12em] cursor-pointer inline-flex items-center gap-1"
         >
-          <Square className="tc-icon-xs" strokeWidth={1.5} />
+          <Square className="w-3 h-3" strokeWidth={1.5} />
           Stop
         </button>
       </div>
@@ -535,18 +536,18 @@ function FocusSettingsPanel({
   const [tab, setTab] = useState<"duration" | "notifications">("duration");
 
   return (
-    <div className="tc-settings">
-      <div className="tc-settings-header">
-        <div className="tc-settings-spacer" />
-        <span className="tc-settings-title">Settings</span>
+    <div className="p-4">
+      <div className="flex items-center mb-5">
+        <div className="flex-1" />
+        <span className="text-ui-lg text-text-primary font-light">Settings</span>
         <div className="tc-settings-spacer tc-settings-spacer-right">
-          <button type="button" onClick={onClose} className="tc-icon-btn">
-            <X className="tc-icon-sm" strokeWidth={1.5} />
+          <button type="button" onClick={onClose} className="w-8 h-8 rounded-full bg-transparent flex items-center justify-center text-text-muted cursor-pointer">
+            <X className="w-3.5 h-3.5" strokeWidth={1.5} />
           </button>
         </div>
       </div>
 
-      <div className="tc-tabs">
+      <div className="flex p-0.5 rounded-full bg-surface-control mb-5">
         <button
           type="button"
           onClick={() => setTab("duration")}
@@ -564,7 +565,7 @@ function FocusSettingsPanel({
       </div>
 
       {tab === "duration" ? (
-        <div className="tc-settings-list">
+        <div className="flex flex-col gap-1">
           <SettingRow
             label="Focus Session"
             value={settings.focusDuration}
@@ -593,23 +594,23 @@ function FocusSettingsPanel({
           />
         </div>
       ) : (
-        <div className="tc-settings-list">
-          <div className="tc-settings-row">
-            <span className="tc-settings-label">Sound</span>
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center justify-between py-2.5">
+            <span className="text-ui-sm text-text-muted font-light">Sound</span>
             <Checkbox
               checked={settings.soundEnabled}
               onCheckedChange={(v) => onUpdate({ soundEnabled: !!v })}
             />
           </div>
-          <div className="tc-settings-row">
-            <span className="tc-settings-label">Notification</span>
+          <div className="flex items-center justify-between py-2.5">
+            <span className="text-ui-sm text-text-muted font-light">Notification</span>
             <Checkbox
               checked={settings.notificationEnabled}
               onCheckedChange={(v) => onUpdate({ notificationEnabled: !!v })}
             />
           </div>
-          <div className="tc-settings-row">
-            <span className="tc-settings-label">Do Not Disturb</span>
+          <div className="flex items-center justify-between py-2.5">
+            <span className="text-ui-sm text-text-muted font-light">Do Not Disturb</span>
             <Checkbox
               checked={settings.dndEnabled}
               onCheckedChange={(v) => onUpdate({ dndEnabled: v })}
@@ -653,15 +654,15 @@ function SettingRow({
   };
 
   return (
-    <div className="tc-settings-row">
-      <span className="tc-settings-label">{label}</span>
+    <div className="flex items-center justify-between py-2.5">
+      <span className="text-ui-sm text-text-muted font-light">{label}</span>
       {editing ? (
         <form
           onSubmit={(e) => {
             e.preventDefault();
             save();
           }}
-          className="tc-settings-edit"
+          className="flex items-center gap-1"
         >
           <input
             ref={inputRef}
@@ -671,15 +672,15 @@ function SettingRow({
             onBlur={save}
             min={min}
             max={max}
-            className="tc-settings-input"
+            className="w-10 text-right text-ui-sm font-light text-text-primary bg-transparent border-none outline-none tabular-nums"
           />
-          <span className="tc-settings-unit">{unit}</span>
+          <span className="text-ui-2xs text-text-dim font-light">{unit}</span>
         </form>
       ) : (
-        <button type="button" onClick={startEdit} className="tc-settings-value">
-          <span className="tc-settings-num">{String(value).padStart(2, "0")}</span>
-          <span className="tc-settings-unit">{unit}</span>
-          <ChevronRight className="tc-icon-sm" strokeWidth={1.5} />
+        <button type="button" onClick={startEdit} className="flex items-center gap-1.5 bg-transparent border-none text-text-muted cursor-pointer">
+          <span className="text-ui-sm font-light tabular-nums">{String(value).padStart(2, "0")}</span>
+          <span className="text-ui-2xs text-text-dim font-light">{unit}</span>
+          <ChevronRight className="w-3.5 h-3.5" strokeWidth={1.5} />
         </button>
       )}
     </div>

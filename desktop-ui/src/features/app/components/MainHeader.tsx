@@ -13,6 +13,7 @@ import { BranchList } from "@/features/git/components/BranchList";
 import { filterBranches, findExactBranch } from "@/features/git/utils/branchSearch";
 import { validateBranchName } from "@/features/git/utils/branchValidation";
 import type { BranchInfo, OpenAppTarget, WorkspaceInfo } from "@/types";
+import { cn } from "@/utils/cn";
 import { useMenuController } from "../hooks/useMenuController";
 import type { WorkspaceLaunchScriptsState } from "../hooks/useWorkspaceLaunchScripts";
 import { LaunchScriptButton } from "./LaunchScriptButton";
@@ -179,19 +180,24 @@ export function MainHeader({
   };
 
   return (
-    <header className="main-header" data-tauri-drag-region>
-      <div className="workspace-header">
-        <div className="workspace-title-line">
-          <span className="workspace-title">{parentName ? parentName : workspace.name}</span>
-          <span className="workspace-separator" aria-hidden>
+    <header
+      className="flex justify-between items-center gap-5 min-w-0 flex-1 w-full select-none"
+      data-tauri-drag-region
+    >
+      <div className="flex items-center min-w-0 flex-1 max-w-[min(100%,var(--conversation-column-width))]">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-ui-sm font-semibold text-text-primary truncate">
+            {parentName ? parentName : workspace.name}
+          </span>
+          <span className="text-text-muted text-ui-sm" aria-hidden>
             ›
           </span>
           {disableBranchMenu ? (
-            <div className="workspace-branch-static-row" ref={infoRef}>
+            <div className="flex items-center" ref={infoRef}>
               <MenuTrigger
                 isOpen={infoOpen}
                 popupRole="dialog"
-                className="workspace-branch-static-button"
+                className="text-ui-sm text-text-muted bg-transparent border-none cursor-pointer"
                 onClick={infoMenu.toggle}
                 data-tauri-drag-region="false"
                 title="Worktree info"
@@ -199,14 +205,16 @@ export function MainHeader({
                 {worktreeLabel || branchName}
               </MenuTrigger>
               {infoOpen && (
-                <PopoverSurface className="worktree-info-popover" role="dialog">
+                <PopoverSurface className="min-w-[280px] p-3" role="dialog">
                   {worktreeRename && (
-                    <div className="worktree-info-rename">
-                      <span className="worktree-info-label">Name</span>
-                      <div className="worktree-info-command">
+                    <div className="mb-3">
+                      <span className="text-ui-xs text-text-muted uppercase tracking-wider block mb-1">
+                        Name
+                      </span>
+                      <div className="flex items-center gap-2">
                         <input
                           ref={renameInputRef}
-                          className="worktree-info-input"
+                          className="flex-1 bg-surface-control border border-border-muted rounded-lg px-2 py-1 text-ui-sm text-text-primary outline-none [-webkit-app-region:no-drag]"
                           value={worktreeRename.name}
                           onFocus={() => {
                             worktreeRename.onFocus();
@@ -243,7 +251,7 @@ export function MainHeader({
                         />
                         <button
                           type="button"
-                          className="icon-button worktree-info-confirm"
+                          className="icon-button"
                           ref={renameConfirmRef}
                           onClick={() => worktreeRename.onCommit()}
                           disabled={worktreeRename.isSubmitting || !worktreeRename.isDirty}
@@ -254,27 +262,27 @@ export function MainHeader({
                         </button>
                       </div>
                       {worktreeRename.error && (
-                        <div className="worktree-info-error">{worktreeRename.error}</div>
+                        <div className="text-ui-xs text-status-error mt-1">{worktreeRename.error}</div>
                       )}
                       {worktreeRename.notice && (
-                        <span className="worktree-info-subtle">{worktreeRename.notice}</span>
+                        <span className="text-ui-xs text-text-muted">{worktreeRename.notice}</span>
                       )}
                       {worktreeRename.upstream && (
-                        <div className="worktree-info-upstream">
-                          <span className="worktree-info-subtle">
+                        <div className="mt-2 p-2 rounded-lg bg-surface-card">
+                          <span className="text-ui-xs text-text-muted">
                             Do you want to update the upstream branch to{" "}
                             <strong>{worktreeRename.upstream.newBranch}</strong>?
                           </span>
                           <button
                             type="button"
-                            className="ghost worktree-info-upstream-button"
+                            className="ghost mt-2"
                             onClick={worktreeRename.upstream.onConfirm}
                             disabled={worktreeRename.upstream.isSubmitting}
                           >
                             Update upstream
                           </button>
                           {worktreeRename.upstream.error && (
-                            <div className="worktree-info-error">
+                            <div className="text-ui-xs text-status-error mt-1">
                               {worktreeRename.upstream.error}
                             </div>
                           )}
@@ -282,16 +290,18 @@ export function MainHeader({
                       )}
                     </div>
                   )}
-                  <div className="worktree-info-title">Worktree</div>
-                  <div className="worktree-info-row">
-                    <span className="worktree-info-label">
+                  <div className="text-ui-sm font-semibold text-text-stronger mb-2">Worktree</div>
+                  <div className="mb-3">
+                    <span className="text-ui-xs text-text-muted uppercase tracking-wider block mb-1">
                       Terminal{parentPath ? " (repo root)" : ""}
                     </span>
-                    <div className="worktree-info-command">
-                      <code className="worktree-info-code">{cdCommand}</code>
+                    <div className="flex items-center gap-2">
+                      <code className="font-code text-ui-xs text-text-primary bg-surface-control px-2 py-1 rounded-md">
+                        {cdCommand}
+                      </code>
                       <button
                         type="button"
-                        className="worktree-info-copy"
+                        className="text-text-muted hover:text-text-strong [-webkit-app-region:no-drag]"
                         onClick={async () => {
                           await navigator.clipboard.writeText(cdCommand);
                         }}
@@ -302,15 +312,17 @@ export function MainHeader({
                         <Copy aria-hidden />
                       </button>
                     </div>
-                    <span className="worktree-info-subtle">
+                    <span className="text-ui-xs text-text-muted block mt-1">
                       Open this worktree in your terminal.
                     </span>
                   </div>
-                  <div className="worktree-info-row">
-                    <span className="worktree-info-label">Reveal</span>
+                  <div className="mb-0">
+                    <span className="text-ui-xs text-text-muted uppercase tracking-wider block mb-1">
+                      Reveal
+                    </span>
                     <button
                       type="button"
-                      className="worktree-info-reveal"
+                      className="text-text-accent hover:underline text-ui-sm [-webkit-app-region:no-drag]"
                       onClick={async () => {
                         await revealItemInDir(resolvedWorktreePath);
                       }}
@@ -323,26 +335,26 @@ export function MainHeader({
               )}
             </div>
           ) : (
-            <div className="workspace-branch-menu" ref={menuRef}>
+            <div className="relative" ref={menuRef}>
               <MenuTrigger
                 isOpen={menuOpen}
-                className="workspace-branch-button"
+                className="flex items-center gap-1 bg-transparent border-none cursor-pointer text-text-muted hover:text-text-strong"
                 onClick={branchMenu.toggle}
                 data-tauri-drag-region="false"
               >
-                <span className="workspace-branch">{branchName}</span>
-                <span className="workspace-branch-caret" aria-hidden>
+                <span className="text-ui-sm text-text-muted">{branchName}</span>
+                <span className="text-ui-xs text-text-muted" aria-hidden>
                   ›
                 </span>
               </MenuTrigger>
               {menuOpen && (
                 <PopoverSurface
-                  className="workspace-branch-dropdown"
+                  className="absolute left-0 top-[calc(100%+8px)] min-w-[200px] z-5"
                   role="menu"
                   data-tauri-drag-region="false"
                 >
-                  <div className="branch-actions">
-                    <div className="branch-search">
+                  <div className="p-2">
+                    <div className="flex gap-2 mb-2">
                       <input
                         value={branchQuery}
                         onChange={(event) => {
@@ -381,7 +393,7 @@ export function MainHeader({
                           }
                         }}
                         placeholder="Search or create branch"
-                        className="branch-input"
+                        className="flex-1 bg-surface-control border border-border-muted rounded-lg px-2 py-1 text-ui-sm text-text-primary outline-none [-webkit-app-region:no-drag]"
                         autoCorrect="off"
                         autoCapitalize="none"
                         spellCheck={false}
@@ -390,7 +402,7 @@ export function MainHeader({
                       />
                       <button
                         type="button"
-                        className="branch-create-button"
+                        className="primary"
                         disabled={!canCreate || Boolean(branchValidationMessage)}
                         onClick={async () => {
                           if (branchValidationMessage) {
@@ -415,22 +427,24 @@ export function MainHeader({
                       </button>
                     </div>
                     {branchValidationMessage && (
-                      <div className="branch-error">{branchValidationMessage}</div>
+                      <div className="text-ui-xs text-status-error mt-1">{branchValidationMessage}</div>
                     )}
                     {canCreate && !branchValidationMessage && (
-                      <div className="branch-create-hint">Create branch “{trimmedQuery}”</div>
+                      <div className="text-ui-xs text-text-muted mt-1">
+                        Create branch &ldquo;{trimmedQuery}&rdquo;
+                      </div>
                     )}
                   </div>
                   <BranchList
                     branches={filteredBranches}
                     currentBranch={branchName}
-                    listClassName="branch-list"
+                    listClassName="flex flex-col gap-0.5"
                     listRole="none"
-                    itemClassName="branch-item"
-                    currentItemClassName="is-active"
+                    itemClassName="flex items-center gap-2 px-2 py-1 rounded-md text-ui-sm text-text-muted cursor-pointer hover:bg-surface-hover"
+                    currentItemClassName="bg-surface-active text-text-strong"
                     itemRole="menuitem"
                     itemDataTauriDragRegion="false"
-                    emptyClassName="branch-empty"
+                    emptyClassName="p-2 text-ui-xs text-text-muted text-center"
                     emptyText="No branches found"
                     onSelect={async (branch) => {
                       if (branch.name === branchName) {
@@ -446,21 +460,21 @@ export function MainHeader({
                       }
                     }}
                   />
-                  {error && <div className="branch-error">{error}</div>}
+                  {error && <div className="text-ui-xs text-status-error mt-1 p-2">{error}</div>}
                 </PopoverSurface>
               )}
             </div>
           )}
         </div>
       </div>
-      <div className="main-header-actions">
+      <div className="flex items-center gap-2.5 shrink-0 [-webkit-app-region:no-drag]">
         {showWorkspaceTools &&
           onRunLaunchScript &&
           onOpenLaunchScriptEditor &&
           onCloseLaunchScriptEditor &&
           onLaunchScriptDraftChange &&
           onSaveLaunchScript && (
-            <div className="launch-script-cluster">
+            <div className="inline-flex items-center gap-1">
               <LaunchScriptButton
                 launchScript={launchScript}
                 editorOpen={launchScriptEditorOpen}
@@ -519,7 +533,10 @@ export function MainHeader({
         {showTerminalButton && (
           <button
             type="button"
-            className={`ghost main-header-action ds-tooltip-trigger${isTerminalOpen ? " is-active" : ""}`}
+            className={cn(
+              "ghost main-header-action ds-tooltip-trigger",
+              isTerminalOpen && "is-active"
+            )}
             onClick={onToggleTerminal}
             data-tauri-drag-region="false"
             aria-label="Toggle terminal panel"
@@ -532,7 +549,10 @@ export function MainHeader({
         )}
         <button
           type="button"
-          className={`ghost main-header-action ds-tooltip-trigger${copyFeedback ? " is-copied" : ""}`}
+          className={cn(
+            "ghost main-header-action ds-tooltip-trigger",
+            copyFeedback && "is-copied"
+          )}
           onClick={handleCopyClick}
           disabled={!canCopyThread || !onCopyThread}
           data-tauri-drag-region="false"
@@ -541,9 +561,21 @@ export function MainHeader({
           data-tooltip="Copy thread"
           data-tooltip-placement="bottom"
         >
-          <span className="main-header-icon" aria-hidden>
-            <Copy className="main-header-icon-copy" size={14} />
-            <Check className="main-header-icon-check" size={14} />
+          <span className="relative w-3.5 h-3.5 inline-flex items-center justify-center" aria-hidden>
+            <Copy
+              className={cn(
+                "absolute inset-0 transition-all duration-150",
+                copyFeedback ? "opacity-0 scale-[0.82] blur-[2px]" : "opacity-100 scale-100 blur-0"
+              )}
+              size={14}
+            />
+            <Check
+              className={cn(
+                "absolute inset-0 transition-all duration-150",
+                copyFeedback ? "opacity-100 scale-100 blur-0" : "opacity-0 scale-[0.82] blur-[2px]"
+              )}
+              size={14}
+            />
           </span>
         </button>
         {extraActionsNode}

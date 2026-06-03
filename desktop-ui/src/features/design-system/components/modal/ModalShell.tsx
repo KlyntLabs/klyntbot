@@ -22,7 +22,7 @@ export function ModalShell({
 }: ModalShellProps) {
   return (
     <div
-      className={cn("ds-modal", className)}
+      className={cn("fixed inset-0 z-ui-modal", className)}
       role="dialog"
       aria-modal="true"
       aria-label={ariaLabel}
@@ -31,11 +31,21 @@ export function ModalShell({
     >
       <button
         type="button"
-        className="ds-modal-backdrop"
+        className="absolute inset-0 bg-[var(--ds-modal-backdrop)] backdrop-blur-[8px] animate-[ds-modal-backdrop-in_var(--ds-dur-entrance)_var(--ds-ease-out)_both] [app.reduced-transparency_&]:backdrop-blur-none"
         aria-label="Close dialog"
         onClick={onBackdropClick}
       />
-      <div className={cn("ds-modal-card", cardClassName)}>{children}</div>
+      <div
+        className={cn(
+          "absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2",
+          "bg-ds-surface-card border border-ds-border-strong text-ds-text-strong",
+          "shadow-[0_18px_40px_rgba(0,0,0,0.35)]",
+          "animate-[ds-modal-card-in_var(--ds-dur-slow)_var(--ds-ease-out)_both]",
+          cardClassName,
+        )}
+      >
+        {children}
+      </div>
     </div>
   );
 }

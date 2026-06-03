@@ -1,4 +1,5 @@
 import type { ReviewPromptState, ReviewPromptStep } from "@threads/hooks/useReviewPrompt";
+import { cn } from "@/utils/cn";
 import { memo, useMemo } from "react";
 
 type ReviewInlinePromptProps = {
@@ -38,9 +39,12 @@ const PresetStep = memo(function PresetStep({
   onHighlightPreset: (index: number) => void;
 }) {
   const optionClass = (index: number) =>
-    `review-inline-option${index === highlightedPresetIndex ? " is-selected" : ""}`;
+    cn(
+      "review-inline-option rounded-[10px] border border-border-subtle bg-surface-card-muted text-text-strong p-[10px_12px] text-ui-sm flex flex-col items-start gap-0.5 text-left",
+      index === highlightedPresetIndex && "is-selected",
+    );
   return (
-    <div className="review-inline-section">
+    <div className="flex flex-col gap-2">
       <button
         type="button"
         className={optionClass(0)}
@@ -48,8 +52,8 @@ const PresetStep = memo(function PresetStep({
         onMouseEnter={() => onHighlightPreset(0)}
         disabled={isSubmitting}
       >
-        <span className="review-inline-option-title">Review against a base branch</span>
-        <span className="review-inline-option-subtitle">(PR Style)</span>
+        <span className="font-semibold">Review against a base branch</span>
+        <span className="text-ui-xs text-text-faint">(PR Style)</span>
       </button>
       <button
         type="button"
@@ -58,7 +62,7 @@ const PresetStep = memo(function PresetStep({
         onMouseEnter={() => onHighlightPreset(1)}
         disabled={isSubmitting}
       >
-        <span className="review-inline-option-title">Review uncommitted changes</span>
+        <span className="font-semibold">Review uncommitted changes</span>
       </button>
       <button
         type="button"
@@ -67,7 +71,7 @@ const PresetStep = memo(function PresetStep({
         onMouseEnter={() => onHighlightPreset(2)}
         disabled={isSubmitting}
       >
-        <span className="review-inline-option-title">Review a commit</span>
+        <span className="font-semibold">Review a commit</span>
       </button>
       <button
         type="button"
@@ -76,7 +80,7 @@ const PresetStep = memo(function PresetStep({
         onMouseEnter={() => onHighlightPreset(3)}
         disabled={isSubmitting}
       >
-        <span className="review-inline-option-title">Custom review instructions</span>
+        <span className="font-semibold">Custom review instructions</span>
       </button>
     </div>
   );
@@ -101,8 +105,8 @@ const BaseBranchStep = memo(function BaseBranchStep({
 }) {
   const branches = reviewPrompt.branches;
   return (
-    <div className="review-inline-section">
-      <div className="review-inline-row">
+    <div className="flex flex-col gap-2">
+      <div className="flex justify-between items-center gap-2">
         <button
           type="button"
           className="ghost review-inline-back"
@@ -120,12 +124,12 @@ const BaseBranchStep = memo(function BaseBranchStep({
           Start review
         </button>
       </div>
-      <div className="review-inline-hint">Pick a recent local branch:</div>
-      <div className="review-inline-list" role="listbox" aria-label="Base branches">
+      <div className="text-ui-sm text-text-subtle">Pick a recent local branch:</div>
+      <div className="flex flex-col gap-[6px] max-h-[200px] overflow-auto pr-0.5" role="listbox" aria-label="Base branches">
         {reviewPrompt.isLoadingBranches ? (
-          <div className="review-inline-empty">Loading branches…</div>
+          <div className="text-ui-sm text-text-subtle px-0.5 py-1">Loading branches…</div>
         ) : branches.length === 0 ? (
-          <div className="review-inline-empty">No branches found.</div>
+          <div className="text-ui-sm text-text-subtle px-0.5 py-1">No branches found.</div>
         ) : (
           branches.map((branch, index) => {
             const selected = index === highlightedBranchIndex;
@@ -135,7 +139,10 @@ const BaseBranchStep = memo(function BaseBranchStep({
                 type="button"
                 role="option"
                 aria-selected={selected}
-                className={`review-inline-list-item${selected ? " is-selected" : ""}`}
+                className={cn(
+                  "review-inline-list-item rounded-[9px] border border-border-subtle bg-surface-card-muted text-text-strong p-[8px_10px] text-ui-sm text-left",
+                  selected && "is-selected",
+                )}
                 onClick={() => onSelectBranch(branch.name)}
                 onMouseEnter={() => {
                   onHighlightBranch(index);
@@ -172,8 +179,8 @@ const CommitStep = memo(function CommitStep({
 }) {
   const commits = reviewPrompt.commits;
   return (
-    <div className="review-inline-section">
-      <div className="review-inline-row">
+    <div className="flex flex-col gap-2">
+      <div className="flex justify-between items-center gap-2">
         <button
           type="button"
           className="ghost review-inline-back"
@@ -191,12 +198,12 @@ const CommitStep = memo(function CommitStep({
           Start review
         </button>
       </div>
-      <div className="review-inline-hint">Select a recent commit:</div>
-      <div className="review-inline-list" role="listbox" aria-label="Commits">
+      <div className="text-ui-sm text-text-subtle">Select a recent commit:</div>
+      <div className="flex flex-col gap-[6px] max-h-[200px] overflow-auto pr-0.5" role="listbox" aria-label="Commits">
         {reviewPrompt.isLoadingCommits ? (
-          <div className="review-inline-empty">Loading commits…</div>
+          <div className="text-ui-sm text-text-subtle px-0.5 py-1">Loading commits…</div>
         ) : commits.length === 0 ? (
-          <div className="review-inline-empty">No commits found.</div>
+          <div className="text-ui-sm text-text-subtle px-0.5 py-1">No commits found.</div>
         ) : (
           commits.map((commit, index) => {
             const title = commit.summary || commit.sha;
@@ -207,9 +214,10 @@ const CommitStep = memo(function CommitStep({
                 type="button"
                 role="option"
                 aria-selected={selected}
-                className={`review-inline-list-item review-inline-commit${
-                  selected ? " is-selected" : ""
-                }`}
+                className={cn(
+                  "review-inline-list-item flex flex-col gap-0.5 rounded-[9px] border border-border-subtle bg-surface-card-muted text-text-strong p-[8px_10px] text-ui-sm text-left",
+                  selected && "is-selected",
+                )}
                 onClick={() => onSelectCommit(commit.sha, title)}
                 onMouseEnter={() => {
                   onHighlightCommit(index);
@@ -217,8 +225,8 @@ const CommitStep = memo(function CommitStep({
                 }}
                 disabled={reviewPrompt.isSubmitting}
               >
-                <span className="review-inline-commit-title">{title}</span>
-                <span className="review-inline-commit-meta">{shortSha(commit.sha)}</span>
+                <span className="font-semibold">{title}</span>
+                <span className="text-ui-xs text-text-faint">{shortSha(commit.sha)}</span>
               </button>
             );
           })
@@ -241,8 +249,8 @@ const CustomStep = memo(function CustomStep({
 }) {
   const canSubmit = reviewPrompt.customInstructions.trim().length > 0;
   return (
-    <div className="review-inline-section">
-      <div className="review-inline-row">
+    <div className="flex flex-col gap-2">
+      <div className="flex justify-between items-center gap-2">
         <button
           type="button"
           className="ghost review-inline-back"
@@ -260,12 +268,12 @@ const CustomStep = memo(function CustomStep({
           Start review
         </button>
       </div>
-      <label className="review-inline-label" htmlFor="review-inline-custom-instructions">
+      <label className="text-ui-sm text-text-faint" htmlFor="review-inline-custom-instructions">
         Instructions
       </label>
       <textarea
         id="review-inline-custom-instructions"
-        className="review-inline-textarea"
+        className="review-inline-textarea rounded-[10px] border border-border-subtle bg-surface-card-muted text-text-strong p-[9px_11px] text-ui-sm w-full"
         value={reviewPrompt.customInstructions}
         onChange={(event) => onUpdateCustomInstructions(event.target.value)}
         placeholder="Focus on correctness, edge cases, and missing tests."
@@ -311,10 +319,10 @@ export const ReviewInlinePrompt = memo(function ReviewInlinePrompt({
   }, [step]);
 
   return (
-    <div className="review-inline" role="dialog" aria-label={title}>
-      <div className="review-inline-header">
-        <div className="review-inline-title">{title}</div>
-        <div className="review-inline-subtitle">{reviewPrompt.workspace.name}</div>
+    <div className="flex flex-col gap-[10px]" role="dialog" aria-label={title}>
+      <div className="flex flex-col gap-0.5">
+        <div className="text-ui-md font-semibold text-text-strong">{title}</div>
+        <div className="text-ui-sm text-text-subtle">{reviewPrompt.workspace.name}</div>
       </div>
 
       {step === "preset" ? (
@@ -353,9 +361,9 @@ export const ReviewInlinePrompt = memo(function ReviewInlinePrompt({
         />
       )}
 
-      {error && <div className="review-inline-error">{error}</div>}
+      {error && <div className="text-ui-sm text-[var(--accent-danger)] bg-[rgba(255,100,100,0.08)] border border-[rgba(255,100,100,0.2)] p-[7px_9px] rounded-[9px]">{error}</div>}
 
-      <div className="review-inline-actions">
+      <div className="flex justify-end gap-2">
         <button type="button" className="ghost review-inline-button" onClick={onClose}>
           Close
         </button>

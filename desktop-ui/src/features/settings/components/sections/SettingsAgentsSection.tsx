@@ -348,7 +348,7 @@ export function SettingsAgentsSection({
       title="Agents"
       subtitle="Configure multi-agent mode, limits, and custom agent roles."
     >
-      <div className="settings-help settings-agents-builtins-help">
+      <div className="text-ui-xs text-text-subtle mb-2">
         Built-in roles from Codex are still available: <code>default</code>, <code>explorer</code>,
         and <code>worker</code>.
       </div>
@@ -357,7 +357,7 @@ export function SettingsAgentsSection({
         title="Config file"
         subtitle={<>Open global Codex config in {fileManagerName()}.</>}
       >
-        <div className="settings-agents-actions">
+        <div className="inline-flex items-center flex-wrap gap-1.5">
           <button type="button" className="ghost" onClick={onRefresh} disabled={isLoading}>
             Refresh
           </button>
@@ -395,10 +395,10 @@ export function SettingsAgentsSection({
           </>
         }
       >
-        <fieldset className="settings-agents-stepper" aria-label="Maximum agent threads">
+        <fieldset className="inline-flex items-center gap-2.5 px-1.5 py-1 rounded-xl border border-border-muted bg-surface-control" aria-label="Maximum agent threads">
           <button
             type="button"
-            className="ghost settings-agents-stepper-button"
+            className="ghost w-7 h-7 p-0 text-ui-md font-bold inline-flex items-center justify-center"
             onClick={() => {
               void handleMaxThreadsStep(-1);
             }}
@@ -407,12 +407,12 @@ export function SettingsAgentsSection({
           >
             ▼
           </button>
-          <div className="settings-agents-stepper-value" aria-live="polite" aria-atomic="true">
+          <div className="min-w-[2ch] text-center text-ui-sm font-bold text-text-strong" aria-live="polite" aria-atomic="true">
             {currentMaxThreads}
           </div>
           <button
             type="button"
-            className="ghost settings-agents-stepper-button"
+            className="ghost w-7 h-7 p-0 text-ui-md font-bold inline-flex items-center justify-center"
             onClick={() => {
               void handleMaxThreadsStep(1);
             }}
@@ -432,10 +432,10 @@ export function SettingsAgentsSection({
           </>
         }
       >
-        <fieldset className="settings-agents-stepper" aria-label="Maximum agent depth">
+        <fieldset className="inline-flex items-center gap-2.5 px-1.5 py-1 rounded-xl border border-border-muted bg-surface-control" aria-label="Maximum agent depth">
           <button
             type="button"
-            className="ghost settings-agents-stepper-button"
+            className="ghost w-7 h-7 p-0 text-ui-md font-bold inline-flex items-center justify-center"
             onClick={() => {
               void handleMaxDepthStep(-1);
             }}
@@ -444,12 +444,12 @@ export function SettingsAgentsSection({
           >
             ▼
           </button>
-          <div className="settings-agents-stepper-value" aria-live="polite" aria-atomic="true">
+          <div className="min-w-[2ch] text-center text-ui-sm font-bold text-text-strong" aria-live="polite" aria-atomic="true">
             {currentMaxDepth}
           </div>
           <button
             type="button"
-            className="ghost settings-agents-stepper-button"
+            className="ghost w-7 h-7 p-0 text-ui-md font-bold inline-flex items-center justify-center"
             onClick={() => {
               void handleMaxDepthStep(1);
             }}
@@ -469,14 +469,14 @@ export function SettingsAgentsSection({
           </>
         }
       />
-      <div className="settings-field settings-agents-form">
-        <div className="settings-agents-description-row">
-          <label className="settings-label" htmlFor="settings-agent-create-name">
+      <div className="flex flex-col gap-2.5 mb-4.5">
+        <div className="flex items-center justify-between gap-2">
+          <label className="text-ui-sm font-semibold text-text-strong" htmlFor="settings-agent-create-name">
             Name
           </label>
           <button
             type="button"
-            className="ghost settings-icon-button settings-agents-generate-button"
+            className="ghost w-7 h-7 p-0 inline-flex items-center justify-center rounded-lg"
             onClick={() => {
               if (createDescriptionGenerating || !canGenerateCreateFromName) {
                 return;
@@ -502,7 +502,7 @@ export function SettingsAgentsSection({
             aria-label="Generate fields for new agent"
           >
             {createDescriptionGenerating ? (
-              <MagicSparkleLoaderIcon className="settings-agents-generate-loader" />
+              <MagicSparkleLoaderIcon className="w-3.5 h-3.5 animate-[spin_var(--duration-ui-spinner)_linear_infinite]" />
             ) : (
               <MagicSparkleIcon />
             )}
@@ -510,41 +510,41 @@ export function SettingsAgentsSection({
         </div>
         <input
           id="settings-agent-create-name"
-          className="settings-input"
+          className="flex-1 min-w-0 py-2.5 px-3 rounded-xl border border-border-muted bg-surface-control text-text-strong text-ui-sm outline-none transition-colors focus:border-border-strong focus:shadow-[0_0_0_3px_rgba(99,102,241,0.16)]"
           value={createName}
           onChange={(event) => setCreateName(event.target.value)}
           placeholder="researcher"
           disabled={creatingAgent}
         />
-        <label className="settings-label" htmlFor="settings-agent-create-description">
+        <label className="text-ui-sm font-semibold text-text-strong" htmlFor="settings-agent-create-description">
           Description
         </label>
         <textarea
           id="settings-agent-create-description"
-          className="settings-agents-textarea settings-agents-textarea--compact"
+          className="w-full min-h-14 resize-y rounded-xl border border-border-muted bg-surface-1 text-text-strong font-code text-ui-sm leading-snug px-3 py-2.5 outline-none focus:border-border-strong focus:shadow-[0_0_0_3px_rgba(99,102,241,0.16)]"
           value={createDescription}
           onChange={(event) => setCreateDescription(event.target.value)}
           placeholder="Short role summary."
           rows={2}
           disabled={creatingAgent}
         />
-        <label className="settings-label" htmlFor="settings-agent-create-developer-instructions">
+        <label className="text-ui-sm font-semibold text-text-strong" htmlFor="settings-agent-create-developer-instructions">
           Developer instructions
         </label>
         <textarea
           id="settings-agent-create-developer-instructions"
-          className="settings-agents-textarea"
+          className="w-full min-h-[150px] resize-y rounded-xl border border-border-muted bg-surface-1 text-text-strong font-code text-ui-sm leading-relaxed px-3 py-2.5 outline-none focus:border-border-strong focus:shadow-[0_0_0_3px_rgba(99,102,241,0.16)]"
           value={createDeveloperInstructions}
           onChange={(event) => setCreateDeveloperInstructions(event.target.value)}
           placeholder="Multiline per-agent developer instructions."
           disabled={creatingAgent}
         />
-        <div className="settings-agents-model-row">
-          <div className="settings-agents-model-field settings-agents-model-field--model">
-            <span className="settings-agents-inline-label">model:</span>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-row items-center gap-1.5 flex-auto min-w-0">
+            <span className="text-ui-2xs font-semibold tracking-wide text-text-muted lowercase">model:</span>
             <select
               id="settings-agent-create-model"
-              className="settings-select settings-select--compact"
+              className="py-2 px-2.5 rounded-xl border border-border-muted bg-surface-control text-text-strong text-ui-sm outline-none transition-colors focus:border-border-strong focus:shadow-[0_0_0_3px_rgba(99,102,241,0.16)]"
               value={createModel}
               onChange={(event) => setCreateModel(event.target.value)}
               disabled={creatingAgent}
@@ -557,14 +557,14 @@ export function SettingsAgentsSection({
               ))}
             </select>
           </div>
-          <span className="settings-agents-inline-separator" aria-hidden>
+          <span className="text-ui-xs text-text-muted opacity-80" aria-hidden>
             |
           </span>
-          <div className="settings-agents-model-field settings-agents-model-field--effort">
-            <span className="settings-agents-inline-label">reasoning:</span>
+          <div className="flex flex-row items-center gap-1.5 flex-auto min-w-0">
+            <span className="text-ui-2xs font-semibold tracking-wide text-text-muted lowercase">reasoning:</span>
             <select
               id="settings-agent-create-effort"
-              className="settings-select settings-select--compact"
+              className="py-2 px-2.5 rounded-xl border border-border-muted bg-surface-control text-text-strong text-ui-sm outline-none transition-colors focus:border-border-strong focus:shadow-[0_0_0_3px_rgba(99,102,241,0.16)]"
               value={createReasoningEffort}
               onChange={(event) => setCreateReasoningEffort(event.target.value)}
               disabled={creatingAgent || createReasoningOptions.length === 0}
@@ -579,20 +579,20 @@ export function SettingsAgentsSection({
             </select>
           </div>
         </div>
-        <div className="settings-agents-actions">
+        <div className="inline-flex items-center flex-wrap gap-1.5">
           <button type="button" className="ghost" onClick={() => void handleCreateAgent()}>
             {creatingAgent ? "Creating..." : "Create Agent"}
           </button>
         </div>
         {modelOptions.length === 0 && (
-          <div className="settings-help">
+          <div className="text-ui-xs text-text-subtle">
             {modelOptionsLoading
               ? "Loading workspace model metadata. Using fallback model defaults for now."
               : "Using fallback model defaults until workspace model metadata is available."}
           </div>
         )}
-        {modelOptionsError && <div className="settings-help">{modelOptionsError}</div>}
-        {createError && <div className="settings-agents-error">{createError}</div>}
+        {modelOptionsError && <div className="text-ui-xs text-text-subtle">{modelOptionsError}</div>}
+        {createError && <div className="text-ui-sm text-status-error bg-[rgba(236,72,153,0.08)] rounded-xl px-2.5 py-2 border border-[rgba(236,72,153,0.2)]">{createError}</div>}
       </div>
 
       <SettingsSubsection
@@ -601,7 +601,7 @@ export function SettingsAgentsSection({
       />
 
       {settings && settings.agents.length === 0 && !isLoading && (
-        <div className="settings-help">No custom agents configured yet.</div>
+        <div className="text-ui-xs text-text-subtle">No custom agents configured yet.</div>
       )}
 
       {settings?.agents.map((agent) => {
@@ -614,20 +614,20 @@ export function SettingsAgentsSection({
         const isConfigEditorOpen = configEditorAgentName === agent.name;
         const canGenerateEditFromName = editNameDraft.trim().length > 0;
         return (
-          <div className="settings-field settings-agent-card" key={agent.name}>
-            <div className="settings-agent-card-header">
+          <div className="flex flex-col gap-2.5 mb-4.5" key={agent.name}>
+            <div className="flex items-start justify-between gap-2.5">
               <div>
-                <div className="settings-toggle-title">{agent.name}</div>
-                <div className="settings-toggle-subtitle">
+                <div className="text-ui-sm font-semibold text-text-strong">{agent.name}</div>
+                <div className="text-ui-xs text-text-subtle">
                   {agent.description || "No description."}
                 </div>
               </div>
             </div>
 
-            <div className="settings-help settings-help-inline">
+            <div className="text-ui-xs text-text-subtle inline mr-1">
               <code>{agent.configFile || "(missing config_file)"}</code>
             </div>
-            <div className="settings-agents-actions">
+            <div className="inline-flex items-center flex-wrap gap-1.5">
               {!isPendingDelete && (
                 <>
                   <button
@@ -664,12 +664,12 @@ export function SettingsAgentsSection({
                 {isReadingConfig ? "Opening..." : "Edit File"}
               </button>
               {!agent.managedByApp && (
-                <span className="settings-help settings-help-inline">External path</span>
+                <span className="text-ui-xs text-text-subtle inline mr-1">External path</span>
               )}
             </div>
             {isPendingDelete && (
-              <div className="settings-agents-actions">
-                <span className="settings-help settings-help-inline">
+              <div className="inline-flex items-center flex-wrap gap-1.5">
+                <span className="text-ui-xs text-text-subtle inline mr-1">
                   Delete agent and managed config file?
                 </span>
                 <button
@@ -694,17 +694,17 @@ export function SettingsAgentsSection({
             )}
 
             {isEditing && (
-              <div className="settings-agents-edit-form">
-                <div className="settings-agents-description-row">
+              <div className="flex flex-col gap-2.5">
+                <div className="flex items-center justify-between gap-2">
                   <label
-                    className="settings-label"
+                    className="text-ui-sm font-semibold text-text-strong"
                     htmlFor={`settings-agent-edit-name-${agent.name}`}
                   >
                     Name
                   </label>
                   <button
                     type="button"
-                    className="ghost settings-icon-button settings-agents-generate-button"
+                    className="ghost w-7 h-7 p-0 inline-flex items-center justify-center rounded-lg"
                     onClick={() => {
                       if (editDescriptionGenerating || !canGenerateEditFromName) {
                         return;
@@ -730,7 +730,7 @@ export function SettingsAgentsSection({
                     aria-label={`Generate fields for ${agent.name}`}
                   >
                     {editDescriptionGenerating ? (
-                      <MagicSparkleLoaderIcon className="settings-agents-generate-loader" />
+                      <MagicSparkleLoaderIcon className="w-3.5 h-3.5 animate-[spin_var(--duration-ui-spinner)_linear_infinite]" />
                     ) : (
                       <MagicSparkleIcon />
                     )}
@@ -738,20 +738,20 @@ export function SettingsAgentsSection({
                 </div>
                 <input
                   id={`settings-agent-edit-name-${agent.name}`}
-                  className="settings-input"
+                  className="flex-1 min-w-0 py-2.5 px-3 rounded-xl border border-border-muted bg-surface-control text-text-strong text-ui-sm outline-none transition-colors focus:border-border-strong focus:shadow-[0_0_0_3px_rgba(99,102,241,0.16)]"
                   value={editNameDraft}
                   onChange={(event) => setEditNameDraft(event.target.value)}
                   disabled={isUpdating}
                 />
                 <label
-                  className="settings-label"
+                  className="text-ui-sm font-semibold text-text-strong"
                   htmlFor={`settings-agent-edit-description-${agent.name}`}
                 >
                   Description
                 </label>
                 <textarea
                   id={`settings-agent-edit-description-${agent.name}`}
-                  className="settings-agents-textarea settings-agents-textarea--compact"
+                  className="w-full min-h-14 resize-y rounded-xl border border-border-muted bg-surface-1 text-text-strong font-code text-ui-sm leading-snug px-3 py-2.5 outline-none focus:border-border-strong focus:shadow-[0_0_0_3px_rgba(99,102,241,0.16)]"
                   value={editDescriptionDraft}
                   onChange={(event) => setEditDescriptionDraft(event.target.value)}
                   placeholder="Short role summary."
@@ -759,20 +759,20 @@ export function SettingsAgentsSection({
                   disabled={isUpdating}
                 />
                 <label
-                  className="settings-label"
+                  className="text-ui-sm font-semibold text-text-strong"
                   htmlFor={`settings-agent-edit-developer-instructions-${agent.name}`}
                 >
                   Developer instructions
                 </label>
                 <textarea
                   id={`settings-agent-edit-developer-instructions-${agent.name}`}
-                  className="settings-agents-textarea"
+                  className="w-full min-h-[150px] resize-y rounded-xl border border-border-muted bg-surface-1 text-text-strong font-code text-ui-sm leading-relaxed px-3 py-2.5 outline-none focus:border-border-strong focus:shadow-[0_0_0_3px_rgba(99,102,241,0.16)]"
                   value={editDeveloperInstructionsDraft}
                   onChange={(event) => setEditDeveloperInstructionsDraft(event.target.value)}
                   placeholder="Multiline per-agent developer instructions."
                   disabled={isUpdating}
                 />
-                <label className="settings-checkbox">
+                <label className="inline-flex items-center gap-2 text-ui-sm text-text-subtle">
                   <input
                     type="checkbox"
                     checked={renameManagedFile}
@@ -780,7 +780,7 @@ export function SettingsAgentsSection({
                   />
                   Rename managed config file when agent name changes
                 </label>
-                <div className="settings-agents-actions">
+                <div className="inline-flex items-center flex-wrap gap-1.5">
                   <button
                     type="button"
                     className="ghost"
@@ -801,20 +801,20 @@ export function SettingsAgentsSection({
                     {isUpdating ? "Saving..." : "Save"}
                   </button>
                 </div>
-                {editError && <div className="settings-agents-error">{editError}</div>}
+                {editError && <div className="text-ui-sm text-status-error bg-[rgba(236,72,153,0.08)] rounded-xl px-2.5 py-2 border border-[rgba(236,72,153,0.2)]">{editError}</div>}
               </div>
             )}
 
             {isConfigEditorOpen && (
-              <div className="settings-field settings-agents-editor">
-                <div className="settings-agents-header">
+              <div className="flex flex-col gap-2.5 mb-4.5">
+                <div className="flex items-center justify-between gap-2.5">
                   <div>
-                    <div className="settings-toggle-title">{agent.name} config file</div>
-                    <div className="settings-toggle-subtitle">
+                    <div className="text-ui-sm font-semibold text-text-strong">{agent.name} config file</div>
+                    <div className="text-ui-xs text-text-subtle">
                       <code>{agent.configFile}</code>
                     </div>
                   </div>
-                  <div className="settings-agents-actions">
+                  <div className="inline-flex items-center flex-wrap gap-1.5">
                     <button
                       type="button"
                       className="ghost"
@@ -836,7 +836,7 @@ export function SettingsAgentsSection({
                   </div>
                 </div>
                 <textarea
-                  className="settings-agents-textarea"
+                  className="w-full min-h-[150px] resize-y rounded-xl border border-border-muted bg-surface-1 text-text-strong font-code text-ui-sm leading-relaxed px-3 py-2.5 outline-none focus:border-border-strong focus:shadow-[0_0_0_3px_rgba(99,102,241,0.16)]"
                   value={configEditorContent}
                   onChange={(event) => {
                     setConfigEditorContent(event.target.value);
@@ -849,9 +849,9 @@ export function SettingsAgentsSection({
         );
       })}
 
-      {isLoading && <div className="settings-help">Loading agents settings...</div>}
-      {openPathError && <div className="settings-agents-error">{openPathError}</div>}
-      {error && <div className="settings-agents-error">{error}</div>}
+      {isLoading && <div className="text-ui-xs text-text-subtle">Loading agents settings...</div>}
+      {openPathError && <div className="text-ui-sm text-status-error bg-[rgba(236,72,153,0.08)] rounded-xl px-2.5 py-2 border border-[rgba(236,72,153,0.2)]">{openPathError}</div>}
+      {error && <div className="text-ui-sm text-status-error bg-[rgba(236,72,153,0.08)] rounded-xl px-2.5 py-2 border border-[rgba(236,72,153,0.2)]">{error}</div>}
     </SettingsSection>
   );
 }

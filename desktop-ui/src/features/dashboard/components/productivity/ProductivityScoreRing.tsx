@@ -19,12 +19,12 @@ interface ProductivityScoreRingProps {
 export function ScoreBar({ label, value }: { label: string; value: number }) {
   const pct = Math.round(Math.min(Math.max(value, 0), 1) * 100);
   return (
-    <div className="dashboard__summary-score-bar">
-      <span className="dashboard__summary-score-label">{label}</span>
-      <div className="dashboard__summary-score-track">
-        <div className="dashboard__summary-score-fill" style={{ width: `${pct}%` }} />
+    <div className="flex items-center gap-1.5 text-ui-2xs font-light">
+      <span className="w-[68px] text-ds-text-subtle text-right shrink-0">{label}</span>
+      <div className="flex-1 h-1 rounded-full bg-surface-control overflow-hidden">
+        <div className="h-full bg-[color-mix(in_srgb,var(--brand)_60%,transparent)]" style={{ width: `${pct}%` }} />
       </div>
-      <span className="dashboard__summary-score-value">{pct}</span>
+      <span className="w-7 text-right text-ds-text-subtle tabular-nums">{pct}</span>
     </div>
   );
 }
@@ -59,9 +59,9 @@ export function ProductivityScoreRing({ score, size = 110, summary }: Productivi
     summary?.avgSessionQuality != null ? Math.round(summary.avgSessionQuality * 100) : null;
 
   return (
-    <div className="dashboard__score-ring">
+    <div className="flex flex-col items-center gap-2">
       <div
-        className="dashboard__score-ring-track"
+        className="relative"
         style={{ width: size, height: size }}
         role="img"
         aria-label={`Productivity score ${Math.round(score)} out of 100`}
@@ -71,14 +71,15 @@ export function ProductivityScoreRing({ score, size = 110, summary }: Productivi
         onBlur={() => setHovered(false)}
       >
         <div
-          className="dashboard__score-ring-glow"
+          className="absolute rounded-full transition-opacity duration-700 ease-out pointer-events-none"
           style={{
+            inset: 8,
             background: `radial-gradient(circle, ${color}15 0%, transparent 70%)`,
             opacity: score > 0 ? 1 : 0,
           }}
         />
 
-        <svg width={size} height={size} className="dashboard__score-ring-svg" aria-hidden="true">
+        <svg width={size} height={size} className="-rotate-90" aria-hidden="true">
           <circle
             cx={center}
             cy={center}
@@ -101,33 +102,33 @@ export function ProductivityScoreRing({ score, size = 110, summary }: Productivi
           />
         </svg>
 
-        <div className="dashboard__score-ring-value">
-          <span style={{ color }}>{Math.round(score)}</span>
-          <span className="dashboard__score-ring-suffix">/100</span>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <span style={{ color }} className="text-ui-display-sm font-light tabular-nums leading-none">{Math.round(score)}</span>
+          <span className="text-ui-2xs font-light text-ds-text-subtle mt-0.5">/100</span>
         </div>
 
         {hovered && summary && summary.totalActiveSecs > 0 && (
-          <div className="dashboard__score-ring-tooltip">
+          <div className="absolute left-1/2 top-full mt-2 -translate-x-1/2 z-50 bg-surface-popover border border-ds-border-subtle shadow-ds-popover rounded-lg px-3 py-2 min-w-[160px] flex flex-col gap-1.5 text-ui-2xs">
             {focusRatio != null && (
-              <div className="dashboard__score-ring-tooltip-row">
+              <div className="flex justify-between gap-2">
                 <span>Focus time</span>
                 <span>
                   {focusRatio}% ({formatHumanDuration(summary.productiveSecs)})
                 </span>
               </div>
             )}
-            <div className="dashboard__score-ring-tooltip-row">
+            <div className="flex justify-between gap-2">
               <span>Context switches</span>
               <span>{summary.contextSwitches}</span>
             </div>
             {qualityAvg != null && (
-              <div className="dashboard__score-ring-tooltip-row">
+              <div className="flex justify-between gap-2">
                 <span>Session quality</span>
                 <span>{qualityAvg}%</span>
               </div>
             )}
             {distractionRatio != null && (
-              <div className="dashboard__score-ring-tooltip-row">
+              <div className="flex justify-between gap-2">
                 <span>Distraction</span>
                 <span>{distractionRatio}%</span>
               </div>
@@ -136,7 +137,7 @@ export function ProductivityScoreRing({ score, size = 110, summary }: Productivi
         )}
       </div>
 
-      <span className="dashboard__score-ring-label" style={{ color }}>
+      <span className="text-ui-2xs font-medium tracking-wider uppercase" style={{ color }}>
         {scoreLabel(score)}
       </span>
     </div>

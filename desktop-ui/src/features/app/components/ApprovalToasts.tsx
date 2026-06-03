@@ -90,7 +90,7 @@ export function ApprovalToasts({
   };
 
   return (
-    <ToastViewport className="approval-toasts" role="region" ariaLive="assertive">
+    <ToastViewport className="fixed top-1/2 left-1/2 w-[min(460px,calc(100vw-48px))] max-h-[min(520px,calc(100vh-140px))] overflow-auto z-5 pointer-events-auto [-webkit-app-region:no-drag] -translate-x-1/2 -translate-y-1/2" role="region" ariaLive="assertive">
       {approvals.map((request) => {
         const workspaceName = workspaceLabels.get(request.workspace_id);
         const params = request.params ?? {};
@@ -99,29 +99,29 @@ export function ApprovalToasts({
         return (
           <ToastCard
             key={`${request.workspace_id}-${request.request_id}`}
-            className="approval-toast"
+            className="[--ds-toast-enter-duration:0.2s]"
             role="alert"
           >
-            <ToastHeader className="approval-toast-header">
-              <ToastTitle className="approval-toast-title">Approval needed</ToastTitle>
+            <ToastHeader className="mb-1.5">
+              <ToastTitle className="text-ui-sm tracking-[0.08em] uppercase">Approval needed</ToastTitle>
               {workspaceName ? (
-                <div className="approval-toast-workspace">{workspaceName}</div>
+                <div className="text-ui-sm text-text-faint">{workspaceName}</div>
               ) : null}
             </ToastHeader>
-            <div className="approval-toast-method">{methodLabel(request.method)}</div>
-            <div className="approval-toast-details">
+            <div className="text-ui-sm font-semibold mb-2 break-words">{methodLabel(request.method)}</div>
+            <div className="grid gap-2 mb-2.5">
               {entries.length ? (
                 entries.map(([key, value]) => {
                   const rendered = renderParamValue(value);
                   return (
-                    <div key={key} className="approval-toast-detail">
-                      <div className="approval-toast-detail-label">{formatLabel(key)}</div>
+                    <div key={key} className="grid gap-1">
+                      <div className="text-ui-xs text-text-faint uppercase tracking-[0.06em]">{formatLabel(key)}</div>
                       {rendered.isCode ? (
-                        <ToastError className="approval-toast-detail-code">
+                        <ToastError className="max-h-40">
                           {rendered.text}
                         </ToastError>
                       ) : (
-                        <ToastBody className="approval-toast-detail-value">
+                        <ToastBody className="text-ui-sm break-words">
                           {rendered.text}
                         </ToastBody>
                       )}
@@ -145,7 +145,7 @@ export function ApprovalToasts({
               {commandInfo && onRemember ? (
                 <button
                   type="button"
-                  className="ghost approval-toast-remember"
+                  className="ghost whitespace-nowrap"
                   onClick={() => onRemember(request, commandInfo.tokens)}
                   title={`Allow commands that start with ${commandInfo.preview}`}
                 >

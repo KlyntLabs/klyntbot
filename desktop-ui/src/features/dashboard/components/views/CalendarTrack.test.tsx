@@ -149,7 +149,7 @@ describe("CalendarTrack", () => {
     );
     await waitFor(() => {
       const btn = screen.getByText("Standup").closest("button");
-      expect(btn?.className).toContain("dashboard__calendar-event--selected");
+      expect(btn?.getAttribute("aria-pressed")).toBe("true");
     });
   });
 

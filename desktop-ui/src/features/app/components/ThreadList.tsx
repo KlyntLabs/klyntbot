@@ -1,5 +1,6 @@
 import type { ThreadStatusById } from "@utils/threadStatus";
 import { type MouseEvent, memo, useMemo, useState } from "react";
+import { cn } from "@/utils/cn";
 import type { ThreadSummary } from "@/types";
 import { ThreadRow } from "./ThreadRow";
 import { buildThreadRowVisibility } from "./threadRowVisibility";
@@ -93,7 +94,7 @@ export const ThreadList = memo(function ThreadList({
   );
 
   return (
-    <div className={`thread-list${nested ? " thread-list-nested" : ""}`}>
+    <div className={cn("thread-list flex flex-col gap-2 ml-0", nested && "ml-2")}>
       {pinnedVisibility.visibleRows.map((row) => (
         <ThreadRow
           key={row.thread.id}
@@ -116,7 +117,7 @@ export const ThreadList = memo(function ThreadList({
         />
       ))}
       {pinnedVisibility.visibleRows.length > 0 && unpinnedVisibility.visibleRows.length > 0 && (
-        <div className="thread-list-separator" aria-hidden="true" />
+        <div className="thread-list-separator h-px my-0.5 mx-[18px] ml-3.5 bg-gradient-to-r from-border-subtle to-transparent" aria-hidden="true" />
       )}
       {unpinnedVisibility.visibleRows.map((row) => (
         <ThreadRow
@@ -142,7 +143,7 @@ export const ThreadList = memo(function ThreadList({
       {showExpandToggle && totalThreadRoots > 3 && (
         <button
           type="button"
-          className="thread-more"
+          className="thread-more border-0 bg-transparent text-text-muted text-ui-xs font-semibold text-left py-0.5 px-2 cursor-pointer [webkit-app-region:no-drag] hover:text-text-stronger"
           onClick={(event) => {
             event.stopPropagation();
             onToggleExpanded(workspaceId);
@@ -154,7 +155,7 @@ export const ThreadList = memo(function ThreadList({
       {showLoadOlder && nextCursor && (isExpanded || totalThreadRoots <= 3) && (
         <button
           type="button"
-          className="thread-more"
+          className="thread-more border-0 bg-transparent text-text-muted text-ui-xs font-semibold text-left py-0.5 px-2 cursor-pointer [webkit-app-region:no-drag] hover:text-text-stronger"
           onClick={(event) => {
             event.stopPropagation();
             onLoadOlderThreads(workspaceId);

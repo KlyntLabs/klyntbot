@@ -7,10 +7,10 @@ export function ChatErrorBanner({ error, onDismiss }: Props) {
   if (error === null) return null;
   return (
     <div className="chat-error-banner" role="alert">
-      <span className="chat-error-banner__message">{error}</span>
+      <span className="flex-1 whitespace-pre-wrap">{error}</span>
       <button
         type="button"
-        className="chat-error-banner__dismiss"
+        className="bg-transparent border-none cursor-pointer text-inherit text-[length:var(--fs-md)] leading-none px-0.5 py-1.5 hover:opacity-70"
         aria-label="Dismiss error"
         onClick={onDismiss}
       >

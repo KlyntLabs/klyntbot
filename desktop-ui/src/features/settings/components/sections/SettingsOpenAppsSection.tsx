@@ -4,8 +4,14 @@ import { fileManagerName, isMacPlatform } from "@utils/platformPaths";
 import ChevronDown from "lucide-react/dist/esm/icons/chevron-down";
 import ChevronUp from "lucide-react/dist/esm/icons/chevron-up";
 import Trash2 from "lucide-react/dist/esm/icons/trash-2";
-import { SettingsSection } from "@/features/design-system/components/settings/SettingsPrimitives";
+import {
+  SettingsHelpText,
+  SettingsInput,
+  SettingsSection,
+  SettingsSelect,
+} from "@/features/design-system/components/settings/SettingsPrimitives";
 import type { OpenAppTarget } from "@/types";
+import { cn } from "@/utils/cn";
 
 type SettingsOpenAppsSectionProps = {
   openAppDrafts: OpenAppDraft[];
@@ -39,7 +45,7 @@ export function SettingsOpenAppsSection({
       title="Open in"
       subtitle="Customize the Open in menu shown in the title bar and file previews."
     >
-      <div className="settings-open-apps">
+      <div className="flex flex-col gap-2">
         {openAppDrafts.map((target, index) => {
           const iconSrc =
             getKnownOpenAppIcon(target.id) ?? openAppIconById[target.id] ?? GENERIC_APP_ICON;
@@ -58,22 +64,29 @@ export function SettingsOpenAppsSection({
           return (
             <div
               key={target.id}
-              className={`settings-open-app-row${isComplete ? "" : " is-incomplete"}`}
+              className={cn(
+                "flex items-center gap-2.5 p-2 px-2.5 rounded-xl border bg-surface-card flex-wrap",
+                isComplete ? "border-border-muted" : "border-status-error/50",
+              )}
             >
-              <div className="settings-open-app-icon-wrap" aria-hidden>
+              <div
+                className="shrink-0 w-6 h-6 rounded-lg border border-border-muted bg-surface-control inline-flex items-center justify-center overflow-hidden"
+                aria-hidden
+              >
                 <img
-                  className="settings-open-app-icon"
+                  className="w-[18px] h-[18px] rounded-[5px]"
                   src={iconSrc}
                   alt=""
                   width={18}
                   height={18}
                 />
               </div>
-              <div className="settings-open-app-fields">
-                <label className="settings-open-app-field settings-open-app-field--label">
-                  <span className="settings-visually-hidden">Label</span>
-                  <input
-                    className="settings-input settings-input--compact settings-open-app-input settings-open-app-input--label"
+              <div className="flex-1 min-w-0 flex items-center gap-2 flex-wrap">
+                <label className="min-w-0 inline-flex items-center">
+                  <span className="sr-only">Label</span>
+                  <SettingsInput
+                    compact
+                    className="w-[140px]"
                     value={target.label}
                     placeholder="Label"
                     onChange={(event) =>
@@ -86,10 +99,10 @@ export function SettingsOpenAppsSection({
                     data-invalid={!labelValid || undefined}
                   />
                 </label>
-                <label className="settings-open-app-field settings-open-app-field--type">
-                  <span className="settings-visually-hidden">Type</span>
-                  <select
-                    className="settings-select settings-select--compact settings-open-app-kind"
+                <label className="min-w-0 inline-flex items-center">
+                  <span className="sr-only">Type</span>
+                  <SettingsSelect
+                    className="w-24 min-w-24 py-1.5 px-2 text-ui-xs"
                     value={target.kind}
                     onChange={(event) =>
                       onOpenAppKindChange(index, event.target.value as OpenAppTarget["kind"])
@@ -99,13 +112,14 @@ export function SettingsOpenAppsSection({
                     <option value="app">App</option>
                     <option value="command">Command</option>
                     <option value="finder">{fileManagerName()}</option>
-                  </select>
+                  </SettingsSelect>
                 </label>
                 {target.kind === "app" && (
-                  <label className="settings-open-app-field settings-open-app-field--appname">
-                    <span className="settings-visually-hidden">App name</span>
-                    <input
-                      className="settings-input settings-input--compact settings-open-app-input settings-open-app-input--appname"
+                  <label className="min-w-0 inline-flex items-center">
+                    <span className="sr-only">App name</span>
+                    <SettingsInput
+                      compact
+                      className="w-[220px] max-w-[240px]"
                       value={target.appName ?? ""}
                       placeholder="App name"
                       onChange={(event) =>
@@ -120,10 +134,11 @@ export function SettingsOpenAppsSection({
                   </label>
                 )}
                 {target.kind === "command" && (
-                  <label className="settings-open-app-field settings-open-app-field--command">
-                    <span className="settings-visually-hidden">Command</span>
-                    <input
-                      className="settings-input settings-input--compact settings-open-app-input settings-open-app-input--command"
+                  <label className="min-w-0 inline-flex items-center">
+                    <span className="sr-only">Command</span>
+                    <SettingsInput
+                      compact
+                      className="w-[200px] max-w-[220px]"
                       value={target.command ?? ""}
                       placeholder="Command"
                       onChange={(event) =>
@@ -138,10 +153,11 @@ export function SettingsOpenAppsSection({
                   </label>
                 )}
                 {target.kind !== "finder" && (
-                  <label className="settings-open-app-field settings-open-app-field--args">
-                    <span className="settings-visually-hidden">Args</span>
-                    <input
-                      className="settings-input settings-input--compact settings-open-app-input settings-open-app-input--args"
+                  <label className="min-w-0 inline-flex items-center">
+                    <span className="sr-only">Args</span>
+                    <SettingsInput
+                      compact
+                      className="flex-1 min-w-[140px]"
                       value={target.argsText}
                       placeholder="Args"
                       onChange={(event) =>
@@ -155,10 +171,10 @@ export function SettingsOpenAppsSection({
                   </label>
                 )}
               </div>
-              <div className="settings-open-app-actions">
+              <div className="inline-flex items-center gap-1.5 ml-auto shrink-0">
                 {!isComplete && (
                   <span
-                    className="settings-open-app-status"
+                    className="text-ui-xs text-status-error px-1.5 py-0.5 rounded-full border border-status-error/40"
                     role="status"
                     title={incompleteHint}
                     aria-label={incompleteHint}
@@ -166,7 +182,7 @@ export function SettingsOpenAppsSection({
                     Incomplete
                   </span>
                 )}
-                <label className="settings-open-app-default">
+                <label className="inline-flex items-center gap-1 text-ui-xs text-text-muted">
                   <input
                     type="radio"
                     name="open-app-default"
@@ -176,7 +192,7 @@ export function SettingsOpenAppsSection({
                   />
                   Default
                 </label>
-                <div className="settings-open-app-order">
+                <div className="inline-flex gap-1">
                   <button
                     type="button"
                     className="ghost icon-button"
@@ -211,16 +227,16 @@ export function SettingsOpenAppsSection({
           );
         })}
       </div>
-      <div className="settings-open-app-footer">
+      <div className="mt-2 flex flex-col gap-1.5">
         <button type="button" className="ghost" onClick={onAddOpenApp}>
           Add app
         </button>
-        <div className="settings-help">
+        <SettingsHelpText>
           Commands receive the selected path as the final argument.{" "}
           {isMacPlatform()
             ? "Apps open via `open -a` with optional args."
             : "Apps run as an executable with optional args."}
-        </div>
+        </SettingsHelpText>
       </div>
     </SettingsSection>
   );

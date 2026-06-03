@@ -4,6 +4,7 @@ import ChevronDown from "lucide-react/dist/esm/icons/chevron-down";
 import ChevronRight from "lucide-react/dist/esm/icons/chevron-right";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import { useCallback, useEffect, useState } from "react";
+import { cn } from "@/utils/cn";
 import type { GitHubIssue, GitHubPullRequest, GitLogEntry } from "@/types";
 import type { PerFileDiffGroup } from "../utils/perFileThreadDiffs";
 import { splitPath } from "./GitDiffPanel.utils";
@@ -61,59 +62,67 @@ export function GitPerFileModeContent({
   }, []);
 
   if (groups.length === 0) {
-    return <div className="diff-empty">No agent edits in this thread yet.</div>;
+    return <div className="text-ui-sm text-text-faint">No agent edits in this thread yet.</div>;
   }
 
   return (
-    <div className="per-file-tree">
+    <div className="per-file-tree flex flex-col gap-3 overflow-y-auto overflow-x-hidden flex-1 h-0 min-h-0 pr-[2px] overscroll-contain">
       {groups.map((group) => {
         const isExpanded = !collapsedPaths.has(group.path);
         const { name: fileName } = splitPath(group.path);
         return (
-          <div key={group.path} className="per-file-group">
+          <div key={group.path} className="per-file-group flex flex-col gap-[6px]">
             <button
               type="button"
-              className="per-file-group-row"
+              className="per-file-group-row w-full grid items-center gap-2 border-0 bg-transparent text-text-emphasis px-[10px] py-[9px] rounded-xl cursor-pointer text-left shadow-none transition-[background,box-shadow,transform] duration-ui-fast"
+              style={{ gridTemplateColumns: "14px minmax(0, 1fr) auto" }}
               onClick={() => toggleGroup(group.path)}
             >
-              <span className="per-file-group-chevron" aria-hidden>
+              <span className="per-file-group-chevron inline-flex items-center justify-center text-text-faint" aria-hidden>
                 {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
               </span>
-              <span className="per-file-group-path" title={group.path}>
+              <span className="per-file-group-path text-ui-sm font-semibold min-w-0 overflow-hidden text-ellipsis whitespace-nowrap" title={group.path}>
                 {fileName || group.path}
               </span>
-              <span className="per-file-group-count">
+              <span className="per-file-group-count text-ui-2xs text-text-faint uppercase tracking-[0.04em]">
                 {group.edits.length} edit{group.edits.length === 1 ? "" : "s"}
               </span>
             </button>
             {isExpanded && (
-              <div className="per-file-edit-list">
+              <div className="per-file-edit-list flex flex-col gap-[2px] pl-[22px]">
                 {group.edits.map((edit) => {
                   const isActive = selectedPath === edit.id;
                   return (
                     <button
                       key={edit.id}
                       type="button"
-                      className={`per-file-edit-row ${isActive ? "active" : ""}`}
+                      className={cn(
+                        "per-file-edit-row w-full border-0 rounded-xl bg-transparent text-text-emphasis grid items-center gap-2 px-[10px] py-2 cursor-pointer text-left shadow-none transition-[background,box-shadow,transform] duration-ui-fast",
+                        isActive && "active",
+                      )}
+                      style={{ gridTemplateColumns: "16px minmax(0, 1fr) auto" }}
                       onClick={() => onSelectFile?.(edit.id)}
                     >
-                      <span className="per-file-edit-status" data-status={edit.status}>
+                      <span
+                        className="per-file-edit-status w-4 h-4 inline-flex items-center justify-center rounded-[4px] text-ui-2xs font-bold border border-border-subtle text-text-faint"
+                        data-status={edit.status}
+                      >
                         {edit.status}
                       </span>
-                      <span className="per-file-edit-label">{edit.label}</span>
-                      <span className="per-file-edit-stats">
+                      <span className="per-file-edit-label text-ui-sm font-semibold">{edit.label}</span>
+                      <span className="per-file-edit-stats inline-flex items-center gap-[6px] text-ui-2xs tabular-nums">
                         {edit.additions > 0 && (
-                          <span className="per-file-edit-stat per-file-edit-stat-add">
+                          <span className="per-file-edit-stat-add text-[#47d488]">
                             +{edit.additions}
                           </span>
                         )}
                         {edit.deletions > 0 && (
-                          <span className="per-file-edit-stat per-file-edit-stat-del">
+                          <span className="per-file-edit-stat-del text-[#ff6b6b]">
                             -{edit.deletions}
                           </span>
                         )}
                         {edit.additions === 0 && edit.deletions === 0 && (
-                          <span className="per-file-edit-stat">0</span>
+                          <span className="per-file-edit-stat text-text-faint">0</span>
                         )}
                       </span>
                     </button>
@@ -154,17 +163,21 @@ export function GitLogModeContent({
   onShowLogMenu,
 }: GitLogModeContentProps) {
   return (
-    <div className="git-log-list">
-      {!logError && logLoading && <div className="diff-viewer-loading">Loading commits...</div>}
+    <div className="git-log-list flex flex-col gap-3 overflow-y-auto flex-1 pr-[2px] min-h-0">
+      {!logError && logLoading && (
+        <div className="text-ui-xs text-text-faint py-[6px]">Loading commits...</div>
+      )}
       {!logError &&
         !logLoading &&
         !logEntries.length &&
         !showAheadSection &&
-        !showBehindSection && <div className="diff-empty">No commits yet.</div>}
+        !showBehindSection && <div className="text-ui-sm text-text-faint">No commits yet.</div>}
       {showAheadSection && (
-        <div className="git-log-section">
-          <div className="git-log-section-title">To push</div>
-          <div className="git-log-section-list">
+        <div className="git-log-section flex flex-col gap-2">
+          <div className="git-log-section-title text-ui-xs font-bold tracking-[0.08em] uppercase text-text-faint">
+            To push
+          </div>
+          <div className="git-log-section-list flex flex-col gap-[2px]">
             {logAheadEntries.map((entry) => {
               const isSelected = selectedCommitSha === entry.sha;
               return (
@@ -182,9 +195,11 @@ export function GitLogModeContent({
         </div>
       )}
       {showBehindSection && (
-        <div className="git-log-section">
-          <div className="git-log-section-title">To pull</div>
-          <div className="git-log-section-list">
+        <div className="git-log-section flex flex-col gap-2">
+          <div className="git-log-section-title text-ui-xs font-bold tracking-[0.08em] uppercase text-text-faint">
+            To pull
+          </div>
+          <div className="git-log-section-list flex flex-col gap-[2px]">
             {logBehindEntries.map((entry) => {
               const isSelected = selectedCommitSha === entry.sha;
               return (
@@ -202,9 +217,11 @@ export function GitLogModeContent({
         </div>
       )}
       {(logEntries.length > 0 || logLoading) && (
-        <div className="git-log-section">
-          <div className="git-log-section-title">Recent commits</div>
-          <div className="git-log-section-list">
+        <div className="git-log-section flex flex-col gap-2">
+          <div className="git-log-section-title text-ui-xs font-bold tracking-[0.08em] uppercase text-text-faint">
+            Recent commits
+          </div>
+          <div className="git-log-section-list flex flex-col gap-[2px]">
             {logEntries.map((entry) => {
               const isSelected = selectedCommitSha === entry.sha;
               return (
@@ -236,26 +253,33 @@ export function GitIssuesModeContent({
   issues,
 }: GitIssuesModeContentProps) {
   return (
-    <div className="git-issues-list">
+    <div className="git-issues-list flex flex-col gap-[10px] overflow-y-auto flex-1 pr-[2px] min-h-0">
       {!issuesError && !issuesLoading && !issues.length && (
-        <div className="diff-empty">No open issues.</div>
+        <div className="text-ui-sm text-text-faint">No open issues.</div>
       )}
       {issues.map((issue) => {
         const relativeTime = formatRelativeTime(new Date(issue.updatedAt).getTime());
         return (
           <a
             key={issue.number}
-            className="git-issue-entry"
+            className="git-issue-entry flex flex-col gap-[6px] px-[10px] py-[9px] border-0 rounded-xl bg-transparent text-inherit no-underline text-left cursor-pointer shadow-none outline-none transition-[background,box-shadow] duration-ui-fast min-w-0"
             href={issue.url}
             onClick={(event) => {
               event.preventDefault();
               void openUrl(issue.url);
             }}
           >
-            <div className="git-issue-summary">
-              <span className="git-issue-number">#{issue.number}</span>
-              <span className="git-issue-title">{issue.title}</span>
-              <span className="git-issue-date">{relativeTime}</span>
+            <div
+              className="git-issue-summary grid items-baseline gap-[10px] text-ui-sm text-text-emphasis"
+              style={{ gridTemplateColumns: "auto minmax(0, 1fr) auto" }}
+            >
+              <span className="git-issue-number font-code text-[11px] text-text-faint">
+                #{issue.number}
+              </span>
+              <span className="git-issue-title min-w-0 font-semibold text-text-strong whitespace-normal overflow-wrap-anywhere">
+                {issue.title}
+              </span>
+              <span className="text-text-faint whitespace-nowrap">{relativeTime}</span>
             </div>
           </a>
         );
@@ -285,9 +309,9 @@ export function GitPullRequestsModeContent({
   onShowPullRequestMenu,
 }: GitPullRequestsModeContentProps) {
   return (
-    <div className="git-pr-list">
+    <div className="git-pr-list flex flex-col gap-[10px] overflow-y-auto overflow-x-hidden flex-1 pr-[2px] min-h-0">
       {!pullRequestsError && !pullRequestsLoading && !pullRequests.length && (
-        <div className="diff-empty">No open pull requests.</div>
+        <div className="text-ui-sm text-text-faint">No open pull requests.</div>
       )}
       {pullRequests.map((pullRequest) => {
         const relativeTime = formatRelativeTime(new Date(pullRequest.updatedAt).getTime());
@@ -298,7 +322,10 @@ export function GitPullRequestsModeContent({
           <button
             type="button"
             key={pullRequest.number}
-            className={`git-pr-entry ${isSelected ? "active" : ""}`}
+            className={cn(
+              "git-pr-entry flex flex-col gap-[6px] px-[10px] py-[9px] border-0 rounded-xl bg-transparent text-inherit text-left cursor-pointer shadow-none outline-none transition-[background,box-shadow] duration-ui-fast min-w-0",
+              isSelected && "active",
+            )}
             onClick={() => onSelectPullRequest?.(pullRequest)}
             onContextMenu={(event) => onShowPullRequestMenu(event, pullRequest)}
             onKeyDown={(event) => {
@@ -308,16 +335,30 @@ export function GitPullRequestsModeContent({
               }
             }}
           >
-            <div className="git-pr-header">
-              <span className="git-pr-title">
-                <span className="git-pr-number">#{pullRequest.number}</span>
-                <span className="git-pr-title-text">{pullRequest.title}</span>
+            <div className="git-pr-header flex items-start justify-between gap-[10px] min-w-0">
+              <span className="git-pr-title inline-flex items-start gap-[6px] min-w-0 text-ui-sm text-text-strong">
+                <span className="git-pr-number font-code text-[11px] text-text-faint">
+                  #{pullRequest.number}
+                </span>
+                <span className="git-pr-title-text min-w-0 font-semibold whitespace-normal leading-snug overflow-wrap-anywhere">
+                  {pullRequest.title}
+                </span>
               </span>
-              <span className="git-pr-time">{relativeTime}</span>
+              <span className="git-pr-time text-ui-xs text-text-faint whitespace-nowrap">
+                {relativeTime}
+              </span>
             </div>
-            <div className="git-pr-meta">
-              <span className="git-pr-author-inline">@{author}</span>
-              {pullRequest.isDraft && <span className="git-pr-pill git-pr-draft">Draft</span>}
+            <div className="git-pr-meta flex flex-wrap gap-[6px] text-ui-xs text-text-faint">
+              <span className="git-pr-author-inline font-code text-[11px] text-text-faint">
+                @{author}
+              </span>
+              {pullRequest.isDraft && (
+                <span className="git-pr-pill text-ui-2xs text-text-muted px-[7px] py-[3px] rounded-full border border-border-subtle bg-surface-control max-w-full">
+                  <span className="git-pr-draft text-text-muted uppercase tracking-[0.08em] text-[9px]">
+                    Draft
+                  </span>
+                </span>
+              )}
             </div>
           </button>
         );

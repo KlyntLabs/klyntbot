@@ -3,7 +3,13 @@ import type { Dispatch, SetStateAction } from "react";
 import { useMemo, useState } from "react";
 import { ModalShell } from "@/features/design-system/components/modal/ModalShell";
 import {
+  SettingsField,
+  SettingsFieldLabel,
+  SettingsFieldRow,
+  SettingsHelpText,
+  SettingsInput,
   SettingsSection,
+  SettingsSelect,
   SettingsToggleRow,
   SettingsToggleSwitch,
 } from "@/features/design-system/components/settings/SettingsPrimitives";
@@ -13,6 +19,7 @@ import type {
   TailscaleStatus,
   TcpDaemonStatus,
 } from "@/types";
+import { cn } from "@/utils/cn";
 
 type AddRemoteBackendDraft = {
   name: string;
@@ -185,13 +192,10 @@ export function SettingsServerSection({
       }
     >
       {!isMobileSimplified && (
-        <div className="settings-field">
-          <label className="settings-field-label" htmlFor="backend-mode">
-            Backend mode
-          </label>
-          <select
+        <SettingsField>
+          <SettingsFieldLabel htmlFor="backend-mode">Backend mode</SettingsFieldLabel>
+          <SettingsSelect
             id="backend-mode"
-            className="settings-select"
             value={appSettings.backendMode}
             onChange={(event) =>
               void onUpdateAppSettings({
@@ -202,20 +206,20 @@ export function SettingsServerSection({
           >
             <option value="local">Local (default)</option>
             <option value="remote">Remote (daemon)</option>
-          </select>
-          <div className="settings-help">
+          </SettingsSelect>
+          <SettingsHelpText>
             Local keeps desktop requests in-process. Remote routes desktop requests through the same
             TCP transport path used by mobile clients.
-          </div>
-        </div>
+          </SettingsHelpText>
+        </SettingsField>
       )}
 
       {isMobileSimplified && (
         <>
-          <div className="settings-field">
-            <div className="settings-field-label">Saved remotes</div>
+          <SettingsField>
+            <SettingsFieldLabel>Saved remotes</SettingsFieldLabel>
             <ul
-              className="settings-mobile-remotes"
+              className="flex flex-col gap-2"
               aria-label="Saved remotes"
               style={{ listStyle: "none", padding: 0, margin: 0 }}
             >
@@ -223,26 +227,37 @@ export function SettingsServerSection({
                 const isActive = entry.id === activeRemoteBackendId;
                 return (
                   <li
-                    className={`settings-mobile-remote${isActive ? " is-active" : ""}`}
                     key={entry.id}
+                    className={cn(
+                      "flex items-center justify-between gap-2.5 px-3 py-2.5 rounded-xl border bg-surface-card",
+                      isActive
+                        ? "border-[color-mix(in_srgb,var(--border-accent)_70%,var(--border-muted))] shadow-[0_0_0_1px_color-mix(in_srgb,var(--border-accent)_35%,transparent)]"
+                        : "border-border-muted",
+                    )}
                   >
-                    <div className="settings-mobile-remote-main">
-                      <div className="settings-mobile-remote-name-row">
-                        <div className="settings-mobile-remote-name">{entry.name}</div>
-                        {isActive && <span className="settings-mobile-remote-badge">Active</span>}
+                    <div className="min-w-0 flex-1 flex flex-col gap-1">
+                      <div className="inline-flex items-center gap-2">
+                        <div className="text-ui-sm font-semibold text-text-strong">{entry.name}</div>
+                        {isActive && (
+                          <span className="inline-flex items-center justify-center rounded-full px-2 py-0.5 text-ui-2xs font-bold tracking-wide text-text-strong bg-[color-mix(in_srgb,var(--border-accent)_18%,transparent)] border border-[color-mix(in_srgb,var(--border-accent)_45%,transparent)]">
+                            Active
+                          </span>
+                        )}
                       </div>
-                      <div className="settings-mobile-remote-meta">TCP · {entry.host}</div>
-                      <div className="settings-mobile-remote-last">
+                      <div className="text-ui-xs text-text-subtle whitespace-nowrap overflow-hidden text-ellipsis">
+                        TCP · {entry.host}
+                      </div>
+                      <div className="text-ui-2xs text-text-faint">
                         Last connected:{" "}
                         {typeof entry.lastConnectedAtMs === "number"
                           ? new Date(entry.lastConnectedAtMs).toLocaleString()
                           : "Never"}
                       </div>
                     </div>
-                    <div className="settings-mobile-remote-actions">
+                    <div className="shrink-0 inline-flex items-center gap-1">
                       <button
                         type="button"
-                        className="ghost settings-mobile-remote-action"
+                        className="ghost min-w-[28px] py-1 px-2 text-ui-xs"
                         onClick={() => {
                           void onSelectRemoteBackend(entry.id);
                         }}
@@ -253,7 +268,7 @@ export function SettingsServerSection({
                       </button>
                       <button
                         type="button"
-                        className="ghost settings-mobile-remote-action"
+                        className="ghost min-w-[28px] py-1 px-2 text-ui-xs"
                         onClick={() => {
                           void onMoveRemoteBackend(entry.id, "up");
                         }}
@@ -264,7 +279,7 @@ export function SettingsServerSection({
                       </button>
                       <button
                         type="button"
-                        className="ghost settings-mobile-remote-action"
+                        className="ghost min-w-[28px] py-1 px-2 text-ui-xs text-status-error"
                         onClick={() => {
                           void onMoveRemoteBackend(entry.id, "down");
                         }}
@@ -275,7 +290,7 @@ export function SettingsServerSection({
                       </button>
                       <button
                         type="button"
-                        className="ghost settings-mobile-remote-action settings-mobile-remote-action-danger"
+                        className="ghost min-w-[28px] py-1 px-2 text-ui-xs text-status-error"
                         onClick={() => {
                           setPendingDeleteRemoteId(entry.id);
                         }}
@@ -288,32 +303,24 @@ export function SettingsServerSection({
                 );
               })}
             </ul>
-            <div className="settings-field-row">
-              <button
-                type="button"
-                className="button settings-button-compact"
-                onClick={openAddRemoteModal}
-              >
+            <SettingsFieldRow className="mt-2">
+              <button type="button" className="primary py-1.5 px-2.5 text-ui-sm" onClick={openAddRemoteModal}>
                 Add remote
               </button>
-            </div>
+            </SettingsFieldRow>
             {remoteStatusText && (
-              <div className={`settings-help${remoteStatusError ? " settings-help-error" : ""}`}>
-                {remoteStatusText}
-              </div>
+              <SettingsHelpText error={remoteStatusError}>{remoteStatusText}</SettingsHelpText>
             )}
-            <div className="settings-help">
+            <SettingsHelpText>
               Switch the active remote here. The fields below edit the active entry.
-            </div>
-          </div>
+            </SettingsHelpText>
+          </SettingsField>
 
-          <div className="settings-field">
-            <label className="settings-field-label" htmlFor="mobile-remote-name">
-              Remote name
-            </label>
-            <input
+          <SettingsField>
+            <SettingsFieldLabel htmlFor="mobile-remote-name">Remote name</SettingsFieldLabel>
+            <SettingsInput
               id="mobile-remote-name"
-              className="settings-input settings-input--compact"
+              compact
               value={remoteNameDraft}
               placeholder="My desktop"
               onChange={(event) => onSetRemoteNameDraft(event.target.value)}
@@ -327,10 +334,8 @@ export function SettingsServerSection({
                 }
               }}
             />
-            {remoteNameError && (
-              <div className="settings-help settings-help-error">{remoteNameError}</div>
-            )}
-          </div>
+            {remoteNameError && <SettingsHelpText error>{remoteNameError}</SettingsHelpText>}
+          </SettingsField>
         </>
       )}
 
@@ -351,11 +356,12 @@ export function SettingsServerSection({
         </SettingsToggleRow>
       )}
 
-      <div className="settings-field">
-        <div className="settings-field-label">Remote backend</div>
-        <div className="settings-field-row">
-          <input
-            className="settings-input settings-input--compact"
+      <SettingsField>
+        <SettingsFieldLabel>Remote backend</SettingsFieldLabel>
+        <SettingsFieldRow>
+          <SettingsInput
+            compact
+            className="flex-1"
             value={remoteHostDraft}
             placeholder="127.0.0.1:4732"
             onChange={(event) => onSetRemoteHostDraft(event.target.value)}
@@ -370,9 +376,10 @@ export function SettingsServerSection({
             }}
             aria-label="Remote backend host"
           />
-          <input
+          <SettingsInput
+            compact
             type="password"
-            className="settings-input settings-input--compact"
+            className="flex-1"
             value={remoteTokenDraft}
             placeholder="Token (required)"
             onChange={(event) => onSetRemoteTokenDraft(event.target.value)}
@@ -387,51 +394,45 @@ export function SettingsServerSection({
             }}
             aria-label="Remote backend token"
           />
-        </div>
-        {remoteHostError && (
-          <div className="settings-help settings-help-error">{remoteHostError}</div>
-        )}
-        <div className="settings-help">
+        </SettingsFieldRow>
+        {remoteHostError && <SettingsHelpText error>{remoteHostError}</SettingsHelpText>}
+        <SettingsHelpText>
           {isMobileSimplified
             ? "Use the Tailscale host from your desktop Klynt app (Server section), for example `macbook.your-tailnet.ts.net:4732`."
             : "This host/token is used by mobile clients and desktop remote-mode testing."}
-        </div>
-      </div>
+        </SettingsHelpText>
+      </SettingsField>
 
       {isMobileSimplified && (
-        <div className="settings-field">
-          <div className="settings-field-label">Connection test</div>
-          <div className="settings-field-row">
+        <SettingsField>
+          <SettingsFieldLabel>Connection test</SettingsFieldLabel>
+          <SettingsFieldRow>
             <button
               type="button"
-              className="button settings-button-compact"
+              className="primary py-1.5 px-2.5 text-ui-sm"
               onClick={onMobileConnectTest}
               disabled={mobileConnectBusy}
             >
               {mobileConnectBusy ? "Connecting..." : "Connect & test"}
             </button>
-          </div>
+          </SettingsFieldRow>
           {mobileConnectStatusText && (
-            <div
-              className={`settings-help${mobileConnectStatusError ? " settings-help-error" : ""}`}
-            >
-              {mobileConnectStatusText}
-            </div>
+            <SettingsHelpText error={mobileConnectStatusError}>{mobileConnectStatusText}</SettingsHelpText>
           )}
-          <div className="settings-help">
+          <SettingsHelpText>
             Make sure your desktop app daemon is running and reachable on Tailscale, then retry this
             test.
-          </div>
-        </div>
+          </SettingsHelpText>
+        </SettingsField>
       )}
 
       {!isMobileSimplified && (
-        <div className="settings-field">
-          <div className="settings-field-label">Mobile access daemon</div>
-          <div className="settings-field-row">
+        <SettingsField>
+          <SettingsFieldLabel>Mobile access daemon</SettingsFieldLabel>
+          <SettingsFieldRow>
             <button
               type="button"
-              className="button settings-button-compact"
+              className="primary py-1.5 px-2.5 text-ui-sm"
               onClick={() => {
                 void onTcpDaemonStart();
               }}
@@ -441,7 +442,7 @@ export function SettingsServerSection({
             </button>
             <button
               type="button"
-              className="button settings-button-compact"
+              className="primary py-1.5 px-2.5 text-ui-sm"
               onClick={() => {
                 void onTcpDaemonStop();
               }}
@@ -451,7 +452,7 @@ export function SettingsServerSection({
             </button>
             <button
               type="button"
-              className="button settings-button-compact"
+              className="primary py-1.5 px-2.5 text-ui-sm"
               onClick={() => {
                 void onTcpDaemonStatus();
               }}
@@ -459,27 +460,27 @@ export function SettingsServerSection({
             >
               {tcpDaemonBusyAction === "status" ? "Refreshing..." : "Refresh status"}
             </button>
-          </div>
-          {tcpRunnerStatusText && <div className="settings-help">{tcpRunnerStatusText}</div>}
+          </SettingsFieldRow>
+          {tcpRunnerStatusText && <SettingsHelpText>{tcpRunnerStatusText}</SettingsHelpText>}
           {tcpDaemonStatus?.startedAtMs && (
-            <div className="settings-help">
+            <SettingsHelpText>
               Started at: {new Date(tcpDaemonStatus.startedAtMs).toLocaleString()}
-            </div>
+            </SettingsHelpText>
           )}
-          <div className="settings-help">
+          <SettingsHelpText>
             Start this daemon before connecting from iOS. It uses your current token and listens on{" "}
             <code>0.0.0.0:&lt;port&gt;</code>, matching your configured host port.
-          </div>
-        </div>
+          </SettingsHelpText>
+        </SettingsField>
       )}
 
       {!isMobileSimplified && (
-        <div className="settings-field">
-          <div className="settings-field-label">Tailscale helper</div>
-          <div className="settings-field-row">
+        <SettingsField>
+          <SettingsFieldLabel>Tailscale helper</SettingsFieldLabel>
+          <SettingsFieldRow>
             <button
               type="button"
-              className="button settings-button-compact"
+              className="primary py-1.5 px-2.5 text-ui-sm"
               onClick={onRefreshTailscaleStatus}
               disabled={tailscaleStatusBusy}
             >
@@ -487,7 +488,7 @@ export function SettingsServerSection({
             </button>
             <button
               type="button"
-              className="button settings-button-compact"
+              className="primary py-1.5 px-2.5 text-ui-sm"
               onClick={onRefreshTailscaleCommandPreview}
               disabled={tailscaleCommandBusy}
             >
@@ -495,7 +496,7 @@ export function SettingsServerSection({
             </button>
             <button
               type="button"
-              className="button settings-button-compact"
+              className="primary py-1.5 px-2.5 text-ui-sm"
               disabled={!tailscaleStatus?.suggestedRemoteHost}
               onClick={() => {
                 void onUseSuggestedTailscaleHost();
@@ -503,108 +504,99 @@ export function SettingsServerSection({
             >
               Use suggested host
             </button>
-          </div>
-          {tailscaleStatusError && (
-            <div className="settings-help settings-help-error">{tailscaleStatusError}</div>
-          )}
+          </SettingsFieldRow>
+          {tailscaleStatusError && <SettingsHelpText error>{tailscaleStatusError}</SettingsHelpText>}
           {tailscaleStatus && (
             <>
-              <div className="settings-help">{tailscaleStatus.message}</div>
-              <div className="settings-help">
+              <SettingsHelpText>{tailscaleStatus.message}</SettingsHelpText>
+              <SettingsHelpText>
                 {tailscaleStatus.installed
                   ? `Version: ${tailscaleStatus.version ?? "unknown"}`
                   : "Install Tailscale on both desktop and iOS to continue."}
-              </div>
+              </SettingsHelpText>
               {tailscaleStatus.suggestedRemoteHost && (
-                <div className="settings-help">
+                <SettingsHelpText>
                   Suggested remote host: <code>{tailscaleStatus.suggestedRemoteHost}</code>
-                </div>
+                </SettingsHelpText>
               )}
               {tailscaleStatus.tailnetName && (
-                <div className="settings-help">
+                <SettingsHelpText>
                   Tailnet: <code>{tailscaleStatus.tailnetName}</code>
-                </div>
+                </SettingsHelpText>
               )}
             </>
           )}
-          {tailscaleCommandError && (
-            <div className="settings-help settings-help-error">{tailscaleCommandError}</div>
-          )}
+          {tailscaleCommandError && <SettingsHelpText error>{tailscaleCommandError}</SettingsHelpText>}
           {tailscaleCommandPreview && (
             <>
-              <div className="settings-help">
+              <SettingsHelpText>
                 Command template (manual fallback) for starting the daemon:
-              </div>
-              <pre className="settings-command-preview">
+              </SettingsHelpText>
+              <pre className="bg-surface-control rounded-lg p-3 text-ui-xs font-code whitespace-pre-wrap text-text-primary overflow-auto">
                 <code>{tailscaleCommandPreview.command}</code>
               </pre>
               {!tailscaleCommandPreview.tokenConfigured && (
-                <div className="settings-help settings-help-error">
+                <SettingsHelpText error>
                   Remote backend token is empty. Set one before exposing daemon access.
-                </div>
+                </SettingsHelpText>
               )}
             </>
           )}
-        </div>
+        </SettingsField>
       )}
 
-      <div className="settings-help">
+      <SettingsHelpText>
         {isMobileSimplified
           ? "Use your own infrastructure only. On iOS, get the Tailscale hostname and token from your desktop Klynt setup."
           : "Mobile access should stay scoped to your own infrastructure (tailnet). Klynt does not provide hosted backend services."}
-      </div>
+      </SettingsHelpText>
+
       {addRemoteOpen && (
         <ModalShell
-          className="settings-add-remote-overlay"
-          cardClassName="settings-add-remote-card"
+          className="z-40"
+          cardClassName="w-[min(420px,calc(100vw-40px))] p-4 flex flex-col gap-2.5 bg-[#141b27] border border-white/15 rounded-2xl shadow-[0_24px_60px_rgba(0,0,0,0.55)] text-[#eef3ff]"
           onBackdropClick={closeAddRemoteModal}
           ariaLabel="Add remote"
         >
-          <div className="settings-add-remote-header">
-            <div className="settings-add-remote-title">Add remote</div>
+          <div className="flex items-center justify-between gap-2">
+            <div className="text-ui-md font-bold text-[#f5f8ff]">Add remote</div>
             <button
               type="button"
-              className="ghost icon-button settings-add-remote-close"
+              className="ghost icon-button p-1 text-[#dce6f7]"
               onClick={closeAddRemoteModal}
               aria-label="Close add remote modal"
               disabled={addRemoteBusy}
             >
-              <X aria-hidden />
+              <X className="w-3.5 h-3.5" aria-hidden />
             </button>
           </div>
-          <div className="settings-field">
-            <label className="settings-field-label" htmlFor="settings-add-remote-name">
-              New remote name
-            </label>
-            <input
+          <SettingsField className="mb-0">
+            <SettingsFieldLabel htmlFor="settings-add-remote-name">New remote name</SettingsFieldLabel>
+            <SettingsInput
               id="settings-add-remote-name"
-              className="settings-input settings-input--compact"
+              compact
               value={addRemoteNameDraft}
               onChange={(event) => setAddRemoteNameDraft(event.target.value)}
               disabled={addRemoteBusy}
             />
-          </div>
-          <div className="settings-field">
-            <label className="settings-field-label" htmlFor="settings-add-remote-host">
-              New remote host
-            </label>
-            <input
+          </SettingsField>
+          <SettingsField className="mb-0">
+            <SettingsFieldLabel htmlFor="settings-add-remote-host">New remote host</SettingsFieldLabel>
+            <SettingsInput
               id="settings-add-remote-host"
-              className="settings-input settings-input--compact"
+              compact
               value={addRemoteHostDraft}
               placeholder="macbook.your-tailnet.ts.net:4732"
               onChange={(event) => setAddRemoteHostDraft(event.target.value)}
               disabled={addRemoteBusy}
             />
-          </div>
-          <div className="settings-field">
-            <label className="settings-field-label" htmlFor="settings-add-remote-token">
-              New remote token
-            </label>
-            <input
+          </SettingsField>
+          <SettingsField className="mb-0">
+            <SettingsFieldLabel htmlFor="settings-add-remote-token">New remote token</SettingsFieldLabel>
+            <SettingsInput
               id="settings-add-remote-token"
+              compact
               type="password"
-              className="settings-input settings-input--compact"
               value={addRemoteTokenDraft}
               placeholder="Token"
               onChange={(event) => setAddRemoteTokenDraft(event.target.value)}
@@ -616,22 +608,15 @@ export function SettingsServerSection({
               }}
               disabled={addRemoteBusy}
             />
-          </div>
-          {addRemoteError && (
-            <div className="settings-help settings-help-error">{addRemoteError}</div>
-          )}
-          <div className="settings-add-remote-actions">
-            <button
-              type="button"
-              className="ghost"
-              onClick={closeAddRemoteModal}
-              disabled={addRemoteBusy}
-            >
+          </SettingsField>
+          {addRemoteError && <SettingsHelpText error>{addRemoteError}</SettingsHelpText>}
+          <div className="inline-flex justify-end gap-2 mt-1">
+            <button type="button" className="ghost" onClick={closeAddRemoteModal} disabled={addRemoteBusy}>
               Cancel
             </button>
             <button
               type="button"
-              className="button"
+              className="primary"
               onClick={handleAddRemoteConfirm}
               disabled={addRemoteBusy}
             >
@@ -640,25 +625,26 @@ export function SettingsServerSection({
           </div>
         </ModalShell>
       )}
+
       {pendingDeleteRemote && (
         <ModalShell
-          className="settings-delete-remote-overlay"
-          cardClassName="settings-delete-remote-card"
+          className="z-40"
+          cardClassName="w-[min(380px,calc(100vw-40px))] p-4 flex flex-col gap-2.5 bg-[#141b27] border border-white/15 rounded-2xl shadow-[0_24px_60px_rgba(0,0,0,0.55)] text-[#eef3ff]"
           onBackdropClick={() => setPendingDeleteRemoteId(null)}
           ariaLabel="Delete remote confirmation"
         >
-          <div className="settings-delete-remote-title">Delete remote?</div>
-          <div className="settings-delete-remote-message">
+          <div className="text-ui-md font-bold text-[#f5f8ff]">Delete remote?</div>
+          <div className="text-ui-sm text-[rgba(232,240,251,0.86)] leading-relaxed">
             Remove <strong>{pendingDeleteRemote.name}</strong> from saved remotes? This only removes
             the profile from this device.
           </div>
-          <div className="settings-delete-remote-actions">
+          <div className="inline-flex justify-end gap-2 mt-1">
             <button type="button" className="ghost" onClick={() => setPendingDeleteRemoteId(null)}>
               Cancel
             </button>
             <button
               type="button"
-              className="button"
+              className="primary"
               onClick={() => {
                 void onDeleteRemoteBackend(pendingDeleteRemote.id);
                 setPendingDeleteRemoteId(null);

@@ -4,6 +4,7 @@ import type { CalendarEvent } from "@/bindings";
 import { useTauriQuery } from "@/lib/query";
 import { qk } from "@/lib/query/queryKeys";
 import { formatHumanDuration, minutesSinceMidnight } from "@/utils/dashboardDates";
+import { cn } from "@/utils/cn";
 import { computeOverlapLayout } from "../../lib/timeline-utils";
 
 interface CalendarTrackProps {
@@ -49,20 +50,7 @@ export function CalendarTrack({
 
   if (events.length === 0) {
     return (
-      <div
-        className="dashboard__calendar-empty"
-        style={{
-          position: "absolute",
-          inset: 0,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontSize: "var(--fs-2xs)",
-          color: "var(--ds-text-subtle)",
-          padding: 16,
-          textAlign: "center",
-        }}
-      >
+      <div className="absolute inset-0 flex items-center justify-center text-ui-2xs text-ds-text-subtle p-4 text-center">
         No calendar events for this day
       </div>
     );
@@ -93,10 +81,12 @@ export function CalendarTrack({
           <button
             type="button"
             key={event.id}
-            className={`dashboard__calendar-event${isSelected ? " dashboard__calendar-event--selected" : ""}`}
+            className={cn(
+              "absolute rounded overflow-hidden cursor-pointer text-left border-none transition-[filter] duration-ui-fast ease-out hover:brightness-[1.15] min-h-[18px]",
+              isSelected && "outline outline-1 outline-border-accent",
+            )}
             style={{
               ...posStyle,
-              position: "absolute",
               borderLeftWidth: 2,
               borderLeftStyle: "solid",
               borderLeftColor: color,
@@ -104,10 +94,15 @@ export function CalendarTrack({
             }}
             onClick={() => onSelectEvent(isSelected ? null : event)}
             aria-label={`${event.title}, ${formatHumanDuration(durationSecs)}`}
+            aria-pressed={isSelected}
           >
-            {height > 16 && <span className="dashboard__calendar-event-title">{event.title}</span>}
+            {height > 16 && (
+              <span className="block text-text-muted font-medium whitespace-nowrap overflow-hidden text-ellipsis px-0.5">
+                {event.title}
+              </span>
+            )}
             {height > 30 && (
-              <span className="dashboard__calendar-event-meta">
+              <span className="block text-text-faint whitespace-nowrap overflow-hidden text-ellipsis px-0.5">
                 {formatHumanDuration(durationSecs)}
                 {event.location ? ` · ${event.location}` : ""}
               </span>

@@ -6,6 +6,7 @@ import X from "lucide-react/dist/esm/icons/x";
 import type { MouseEvent } from "react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { cn } from "@/utils/cn";
 import { PierreDiffBlock } from "@/features/git/components/PierreDiffBlock";
 import type { ConversationItem } from "@/types";
 import {
@@ -87,7 +88,7 @@ const MessageImageGrid = memo(function MessageImageGrid({
   hasText: boolean;
 }) {
   return (
-    <ul className={`message-image-grid${hasText ? " message-image-grid--with-text" : ""}`}>
+    <ul className={cn("message-image-grid", hasText && "mb-3")}>
       {images.map((image, index) => (
         <button
           key={image.src}
@@ -591,38 +592,38 @@ export const ToolRow = memo(function ToolRow({
       <div className={className}>
         <button
           type="button"
-          className="tool-row__toggle"
+          className="flex flex-1 items-center gap-[10px] py-2 pr-3 pl-3.5 bg-transparent border-0 cursor-pointer text-left [font:inherit] text-text-stronger min-w-0"
           aria-label={`Toggle ${desc.name} details`}
           aria-expanded={isExpanded}
           disabled={askUser || isRunning}
           onClick={handleClick}
         >
-          <span className="tool-row__icon" aria-hidden>
+          <span className="w-3.5 h-3.5 shrink-0 inline-flex items-center justify-center" style={{ color: "var(--tool-row-bar)" }} aria-hidden>
             {isRunning ? (
-              <span className="tool-row__spinner" />
+              <span className="w-[11px] h-[11px] border-[1.5px] border-current border-t-transparent rounded-full" style={{ animation: "spin 0.7s linear infinite" }} data-testid="tool-spinner" />
             ) : isFailed ? (
               <X size={11} aria-hidden />
             ) : null}
           </span>
-          <span className="tool-row__name">{desc.name}:</span>
-          {desc.arg && <span className="tool-row__arg">{desc.arg}</span>}
+          <span className="font-semibold text-ui-sm text-text-strong shrink-0">{desc.name}:</span>
+          {desc.arg && <span className="font-code text-[11px] text-text-muted overflow-hidden text-ellipsis whitespace-nowrap min-w-0 flex-1">{desc.arg}</span>}
           {desc.meta.length > 0 && (
-            <span className="tool-row__meta">
+            <span className="ml-auto text-ui-xs text-text-faint inline-flex items-center gap-1.5 shrink-0">
               {desc.meta.map((fragment, idx) => (
                 <span key={`meta-${idx}`}>
-                  {idx > 0 && <span className="tool-row__meta-sep">·</span>}
+                  {idx > 0 && <span className="opacity-50">·</span>}
                   {fragment}
                 </span>
               ))}
             </span>
           )}
-          <span className="tool-row__chevron" aria-hidden>
+          <span className="shrink-0 text-text-subtle text-[10px] transition-transform duration-150" aria-hidden>
             ▸
           </span>
         </button>
       </div>
       {showTail && <BashTail output={item.output ?? ""} />}
-      {isExpanded && <ToolRowBody item={item} />}
+      {isExpanded && <ToolRowBody item={item} isFailed={isFailed} />}
     </>
   );
 });
@@ -630,20 +631,21 @@ export const ToolRow = memo(function ToolRow({
 export const ExploreRow = memo(function ExploreRow({ item }: ExploreRowProps) {
   const isProcessing = item.status === "exploring";
   return (
-    <div className={`tool-row tool-row--search${isProcessing ? " is-running" : ""}`}>
-      <div className="tool-row__toggle" aria-disabled="true">
-        <span className="tool-row__icon" aria-hidden>
-          {isProcessing ? <span className="tool-row__spinner" /> : null}
+    <div className={`tool-row${isProcessing ? " is-running" : ""}`} data-testid="explore-row">
+      <div className="flex flex-1 items-center gap-[10px] py-2 pr-3 pl-3.5 min-w-0" aria-disabled="true">
+        <span className="w-3.5 h-3.5 shrink-0 inline-flex items-center justify-center" style={{ color: "var(--tool-row-bar)" }} aria-hidden>
+          {isProcessing ? <span className="w-[11px] h-[11px] border-[1.5px] border-current border-t-transparent rounded-full" style={{ animation: "spin 0.7s linear infinite" }} data-testid="tool-spinner" /> : null}
         </span>
-        <span className="tool-row__name">{isProcessing ? "Exploring" : "Explored"}:</span>
-        <span className="tool-row__arg tool-row__explore-list">
+        <span className="font-semibold text-ui-sm text-text-strong shrink-0">{isProcessing ? "Exploring" : "Explored"}:</span>
+        <span className="text-text-muted flex flex-wrap gap-3 whitespace-normal">
           {item.entries.map((entry) => (
             <span
               key={`${entry.kind}-${entry.label}-${entry.detail ?? ""}`}
-              className="tool-row__explore-item"
+              className="inline-flex items-baseline gap-1"
+              data-testid="explore-item"
             >
-              <span className="tool-row__explore-kind">{exploreKindLabel(entry.kind)}</span>
-              <span className="tool-row__explore-label">{entry.label}</span>
+              <span className="font-semibold text-text-subtle">{exploreKindLabel(entry.kind)}</span>
+              <span className="text-text-stronger [overflow-wrap:anywhere]">{entry.label}</span>
             </span>
           ))}
         </span>

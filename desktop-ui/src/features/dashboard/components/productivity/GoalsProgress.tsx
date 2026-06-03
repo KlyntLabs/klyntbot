@@ -10,6 +10,7 @@ import {
 import type { GoalProgressResponse } from "@/bindings";
 import { useTauriMutation, useTauriQuery } from "@/lib/query";
 import { qk } from "@/lib/query/queryKeys";
+import { cn } from "@/utils/cn";
 import { AddGoalDialog } from "./AddGoalDialog";
 
 function metricLabel(metric: string): string {
@@ -66,35 +67,33 @@ export function GoalsProgress() {
 
   return (
     <>
-      <div className="dashboard__goals">
-        <div className="dashboard__goals-header">
-          <h2>Goals</h2>
+      <div className="bg-surface-card-strong border border-ds-border-subtle rounded-lg px-3.5 py-3 flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-ui-sm font-medium text-ds-text-subtle m-0">Goals</h2>
           <button
             type="button"
             onClick={() => setShowAdd(true)}
-            className="dashboard__goals-add-btn"
+            className="w-6 h-6 rounded-md bg-none border-none text-ds-text-subtle flex items-center justify-center cursor-pointer hover:text-brand hover:bg-surface-control"
             aria-label="Add goal"
           >
-            <Plus aria-hidden />
+            <Plus aria-hidden className="w-3.5 h-3.5" />
           </button>
         </div>
 
         {goals.length === 0 ? (
-          <p className="dashboard__goals-empty">No goals set</p>
+          <p className="text-ui-2xs font-light text-ds-text-subtle m-0">No goals set</p>
         ) : (
           <div>
             {goals.map((g) => {
               const pct =
                 g.targetValue > 0 ? Math.min((g.currentValue / g.targetValue) * 100, 100) : 0;
               return (
-                <div key={g.id} className="dashboard__goal-row">
-                  <div className="dashboard__goal-meta">
+                <div key={g.id} className="group flex flex-col gap-1 mb-2">
+                  <div className="flex items-center gap-2 text-ui-2xs font-light flex-wrap">
                     <span
-                      className={
-                        g.met
-                          ? "dashboard__goal-status dashboard__goal-status--met"
-                          : "dashboard__goal-status dashboard__goal-status--in-progress"
-                      }
+                      className={cn(
+                        g.met ? "text-success" : "text-brand",
+                      )}
                     >
                       {g.met ? "MET" : "IN PROGRESS"}
                     </span>
@@ -102,7 +101,7 @@ export function GoalsProgress() {
                       {formatValue(g.metric, g.targetValue)} {metricLabel(g.metric)}
                     </span>
                     {g.projectId && (
-                      <span className="dashboard__goal-project-tag">{g.projectId}</span>
+                      <span className="text-ui-2xs px-1.5 py-0.5 rounded bg-surface-control text-ds-text-subtle">{g.projectId}</span>
                     )}
                     <span>({g.goalType})</span>
                     <span>
@@ -112,20 +111,16 @@ export function GoalsProgress() {
                     <button
                       type="button"
                       onClick={() => handleDelete(g.id)}
-                      className="dashboard__goal-delete-btn"
+                      className="w-5 h-5 rounded bg-none border-none text-transparent cursor-pointer flex items-center justify-center group-hover:text-ds-text-subtle hover:text-destructive"
                       aria-label="Delete goal"
                     >
-                      <Trash2 aria-hidden />
+                      <Trash2 aria-hidden className="w-3 h-3" />
                     </button>
                   </div>
-                  <div className="dashboard__goal-bar-track">
+                  <div className="h-1.5 rounded-full bg-surface-control overflow-hidden">
                     <div
-                      className={
-                        g.met
-                          ? "dashboard__goal-bar-fill dashboard__goal-bar-fill--met"
-                          : "dashboard__goal-bar-fill"
-                      }
-                      style={{ width: `${pct}%` }}
+                      className={cn("h-full rounded-full transition-[width] duration-300", g.met && "bg-success")}
+                      style={{ width: `${pct}%`, backgroundColor: g.met ? undefined : "var(--brand)" }}
                     />
                   </div>
                 </div>

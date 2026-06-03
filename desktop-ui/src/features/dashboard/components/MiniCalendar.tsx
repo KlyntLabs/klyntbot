@@ -1,6 +1,7 @@
 import ChevronLeft from "lucide-react/dist/esm/icons/chevron-left";
 import ChevronRight from "lucide-react/dist/esm/icons/chevron-right";
 import { useEffect, useMemo, useState } from "react";
+import { cn } from "@/utils/cn";
 import { LONG_MONTHS, toLocalISO } from "@/utils/dashboardDates";
 
 interface MiniCalendarProps {
@@ -95,18 +96,21 @@ export function MiniCalendar({
 
   return (
     <fieldset
-      className="dashboard__mini-calendar"
+      className="w-full min-w-[252px] border-none p-0 m-0"
       onClick={(e) => e.stopPropagation()}
       onKeyDown={(e) => e.stopPropagation()}
     >
       {showShortcuts && (
-        <div className="dashboard__mini-shortcuts">
+        <div className="flex gap-1 mb-1.5 px-0.5">
           {shortcuts.map((s) => (
             <button
               type="button"
               key={s.label}
               onClick={() => onSelect(s.iso)}
-              className={`dashboard__mini-shortcut${value === s.iso ? " dashboard__mini-shortcut--active" : ""}`}
+              className={cn(
+                "px-2 py-0.5 text-ui-2xs rounded-lg bg-surface-hover text-text-muted border-none cursor-pointer transition-colors duration-ui-fast ease-out hover:text-text-strong",
+                value === s.iso && "bg-surface-active text-border-accent",
+              )}
             >
               {s.label}
             </button>
@@ -114,46 +118,42 @@ export function MiniCalendar({
         </div>
       )}
 
-      <div className="dashboard__mini-month-nav">
+      <div className="flex items-center justify-between px-0.5 mb-1">
         <button
           type="button"
           onClick={prevMonth}
           aria-label="Previous month"
-          className="dashboard__icon-button"
+          className="bg-transparent border-none p-1.5 rounded-full text-text-muted cursor-pointer transition-colors duration-ui-fast ease-out inline-flex items-center justify-center hover:text-text-strong hover:bg-surface-active"
         >
-          <ChevronLeft strokeWidth={1.5} />
+          <ChevronLeft strokeWidth={1.5} className="w-4 h-4" />
         </button>
-        <span className="dashboard__mini-month-label">
+        <span className="text-ui-xs font-medium text-text-muted">
           {LONG_MONTHS[viewMonth]} {viewYear}
         </span>
         <button
           type="button"
           onClick={nextMonth}
           aria-label="Next month"
-          className="dashboard__icon-button"
+          className="bg-transparent border-none p-1.5 rounded-full text-text-muted cursor-pointer transition-colors duration-ui-fast ease-out inline-flex items-center justify-center hover:text-text-strong hover:bg-surface-active"
         >
-          <ChevronRight strokeWidth={1.5} />
+          <ChevronRight strokeWidth={1.5} className="w-4 h-4" />
         </button>
       </div>
 
-      <div className="dashboard__mini-weekdays">
+      <div className="grid grid-cols-7 mb-0.5">
         {WEEKDAYS.map((d) => (
-          <div key={d} className="dashboard__mini-weekday">
+          <div key={d} className="h-6 flex items-center justify-center text-ui-2xs font-medium text-text-muted">
             {d}
           </div>
         ))}
       </div>
 
-      <div className="dashboard__mini-days">
+      <div className="grid grid-cols-7 gap-0.5">
         {cells.map((d) => {
           const iso = toLocalISO(d);
           const isCurrentMonth = d.getMonth() === viewMonth;
           const isToday = iso === todayISO;
           const isSelected = iso === value;
-          const cls = ["dashboard__mini-day"];
-          if (isSelected) cls.push("dashboard__mini-day--selected");
-          else if (isToday) cls.push("dashboard__mini-day--today");
-          else if (!isCurrentMonth) cls.push("dashboard__mini-day--other-month");
 
           return (
             <button
@@ -161,7 +161,12 @@ export function MiniCalendar({
               key={iso}
               onClick={() => onSelect(iso)}
               aria-label={`${d.getDate()} ${LONG_MONTHS[d.getMonth()]} ${d.getFullYear()}`}
-              className={cls.join(" ")}
+              className={cn(
+                "h-8 flex items-center justify-center text-ui-2xs font-medium rounded-lg border border-transparent bg-surface-hover text-text-muted cursor-pointer transition-colors duration-ui-fast ease-out hover:bg-surface-active",
+                isSelected && "bg-border-accent text-[var(--color-surface-raised,var(--surface-hover))] border-[color-mix(in_srgb,var(--border-accent)_40%,transparent)]",
+                !isSelected && isToday && "bg-surface-active text-border-accent border-[color-mix(in_srgb,var(--border-accent)_30%,transparent)]",
+                !isSelected && !isToday && !isCurrentMonth && "text-[color-mix(in_srgb,var(--text-muted)_30%,transparent)]",
+              )}
             >
               {d.getDate()}
             </button>
@@ -173,7 +178,7 @@ export function MiniCalendar({
         <button
           type="button"
           onClick={onClear}
-          className="dashboard__popover-reset"
+          className="w-full text-left mt-1 px-2.5 py-1.5 text-ui-2xs text-text-muted bg-transparent border-none cursor-pointer rounded-md transition-colors duration-ui-fast ease-out hover:bg-surface-hover hover:text-text-strong"
           style={{ color: "var(--text-error, #d97373)" }}
         >
           Clear date

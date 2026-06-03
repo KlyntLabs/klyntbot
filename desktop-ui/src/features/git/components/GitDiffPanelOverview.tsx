@@ -30,22 +30,26 @@ export function GitPanelModeStatus({
   pullRequestsTotal,
 }: GitPanelModeStatusProps) {
   if (mode === "diff") {
-    return <div className="diff-status">{diffStatusLabel}</div>;
+    return (
+      <div className="text-ui-xs font-medium text-text-muted">{diffStatusLabel}</div>
+    );
   }
 
   if (mode === "perFile") {
-    return <div className="diff-status">{perFileDiffStatusLabel}</div>;
+    return (
+      <div className="text-ui-xs font-medium text-text-muted">{perFileDiffStatusLabel}</div>
+    );
   }
 
   if (mode === "log") {
     return (
       <>
-        <div className="diff-status">{logCountLabel}</div>
-        <div className="git-log-sync">
+        <div className="text-ui-xs font-medium text-text-muted">{logCountLabel}</div>
+        <div className="git-log-sync inline-flex flex-wrap gap-[6px] text-ui-xs text-text-faint">
           <span>{logSyncLabel}</span>
           {logUpstreamLabel && (
             <>
-              <span className="git-log-sep">·</span>
+              <span className="text-text-dim">·</span>
               <span>{logUpstreamLabel}</span>
             </>
           )}
@@ -57,11 +61,11 @@ export function GitPanelModeStatus({
   if (mode === "issues") {
     return (
       <>
-        <div className="diff-status diff-status-issues">
+        <div className="diff-status-issues inline-flex items-center gap-[6px] text-ui-xs font-medium text-text-muted">
           <span>GitHub issues</span>
           {issuesLoading && <span className="git-panel-spinner" aria-hidden />}
         </div>
-        <div className="git-log-sync">
+        <div className="git-log-sync inline-flex flex-wrap gap-[6px] text-ui-xs text-text-faint">
           <span>{issuesTotal} open</span>
         </div>
       </>
@@ -70,11 +74,11 @@ export function GitPanelModeStatus({
 
   return (
     <>
-      <div className="diff-status diff-status-issues">
+      <div className="diff-status-issues inline-flex items-center gap-[6px] text-ui-xs font-medium text-text-muted">
         <span>GitHub pull requests</span>
         {pullRequestsLoading && <span className="git-panel-spinner" aria-hidden />}
       </div>
-      <div className="git-log-sync">
+      <div className="git-log-sync inline-flex flex-wrap gap-[6px] text-ui-xs text-text-faint">
         <span>{pullRequestsTotal} open</span>
       </div>
     </>
@@ -94,14 +98,18 @@ export function GitBranchRow({ mode, branchName, onFetch, fetchLoading }: GitBra
   }
 
   return (
-    <div className="diff-branch-row">
-      <div className="diff-branch-meta">
-        <span className="diff-branch-label">Branch</span>
-        <div className="diff-branch">{branchName || "unknown"}</div>
+    <div className="diff-branch-row flex items-center justify-between gap-[10px] min-w-0 pt-2 border-t border-border-subtle">
+      <div className="diff-branch-meta flex flex-col gap-[2px] min-w-0">
+        <span className="text-ui-2xs font-semibold tracking-[0.08em] uppercase text-text-faint">
+          Branch
+        </span>
+        <div className="text-ui-sm font-semibold text-text-strong">
+          {branchName || "unknown"}
+        </div>
       </div>
       <button
         type="button"
-        className="diff-branch-refresh"
+        className="diff-branch-refresh inline-flex items-center justify-center w-7 h-7 rounded-full border border-border-default bg-surface-control text-text-muted cursor-pointer p-0 shrink-0 shadow-none transition-[background,border-color,color] duration-ui-fast"
         onClick={() => void onFetch?.()}
         disabled={!onFetch || fetchLoading}
         title={fetchLoading ? "Fetching remote..." : "Fetch remote"}
@@ -137,21 +145,23 @@ export function GitRootCurrentPath({
   }
 
   return (
-    <div className="git-root-current">
-      <div className="git-root-current-main">
-        <span className="git-root-label">Repository root</span>
-        <span className="git-root-path" title={gitRoot ?? ""}>
+    <div className="git-root-current flex items-center justify-between gap-[10px] min-w-0 pt-2 border-t border-border-subtle text-ui-xs text-text-faint">
+      <div className="git-root-current-main flex flex-col gap-[3px] min-w-0">
+        <span className="git-root-label text-ui-2xs font-semibold tracking-[0.08em] uppercase text-text-faint">
+          Repository root
+        </span>
+        <span className="git-root-path min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-text-muted" title={gitRoot ?? ""}>
           {gitRoot}
         </span>
       </div>
       {onScanGitRoots && (
         <button
           type="button"
-          className="ghost git-root-button git-root-button--icon"
+          className="ghost git-root-button inline-flex items-center gap-[6px] px-[11px] py-[7px] text-ui-sm rounded-full border border-border-default bg-surface-control text-text-emphasis shadow-none transition-[background,border-color,color] duration-ui-fast"
           onClick={onScanGitRoots}
           disabled={gitRootScanLoading}
         >
-          <ArrowLeftRight className="git-root-button-icon" aria-hidden />
+          <ArrowLeftRight className="git-root-button-icon w-3 h-3" aria-hidden />
           Change
         </button>
       )}

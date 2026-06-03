@@ -44,10 +44,10 @@ export function Home({
   onSelectThread,
 }: HomeProps) {
   return (
-    <div className="home">
-      <div className="home-hero">
-        <div className="home-title">Klynt</div>
-        <div className="home-subtitle">Orchestrate agents across your local projects.</div>
+    <div className="home h-full w-full col-span-full row-span-full flex flex-col items-stretch gap-5 justify-start justify-self-stretch self-stretch max-w-none m-0 text-left overflow-y-auto overflow-x-hidden">
+      <div className="text-center flex flex-col gap-1.5">
+        <div className="text-[44px] font-semibold tracking-tight">Klynt</div>
+        <div className="text-ui-lg text-text-muted">Orchestrate agents across your local projects.</div>
       </div>
       <HomeLatestAgentsSection
         latestAgentRuns={latestAgentRuns}

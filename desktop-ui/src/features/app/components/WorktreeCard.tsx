@@ -1,4 +1,5 @@
 import type { MouseEvent } from "react";
+import { cn } from "@/utils/cn";
 
 import type { WorkspaceInfo } from "@/types";
 
@@ -30,10 +31,10 @@ export function WorktreeCard({
   const contentCollapsedClass = worktreeCollapsed ? " collapsed" : "";
 
   return (
-    <div className={`worktree-card${isDeleting ? " deleting" : ""}`}>
+    <div className={isDeleting ? "rounded-lg border border-border-subtle bg-surface-card overflow-hidden opacity-60" : "rounded-lg border border-border-subtle bg-surface-card overflow-hidden"}>
       <button
         type="button"
-        className={`worktree-row ${isActive ? "active" : ""}${isDeleting ? " deleting" : ""}`}
+        className={cn("flex items-center gap-2 px-3 py-2 w-full text-left bg-transparent border-none cursor-pointer", isActive && "bg-surface-active", isDeleting && "opacity-60 cursor-default")}
         disabled={isDeleting}
         onClick={() => {
           if (!isDeleting) {
@@ -55,21 +56,21 @@ export function WorktreeCard({
           }
         }}
       >
-        <div className="worktree-copy">
-          <div className="worktree-label">{worktreeLabel}</div>
-          {worktreeMeta && <div className="worktree-meta">{worktreeMeta}</div>}
+        <div className="min-w-0 flex-1">
+          <div className="text-ui-sm font-semibold leading-tight text-text-strong whitespace-nowrap overflow-hidden text-ellipsis">{worktreeLabel}</div>
+          {worktreeMeta && <div className="mt-1 text-ui-2xs leading-tight text-text-muted whitespace-nowrap overflow-hidden text-ellipsis">{worktreeMeta}</div>}
         </div>
-        <div className="worktree-actions">
+        <div className="inline-flex items-center gap-1.5">
           {isDeleting ? (
-            <div className="worktree-deleting" role="status" aria-live="polite">
-              <span className="worktree-deleting-spinner" aria-hidden />
-              <span className="worktree-deleting-label">Deleting</span>
+            <div className="inline-flex items-center gap-1.5 text-ui-xs text-text-faint" role="status" aria-live="polite">
+              <span className="w-2.5 h-2.5 rounded-full border-2 border-border-subtle border-t-text-strong animate-[spin_var(--duration-ui-spinner)_linear_infinite]" aria-hidden />
+              <span className="tracking-wide">Deleting</span>
             </div>
           ) : (
             <>
               <button
                 type="button"
-                className={`worktree-toggle ${worktreeCollapsed ? "" : "expanded"}`}
+                className={cn("border-none bg-transparent text-text-muted inline-flex items-center justify-center text-ui-sm leading-none px-0.5 [-webkit-app-region:no-drag] opacity-45 transition-opacity hover:text-text-strong hover:opacity-100 focus-visible:opacity-100", !worktreeCollapsed && "[&>span]:rotate-90")}
                 onClick={(event) => {
                   event.stopPropagation();
                   onToggleWorkspaceCollapse(worktree.id, !worktreeCollapsed);
@@ -78,7 +79,7 @@ export function WorktreeCard({
                 aria-label={worktreeCollapsed ? "Show agents" : "Hide agents"}
                 aria-expanded={!worktreeCollapsed}
               >
-                <span className="worktree-toggle-icon">›</span>
+                <span className="inline-block transition-transform duration-150">›</span>
               </button>
               {!worktree.connected && (
                 <button

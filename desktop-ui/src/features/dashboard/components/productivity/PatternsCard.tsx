@@ -23,9 +23,9 @@ export function PatternsCard() {
   if (!data || data.daysAnalyzed < 3) {
     const remaining = Math.max(0, 3 - (data?.daysAnalyzed ?? 0));
     return (
-      <div className="dashboard__patterns dashboard__patterns--empty">
-        <div className="dashboard__patterns-title">Your Patterns</div>
-        <div className="dashboard__patterns-row">
+      <div className="px-1 py-2 flex flex-col gap-1 opacity-70">
+        <div className="text-ui-2xs font-medium text-ds-text-strong">Your Patterns</div>
+        <div className="text-ui-2xs text-ds-text-subtle">
           {remaining === 3
             ? "Patterns appear after 3 days of tracking."
             : `${remaining} more day${remaining === 1 ? "" : "s"} of tracking until patterns appear.`}
@@ -38,17 +38,17 @@ export function PatternsCard() {
     data.peakFocusHours.length > 0 ? data.peakFocusHours.map((h) => `${h}:00`).join(", ") : "—";
 
   return (
-    <div className="dashboard__patterns">
-      <div className="dashboard__patterns-title">Your Patterns</div>
+    <div className="px-1 py-2 flex flex-col gap-1">
+      <div className="text-ui-2xs font-medium text-ds-text-strong">Your Patterns</div>
       <div>
-        <div className="dashboard__patterns-row">Peak hours: {peakLabel}</div>
+        <div className="text-ui-2xs text-ds-text-subtle">Peak hours: {peakLabel}</div>
         {data.bestDayOfWeek && (
-          <div className="dashboard__patterns-row">Best day: {data.bestDayOfWeek}</div>
+          <div className="text-ui-2xs text-ds-text-subtle">Best day: {data.bestDayOfWeek}</div>
         )}
-        <div className="dashboard__patterns-row">
+        <div className="text-ui-2xs text-ds-text-subtle">
           Avg session: {Math.round(data.avgSessionMins)}min
         </div>
-        <div className="dashboard__patterns-footer">{data.daysAnalyzed} days analyzed</div>
+        <div className="text-ui-2xs text-[color-mix(in_srgb,var(--ds-text-subtle)_60%,transparent)]">{data.daysAnalyzed} days analyzed</div>
       </div>
     </div>
   );

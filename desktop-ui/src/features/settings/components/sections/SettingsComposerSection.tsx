@@ -1,9 +1,15 @@
 import {
+  SettingsField,
+  SettingsFieldLabel,
+  SettingsHelpText,
   SettingsSection,
+  SettingsSelect,
+  SettingsSubsection,
   SettingsToggleRow,
   SettingsToggleSwitch,
 } from "@/features/design-system/components/settings/SettingsPrimitives";
 import type { AppSettings } from "@/types";
+import { cn } from "@/utils/cn";
 
 type ComposerPreset = AppSettings["composerEditorPreset"];
 
@@ -30,20 +36,31 @@ export function SettingsComposerSection({
       title="Composer"
       subtitle="Control helpers and formatting behavior inside the message editor."
     >
-      <div className="settings-field">
-        <div className="settings-field-label">Follow-up behavior</div>
+      <SettingsField>
+        <SettingsFieldLabel>Follow-up behavior</SettingsFieldLabel>
         <div
-          className={`settings-segmented${appSettings.followUpMessageBehavior === "steer" ? " is-second-active" : ""}`}
+          className="relative inline-flex items-center self-start gap-1 p-1 rounded-full border border-border-muted bg-surface-control"
           role="radiogroup"
           aria-label="Follow-up behavior"
         >
+          <div
+            className={cn(
+              "absolute top-1 left-1 h-[calc(100%-8px)] rounded-full bg-surface-card shadow-[inset_0_0_0_1px_var(--border-strong)] z-0 transition-transform duration-200 w-[calc(50%-6px)]",
+              appSettings.followUpMessageBehavior === "steer"
+                ? "translate-x-[calc(100%+4px)]"
+                : "translate-x-0",
+            )}
+          />
           <label
-            className={`settings-segmented-option${
-              appSettings.followUpMessageBehavior === "queue" ? " is-active" : ""
-            }`}
+            className={cn(
+              "relative z-[1] inline-flex items-center justify-center rounded-full bg-transparent text-ui-sm font-semibold p-0 min-w-[72px] overflow-hidden transition-colors duration-200",
+              appSettings.followUpMessageBehavior === "queue"
+                ? "text-text-strong"
+                : "text-text-muted hover:text-text-strong hover:bg-surface-card/55",
+            )}
           >
             <input
-              className="settings-segmented-input"
+              className="absolute inset-0 opacity-0 m-0"
               type="radio"
               name="follow-up-behavior"
               value="queue"
@@ -55,16 +72,24 @@ export function SettingsComposerSection({
                 })
               }
             />
-            <span className="settings-segmented-option-label">Queue</span>
+            <span className="inline-flex items-center justify-center w-full px-3 py-1.5">
+              Queue
+            </span>
           </label>
           <label
-            className={`settings-segmented-option${
-              appSettings.followUpMessageBehavior === "steer" ? " is-active" : ""
-            }${steerUnavailable ? " is-disabled" : ""}`}
+            className={cn(
+              "relative z-[1] inline-flex items-center justify-center rounded-full bg-transparent text-ui-sm font-semibold p-0 min-w-[72px] overflow-hidden transition-colors duration-200",
+              appSettings.followUpMessageBehavior === "steer"
+                ? "text-text-strong"
+                : "text-text-muted",
+              steerUnavailable
+                ? "cursor-not-allowed text-text-faint"
+                : "hover:text-text-strong hover:bg-surface-card/55",
+            )}
             title={steerUnavailable ? "Steer is unavailable in the current Codex config." : ""}
           >
             <input
-              className="settings-segmented-input"
+              className="absolute inset-0 opacity-0 m-0"
               type="radio"
               name="follow-up-behavior"
               value="steer"
@@ -80,13 +105,15 @@ export function SettingsComposerSection({
                 });
               }}
             />
-            <span className="settings-segmented-option-label">Steer</span>
+            <span className="inline-flex items-center justify-center w-full px-3 py-1.5">
+              Steer
+            </span>
           </label>
         </div>
-        <div className="settings-help">
+        <SettingsHelpText>
           Choose the default while a run is active. Press {followUpShortcutLabel} to send the
           opposite behavior for one message.
-        </div>
+        </SettingsHelpText>
         <SettingsToggleRow
           title="Show follow-up hint while processing"
           subtitle="Displays queue/steer shortcut guidance above the composer."
@@ -102,23 +129,20 @@ export function SettingsComposerSection({
           />
         </SettingsToggleRow>
         {steerUnavailable && (
-          <div className="settings-help">
+          <SettingsHelpText>
             Steer is unavailable in the current Codex config. Follow-ups will queue.
-          </div>
+          </SettingsHelpText>
         )}
-      </div>
-      <div className="settings-divider" />
-      <div className="settings-subsection-title">Presets</div>
-      <div className="settings-subsection-subtitle">
-        Choose a starting point and fine-tune the toggles below.
-      </div>
-      <div className="settings-field">
-        <label className="settings-field-label" htmlFor="composer-preset">
-          Preset
-        </label>
-        <select
+      </SettingsField>
+      <div className="h-px bg-border-muted my-4 rounded-full" />
+      <SettingsSubsection
+        title="Presets"
+        subtitle="Choose a starting point and fine-tune the toggles below."
+      />
+      <SettingsField>
+        <SettingsFieldLabel htmlFor="composer-preset">Preset</SettingsFieldLabel>
+        <SettingsSelect
           id="composer-preset"
-          className="settings-select"
           value={appSettings.composerEditorPreset}
           onChange={(event) => onComposerPresetChange(event.target.value as ComposerPreset)}
         >
@@ -127,13 +151,13 @@ export function SettingsComposerSection({
               {label}
             </option>
           ))}
-        </select>
-        <div className="settings-help">
+        </SettingsSelect>
+        <SettingsHelpText>
           Presets update the toggles below. Customize any setting after selecting.
-        </div>
-      </div>
-      <div className="settings-divider" />
-      <div className="settings-subsection-title">Code fences</div>
+        </SettingsHelpText>
+      </SettingsField>
+      <div className="h-px bg-border-muted my-4 rounded-full" />
+      <SettingsSubsection title="Code fences" />
       <SettingsToggleRow
         title="Expand fences on Space"
         subtitle="Typing ``` then Space inserts a fenced block."
@@ -206,8 +230,8 @@ export function SettingsComposerSection({
           }
         />
       </SettingsToggleRow>
-      <div className="settings-divider" />
-      <div className="settings-subsection-title">Pasting</div>
+      <div className="h-px bg-border-muted my-4 rounded-full" />
+      <SettingsSubsection title="Pasting" />
       <SettingsToggleRow
         title="Auto-wrap multi-line paste"
         subtitle="Wraps multi-line paste inside a fenced block."
@@ -236,8 +260,8 @@ export function SettingsComposerSection({
           }
         />
       </SettingsToggleRow>
-      <div className="settings-divider" />
-      <div className="settings-subsection-title">Lists</div>
+      <div className="h-px bg-border-muted my-4 rounded-full" />
+      <SettingsSubsection title="Lists" />
       <SettingsToggleRow
         title="Continue lists on Shift+Enter"
         subtitle="Continues numbered and bulleted lists when the line has content."

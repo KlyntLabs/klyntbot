@@ -24,23 +24,6 @@
 .review-result-part__group h4 {
   font-size: var(--fs-sm);
 }
-.review-issue__location {
-  font-family: var(--ff-mono);
-  font-size: var(--fs-xs);
-  color: var(--color-link);
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 0;
-}
-.review-issue__description {
-  font-size: var(--fs-sm);
-  margin: var(--space-xs) 0;
-}
-.review-issue__suggestion {
-  font-size: var(--fs-xs);
-  color: var(--color-fg-muted);
-}
 .review-result-part__empty {
   font-size: var(--fs-sm);
   color: var(--color-fg-muted);

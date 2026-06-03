@@ -96,16 +96,16 @@ export function WorktreeSection({
 
   return (
     <div className={`worktree-section${className ? ` ${className}` : ""}`}>
-      <div className="worktree-header">
-        <span className="worktree-header-title">
-          <span className="worktree-header-icon-wrap">
-            {sectionIcon ?? <Layers className="worktree-header-icon" aria-hidden />}
+      <div className="flex items-center justify-between gap-2 px-1 pb-1">
+        <span className="text-ui-sm font-semibold tracking-wide text-text-strong">
+          <span className="inline-flex items-center justify-center w-5 h-5">
+            {sectionIcon ?? <Layers className="w-4 h-4 text-text-muted" aria-hidden />}
           </span>
           <span>{sectionLabel}</span>
         </span>
-        <span className="worktree-header-count">{worktrees.length}</span>
+        <span className="min-w-[22px] h-[22px] px-2 rounded-full bg-cm-surface-panel-quiet border border-border-subtle text-text-muted inline-flex items-center justify-center text-ui-xs leading-none">{worktrees.length}</span>
       </div>
-      <div className="worktree-list">
+      <div className="flex flex-col gap-2">
         {worktrees.map((worktree) => {
           const worktreeThreads = threadsByWorkspace[worktree.id] ?? [];
           const isLoadingWorktreeThreads = threadListLoadingByWorkspace[worktree.id] ?? false;

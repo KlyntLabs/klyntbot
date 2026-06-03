@@ -95,10 +95,13 @@ export function WindowCaptionControls() {
   };
 
   return (
-    <fieldset className="window-caption-controls" aria-label="Window controls">
+    <fieldset
+      className="window-caption-controls absolute top-0 right-0 z-[6] inline-flex items-stretch h-[var(--main-topbar-height,44px)] [webkit-app-region:no-drag] [&>button>svg]:w-3.5 [&>button>svg]:h-3.5"
+      aria-label="Window controls"
+    >
       <button
         type="button"
-        className="window-caption-control"
+        className="window-caption-control w-[46px] h-[var(--main-topbar-height,44px)] border-0 rounded-none p-0 bg-transparent text-text-muted inline-flex items-center justify-center shadow-none transition-colors duration-[120ms] ease-out"
         aria-label="Minimize window"
         data-tauri-drag-region="false"
         onClick={handleMinimize}
@@ -107,7 +110,7 @@ export function WindowCaptionControls() {
       </button>
       <button
         type="button"
-        className="window-caption-control"
+        className="window-caption-control w-[46px] h-[var(--main-topbar-height,44px)] border-0 rounded-none p-0 bg-transparent text-text-muted inline-flex items-center justify-center shadow-none transition-colors duration-[120ms] ease-out"
         aria-label={isMaximized ? "Restore window" : "Maximize window"}
         data-tauri-drag-region="false"
         onClick={handleToggleMaximize}
@@ -116,7 +119,7 @@ export function WindowCaptionControls() {
       </button>
       <button
         type="button"
-        className="window-caption-control window-caption-control-close"
+        className="window-caption-control window-caption-control-close w-[46px] h-[var(--main-topbar-height,44px)] border-0 rounded-none p-0 bg-transparent text-text-muted inline-flex items-center justify-center shadow-none transition-colors duration-[120ms] ease-out"
         aria-label="Close window"
         data-tauri-drag-region="false"
         onClick={handleClose}

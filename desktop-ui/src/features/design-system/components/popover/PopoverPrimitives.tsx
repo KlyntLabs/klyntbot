@@ -7,7 +7,17 @@ type PopoverSurfaceProps = ComponentPropsWithoutRef<"div"> & {
 
 export const PopoverSurface = forwardRef<HTMLDivElement, PopoverSurfaceProps>(
   function PopoverSurface({ className, ...props }, ref) {
-    return <div ref={ref} className={cn("ds-popover", className)} {...props} />;
+    return (
+      <div
+        ref={ref}
+        className={cn(
+          "bg-surface-popover border border-border-muted rounded-ui-lg shadow-ds-popover",
+          "animate-[ds-popover-in_var(--ds-dur-fast)_var(--ds-ease-out)_both]",
+          className,
+        )}
+        {...props}
+      />
+    );
   },
 );
 
@@ -27,15 +37,23 @@ export function PopoverMenuItem({
   return (
     <button
       type="button"
-      className={cn("ds-popover-item", active && "is-active", className)}
+      className={cn(
+        "w-full flex items-center justify-start gap-2 px-2 py-1.5 rounded-ui-md",
+        "bg-transparent border-none text-text-muted text-ui-sm text-left cursor-pointer",
+        "transition-colors duration-ui-fast ease-ui-out-soft",
+        "hover:bg-surface-hover hover:text-text-stronger focus-visible:bg-surface-hover focus-visible:text-text-stronger",
+        "disabled:opacity-[0.55] disabled:cursor-not-allowed",
+        active && "bg-surface-hover text-text-stronger",
+        className,
+      )}
       {...props}
     >
       {icon ? (
-        <span className="ds-popover-item-icon" aria-hidden>
+        <span className="shrink-0 inline-flex items-center justify-center w-3.5 h-3.5" aria-hidden>
           {icon}
         </span>
       ) : null}
-      <span className="ds-popover-item-label">{children}</span>
+      <span className="min-w-0 flex-1 truncate">{children}</span>
     </button>
   );
 }

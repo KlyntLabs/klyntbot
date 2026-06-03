@@ -3,6 +3,7 @@ import Folder from "lucide-react/dist/esm/icons/folder";
 import GitBranch from "lucide-react/dist/esm/icons/git-branch";
 import ScrollText from "lucide-react/dist/esm/icons/scroll-text";
 import { type KeyboardEvent, type ReactNode, useRef } from "react";
+import { cn } from "@/utils/cn";
 
 export type PanelTabId = "activity" | "git" | "files" | "prompts";
 
@@ -68,14 +69,22 @@ export function PanelTabs({ active, onSelect, tabs = defaultTabs }: PanelTabsPro
   };
 
   return (
-    <div className="panel-tabs" role="tablist" aria-label="Panel" aria-orientation="horizontal">
+    <div
+      className="panel-tabs inline-flex items-center gap-[6px] rounded-full border border-border-subtle bg-surface-control p-[4px]"
+      role="tablist"
+      aria-label="Panel"
+      aria-orientation="horizontal"
+    >
       {tabs.map((tab, index) => {
         const isActive = active === tab.id;
         return (
           <button
             key={tab.id}
             type="button"
-            className={`panel-tab${isActive ? " is-active" : ""}`}
+            className={cn(
+              "panel-tab inline-flex items-center gap-0 rounded-full bg-transparent text-text-subtle shadow-none transition-[background,color] duration-ui-fast",
+              isActive && "is-active",
+            )}
             onClick={() => onSelect(tab.id)}
             onKeyDown={(event) => handleKeyDown(event, index)}
             ref={(element) => {
@@ -87,7 +96,7 @@ export function PanelTabs({ active, onSelect, tabs = defaultTabs }: PanelTabsPro
             aria-label={tab.label}
             title={tab.label}
           >
-            <span className="panel-tab-icon" aria-hidden>
+            <span className="panel-tab-icon inline-flex items-center" aria-hidden>
               {tab.icon}
             </span>
           </button>

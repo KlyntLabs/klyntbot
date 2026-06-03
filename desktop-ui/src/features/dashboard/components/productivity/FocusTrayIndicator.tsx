@@ -13,8 +13,8 @@ export function FocusTrayIndicator() {
   if (!inFocus) return null;
 
   return (
-    <div className="dashboard__focus-tray-pill">
-      <span className="dashboard__focus-state-pill-dot dashboard__focus-state-pill-dot--pulsing" />
+    <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-[color-mix(in_srgb,var(--success)_10%,transparent)] text-success text-ui-2xs font-medium">
+      <span className="w-1.5 h-1.5 rounded-full animate-[pulse_2s_ease-in-out_infinite]" />
       <span>Focus</span>
     </div>
   );

@@ -24,6 +24,7 @@ import {
 import { PanelShell } from "@/features/layout/components/PanelShell";
 import type { PanelTabId } from "@/features/layout/components/PanelTabs";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { cn } from "@/utils/cn";
 import type { OpenAppTarget } from "@/types";
 import { FilePreviewPopover } from "./FilePreviewPopover";
 
@@ -535,7 +536,7 @@ export function FileTreePanel({
     const lines = previewContent.split("\n");
     const selected = lines.slice(previewSelection.start, previewSelection.end + 1);
     const language = languageFromPath(previewPath);
-    const fence = language ? `\`\`\`${language}` : "```";
+    const fence = language ? `\`\`\`${language}` : "\`\`\`";
     const start = previewSelection.start + 1;
     const end = previewSelection.end + 1;
     const rangeLabel = start === end ? `L${start}` : `L${start}-L${end}`;
@@ -587,10 +588,14 @@ export function FileTreePanel({
     const { node, depth, isFolder, isExpanded } = entry;
     const fileTypeIconUrl = isFolder ? null : getFileTypeIconUrl(node.path);
     return (
-      <div className="file-tree-row-wrap">
+      <div className="file-tree-row-wrap relative flex items-center" style={{ minHeight: "var(--file-tree-row-height, 28px)" }}>
         <button
           type="button"
-          className={`file-tree-row${isFolder ? " is-folder" : " is-file"}`}
+          className={cn(
+            "file-tree-row flex items-center gap-[6px] px-[6px] py-1 rounded-lg cursor-pointer border border-transparent bg-transparent text-text-emphasis text-ui-xs text-left w-full",
+            isFolder && "is-folder font-semibold",
+            !isFolder && "is-file pl-6",
+          )}
           style={{ paddingLeft: `${depth * 10}px` }}
           onClick={(event) => {
             if (isFolder) {
@@ -604,16 +609,16 @@ export function FileTreePanel({
           }}
         >
           {isFolder ? (
-            <span className={`file-tree-chevron${isExpanded ? " is-open" : ""}`}>›</span>
+            <span className={cn("file-tree-chevron w-[14px] h-[14px] inline-flex items-center justify-center text-text-faint transition-transform duration-[140ms]", isExpanded && "is-open")}>›</span>
           ) : (
-            <span className="file-tree-spacer" aria-hidden />
+            <span className="file-tree-spacer w-[14px] h-[14px]" aria-hidden />
           )}
-          <span className="file-tree-icon" aria-hidden>
+          <span className="file-tree-icon inline-flex items-center justify-center text-text-faint" aria-hidden>
             {isFolder ? (
               <Folder size={12} />
             ) : fileTypeIconUrl ? (
               <img
-                className="file-tree-icon-image"
+                className="file-tree-icon-image w-3 h-3 block"
                 src={fileTypeIconUrl}
                 alt=""
                 loading="lazy"
@@ -623,7 +628,9 @@ export function FileTreePanel({
               <File size={12} />
             )}
           </span>
-          <span className="file-tree-name">{node.name}</span>
+          <span className="file-tree-name min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
+            {node.name}
+          </span>
         </button>
         {!isFolder && (
           <button
@@ -651,11 +658,11 @@ export function FileTreePanel({
     <PanelShell
       filePanelMode={filePanelMode}
       onFilePanelModeChange={onFilePanelModeChange}
-      className="file-tree-panel"
+      className="file-tree-panel gap-[10px]"
       headerClassName="git-panel-header"
       headerRight={
         <PanelMeta className="file-tree-meta">
-          <div className="file-tree-count">
+          <div className="file-tree-count text-ui-xs text-text-faint">
             {visibleEntries.length
               ? normalizedQuery
                 ? `${visibleEntries.length} match${visibleEntries.length === 1 ? "" : "es"}`
@@ -671,7 +678,7 @@ export function FileTreePanel({
           {hasFolders ? (
             <button
               type="button"
-              className="ghost icon-button file-tree-toggle"
+              className="ghost icon-button file-tree-toggle p-1"
               onClick={toggleAllFolders}
               aria-label={allVisibleExpanded ? "Collapse all folders" : "Expand all folders"}
               title={allVisibleExpanded ? "Collapse all folders" : "Expand all folders"}
@@ -693,7 +700,10 @@ export function FileTreePanel({
           trailing={
             <button
               type="button"
-              className={`ghost icon-button file-tree-search-filter${filterMode === "modified" ? " is-active" : ""}`}
+              className={cn(
+                "ghost icon-button file-tree-search-filter shrink-0 w-6 h-6 rounded-[7px] p-0 text-text-faint",
+                filterMode === "modified" && "is-active",
+              )}
               onClick={() => {
                 setFilterMode((prev) => (prev === "all" ? "modified" : "all"));
               }}
@@ -708,22 +718,22 @@ export function FileTreePanel({
       }
     >
       <div
-        className="file-tree-list"
+        className="file-tree-list flex flex-col gap-[2px] overflow-y-auto flex-1 pr-[2px] min-h-0"
         ref={listRef}
         style={{ ["--file-tree-row-height" as string]: `${FILE_TREE_ROW_HEIGHT}px` }}
       >
         {showLoading ? (
-          <div className="file-tree-skeleton">
+          <div className="file-tree-skeleton flex flex-col gap-[6px] px-[2px] py-1">
             {SKELETON_KEYS.map((sk, i) => (
               <div
-                className="file-tree-skeleton-row"
+                className="file-tree-skeleton-row h-2 rounded-full"
                 key={sk}
                 style={{ width: `${68 + i * 3}%` }}
               />
             ))}
           </div>
         ) : nodes.length === 0 ? (
-          <div className="file-tree-empty">
+          <div className="file-tree-empty text-ui-sm text-text-faint">
             {normalizedQuery
               ? filterMode === "modified"
                 ? "No modified files match your filter."
@@ -733,7 +743,7 @@ export function FileTreePanel({
                 : "No files available."}
           </div>
         ) : (
-          <div className="file-tree-virtual" style={{ height: rowVirtualizer.getTotalSize() }}>
+          <div className="file-tree-virtual relative w-full" style={{ height: rowVirtualizer.getTotalSize() }}>
             {virtualRows.map((virtualRow) => {
               const entry = flatNodes[virtualRow.index];
               if (!entry) {

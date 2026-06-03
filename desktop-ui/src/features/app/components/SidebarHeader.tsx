@@ -8,6 +8,7 @@ import ListTree from "lucide-react/dist/esm/icons/list-tree";
 import RefreshCw from "lucide-react/dist/esm/icons/refresh-cw";
 import Search from "lucide-react/dist/esm/icons/search";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { cn } from "@/utils/cn";
 import {
   MenuTrigger,
   PopoverMenuItem,
@@ -118,11 +119,11 @@ export function SidebarHeader({
   };
 
   return (
-    <div className="sidebar-header">
-      <div className="sidebar-header-title">
-        <div className="sidebar-title-group">
+    <div className="sidebar-header flex items-center gap-[10px] min-h-[32px] p-0 mb-0 [webkit-app-region:no-drag] relative z-[6]">
+      <div className="sidebar-header-title inline-flex items-center gap-[6px] min-w-0">
+        <div className="sidebar-title-group inline-flex items-center gap-[10px] min-w-0">
           <button
-            className="sidebar-title-add ds-tooltip-trigger"
+            className="sidebar-title-add inline-flex items-center justify-center w-[30px] h-[30px] p-0 border-0 bg-transparent text-text-muted leading-none rounded-lg shadow-none transition-colors duration-[120ms] ease-out shrink-0 hover:text-text-strong hover:bg-surface-hover focus-visible:text-text-strong focus-visible:bg-surface-hover [&>svg]:w-4 [&>svg]:h-4 ds-tooltip-trigger"
             onClick={onAddWorkspace}
             data-tauri-drag-region="false"
             aria-label="Add workspaces"
@@ -135,7 +136,7 @@ export function SidebarHeader({
           </button>
           <button
             type="button"
-            className="subtitle subtitle-button sidebar-title-button"
+            className="subtitle subtitle-button sidebar-title-button min-w-0 -ml-[6px] px-[6px] py-1 rounded-lg transition-colors duration-[120ms] ease-out hover:bg-surface-hover focus-visible:bg-surface-hover text-[20px] font-semibold inline-flex items-center gap-2 leading-[1.1] cursor-pointer [webkit-app-region:no-drag]"
             onClick={onSelectHome}
             data-tauri-drag-region="false"
             aria-label="Open home"
@@ -144,12 +145,12 @@ export function SidebarHeader({
           </button>
         </div>
       </div>
-      <div className="sidebar-header-actions">
-        <div className="sidebar-sort-menu" ref={sortMenuRef}>
+      <div className="sidebar-header-actions inline-flex items-center gap-2 ml-auto">
+        <div className="sidebar-sort-menu relative" ref={sortMenuRef}>
           <MenuTrigger
             isOpen={sortMenuOpen}
             activeClassName="is-active"
-            className="ghost sidebar-sort-toggle ds-tooltip-trigger"
+            className="ghost sidebar-sort-toggle w-8 h-8 p-0 rounded-lg border-0 inline-flex items-center justify-center text-text-muted hover:text-text-strong hover:bg-surface-hover focus-visible:text-text-strong focus-visible:bg-surface-hover [&>svg]:w-3.5 [&>svg]:h-3.5 ds-tooltip-trigger"
             onClick={sortMenu.toggle}
             data-tauri-drag-region="false"
             aria-label="Organize and sort threads"
@@ -162,7 +163,7 @@ export function SidebarHeader({
           </MenuTrigger>
           {sortMenuOpen && (
             <PopoverSurface
-              className="sidebar-sort-dropdown"
+              className="sidebar-sort-dropdown absolute top-[calc(100%+8px)] right-0 w-[196px] max-w-[calc(100vw-24px)] rounded-[10px] p-[6px] max-h-[min(72vh,420px)] overflow-y-auto z-[14] flex flex-col gap-1"
               role="menu"
               ref={sortMenuPopoverRef}
               style={
@@ -171,9 +172,9 @@ export function SidebarHeader({
                   : undefined
               }
             >
-              <div className="sidebar-sort-section-label">Organize</div>
+              <div className="sidebar-sort-section-label text-ui-xs font-semibold text-text-faint px-2 pt-1 pb-0.5">Organize</div>
               <PopoverMenuItem
-                className="sidebar-sort-option"
+                className="sidebar-sort-option w-full border-0 rounded-lg bg-transparent text-text-muted inline-flex items-center justify-start gap-2 px-2 py-[6px] text-ui-sm text-left hover:text-text-strong hover:bg-surface-hover focus-visible:text-text-strong focus-visible:bg-surface-hover [&>svg]:w-[13px] [&>svg]:h-[13px] [&>svg]:shrink-0"
                 role="menuitemradio"
                 aria-checked={threadListOrganizeMode === "by_project"}
                 onClick={() => handleSelectOrganize("by_project")}
@@ -184,7 +185,7 @@ export function SidebarHeader({
                 By project
               </PopoverMenuItem>
               <PopoverMenuItem
-                className="sidebar-sort-option"
+                className="sidebar-sort-option w-full border-0 rounded-lg bg-transparent text-text-muted inline-flex items-center justify-start gap-2 px-2 py-[6px] text-ui-sm text-left hover:text-text-strong hover:bg-surface-hover focus-visible:text-text-strong focus-visible:bg-surface-hover [&>svg]:w-[13px] [&>svg]:h-[13px] [&>svg]:shrink-0"
                 role="menuitemradio"
                 aria-checked={threadListOrganizeMode === "by_project_activity"}
                 onClick={() => handleSelectOrganize("by_project_activity")}
@@ -195,7 +196,7 @@ export function SidebarHeader({
                 By project activity
               </PopoverMenuItem>
               <PopoverMenuItem
-                className="sidebar-sort-option"
+                className="sidebar-sort-option w-full border-0 rounded-lg bg-transparent text-text-muted inline-flex items-center justify-start gap-2 px-2 py-[6px] text-ui-sm text-left hover:text-text-strong hover:bg-surface-hover focus-visible:text-text-strong focus-visible:bg-surface-hover [&>svg]:w-[13px] [&>svg]:h-[13px] [&>svg]:shrink-0"
                 role="menuitemradio"
                 aria-checked={threadListOrganizeMode === "threads_only"}
                 onClick={() => handleSelectOrganize("threads_only")}
@@ -205,10 +206,10 @@ export function SidebarHeader({
               >
                 Thread list
               </PopoverMenuItem>
-              <div className="sidebar-sort-divider" aria-hidden />
-              <div className="sidebar-sort-section-label">Sort by</div>
+              <div className="sidebar-sort-divider h-px mx-[6px] my-1 bg-border-subtle" aria-hidden />
+              <div className="sidebar-sort-section-label text-ui-xs font-semibold text-text-faint px-2 pt-1 pb-0.5">Sort by</div>
               <PopoverMenuItem
-                className="sidebar-sort-option"
+                className="sidebar-sort-option w-full border-0 rounded-lg bg-transparent text-text-muted inline-flex items-center justify-start gap-2 px-2 py-[6px] text-ui-sm text-left hover:text-text-strong hover:bg-surface-hover focus-visible:text-text-strong focus-visible:bg-surface-hover [&>svg]:w-[13px] [&>svg]:h-[13px] [&>svg]:shrink-0"
                 role="menuitemradio"
                 aria-checked={threadListSortKey === "updated_at"}
                 onClick={() => handleSelectSort("updated_at")}
@@ -219,7 +220,7 @@ export function SidebarHeader({
                 Updated
               </PopoverMenuItem>
               <PopoverMenuItem
-                className="sidebar-sort-option"
+                className="sidebar-sort-option w-full border-0 rounded-lg bg-transparent text-text-muted inline-flex items-center justify-start gap-2 px-2 py-[6px] text-ui-sm text-left hover:text-text-strong hover:bg-surface-hover focus-visible:text-text-strong focus-visible:bg-surface-hover [&>svg]:w-[13px] [&>svg]:h-[13px] [&>svg]:shrink-0"
                 role="menuitemradio"
                 aria-checked={threadListSortKey === "created_at"}
                 onClick={() => handleSelectSort("created_at")}
@@ -233,7 +234,7 @@ export function SidebarHeader({
           )}
         </div>
         <button
-          className="ghost sidebar-refresh-toggle ds-tooltip-trigger"
+          className="ghost sidebar-refresh-toggle w-8 h-8 p-0 rounded-lg border-0 inline-flex items-center justify-center text-text-muted hover:text-text-strong hover:bg-surface-hover focus-visible:text-text-strong focus-visible:bg-surface-hover disabled:opacity-[0.55] [&>svg]:w-3.5 [&>svg]:h-3.5 ds-tooltip-trigger"
           onClick={onRefreshAllThreads}
           data-tauri-drag-region="false"
           aria-label="Refresh all workspace threads"
@@ -246,12 +247,15 @@ export function SidebarHeader({
           aria-busy={refreshInProgress}
         >
           <RefreshCw
-            className={refreshInProgress ? "sidebar-refresh-icon spinning" : "sidebar-refresh-icon"}
+            className={refreshInProgress ? "sidebar-refresh-icon spinning [&>svg]:w-3.5 [&>svg]:h-3.5" : "sidebar-refresh-icon [&>svg]:w-3.5 [&>svg]:h-3.5"}
             aria-hidden
           />
         </button>
         <button
-          className={`ghost sidebar-search-toggle ds-tooltip-trigger${isSearchOpen ? " is-active" : ""}`}
+          className={cn(
+            "ghost sidebar-search-toggle w-8 h-8 p-0 rounded-lg border-0 inline-flex items-center justify-center text-text-muted hover:text-text-strong hover:bg-surface-hover focus-visible:text-text-strong focus-visible:bg-surface-hover [&>svg]:w-3.5 [&>svg]:h-3.5 ds-tooltip-trigger",
+            isSearchOpen && "is-active text-text-strong bg-surface-hover shadow-[inset_0_0_0_1px_var(--border-quiet)]",
+          )}
           onClick={onToggleSearch}
           data-tauri-drag-region="false"
           aria-label="Toggle search"

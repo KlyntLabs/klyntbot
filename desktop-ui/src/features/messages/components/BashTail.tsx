@@ -17,11 +17,19 @@ export const BashTail = memo(function BashTail({ output }: BashTailProps) {
   if (lastLines.length === 0) return null;
 
   return (
-    <div className="tool-row__tail" role="log" aria-live="polite">
+    <div
+      className="flex flex-col gap-[2px] -mt-0.5 mb-1 ml-3.5 py-1.5 px-3 bg-[var(--cm-surface-command-panel)] rounded-r-[6px] font-code text-[11px] text-text-quiet leading-[1.45] overflow-hidden"
+      style={{
+        maxHeight: "calc(1.45em * 3 + 12px)",
+        borderLeft: "2px solid var(--tool-row-bar, var(--border-subtle))",
+      }}
+      role="log"
+      aria-live="polite"
+    >
       {lastLines.map((line, index) => (
         <div
           key={`tail-${index}-${line.slice(0, 16)}`}
-          className={`tool-row__tail-line${index < lastLines.length - 1 ? " tool-row__tail-line--dim" : ""}`}
+          className={`whitespace-pre-wrap break-words${index < lastLines.length - 1 ? " text-text-faint" : ""}`}
         >
           {line || " "}
         </div>

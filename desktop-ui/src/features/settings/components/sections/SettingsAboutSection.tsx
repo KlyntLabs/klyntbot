@@ -1,6 +1,9 @@
 import { type AppBuildType, getAppBuildType, isMobileRuntime } from "@services/tauri";
 import { useEffect, useState } from "react";
 import {
+  SettingsField,
+  SettingsFieldLabel,
+  SettingsHelpText,
   SettingsSection,
   SettingsToggleRow,
   SettingsToggleSwitch,
@@ -91,25 +94,25 @@ export function SettingsAboutSection({
 
   return (
     <SettingsSection title="About" subtitle="App version, build metadata, and update controls.">
-      <div className="settings-field">
-        <div className="settings-help">
+      <SettingsField>
+        <SettingsHelpText>
           Version: <code>{__APP_VERSION__}</code>
-        </div>
-        <div className="settings-help">
+        </SettingsHelpText>
+        <SettingsHelpText>
           Build type: <code>{appBuildType}</code>
-        </div>
-        <div className="settings-help">
+        </SettingsHelpText>
+        <SettingsHelpText>
           Branch: <code>{__APP_GIT_BRANCH__ || "unknown"}</code>
-        </div>
-        <div className="settings-help">
+        </SettingsHelpText>
+        <SettingsHelpText>
           Commit: <code>{__APP_COMMIT_HASH__ || "unknown"}</code>
-        </div>
-        <div className="settings-help">
+        </SettingsHelpText>
+        <SettingsHelpText>
           Build date: <code>{buildDateLabel}</code>
-        </div>
-      </div>
-      <div className="settings-field">
-        <div className="settings-label">App Updates</div>
+        </SettingsHelpText>
+      </SettingsField>
+      <SettingsField>
+        <SettingsFieldLabel>App Updates</SettingsFieldLabel>
         <SettingsToggleRow
           title="Automatically check for app updates"
           subtitle="When enabled, Klynt checks for new app versions on launch."
@@ -121,21 +124,21 @@ export function SettingsAboutSection({
             }}
           />
         </SettingsToggleRow>
-        <div className="settings-help">
+        <SettingsHelpText>
           Currently running version <code>{__APP_VERSION__}</code>
-        </div>
+        </SettingsHelpText>
         {!updaterEnabled && (
-          <div className="settings-help">Updates are unavailable in this runtime.</div>
+          <SettingsHelpText>Updates are unavailable in this runtime.</SettingsHelpText>
         )}
 
         {updaterState.stage === "error" && (
-          <div className="settings-help ds-text-danger">Update failed: {updaterState.error}</div>
+          <SettingsHelpText error>Update failed: {updaterState.error}</SettingsHelpText>
         )}
 
         {updaterState.stage === "downloading" ||
         updaterState.stage === "installing" ||
         updaterState.stage === "restarting" ? (
-          <div className="settings-help">
+          <SettingsHelpText>
             {updaterState.stage === "downloading" ? (
               <>
                 Downloading update...{" "}
@@ -148,16 +151,16 @@ export function SettingsAboutSection({
             ) : (
               "Restarting..."
             )}
-          </div>
+          </SettingsHelpText>
         ) : updaterState.stage === "available" ? (
-          <div className="settings-help">
+          <SettingsHelpText>
             Version <code>{updaterState.version}</code> is available.
-          </div>
+          </SettingsHelpText>
         ) : updaterState.stage === "latest" ? (
-          <div className="settings-help">You are on the latest version.</div>
+          <SettingsHelpText>You are on the latest version.</SettingsHelpText>
         ) : null}
 
-        <div className="settings-controls">
+        <div className="flex items-center gap-2.5 mt-2">
           {updaterState.stage === "available" ? (
             <button
               type="button"
@@ -184,7 +187,7 @@ export function SettingsAboutSection({
             </button>
           )}
         </div>
-      </div>
+      </SettingsField>
     </SettingsSection>
   );
 }

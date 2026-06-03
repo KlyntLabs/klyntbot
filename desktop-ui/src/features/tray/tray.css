@@ -6,6 +6,9 @@
    real palette (`themes.dark.css` / `themes.light.css` / `themes.dim.css`),
    so theme switches reach the tray automatically. */
 
+@import "tailwindcss";
+@import "../../styles/tailwind-theme.css";
+
 @keyframes tray-glass-appear {
   from {
     opacity: 0;
@@ -32,16 +35,11 @@
    so all three aux windows share it. */
 
 .tray-root {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  color: var(--text-primary);
-  font-family: var(--ui-font-family, system-ui);
-  font-size: 13px;
+  @apply w-full h-full flex text-text-primary font-ui text-ui-sm;
 
   /* The accent family in this project is a cyan-blue (rgba(100, 200, 255, …)).
-	   `--text-accent` itself is dim (0.7α), so for solid brand text we use a
-	   stronger cyan; for surfaces we lean on the existing accent layer. */
+		 `--text-accent` itself is dim (0.7α), so for solid brand text we use a
+		 stronger cyan; for surfaces we lean on the existing accent layer. */
   --tray-brand: rgba(100, 200, 255, 0.95);
   --tray-brand-bg: var(--surface-active, rgba(100, 200, 255, 0.14));
   --tray-brand-border: var(--border-accent-soft, rgba(100, 200, 255, 0.3));
@@ -54,15 +52,11 @@
 }
 
 .tray-shell {
-  width: 100%;
-  flex: 1 1 auto;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
+  @apply w-full flex-1 flex flex-col overflow-hidden;
   background: var(--surface-sidebar, rgba(22, 24, 28, 0.55));
   border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
   /* Match Tauri's HUD effect radius (16px) — same curve as the window
-	   bezel so no vibrancy halo bleeds at the corners. */
+		 bezel so no vibrancy halo bleeds at the corners. */
   border-radius: 16px;
   backdrop-filter: blur(40px) saturate(1.4);
   -webkit-backdrop-filter: blur(40px) saturate(1.4);
@@ -74,57 +68,43 @@
    hook observes this element's scrollHeight and resizes the OS window
    to match. Mirrors the launcher's `.lc-body` exactly. */
 .tray-body {
-  overflow: visible;
+  @apply overflow-visible;
   border-radius: 12px;
 }
 
 .tray-divider {
-  margin: 0 16px;
-  height: 1px;
+  @apply mx-4 h-px;
   background: var(--border-subtle, rgba(255, 255, 255, 0.06));
 }
 
 .tray-section {
-  padding: 12px 16px;
+  @apply py-3 px-4;
 }
 
 .tray-section-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
+  @apply flex items-center justify-between mb-2;
 }
 
 .tray-section-title {
-  font-size: 11px;
-  font-weight: 300;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+  @apply text-ui-2xs font-light text-text-muted uppercase tracking-[0.08em];
 }
 
 /* Tasks list grows with content — window auto-resizes up to its maxHeight. */
 .tray-tasks {
-  overflow: visible;
+  @apply overflow-visible;
 }
 
 .tray-task-list {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+  @apply flex flex-col gap-0.5;
 }
 
 .tray-task {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 8px;
-  border-radius: 8px;
+  @apply flex items-center gap-2.5 py-1.5 px-2 rounded-lg;
   border-left: 2px solid transparent;
   transition: background-color 120ms ease;
 }
 .tray-task:hover {
-  background: var(--surface-control, rgba(255, 255, 255, 0.06));
+  @apply bg-surface-control;
 }
 .tray-task.is-overdue {
   border-left-color: var(--tray-destructive);
@@ -140,119 +120,66 @@
 }
 
 .tray-task-title {
-  flex: 1;
-  font-size: 12px;
-  font-weight: 300;
-  background: transparent;
-  border: none;
-  color: var(--text-muted);
-  text-align: left;
-  cursor: pointer;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  @apply flex-1 text-ui-xs font-light bg-transparent border-none text-text-muted text-left cursor-pointer whitespace-nowrap overflow-hidden text-ellipsis;
 }
 .tray-task-title:hover {
-  text-decoration: underline;
+  @apply underline;
 }
 .tray-task-title.is-done {
-  color: var(--text-dim);
-  text-decoration: line-through;
+  @apply text-text-dim line-through;
 }
 .tray-task-title.is-overdue {
-  color: var(--text-primary);
+  @apply text-text-primary;
 }
 
 .tray-task-due {
-  font-size: 10px;
-  font-weight: 300;
-  color: var(--text-muted);
-  flex-shrink: 0;
+  @apply text-ui-3xs font-light text-text-muted shrink-0;
 }
 .tray-task-due.is-overdue {
   color: var(--tray-destructive);
 }
 
 .tray-event-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 8px;
+  @apply flex flex-col gap-2 mt-2;
 }
 .tray-event {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+  @apply flex items-center gap-2.5;
 }
 .tray-event-color {
-  width: 4px;
-  height: 24px;
-  border-radius: 2px;
-  flex-shrink: 0;
+  @apply w-1 h-6 rounded-sm shrink-0;
 }
 .tray-event-body {
-  flex: 1;
-  min-width: 0;
+  @apply flex-1 min-w-0;
 }
 .tray-event-title {
-  font-size: 12px;
-  font-weight: 300;
-  color: var(--text-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  margin: 0;
+  @apply text-ui-xs font-light text-text-muted whitespace-nowrap overflow-hidden text-ellipsis m-0;
 }
 .tray-event-time {
-  font-size: 11px;
-  font-weight: 300;
-  color: var(--text-dim);
-  flex-shrink: 0;
+  @apply text-ui-2xs font-light text-text-dim shrink-0;
 }
 
 /* ── Coaching nudge ────────────────────────────────────────────── */
 .tray-nudge {
-  padding: 12px 16px;
+  @apply py-3 px-4;
   animation: tray-nudge-slide-in 0.25s ease-out;
 }
 .tray-nudge-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
+  @apply flex items-start gap-2.5;
 }
 .tray-nudge-text {
-  flex: 1;
-  font-size: 12px;
-  font-weight: 300;
-  line-height: 1.5;
-  color: var(--text-muted);
-  margin: 0;
+  @apply flex-1 text-ui-xs font-light leading-normal text-text-muted m-0;
 }
 .tray-nudge-actions {
-  display: flex;
-  gap: 4px;
-  margin-top: 8px;
-  margin-left: 24px;
+  @apply flex gap-1 mt-2 ml-6;
 }
 .tray-nudge-action {
-  height: 24px;
-  padding: 0 8px;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  border-radius: 6px;
-  background: transparent;
-  border: none;
-  color: var(--text-muted);
-  font-size: 10px;
-  cursor: pointer;
+  @apply h-6 px-2 flex items-center gap-1 rounded-md bg-transparent border-none text-text-muted text-ui-3xs cursor-pointer;
   transition:
     background-color 120ms ease,
     color 120ms ease;
 }
 .tray-nudge-action:hover {
-  background: var(--surface-control, rgba(255, 255, 255, 0.06));
-  color: var(--text-primary);
+  @apply bg-surface-control text-text-primary;
 }
 .tray-nudge-action.is-success:hover {
   color: var(--tray-success);
@@ -263,33 +190,19 @@
 
 /* ── Footer ────────────────────────────────────────────────────── */
 .tray-footer {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 2px;
-  padding: 6px 10px;
+  @apply flex items-center justify-end gap-0.5 py-1.5 px-2.5;
 }
 .tray-footer-btn {
-  width: 30px;
-  height: 30px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 8px;
-  background: transparent;
-  border: none;
+  @apply w-[30px] h-[30px] flex items-center justify-center rounded-lg bg-transparent border-none text-text-faint cursor-pointer;
   /* Step up from --text-muted (0.7α) to --text-faint (0.5α) so the toolbar
-	   reads as secondary chrome but doesn't fade into the panel; it lifts on
-	   hover via --surface-hover (the same surface the sidebar item rows use). */
-  color: var(--text-faint);
-  cursor: pointer;
+		 reads as secondary chrome but doesn't fade into the panel; it lifts on
+		 hover via --surface-hover (the same surface the sidebar item rows use). */
   transition:
     background-color 120ms ease,
     color 120ms ease;
 }
 .tray-footer-btn:hover {
-  background: var(--surface-hover);
-  color: var(--text-strong);
+  @apply bg-surface-hover text-text-strong;
 }
 .tray-footer-btn.is-danger:hover {
   color: var(--tray-destructive);
@@ -297,31 +210,22 @@
 }
 /* ── Generic helpers ───────────────────────────────────────────── */
 .tray-icon-xs {
-  width: 14px;
-  height: 14px;
+  @apply w-3.5 h-3.5;
 }
 
 .tray-footer-btn .tray-icon-xs {
-  width: 15px;
-  height: 15px;
+  @apply w-[15px] h-[15px];
 }
 .tray-icon-xs.is-info {
   color: var(--tray-info);
 }
 .tray-muted-xs {
-  font-size: 11px;
-  color: var(--text-muted);
-  font-weight: 300;
+  @apply text-ui-2xs text-text-muted font-light;
 }
 
 /* ── Badge ─────────────────────────────────────────────────────── */
 .tray-badge {
-  font-size: 10px;
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-weight: 300;
-  background: var(--surface-control, rgba(255, 255, 255, 0.08));
-  color: var(--text-muted);
+  @apply text-ui-3xs py-0.5 px-2 rounded-full font-light bg-surface-control text-text-muted;
 }
 .tray-badge.variant-brand {
   background: var(--tray-brand-bg);
@@ -334,29 +238,14 @@
 
 /* ── Checkbox ──────────────────────────────────────────────────── */
 .tray-checkbox {
-  width: 16px;
-  height: 16px;
-  flex-shrink: 0;
-  border-radius: 4px;
+  @apply w-4 h-4 shrink-0 rounded bg-transparent cursor-pointer inline-flex items-center justify-center text-transparent relative;
   border: 1px solid var(--border-strong, rgba(255, 255, 255, 0.2));
-  background: transparent;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: transparent;
-  position: relative;
   transition:
     background-color 120ms ease,
     border-color 120ms ease;
 }
 .tray-checkbox-native {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  width: 100%;
-  height: 100%;
-  margin: 0;
+  @apply absolute inset-0 opacity-0 w-full h-full m-0;
   cursor: inherit;
 }
 .tray-checkbox.is-checked {
@@ -365,47 +254,26 @@
   color: #0a0e14;
 }
 .tray-checkbox svg {
-  width: 12px;
-  height: 12px;
+  @apply w-3 h-3;
 }
 
 /* ── Review prompt stub ────────────────────────────────────────── */
 .tray-review-prompt {
-  padding: 8px 12px;
-  border-radius: 8px;
-  background: var(--surface-card, rgba(255, 255, 255, 0.04));
+  @apply py-2 px-3 rounded-lg bg-surface-card flex items-center justify-between gap-2;
   border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.06));
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
 }
 .tray-review-prompt-actions {
-  display: flex;
-  gap: 6px;
+  @apply flex gap-1.5;
 }
 .tray-pill {
-  padding: 6px 16px;
-  border-radius: 999px;
-  background: var(--surface-control, rgba(255, 255, 255, 0.08));
-  border: none;
-  color: var(--text-primary);
-  font-size: 11px;
-  font-weight: 300;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
+  @apply py-1.5 px-4 rounded-full bg-surface-control border-none text-text-primary text-ui-2xs font-light tracking-[0.08em] uppercase cursor-pointer inline-flex items-center gap-1;
   transition: background-color 120ms ease;
 }
 .tray-pill:hover:not(:disabled) {
-  background: var(--surface-control-hover, rgba(255, 255, 255, 0.14));
+  @apply bg-surface-control-hover;
 }
 .tray-pill:disabled {
-  opacity: 0.5;
-  cursor: default;
+  @apply opacity-50 cursor-default;
 }
 .tray-pill.is-brand {
   background: var(--tray-brand);
@@ -416,67 +284,48 @@
 /* FocusControl (tc-*)                                                  */
 /* ──────────────────────────────────────────────────────────────── */
 .tc-timer {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 16px;
+  @apply flex flex-col items-center p-4;
 }
 
 .tc-icon-btn {
-  width: 32px;
-  height: 32px;
-  border-radius: 999px;
+  @apply w-8 h-8 rounded-full bg-transparent flex items-center justify-center text-text-muted cursor-pointer;
   /* Step up to --border-strong (0.14α) so the circle bezel is visibly there
-	   on the translucent shell — at 0.08α the border read as "missing". */
+		 on the translucent shell — at 0.08α the border read as "missing". */
   border: 1px solid var(--border-strong, rgba(255, 255, 255, 0.18));
-  background: transparent;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-muted);
-  cursor: pointer;
   transition:
     color 120ms ease,
     border-color 120ms ease,
     background-color 120ms ease;
 }
 .tc-icon-btn:hover:not(:disabled) {
-  color: var(--text-primary);
+  @apply text-text-primary bg-surface-hover;
   border-color: var(--border-stronger, rgba(255, 255, 255, 0.28));
-  background: var(--surface-hover);
 }
 .tc-icon-btn:disabled {
-  opacity: 0.4;
-  cursor: default;
+  @apply opacity-40 cursor-default;
 }
 .tc-icon-sm {
-  width: 14px;
-  height: 14px;
+  @apply w-3.5 h-3.5;
 }
 .tc-icon-xs {
-  width: 12px;
-  height: 12px;
+  @apply w-3 h-3;
 }
 
 .tc-today-stats {
-  font-size: 10px;
-  text-align: center;
-  color: var(--text-muted);
-  margin-bottom: 4px;
+  @apply text-ui-3xs text-center text-text-muted mb-1;
 }
 
 .tc-ring-wrap {
-  position: relative;
+  @apply relative;
 }
 .tc-ring-svg {
-  width: 100%;
-  height: 100%;
+  @apply w-full h-full;
 }
 .tc-ring-progress {
   transition: stroke-dashoffset 1s linear;
 }
 .tc-ring-progress.is-paused {
-  opacity: 0.5;
+  @apply opacity-50;
 }
 .tc-ring-progress.is-warning {
   animation: tray-pulse 1.2s ease-in-out infinite;
@@ -492,17 +341,10 @@
 }
 
 .tc-ring-content {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
+  @apply absolute inset-0 flex flex-col items-center justify-center;
 }
 .tc-mode-icon {
-  width: 16px;
-  height: 16px;
-  margin-bottom: 8px;
+  @apply w-4 h-4 mb-2;
 }
 .tc-mode-icon.is-info {
   color: var(--tray-info);
@@ -511,25 +353,14 @@
   color: var(--tray-brand);
 }
 .tc-mode-icon.is-dim {
-  color: var(--text-dim);
+  @apply text-text-dim;
 }
 
 .tc-time-edit-row {
-  display: flex;
-  align-items: baseline;
-  justify-content: center;
-  gap: 4px;
+  @apply flex items-baseline justify-center gap-1;
 }
 .tc-time-edit-input {
-  width: 64px;
-  text-align: center;
-  font-size: 36px;
-  font-weight: 200;
-  color: var(--text-primary);
-  background: transparent;
-  border: none;
-  outline: none;
-  font-variant-numeric: tabular-nums;
+  @apply w-16 text-center text-[36px] font-extralight text-text-primary bg-transparent border-none outline-none tabular-nums;
   -moz-appearance: textfield;
   appearance: textfield;
 }
@@ -539,41 +370,27 @@
   margin: 0;
 }
 .tc-time-edit-unit {
-  font-size: 11px;
-  color: var(--text-dim);
-  font-weight: 300;
+  @apply text-ui-2xs text-text-dim font-light;
 }
 .tc-time-button {
-  background: transparent;
-  border: none;
-  color: inherit;
-  cursor: pointer;
-  padding: 0;
+  @apply bg-transparent border-none text-inherit cursor-pointer p-0;
+  font-family: inherit;
 }
 .tc-time-button:disabled {
-  cursor: default;
+  @apply cursor-default;
 }
 .tc-time-button.is-paused {
   animation: tray-pulse 1.2s ease-in-out infinite;
 }
 .tc-time-display {
-  font-size: 36px;
-  font-weight: 200;
-  color: var(--text-primary);
-  font-variant-numeric: tabular-nums;
-  line-height: 1;
+  @apply text-[36px] font-extralight text-text-primary tabular-nums leading-none;
 }
 
 .tc-dots {
-  display: flex;
-  gap: 6px;
-  margin-top: 10px;
+  @apply flex gap-1.5 mt-2.5;
 }
 .tc-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--surface-control, rgba(255, 255, 255, 0.18));
+  @apply w-1.5 h-1.5 rounded-full bg-surface-control;
   transition: background-color 300ms ease;
 }
 .tc-dot.is-filled {
@@ -581,49 +398,28 @@
 }
 
 .tc-phase-label {
-  font-size: 10px;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.2em;
-  margin-top: 6px;
-  font-weight: 300;
+  @apply text-ui-3xs text-text-muted uppercase tracking-[0.2em] mt-1.5 font-light;
 }
 
 .tc-action-title {
-  font-size: 10px;
-  color: var(--text-muted);
-  max-width: 120px;
-  margin-top: 2px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  @apply text-ui-3xs text-text-muted max-w-[120px] mt-0.5 whitespace-nowrap overflow-hidden text-ellipsis;
 }
 
 .tc-learning-banner {
-  font-size: 11px;
+  @apply text-ui-2xs mt-1.5;
   color: rgba(255, 255, 255, 0.4);
-  margin-top: 6px;
 }
 
 .tc-presets {
-  display: flex;
-  gap: 6px;
-  justify-content: center;
-  margin-top: 4px;
+  @apply flex gap-1.5 justify-center mt-1;
 }
 .tc-preset {
-  padding: 4px 10px;
-  border-radius: 999px;
-  font-size: 10px;
-  font-weight: 300;
-  background: var(--surface-control, rgba(255, 255, 255, 0.06));
+  @apply py-1 px-2.5 rounded-full text-ui-3xs font-light bg-surface-control text-text-muted cursor-pointer;
   border: 1px solid transparent;
-  color: var(--text-muted);
-  cursor: pointer;
   transition: color 120ms ease;
 }
 .tc-preset:hover {
-  color: var(--text-primary);
+  @apply text-text-primary;
 }
 .tc-preset.is-active {
   background: var(--tray-brand-bg);
@@ -632,79 +428,44 @@
 }
 
 .tc-review-wrap {
-  margin-top: 12px;
-  padding: 0 4px;
-  width: 100%;
+  @apply mt-3 px-1 w-full;
 }
 
 .tc-distraction-row {
-  display: flex;
-  gap: 4px;
-  justify-content: center;
-  flex-wrap: wrap;
-  padding: 0 8px;
-  margin-top: 12px;
+  @apply flex gap-1 justify-center flex-wrap px-2 mt-3;
 }
 .tc-distraction-chip {
-  padding: 2px 8px;
-  border-radius: 6px;
-  background: var(--surface-control, rgba(255, 255, 255, 0.06));
-  border: none;
-  color: var(--text-muted);
-  font-size: 10px;
-  cursor: pointer;
+  @apply py-0.5 px-2 rounded-md bg-surface-control border-none text-text-muted text-ui-3xs cursor-pointer;
   transition: color 120ms ease;
 }
 .tc-distraction-chip:hover {
-  color: var(--text-primary);
+  @apply text-text-primary;
 }
 
 .tc-warning {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  margin-top: 12px;
+  @apply flex flex-col items-center gap-2 mt-3;
 }
 .tc-warning-text {
-  font-size: 11px;
+  @apply text-ui-2xs font-light text-center;
   color: var(--tray-warning);
-  font-weight: 300;
-  text-align: center;
 }
 .tc-warning-actions {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-  justify-content: center;
+  @apply flex gap-1.5 flex-wrap justify-center;
 }
 .tc-pill {
-  padding: 6px 16px;
-  border-radius: 999px;
-  background: var(--surface-control, rgba(255, 255, 255, 0.08));
-  border: none;
-  color: var(--text-primary);
-  font-size: 11px;
-  font-weight: 300;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
+  @apply py-1.5 px-4 rounded-full bg-surface-control border-none text-text-primary text-ui-2xs font-light uppercase tracking-[0.12em] cursor-pointer inline-flex items-center gap-1;
   transition:
     background-color 120ms ease,
     color 120ms ease;
 }
 .tc-pill:hover:not(:disabled) {
-  background: var(--surface-control-hover, rgba(255, 255, 255, 0.14));
+  @apply bg-surface-control-hover;
 }
 .tc-pill:disabled {
-  opacity: 0.5;
-  cursor: default;
+  @apply opacity-50 cursor-default;
 }
 .tc-pill.is-wide {
-  padding: 8px 32px;
+  @apply py-2 px-8;
 }
 /* Mirrors the .bak: STOP is RED at rest, RED-tinted on hover.
    The previous rule only colored on hover, which made the dangerous action
@@ -724,193 +485,109 @@
 }
 
 .tc-break-pending {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  margin-top: 12px;
+  @apply flex flex-col items-center gap-2 mt-3;
 }
 .tc-break-pending-text {
-  font-size: 11px;
-  color: var(--text-muted);
-  font-weight: 300;
+  @apply text-ui-2xs text-text-muted font-light;
 }
 
 .tc-coaching {
-  margin: 8px;
-  padding: 10px;
-  border-radius: 8px;
+  @apply m-2 p-2.5 rounded-lg;
   background: var(--tray-brand-bg);
   border: 1px solid var(--tray-brand-border);
 }
 .tc-coaching-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
+  @apply flex items-start gap-2;
 }
 .tc-coaching-icon {
-  width: 14px;
-  height: 14px;
+  @apply w-3.5 h-3.5 mt-0.5 shrink-0;
   color: var(--tray-brand);
-  margin-top: 2px;
-  flex-shrink: 0;
 }
 .tc-coaching-text {
-  flex: 1;
-  font-size: 12px;
-  color: var(--text-primary);
-  line-height: 1.5;
-  margin: 0;
+  @apply flex-1 text-ui-xs text-text-primary leading-normal m-0;
 }
 .tc-coaching-close {
-  background: transparent;
-  border: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  flex-shrink: 0;
+  @apply bg-transparent border-none text-text-muted cursor-pointer shrink-0;
 }
 .tc-coaching-close:hover {
-  color: var(--text-primary);
+  @apply text-text-primary;
 }
 
 .tc-dnd-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 12px;
-  cursor: pointer;
-  user-select: none;
+  @apply flex items-center gap-2 mt-3 cursor-pointer select-none;
 }
 .tc-dnd-label {
-  font-size: 11px;
-  color: var(--text-muted);
-  font-weight: 300;
+  @apply text-ui-2xs text-text-muted font-light;
 }
 
 .tc-dnd-hint {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 8px;
-  padding: 0 8px;
+  @apply flex items-center gap-2 mt-2 px-2;
 }
 .tc-dnd-hint-text {
-  font-size: 10px;
+  @apply text-ui-3xs font-light leading-[1.3] flex-1 m-0;
   color: rgba(255, 175, 85, 0.7);
-  font-weight: 300;
-  line-height: 1.3;
-  flex: 1;
-  margin: 0;
 }
 .tc-dnd-hint-close {
-  background: transparent;
-  border: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  flex-shrink: 0;
+  @apply bg-transparent border-none text-text-muted cursor-pointer shrink-0;
 }
 .tc-dnd-hint-close:hover {
-  color: var(--text-primary);
+  @apply text-text-primary;
 }
 
 .tc-controls {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  margin-top: 16px;
+  @apply flex items-center justify-between w-full mt-4;
 }
 .tc-idle-controls {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  width: 100%;
+  @apply flex items-center justify-center gap-3 w-full;
 }
 
 /* ── Settings panel ────────────────────────────────────────────── */
 .tc-settings {
-  padding: 16px;
+  @apply p-4;
 }
 .tc-settings-header {
-  display: flex;
-  align-items: center;
-  margin-bottom: 20px;
+  @apply flex items-center mb-5;
 }
 .tc-settings-spacer {
-  flex: 1;
+  @apply flex-1;
 }
 .tc-settings-spacer-right {
-  display: flex;
-  justify-content: flex-end;
+  @apply flex justify-end;
 }
 .tc-settings-title {
-  font-size: 15px;
-  color: var(--text-primary);
-  font-weight: 300;
+  @apply text-ui-lg text-text-primary font-light;
 }
 
 .tc-tabs {
-  display: flex;
-  padding: 2px;
-  border-radius: 999px;
-  background: var(--surface-control, rgba(255, 255, 255, 0.06));
-  margin-bottom: 20px;
+  @apply flex p-0.5 rounded-full bg-surface-control mb-5;
 }
 .tc-tab {
-  flex: 1;
-  padding: 6px 0;
-  border-radius: 999px;
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  font-weight: 300;
-  background: transparent;
-  border: none;
-  color: var(--text-muted);
-  cursor: pointer;
+  @apply flex-1 py-1.5 rounded-full text-ui-3xs uppercase tracking-[0.12em] font-light bg-transparent border-none text-text-muted cursor-pointer;
   transition:
     background-color 120ms ease,
     color 120ms ease;
 }
 .tc-tab:hover {
-  color: var(--text-primary);
+  @apply text-text-primary;
 }
 .tc-tab.is-active {
-  background: var(--surface-control-hover, rgba(255, 255, 255, 0.12));
-  color: var(--text-primary);
+  @apply bg-surface-control-hover text-text-primary;
 }
 
 .tc-settings-list {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  @apply flex flex-col gap-1;
 }
 .tc-settings-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 0;
+  @apply flex items-center justify-between py-2.5;
 }
 .tc-settings-label {
-  font-size: 13px;
-  color: var(--text-muted);
-  font-weight: 300;
+  @apply text-ui-sm text-text-muted font-light;
 }
 .tc-settings-edit {
-  display: flex;
-  align-items: center;
-  gap: 4px;
+  @apply flex items-center gap-1;
 }
 .tc-settings-input {
-  width: 40px;
-  text-align: right;
-  font-size: 13px;
-  font-weight: 300;
-  color: var(--text-primary);
-  background: transparent;
-  border: none;
-  outline: none;
+  @apply w-10 text-right text-ui-sm font-light text-text-primary bg-transparent border-none outline-none tabular-nums;
   -moz-appearance: textfield;
   appearance: textfield;
 }
@@ -920,25 +597,15 @@
   margin: 0;
 }
 .tc-settings-value {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: transparent;
-  border: none;
-  color: var(--text-muted);
-  cursor: pointer;
+  @apply flex items-center gap-1.5 bg-transparent border-none text-text-muted cursor-pointer;
   transition: color 120ms ease;
 }
 .tc-settings-value:hover {
-  color: var(--text-primary);
+  @apply text-text-primary;
 }
 .tc-settings-num {
-  font-size: 13px;
-  font-weight: 300;
-  font-variant-numeric: tabular-nums;
+  @apply text-ui-sm font-light tabular-nums;
 }
 .tc-settings-unit {
-  font-size: 11px;
-  color: var(--text-dim);
-  font-weight: 300;
+  @apply text-ui-2xs text-text-dim font-light;
 }

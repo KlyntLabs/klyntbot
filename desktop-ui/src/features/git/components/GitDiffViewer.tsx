@@ -7,6 +7,7 @@ import { workerFactory } from "@utils/diffsWorker";
 import GitCommitHorizontal from "lucide-react/dist/esm/icons/git-commit-horizontal";
 import RotateCcw from "lucide-react/dist/esm/icons/rotate-ccw";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { cn } from "@/utils/cn";
 import { DIFF_VIEWER_HIGHLIGHTER_OPTIONS } from "@/features/design-system/diff/diffViewerTheme";
 import type { PullRequestReviewIntent, PullRequestSelectionRange } from "@/types";
 import { splitPath } from "./GitDiffPanel.utils";
@@ -439,9 +440,10 @@ export function GitDiffViewer({
   return (
     <WorkerPoolContextProvider poolOptions={poolOptions} highlighterOptions={highlighterOptions}>
       <div
-        className={`diff-viewer ds-diff-viewer ${
-          diffStyle === "unified" ? "is-unified" : "is-split"
-        }`}
+        className={cn(
+          "diff-viewer ds-diff-viewer flex flex-col gap-0 overflow-y-auto relative pt-3 pb-4 flex-1 min-h-0 min-w-0 bg-surface-messages",
+          diffStyle === "unified" ? "is-unified" : "is-split",
+        )}
         ref={containerRef}
       >
         {pullRequest && (
@@ -458,25 +460,30 @@ export function GitDiffViewer({
         )}
         {!error && stickyEntry && (
           <div className="diff-viewer-sticky">
-            <div className="diff-viewer-header diff-viewer-header-sticky">
-              <span className="diff-viewer-status" data-status={stickyEntry.status}>
+            <div className="diff-viewer-header diff-viewer-header-sticky flex items-center gap-2 text-ui-sm text-text-muted px-3 py-[10px] m-0 border-b border-border-subtle">
+              <span
+                className="diff-viewer-status font-bold text-ui-xs px-[6px] py-[2px] rounded-full border border-border-stronger text-text-stronger bg-surface-control uppercase"
+                data-status={stickyEntry.status}
+              >
                 {stickyEntry.status}
               </span>
               <span
-                className="diff-viewer-path"
+                className="diff-viewer-path inline-flex items-baseline gap-[6px] flex-1 min-w-0 break-words"
                 title={stickyEntry.displayPath ?? stickyEntry.path}
               >
-                <span className="diff-viewer-name">
+                <span className="diff-viewer-name text-text-emphasis font-semibold min-w-0 shrink-[1] grow-0 basis-auto overflow-hidden text-ellipsis whitespace-nowrap">
                   {stickyPathDisplay?.fileName ?? stickyEntry.path}
                 </span>
                 {stickyPathDisplay?.displayDir && (
-                  <span className="diff-viewer-dir">{stickyPathDisplay.displayDir}</span>
+                  <span className="diff-viewer-dir text-text-faint flex-1 overflow-hidden text-ellipsis whitespace-nowrap min-w-0">
+                    {stickyPathDisplay.displayDir}
+                  </span>
                 )}
               </span>
               {showRevert && (
                 <button
                   type="button"
-                  className="diff-viewer-header-action diff-viewer-header-action--discard"
+                  className="w-6 h-6 rounded-md p-0 border border-transparent bg-transparent text-text-faint inline-flex items-center justify-center cursor-pointer shrink-0 transition-[background,border-color,color] duration-ui-fast hover:bg-surface-control-hover hover:border-border-subtle hover:text-text-emphasis hover:!bg-[rgba(255,107,107,0.14)] hover:!border-[rgba(255,107,107,0.35)] hover:!text-[#ff6b6b] focus-visible:outline-2 focus-visible:outline-border-accent-soft focus-visible:outline-offset-2"
                   title="Discard changes in this file"
                   aria-label="Discard changes in this file"
                   onClick={(event) => {
@@ -491,24 +498,39 @@ export function GitDiffViewer({
             </div>
           </div>
         )}
-        {error && <div className="diff-viewer-empty">{error}</div>}
+        {error && <div className="text-ui-sm text-text-faint px-4 py-2">{error}</div>}
         {!error && isLoading && diffs.length > 0 && (
-          <div className="diff-viewer-loading diff-viewer-loading-overlay">Refreshing diff...</div>
+          <div className="diff-viewer-loading diff-viewer-loading-overlay text-ui-xs text-text-faint py-[6px]">
+            Refreshing diff...
+          </div>
         )}
         {!error && !isLoading && !diffs.length && (
-          <div className="diff-viewer-empty-state" role="status" aria-live="polite">
+          <div
+            className="diff-viewer-empty-state relative flex-1 min-h-[240px] flex flex-col items-center justify-center gap-2 px-4 pt-6 pb-[30px] text-center"
+            role="status"
+            aria-live="polite"
+          >
             <div className="diff-viewer-empty-glow" aria-hidden />
-            <span className="diff-viewer-empty-icon" aria-hidden>
+            <span
+              className="diff-viewer-empty-icon relative w-[34px] h-[34px] rounded-full inline-flex items-center justify-center text-text-emphasis"
+              aria-hidden
+            >
               <GitCommitHorizontal size={18} />
             </span>
-            <h3 className="diff-viewer-empty-title">{emptyStateCopy.title}</h3>
-            <p className="diff-viewer-empty-subtitle">{emptyStateCopy.subtitle}</p>
-            <p className="diff-viewer-empty-hint">{emptyStateCopy.hint}</p>
+            <h3 className="diff-viewer-empty-title text-ui-xl leading-snug text-text-emphasis tracking-[0.01em]">
+              {emptyStateCopy.title}
+            </h3>
+            <p className="diff-viewer-empty-subtitle text-ui-sm text-text-subtle leading-snug max-w-[560px]">
+              {emptyStateCopy.subtitle}
+            </p>
+            <p className="diff-viewer-empty-hint text-ui-sm text-text-faint leading-normal max-w-[560px]">
+              {emptyStateCopy.hint}
+            </p>
           </div>
         )}
         {!error && diffs.length > 0 && (
           <div
-            className="diff-viewer-list"
+            className="diff-viewer-list relative w-full"
             ref={listRef}
             style={{
               height: rowVirtualizer.getTotalSize(),
@@ -519,12 +541,14 @@ export function GitDiffViewer({
               return (
                 <div
                   key={entry.path}
-                  className="diff-viewer-row"
-                  data-index={virtualRow.index}
-                  ref={setRowRef(entry.path)}
+                  className="diff-viewer-row absolute left-0 top-0 w-full pb-0"
                   style={{
+                    willChange: "transform",
+                    isolation: "isolate",
                     transform: `translate3d(0, ${virtualRow.start}px, 0)`,
                   }}
+                  data-index={virtualRow.index}
+                  ref={setRowRef(entry.path)}
                 >
                   {entry.isImage ? (
                     <ImageDiffCard

@@ -249,8 +249,8 @@ export const Messages = memo(function Messages({
   );
 
   return (
-    <div className="messages messages-full" ref={containerRef} onScroll={updateAutoScroll}>
-      <div className="messages-inner">
+    <div className="overflow-y-auto [-webkit-app-region:no-drag] flex-1 min-h-0 min-w-0 messages-full" data-testid="messages-container" ref={containerRef} onScroll={updateAutoScroll}>
+      <div className="messages-inner w-full m-0 flex flex-col gap-3.5">
         <VirtualizedMessageList
           items={grouped}
           renderItem={renderGroupedEntry}
@@ -271,15 +271,15 @@ export const Messages = memo(function Messages({
                 pollingIntervalMs={pollingIntervalMs}
               />
               {!items.length && !userInputNode && !isThinking && !isLoadingMessages && (
-                <div className="empty messages-empty">
+                <div className="empty p-[20px_22px] rounded-[18px] border border-[var(--cm-border-strong)] bg-[var(--cm-surface-panel)] text-text-muted">
                   {threadId ? "Send a prompt to the agent." : "Send a prompt to start a new agent."}
                 </div>
               )}
               {!items.length && !userInputNode && !isThinking && isLoadingMessages && (
-                <div className="empty messages-empty">
-                  <div className="messages-loading-indicator" role="status" aria-live="polite">
-                    <span className="working-spinner" aria-hidden />
-                    <span className="messages-loading-label">Loading…</span>
+                <div className="empty p-[20px_22px] rounded-[18px] border border-[var(--cm-border-strong)] bg-[var(--cm-surface-panel)] text-text-muted">
+                  <div className="inline-flex items-center gap-[10px] p-0" role="status" aria-live="polite">
+                    <span className="working-spinner w-3.5 h-3.5 rounded-full border-2 border-[rgba(255,255,255,0.2)] border-t-text-stronger" aria-hidden />
+                    <span className="text-text-muted text-ui-sm tracking-[0.02em]">Loading…</span>
                   </div>
                 </div>
               )}

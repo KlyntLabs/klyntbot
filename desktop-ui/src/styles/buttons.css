@@ -3,7 +3,9 @@
   font-size: var(--fs-sm);
 }
 
-button {
+/* Legacy button base styles — scoped to buttons that use the legacy class
+   names so they don't conflict with Tailwind-styled buttons. */
+button:is(.primary, .secondary, .ghost, .icon-button) {
   border: none;
   border-radius: 10px;
   padding: 8px 14px;
@@ -18,7 +20,7 @@ button {
   -webkit-app-region: no-drag;
 }
 
-button:disabled {
+button:is(.primary, .secondary, .ghost, .icon-button):disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
@@ -52,12 +54,12 @@ button:disabled {
   height: 16px;
 }
 
-button:hover:not(:disabled) {
+button:is(.primary, .secondary, .ghost, .icon-button):hover:not(:disabled) {
   transform: translateY(-1px);
   box-shadow: 0 12px 18px rgba(0, 0, 0, 0.2);
 }
 
-button:active:not(:disabled) {
+button:is(.primary, .secondary, .ghost, .icon-button):active:not(:disabled) {
   transform: scale(var(--ds-active-scale));
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
   transition-duration: 50ms;

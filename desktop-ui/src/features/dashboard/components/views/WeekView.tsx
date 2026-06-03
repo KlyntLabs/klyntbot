@@ -190,13 +190,13 @@ export function WeekView() {
   }, [data.entries, days]);
 
   return (
-    <div style={{ display: "flex", gap: 8, height: "100%", width: "100%" }}>
-      <div className="dashboard__week-grid" style={{ flex: 1 }}>
-        <div className="dashboard__week-grid-inner">
-          {isLoading && <div className="dashboard__week-loading">Loading...</div>}
+    <div className="flex gap-2 h-full w-full">
+      <div className="flex gap-2 h-full flex-1">
+        <div className="flex-1 flex flex-col overflow-hidden bg-transparent border-none rounded-none">
+          {isLoading && <div className="text-ui-2xs text-ds-text-subtle mb-1 px-2 py-1">Loading...</div>}
 
           {/* Header row */}
-          <div className="dashboard__week-header">
+          <div className="grid grid-cols-[48px_repeat(7,1fr)] border-b border-border-subtle">
             <div /> {/* gutter */}
             {days.map((day) => {
               const isToday = day === today;
@@ -207,20 +207,19 @@ export function WeekView() {
                   key={day}
                   data-testid="week-day-header"
                   type="button"
-                  className={`dashboard__week-header-cell${isToday ? " dashboard__week-header-cell--today" : ""}`}
+                  className={cn(
+                    "p-2 text-center text-ui-xs font-medium cursor-pointer transition-colors duration-150 ease-out text-text-muted bg-transparent border-none hover:text-text-strong",
+                    isToday && "text-border-accent bg-[color-mix(in_oklch,var(--border-accent)_5%,transparent)]",
+                  )}
                   onClick={() => {
                     setDate(day);
                     setMode("day");
                   }}
                 >
-                  <div className="dashboard__week-header-day">
-                    {d.toLocaleDateString("en-US", { weekday: "short" })}
-                  </div>
+                  <div className="text-ui-2xs uppercase">{d.toLocaleDateString("en-US", { weekday: "short" })}</div>
                   <div>{d.getDate()}</div>
                   {activeSecs > 0 && (
-                    <div className="dashboard__week-day-active">
-                      {formatHumanDuration(activeSecs)}
-                    </div>
+                    <div className="text-ui-2xs text-ds-text-subtle mt-0.5">{formatHumanDuration(activeSecs)}</div>
                   )}
                 </button>
               );
@@ -228,15 +227,15 @@ export function WeekView() {
           </div>
 
           {/* Scrollable grid */}
-          <div className="dashboard__week-scroll">
-            <div className="dashboard__week-columns">
+          <div className="flex-1 overflow-y-auto">
+            <div className="grid grid-cols-[48px_repeat(7,1fr)] relative w-full">
               {/* Hour gutter */}
-              <div className="dashboard__day-gutter">
+              <div className="w-12 shrink-0 border-r border-border-subtle">
                 {HOURS.map((h) => (
                   <div
                     key={h}
                     data-testid="hour-label"
-                    className="dashboard__day-hour-label"
+                    className="text-ui-2xs text-text-muted text-right pr-1.5"
                     style={{ height: HOUR_HEIGHT }}
                   >
                     {h === 0 ? "" : `${h}:00`}
@@ -250,15 +249,15 @@ export function WeekView() {
                 const sessions = buildWeekSessions(dayEntries);
 
                 return (
-                  <div key={day} className="dashboard__day-column">
+                  <div key={day} className="flex-1 relative border-r border-border-subtle last:border-r-0">
                     {/* Hour lines */}
                     {HOURS.map((h) => (
                       <div
                         key={h}
-                        className="dashboard__hour-row"
+                        className="absolute w-full flex items-start"
                         style={{ top: h * HOUR_HEIGHT, height: HOUR_HEIGHT }}
                       >
-                        <div className="dashboard__hour-line" />
+                        <div className="flex-1 border-t border-border-subtle" />
                       </div>
                     ))}
 
@@ -271,7 +270,7 @@ export function WeekView() {
                         return (
                           <div
                             key={`focus-${s.startMin}`}
-                            className="dashboard__week-focus-bar"
+                            className="absolute left-0 w-[3px] rounded-sm pointer-events-none bg-[var(--timeline-focus)] opacity-90"
                             style={{ top, height }}
                           />
                         );
@@ -281,7 +280,7 @@ export function WeekView() {
                         <button
                           key={`activity-${s.startMin}`}
                           type="button"
-                          className="dashboard__week-session"
+                          className="absolute rounded-[3px] cursor-pointer transition-[filter] duration-150 ease-out overflow-hidden border-none dashboard__week-session hover:brightness-[1.15]"
                           aria-label={`${s.label}, ${formatHumanDuration(s.totalSecs)}`}
                           style={{
                             top,
@@ -307,9 +306,11 @@ export function WeekView() {
                             });
                           }}
                         >
-                          <span className="dashboard__week-session-label">{s.label}</span>
+                          <span className="block text-ui-2xs text-text-strong font-medium px-1 mt-0.5 whitespace-nowrap overflow-hidden text-ellipsis leading-tight">
+                            {s.label}
+                          </span>
                           {s.appCount > 1 && (
-                            <span className="dashboard__week-session-meta">
+                            <span className="block text-ui-3xs text-white/60 px-1 whitespace-nowrap overflow-hidden text-ellipsis">
                               {s.appCount} apps · {Math.round(s.totalSecs / 60)}m
                             </span>
                           )}
@@ -346,8 +347,12 @@ function WeekNowLine() {
   const mins = now.getHours() * 60 + now.getMinutes();
   const top = mins * PX_PER_MIN;
   return (
-    <div className="dashboard__now-line" style={{ top }}>
-      <div style={{ borderTop: "1px solid var(--destructive)" }} />
+    <div className="absolute w-full pointer-events-none dashboard__now-line" style={{ top }}>
+      <div className="border-t border-destructive" />
     </div>
   );
+}
+
+function cn(...inputs: (string | false | undefined)[]) {
+  return inputs.filter(Boolean).join(" ");
 }

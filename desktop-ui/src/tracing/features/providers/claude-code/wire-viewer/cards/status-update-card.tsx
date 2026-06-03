@@ -11,22 +11,22 @@ export function StatusUpdateCard({ event }: Props) {
   const subtype = (event.payload as { subtype?: string }).subtype ?? event.type;
   const summary = renderSummary(subtype, event.payload);
   return (
-    <div className="cc-card cc-card--status">
+    <div className="rounded-lg border border-border-subtle border-l-[3px] bg-surface-card text-ui-sm overflow-hidden border-l-cyan-500">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="cc-card__header cc-card__header--button"
+        className="flex items-center gap-2 w-full py-2 px-3.5 bg-transparent border-0 text-left text-inherit [font:inherit] min-w-0 cursor-pointer transition-colors duration-100 hover:bg-[var(--color-accent)]"
         aria-expanded={open}
       >
-        <span className="cc-card__role cc-card__role--system">{subtype}</span>
-        {summary && <span className="cc-card__meta">{summary}</span>}
+        <span className="inline-flex items-center gap-1 py-px px-[0.4375rem] rounded text-ui-2xs font-semibold tracking-[0.04em] uppercase bg-surface-card-muted text-text-muted shrink-0 leading-[1.4] bg-[rgba(6,182,212,0.14)] text-[rgb(14,116,144)] dark:bg-[rgba(6,182,212,0.18)] dark:text-[rgb(125,211,252)]">{subtype}</span>
+        {summary && <span className="ml-auto text-ui-2xs text-text-muted shrink-0 inline-flex items-center gap-2">{summary}</span>}
         {open ? (
-          <ChevronDown size={14} className="cc-card__chevron" />
+          <ChevronDown size={14} className="text-text-muted shrink-0 transition-transform duration-100" />
         ) : (
-          <ChevronRight size={14} className="cc-card__chevron" />
+          <ChevronRight size={14} className="text-text-muted shrink-0 transition-transform duration-100" />
         )}
       </button>
-      {open && <pre className="cc-card__code">{JSON.stringify(event.payload, null, 2)}</pre>}
+      {open && <pre className="m-0 py-2.5 px-3.5 font-code text-ui-2xs leading-[1.55] bg-[rgba(0,0,0,0.04)] dark:bg-[rgba(0,0,0,0.28)] border-t border-border-subtle max-h-[40vh] overflow-auto whitespace-pre text-text-primary">{JSON.stringify(event.payload, null, 2)}</pre>}
     </div>
   );
 }

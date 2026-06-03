@@ -134,8 +134,8 @@ function LauncherShell() {
   );
 
   return (
-    <div className="lc-root">
-      <div ref={contentRef} className="lc-shell">
+    <div className="w-full h-full flex text-text-primary font-ui text-ui-sm">
+      <div ref={contentRef} className="w-full flex-1 flex flex-col overflow-hidden bg-surface-sidebar/55 border border-border-subtle/80 rounded-2xl backdrop-blur-[40px] saturate-[1.4] shadow-[0_18px_48px_rgba(0,0,0,0.45)] animate-[lc-glass-appear_0.2s_ease-out]">
         <button
           type="button"
           className="lc-drag-handle"
@@ -237,10 +237,10 @@ function ShortcutHints() {
     { key: "?", label: "Ask AI" },
   ];
   return (
-    <div className="lc-hints">
+    <div className="flex gap-1 mt-1">
       {hints.map((h) => (
-        <span key={h.key} className="lc-hint">
-          <kbd className="lc-kbd">{h.key}</kbd>
+        <span key={h.key} className="text-ui-xs text-text-faint flex items-center gap-1">
+          <kbd className="rounded bg-surface-control text-text-muted font-code text-ui-2xs py-0.5 px-1.5">{h.key}</kbd>
           {h.label}
         </span>
       ))}

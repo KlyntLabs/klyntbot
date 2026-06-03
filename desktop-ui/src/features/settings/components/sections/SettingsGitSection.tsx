@@ -1,5 +1,9 @@
 import {
+  SettingsField,
+  SettingsFieldLabel,
+  SettingsHelpText,
   SettingsSection,
+  SettingsSelect,
   SettingsToggleRow,
   SettingsToggleSwitch,
 } from "@/features/design-system/components/settings/SettingsPrimitives";
@@ -55,23 +59,23 @@ export function SettingsGitSection({
           }
         />
       </SettingsToggleRow>
-      <div className="settings-field">
-        <div className="settings-field-label">Commit message prompt</div>
-        <div className="settings-help">
+      <SettingsField>
+        <SettingsFieldLabel>Commit message prompt</SettingsFieldLabel>
+        <SettingsHelpText>
           Used when generating commit messages. Include <code>{"{diff}"}</code> to insert the git
           diff.
-        </div>
+        </SettingsHelpText>
         <textarea
-          className="settings-agents-textarea"
+          className="w-full min-h-[150px] resize-y rounded-xl border border-border-muted bg-surface-1 text-text-strong font-code text-ui-sm leading-relaxed px-3 py-2.5 outline-none focus:border-border-strong focus:shadow-[0_0_0_3px_rgba(99,102,241,0.16)]"
           value={commitMessagePromptDraft}
           onChange={(event) => onSetCommitMessagePromptDraft(event.target.value)}
           spellCheck={false}
           disabled={commitMessagePromptSaving}
         />
-        <div className="settings-field-actions">
+        <div className="flex gap-2.5 items-center">
           <button
             type="button"
-            className="ghost settings-button-compact"
+            className="ghost py-1.5 px-2.5 text-ui-sm"
             onClick={() => {
               void onResetCommitMessagePrompt();
             }}
@@ -81,7 +85,7 @@ export function SettingsGitSection({
           </button>
           <button
             type="button"
-            className="primary settings-button-compact"
+            className="primary py-1.5 px-2.5 text-ui-sm"
             onClick={() => {
               void onSaveCommitMessagePrompt();
             }}
@@ -90,19 +94,18 @@ export function SettingsGitSection({
             {commitMessagePromptSaving ? "Saving..." : "Save"}
           </button>
         </div>
-      </div>
+      </SettingsField>
       {models.length > 0 && (
-        <div className="settings-field">
-          <label className="settings-field-label" htmlFor="commit-message-model-select">
+        <SettingsField>
+          <SettingsFieldLabel htmlFor="commit-message-model-select">
             Commit message model
-          </label>
-          <div className="settings-help">
+          </SettingsFieldLabel>
+          <SettingsHelpText>
             The model used when generating commit messages. Leave on default to use the workspace
             model.
-          </div>
-          <select
+          </SettingsHelpText>
+          <SettingsSelect
             id="commit-message-model-select"
-            className="settings-select"
             value={appSettings.commitMessageModelId ?? ""}
             onChange={(event) => {
               const value = event.target.value || null;
@@ -118,8 +121,8 @@ export function SettingsGitSection({
                 {model.displayName?.trim() || model.model}
               </option>
             ))}
-          </select>
-        </div>
+          </SettingsSelect>
+        </SettingsField>
       )}
     </SettingsSection>
   );
