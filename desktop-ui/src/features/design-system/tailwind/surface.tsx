@@ -26,16 +26,16 @@ export interface SurfaceProps extends Omit<HTMLAttributes<HTMLDivElement>, "clas
 }
 
 const variantMap = {
-  sidebar: "bg-surface-sidebar",
-  topbar: "bg-surface-topbar",
-  messages: "bg-surface-messages",
-  card: "bg-surface-card",
-  "card-strong": "bg-surface-card-strong",
-  control: "bg-surface-control",
+  sidebar: "bg-surface",
+  topbar: "bg-surface-elevated",
+  messages: "bg-surface",
+  card: "bg-surface-elevated",
+  "card-strong": "bg-surface",
+  control: "bg-surface-sunken",
   hover: "bg-surface-hover",
   active: "bg-surface-active",
-  popover: "bg-surface-popover",
-  command: "bg-surface-command",
+  popover: "bg-overlay",
+  command: "bg-overlay",
   transparent: "bg-transparent",
 };
 

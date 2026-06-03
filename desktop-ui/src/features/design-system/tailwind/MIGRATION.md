@@ -2,49 +2,89 @@
 
 ## Architecture
 
-All app styles are now consolidated into a single entry point:
-
-```
-src/styles/app.css          ← Unified CSS (Tailwind v4 + all legacy styles)
-src/styles/themes.css       ← Theme imports (dark/dim/light/system)
-src/styles/themes.*.css     ← Theme variable definitions
-src/styles/ds-tokens.css    ← Design system token aliases
-```
-
-**Legacy `src/styles/index.css` and 50+ scattered CSS files have been removed.**
-
-## File Structure
+### Unified CSS Entry Point
 
 ```
 src/styles/
-  app.css              ← One file to rule them all
-  themes.css           ← Imports all theme files
-  themes.dark.css      ← Dark theme tokens
-  themes.dim.css       ← Dim theme tokens
-  themes.light.css     ← Light theme tokens
-  themes.system.css    ← System theme tokens
-  ds-tokens.css        ← Design system aliases
-
-src/features/design-system/tailwind/
-  index.ts             ← Export all primitives
-  box.tsx              ← Generic container
-  stack.tsx            ← Stack, HStack, VStack
-  grid.tsx             ← Grid, Container
-  text.tsx             ← Text, Heading
-  surface.tsx          ← Surface, Divider
-  skeleton.tsx         ← Loading placeholder
-  spinner.tsx          ← Loading spinner
-  label.tsx            ← Form label
-  textarea.tsx         ← Multi-line input
-  switch.tsx           ← Toggle switch
-  avatar.tsx           ← User avatar
-  chip.tsx             ← Tag/chip
-  button.tsx           ← Button (CVA)
-  badge.tsx            ← Badge (CVA)
-  input.tsx            ← Input, SearchField
-  card.tsx             ← Card compound
-  panel.tsx            ← Panel compound
+├── app.css                          ← Main entry (Tailwind + all styles)
+├── themes.css                       ← Imports primitives, semantic, themes
+├── ds-tokens.css                    ← Component-specific aliases
+├── tokens/                          ← NEW: OKLCH-based token system
+│   ├── primitives.css               ← Base values (hue, chroma, lightness)
+│   ├── semantic.css                 ← Derived tokens (bg, fg, border, accent)
+│   ├── colors-extended.css          ← Status, CM chips, tool families
+│   ├── typography.css               ← Font families, size scale
+│   ├── spacing.css                  ← Spacing scale
+│   ├── motion.css                   ← Durations, easings
+│   └── radius.css                   ← Border radius scale
+└── themes/                          ← NEW: Theme files (only override primitives)
+    ├── dark.css                     ← Dark theme + backward-compat aliases
+    ├── dim.css                      ← Dim theme
+    ├── light.css                    ← Light theme
+    └── system.css                   ← prefers-color-scheme wrapper
 ```
+
+### The 3-Layer Token System
+
+```
+Layer 1: PRIMITIVES        Layer 2: SEMANTIC           Layer 3: COMPONENT
+─────────────────          ─────────────────           ──────────────────
+--primitive-bg-l: 15%  →   --color-surface             --composer-bg
+--primitive-fg-l: 95%  →   --color-foreground          --sidebar-bg
+--primitive-accent-hue   →   --color-accent              --message-bubble-bg
+                           --color-border
+                           --color-success
+                           --color-error
+```
+
+**Key insight**: Themes only override ~6 primitives. All semantic tokens derive automatically via `oklch()` and `color-mix()`.
+
+---
+
+## Semantic Tokens (New — Use These)
+
+### Backgrounds
+
+| Token | Utility | Usage |
+|-------|---------|-------|
+| `--color-surface` | `bg-surface` | App background, base layer |
+| `--color-surface-elevated` | `bg-surface-elevated` | Cards, panels, topbar |
+| `--color-surface-sunken` | `bg-surface-sunken` | Inputs, controls, code blocks |
+| `--color-surface-hover` | `bg-surface-hover` | Hover states |
+| `--color-surface-active` | `bg-surface-active` | Active/selected states |
+| `--color-overlay` | `bg-overlay` | Modals, popovers, toasts |
+| `--color-inset` | `bg-inset` | Deeply nested content |
+
+### Foregrounds (Text)
+
+| Token | Utility | Usage |
+|-------|---------|-------|
+| `--color-foreground` | `text-foreground` | Primary text |
+| `--color-foreground-muted` | `text-foreground-muted` | Secondary text, labels |
+| `--color-foreground-faint` | `text-foreground-faint` | Placeholders, hints |
+| `--color-foreground-accent` | `text-foreground-accent` | Links, active text |
+| `--color-foreground-on-accent` | `text-foreground-on-accent` | Text on accent buttons |
+
+### Borders
+
+| Token | Utility | Usage |
+|-------|---------|-------|
+| `--color-border` | `border-border` | Default borders |
+| `--color-border-strong` | `border-border-strong` | Focused, emphasized borders |
+| `--color-border-accent` | `border-border-accent` | Active/brand borders |
+
+### Accent & Status
+
+| Token | Utility | Usage |
+|-------|---------|-------|
+| `--color-accent` | `bg-accent`, `text-accent` | Primary accent color |
+| `--color-accent-strong` | `bg-accent-strong` | Hover/active accent |
+| `--color-accent-muted` | `bg-accent-muted` | Subtle accent backgrounds |
+| `--color-success` | `text-success`, `bg-success` | Success states |
+| `--color-warning` | `text-warning`, `bg-warning` | Warning states |
+| `--color-error` | `text-error`, `bg-error` | Error states |
+
+---
 
 ## Quick Reference
 
@@ -109,18 +149,34 @@ import { Avatar, Chip, Badge } from "@/features/design-system/tailwind";
 <Badge variant="primary">New</Badge>
 ```
 
-## Custom Utilities
+---
 
-The unified CSS defines `@utility` directives for common patterns:
+## Backward Compatibility
+
+Old tokens (`--text-muted`, `--surface-card`, `--border-subtle`, etc.) still work.
+They are aliased to the new semantic tokens in each theme file:
+
+```css
+/* themes/dark.css */
+--text-muted: var(--color-foreground-muted);
+--surface-card: var(--color-surface-elevated);
+--border-subtle: var(--color-border);
+```
+
+This means:
+- ✅ Legacy BEM CSS in `@layer components` continues to work
+- ✅ Existing components using old Tailwind utilities (`text-text-muted`) still work
+- ✅ New components should use semantic tokens (`text-foreground-muted`)
+
+---
+
+## Custom Utilities
 
 ```tsx
 // Buttons (legacy compat)
 className="btn-primary"
 className="btn-secondary"
 className="btn-ghost"
-className="btn-danger"
-className="btn-link"
-className="icon-button"
 
 // Layout
 className="flex-center"
@@ -129,53 +185,100 @@ className="truncate-text"
 className="no-drag"
 className="no-select"
 
-// Surfaces
-className="surface-card"
-className="surface-hover-effect"
-className="focus-ring"
-
 // Animations
 className="animate-spin-slow"
 className="animate-fade-in"
 className="animate-slide-in"
 ```
 
-## Design Tokens
-
-All CSS custom properties are bridged to Tailwind utilities:
-
-| Token Type | Utility Prefix | Example |
-|-----------|---------------|---------|
-| Surfaces | `bg-surface-*` | `bg-surface-card` |
-| Text | `text-text-*` | `text-text-muted` |
-| Borders | `border-border-*` | `border-border-strong` |
-| Status | `text-status-*` | `text-status-error` |
-| Typography | `text-ui-*` | `text-ui-sm` |
-| Spacing | `gap-ui-*` / `p-ui-*` | `gap-ui-2` |
-| Radius | `rounded-ui-*` | `rounded-ui-lg` |
-| Motion | `duration-ui-*` | `duration-ui-fast` |
+---
 
 ## Theme Switching
 
-Themes continue to work via `data-theme` on `<html>`:
+Themes work via `data-theme` on `<html>`:
 
 ```tsx
 document.documentElement.dataset.theme = "dark" | "dim" | "light";
 ```
 
-All Tailwind utilities referencing CSS custom properties update automatically.
+Or follow system preference (no data-theme attribute):
 
-## Migration Rules
+```css
+/* System theme uses prefers-color-scheme */
+@media (prefers-color-scheme: light) { ... }
+```
 
-1. **New components** → Use atomic primitives + Tailwind utilities
-2. **Refactoring legacy** → Replace BEM classes with utilities or atomic components
-3. **Custom patterns** → Add `@utility` in `app.css` if reused across components
-4. **One-off styles** → Use `className={cn("...", className)}` with Tailwind utilities
+### Adding a New Theme
+
+Create a new file in `src/styles/themes/`:
+
+```css
+/* themes/ocean.css */
+[data-theme="ocean"] {
+  color-scheme: dark;
+  --primitive-bg-l: 15%;
+  --primitive-fg-l: 95%;
+  --primitive-accent-hue: 190;    /* Teal instead of blue */
+  --primitive-accent-chroma: 0.16;
+}
+```
+
+Import it in `themes.css`:
+
+```css
+@import "./themes/ocean.css";
+```
+
+Done. All semantic tokens derive automatically.
+
+---
 
 ## Dark Mode
 
 Use `dark:` prefix for theme overrides. Both `data-theme="dark"` and `data-theme="dim"` trigger it:
 
 ```tsx
-<div className="bg-surface-card dark:bg-surface-card-strong" />
+<div className="bg-surface dark:bg-surface-elevated" />
 ```
+
+---
+
+## Design Token Philosophy
+
+### Old Way (RGBA — 80+ tokens)
+```css
+--surface-card: rgba(255, 255, 255, 0.04);
+--surface-card-strong: rgba(255, 255, 255, 0.12);
+--surface-card-muted: rgba(255, 255, 255, 0.06);
+--text-muted: rgba(255, 255, 255, 0.7);
+--text-faint: rgba(255, 255, 255, 0.5);
+/* ... 80 more */
+```
+
+### New Way (OKLCH — 18 tokens)
+```css
+--primitive-bg-l: 15%;
+--primitive-fg-l: 95%;
+
+--color-surface: oklch(var(--primitive-bg-l) 0.01 255);
+--color-surface-elevated: oklch(calc(var(--primitive-bg-l) + 5%) 0.01 255);
+--color-foreground: oklch(var(--primitive-fg-l) 0.01 255);
+--color-foreground-muted: color-mix(in oklch, var(--color-foreground) 55%, var(--color-surface));
+```
+
+**Why OKLCH?**
+- Perceptually uniform — changing lightness doesn't shift hue
+- `color-mix(in oklch, ...)` produces natural tints/shades
+- Changing `--primitive-accent-hue` shifts the entire app accent
+- 96%+ browser support
+
+---
+
+## Migration Path
+
+| Step | Action |
+|------|--------|
+| 1 | Use new semantic tokens in new components |
+| 2 | Refactor existing components on touch |
+| 3 | Remove old `@theme inline` bridges when no consumers remain |
+| 4 | Eventually remove old token aliases from theme files |

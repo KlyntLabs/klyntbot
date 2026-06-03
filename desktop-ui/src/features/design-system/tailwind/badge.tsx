@@ -12,7 +12,7 @@ const badgeVariants = cva(
     variants: {
       variant: {
         default:
-          "bg-surface-card-strong text-text-muted border border-border-subtle",
+          "bg-surface-elevated-strong text-foreground-muted border border-border-subtle",
         primary: "bg-surface-active text-text-strong",
         success: "bg-cm-green-bg text-cm-green-fg border border-cm-green-border",
         warning: "bg-cm-amber-bg text-cm-amber-fg border border-cm-amber-border",

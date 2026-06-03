@@ -1,0 +1,76 @@
+/* ============================================================================
+   Design Tokens — Semantic (Layer 2)
+   ============================================================================
+   Purpose-based tokens derived from primitives via oklch() and color-mix().
+   NEVER hardcode values here. Always derive from --primitive-* variables.
+
+   These are the tokens components should use.
+   ============================================================================ */
+
+:root {
+  /* ── Backgrounds ── */
+  --color-surface: oklch(var(--primitive-bg-l) var(--primitive-muted-chroma) var(--primitive-neutral-hue));
+  --color-surface-elevated: oklch(
+    calc(var(--primitive-bg-l) + var(--primitive-elevated-l-offset))
+    var(--primitive-muted-chroma)
+    var(--primitive-neutral-hue)
+  );
+  --color-surface-sunken: oklch(
+    calc(var(--primitive-bg-l) - var(--primitive-sunken-l-offset))
+    var(--primitive-muted-chroma)
+    var(--primitive-neutral-hue)
+  );
+  --color-surface-hover: color-mix(in oklch, var(--color-foreground) var(--primitive-hover-mix), var(--color-surface));
+  --color-surface-active: color-mix(in oklch, var(--color-accent) var(--primitive-active-mix), var(--color-surface));
+  --color-overlay: oklch(
+    calc(var(--primitive-bg-l) - 2%)
+    var(--primitive-muted-chroma)
+    var(--primitive-neutral-hue) / 0.96
+  );
+  --color-inset: oklch(
+    calc(var(--primitive-bg-l) - var(--primitive-sunken-l-offset) - 2%)
+    var(--primitive-muted-chroma)
+    var(--primitive-neutral-hue)
+  );
+
+  /* ── Foregrounds ── */
+  --color-foreground: oklch(var(--primitive-fg-l) var(--primitive-muted-chroma) var(--primitive-neutral-hue));
+  --color-foreground-muted: color-mix(in oklch, var(--color-foreground) 55%, var(--color-surface));
+  --color-foreground-faint: color-mix(in oklch, var(--color-foreground) 32%, var(--color-surface));
+  --color-foreground-accent: oklch(
+    calc(var(--primitive-fg-l) - 15%)
+    var(--primitive-accent-chroma)
+    var(--primitive-accent-hue)
+  );
+  --color-foreground-on-accent: oklch(
+    calc(var(--primitive-bg-l) + 5%)
+    var(--primitive-muted-chroma)
+    var(--primitive-neutral-hue)
+  );
+
+  /* ── Borders ── */
+  --color-border: color-mix(in oklch, var(--color-foreground) var(--primitive-border-mix), var(--color-surface));
+  --color-border-strong: color-mix(in oklch, var(--color-foreground) var(--primitive-border-strong-mix), var(--color-surface));
+  --color-border-accent: color-mix(in oklch, var(--color-accent) 55%, transparent);
+
+  /* ── Accent ── */
+  --color-accent: oklch(70% var(--primitive-accent-chroma) var(--primitive-accent-hue));
+  --color-accent-strong: oklch(78% calc(var(--primitive-accent-chroma) * 1.15) var(--primitive-accent-hue));
+  --color-accent-muted: color-mix(in oklch, var(--color-accent) 30%, transparent);
+  --color-accent-glow: color-mix(in oklch, var(--color-accent) 25%, transparent);
+
+  /* ── Status ── */
+  --color-success: oklch(75% var(--primitive-status-chroma) var(--primitive-success-hue));
+  --color-warning: oklch(78% var(--primitive-status-chroma) var(--primitive-warning-hue));
+  --color-error: oklch(68% var(--primitive-status-chroma) var(--primitive-error-hue));
+  --color-info: oklch(75% var(--primitive-status-chroma) var(--primitive-accent-hue));
+
+  /* ── Review (pink/green pair) ── */
+  --color-review: oklch(70% 0.18 var(--primitive-review-hue));
+  --color-review-active: color-mix(in oklch, var(--color-review) 22%, var(--color-surface));
+  --color-review-done: oklch(75% 0.15 155);
+
+  /* ── Focus Ring ── */
+  --color-ring: color-mix(in oklch, var(--color-accent) 70%, transparent);
+  --color-ring-offset: var(--color-surface);
+}

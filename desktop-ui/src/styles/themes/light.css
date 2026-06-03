@@ -1,0 +1,118 @@
+/* ============================================================================
+   Theme: Light
+   ============================================================================ */
+
+[data-theme="light"] {
+  color-scheme: light;
+
+  /* ── Primitive Overrides ── */
+  --primitive-bg-l: 98%;
+  --primitive-fg-l: 18%;
+  --primitive-accent-hue: 210;
+  --primitive-accent-chroma: 0.16;
+  --primitive-muted-chroma: 0.01;
+
+  /* ── Backward Compatibility Aliases ── */
+
+  /* Text */
+  --text-primary: var(--color-foreground);
+  --text-strong: var(--color-foreground);
+  --text-emphasis: var(--color-foreground);
+  --text-stronger: var(--color-foreground);
+  --text-quiet: var(--color-foreground-muted);
+  --text-muted: var(--color-foreground-muted);
+  --text-subtle: var(--color-foreground-faint);
+  --text-faint: var(--color-foreground-faint);
+  --text-fainter: var(--color-foreground-faint);
+  --text-dim: var(--color-foreground-faint);
+  --text-accent: var(--color-foreground-accent);
+  --text-accent-cyan: var(--color-foreground-accent);
+  --text-review-active: var(--color-review);
+  --text-review-done: var(--color-review-done);
+
+  /* Surfaces */
+  --surface-sidebar: var(--color-surface);
+  --surface-sidebar-opaque: oklch(var(--primitive-bg-l) var(--primitive-muted-chroma) var(--primitive-neutral-hue));
+  --surface-topbar: var(--color-surface-elevated);
+  --surface-right-panel: var(--color-surface-elevated);
+  --surface-composer: var(--color-surface-elevated);
+  --surface-messages: var(--color-surface);
+  --surface-card: var(--color-surface-elevated);
+  --surface-card-strong: color-mix(in oklch, var(--color-surface-elevated), var(--color-foreground) 8%);
+  --surface-card-muted: var(--color-surface-sunken);
+  --surface-item: var(--color-surface-hover);
+  --surface-control: var(--color-surface-sunken);
+  --surface-control-hover: var(--color-surface-hover);
+  --surface-control-disabled: color-mix(in oklch, var(--color-surface-sunken), transparent 50%);
+  --surface-hover: var(--color-surface-hover);
+  --surface-active: var(--color-surface-active);
+  --surface-approval: var(--color-overlay);
+  --surface-debug: var(--color-overlay);
+  --surface-command: var(--color-overlay);
+  --surface-diff-card: var(--color-surface-elevated);
+  --surface-bubble: var(--color-surface-sunken);
+  --surface-bubble-user: var(--color-accent-muted);
+  --surface-context-core: var(--color-inset);
+  --surface-popover: var(--color-overlay);
+  --surface-review: var(--color-review-active);
+  --surface-review-active: var(--color-review-active);
+  --surface-review-done: color-mix(in oklch, var(--color-review-done) 25%, var(--color-surface));
+  --surface-raised: var(--color-surface-sunken);
+
+  /* Borders */
+  --border-subtle: var(--color-border);
+  --border-muted: var(--color-border);
+  --border-strong: var(--color-border-strong);
+  --border-stronger: var(--color-border-strong);
+  --border-quiet: var(--color-border-strong);
+  --border-accent: var(--color-border-accent);
+  --border-accent-soft: var(--color-accent-muted);
+  --border-review: color-mix(in oklch, var(--color-review) 45%, transparent);
+
+  /* Status */
+  --status-success: var(--color-success);
+  --status-warning: var(--color-warning);
+  --status-error: var(--color-error);
+  --status-unknown: var(--color-foreground-faint);
+
+  /* Misc */
+  --message-link-color: var(--color-foreground-accent);
+  --shadow-accent: var(--color-accent-glow);
+  --select-caret: var(--color-foreground-muted);
+}
+
+/* Windows vibrancy override */
+[data-theme="light"] .app.is-windows:not(.reduced-transparency) {
+  --surface-sidebar: oklch(calc(var(--primitive-bg-l) - 3%) var(--primitive-muted-chroma) var(--primitive-neutral-hue) / 0.25);
+  --surface-right-panel: oklch(calc(var(--primitive-bg-l) - 4%) var(--primitive-muted-chroma) var(--primitive-neutral-hue) / 0.25);
+  --surface-topbar: oklch(calc(var(--primitive-bg-l) - 3%) var(--primitive-muted-chroma) var(--primitive-neutral-hue) / 0.25);
+  --surface-messages: oklch(var(--primitive-bg-l) var(--primitive-muted-chroma) var(--primitive-neutral-hue));
+  --surface-composer: oklch(calc(var(--primitive-bg-l) - 3%) var(--primitive-muted-chroma) var(--primitive-neutral-hue));
+}
+
+/* Reduced transparency */
+[data-theme="light"] .app.reduced-transparency {
+  --surface-sidebar: oklch(calc(var(--primitive-bg-l) - 3%) var(--primitive-muted-chroma) var(--primitive-neutral-hue) / 0.98);
+  --surface-sidebar-opaque: oklch(calc(var(--primitive-bg-l) - 3%) var(--primitive-muted-chroma) var(--primitive-neutral-hue));
+  --surface-topbar: oklch(calc(var(--primitive-bg-l) - 2%) var(--primitive-muted-chroma) var(--primitive-neutral-hue) / 0.98);
+  --surface-right-panel: oklch(calc(var(--primitive-bg-l) - 3%) var(--primitive-muted-chroma) var(--primitive-neutral-hue) / 0.98);
+  --surface-composer: oklch(calc(var(--primitive-bg-l) - 2%) var(--primitive-muted-chroma) var(--primitive-neutral-hue) / 0.98);
+  --surface-messages: oklch(calc(var(--primitive-bg-l) - 4%) var(--primitive-muted-chroma) var(--primitive-neutral-hue) / 0.98);
+  --surface-card: oklch(calc(var(--primitive-bg-l) - 1%) var(--primitive-muted-chroma) var(--primitive-neutral-hue) / 0.96);
+  --surface-card-strong: oklch(calc(var(--primitive-bg-l) - 0.5%) var(--primitive-muted-chroma) var(--primitive-neutral-hue) / 0.98);
+  --surface-card-muted: oklch(calc(var(--primitive-bg-l) - 2%) var(--primitive-muted-chroma) var(--primitive-neutral-hue) / 0.96);
+  --surface-item: oklch(calc(var(--primitive-bg-l) - 3%) var(--primitive-muted-chroma) var(--primitive-neutral-hue) / 0.96);
+  --surface-control: oklch(calc(var(--primitive-bg-l) - 6%) var(--primitive-muted-chroma) var(--primitive-neutral-hue) / 0.12);
+  --surface-control-hover: oklch(calc(var(--primitive-bg-l) - 6%) var(--primitive-muted-chroma) var(--primitive-neutral-hue) / 0.18);
+  --surface-control-disabled: oklch(calc(var(--primitive-bg-l) - 6%) var(--primitive-muted-chroma) var(--primitive-neutral-hue) / 0.08);
+  --surface-hover: oklch(calc(var(--primitive-bg-l) - 6%) var(--primitive-muted-chroma) var(--primitive-neutral-hue) / 0.1);
+  --surface-active: color-mix(in oklch, var(--color-accent) 22%, var(--color-surface));
+  --surface-approval: oklch(calc(var(--primitive-bg-l) - 2%) var(--primitive-muted-chroma) var(--primitive-neutral-hue) / 0.98);
+  --surface-debug: oklch(calc(var(--primitive-bg-l) - 2%) var(--primitive-muted-chroma) var(--primitive-neutral-hue) / 0.98);
+  --surface-command: oklch(calc(var(--primitive-bg-l) - 1%) var(--primitive-muted-chroma) var(--primitive-neutral-hue) / 0.98);
+  --surface-diff-card: oklch(calc(var(--primitive-bg-l) - 3%) var(--primitive-muted-chroma) var(--primitive-neutral-hue) / 0.98);
+  --surface-bubble: oklch(calc(var(--primitive-bg-l) - 1%) var(--primitive-muted-chroma) var(--primitive-neutral-hue) / 0.98);
+  --surface-bubble-user: color-mix(in oklch, var(--color-accent) 28%, transparent);
+  --surface-context-core: oklch(calc(var(--primitive-bg-l) - 1%) var(--primitive-muted-chroma) var(--primitive-neutral-hue) / 0.98);
+  --surface-popover: oklch(calc(var(--primitive-bg-l) - 0.5%) var(--primitive-muted-chroma) var(--primitive-neutral-hue) / 0.995);
+}

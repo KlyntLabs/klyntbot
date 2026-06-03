@@ -1,0 +1,49 @@
+/* ============================================================================
+   Design Tokens — Primitives (Layer 1)
+   ============================================================================
+   Base values that themes override. All other tokens derive from these.
+   Changing a primitive (e.g. --primitive-accent-hue) cascades to every
+   derived semantic and component token automatically.
+
+   Color Space: OKLCH
+   - L: Lightness (0% = black, 100% = white)
+   - C: Chroma (0 = grey, 0.4 = max saturation)
+   - H: Hue (0-360 degrees on color wheel)
+   ============================================================================ */
+
+:root {
+  /* ── Hue Wheel Positions ──
+     Use these to shift the entire app’s color family.
+     e.g. --primitive-accent-hue: 30 for orange, 120 for green, 340 for pink */
+  --primitive-neutral-hue: 255;
+  --primitive-accent-hue: 210;
+  --primitive-success-hue: 155;
+  --primitive-warning-hue: 80;
+  --primitive-error-hue: 25;
+  --primitive-review-hue: 340;
+
+  /* ── Chroma (Colorfulness) ──
+     Higher = more vivid. Lower = more grey/desaturated. */
+  --primitive-muted-chroma: 0.01;
+  --primitive-accent-chroma: 0.18;
+  --primitive-status-chroma: 0.14;
+
+  /* ── Lightness ──
+     These are THE ONLY values themes override.
+     --primitive-bg-l: background lightness
+     --primitive-fg-l: foreground (text) lightness */
+  --primitive-bg-l: 15%;
+  --primitive-fg-l: 95%;
+
+  /* ── Derivation Offsets ──
+     How much lighter/darker elevated/sunken surfaces are. */
+  --primitive-elevated-l-offset: 5%;
+  --primitive-sunken-l-offset: 3%;
+
+  /* ── Mix Ratios ──
+     How much foreground is mixed into background for borders, hover, etc. */
+  --primitive-border-mix: 8%;
+  --primitive-border-strong-mix: 18%;
+  --primitive-hover-mix: 6%;
+  --primitive-active-mix: 18%;
+}

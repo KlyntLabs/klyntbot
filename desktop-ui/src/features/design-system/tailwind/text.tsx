@@ -33,15 +33,15 @@ const weightMap = {
 };
 
 const colorMap = {
-  primary: "text-text-primary",
-  strong: "text-text-strong",
-  muted: "text-text-muted",
-  subtle: "text-text-subtle",
-  faint: "text-text-faint",
-  accent: "text-text-accent",
-  "accent-cyan": "text-text-accent-cyan",
-  danger: "text-status-error",
-  success: "text-status-success",
+  primary: "text-foreground",
+  strong: "text-foreground",
+  muted: "text-foreground-muted",
+  subtle: "text-foreground-faint",
+  faint: "text-foreground-faint",
+  accent: "text-foreground-accent",
+  "accent-cyan": "text-foreground-accent",
+  danger: "text-error",
+  success: "text-success",
 };
 
 export function Text({

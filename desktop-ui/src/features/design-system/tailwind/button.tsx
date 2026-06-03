@@ -23,18 +23,18 @@ const buttonVariants = cva(
           "hover:-translate-y-px hover:shadow-[0_12px_18px_rgba(0,0,0,0.2)] " +
           "active:brightness-[0.92]",
         secondary:
-          "bg-surface-card-strong text-text-primary " +
+          "bg-surface-elevated text-foreground " +
           "hover:-translate-y-px hover:shadow-[0_12px_18px_rgba(0,0,0,0.2)]",
         ghost:
-          "bg-transparent text-text-muted border border-border-strong " +
+          "bg-transparent text-foreground-muted border border-border-strong " +
           "hover:-translate-y-px hover:shadow-[0_12px_18px_rgba(0,0,0,0.2)] " +
           "active:bg-surface-hover",
         danger:
-          "bg-status-error/90 text-white " +
+          "bg-error text-white " +
           "hover:-translate-y-px hover:shadow-[0_12px_18px_rgba(0,0,0,0.2)] " +
           "active:brightness-[0.92]",
         link:
-          "bg-transparent text-text-accent-cyan underline-offset-4 hover:underline " +
+          "bg-transparent text-foreground-accent underline-offset-4 hover:underline " +
           "shadow-none hover:shadow-none active:scale-100",
       },
       size: {

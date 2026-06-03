@@ -30,7 +30,7 @@ export function Input({
       ) : null}
       <input
         className={cn(
-          "flex-1 min-w-0 bg-transparent text-text-primary placeholder:text-text-faint outline-none",
+          "flex-1 min-w-0 bg-transparent text-text-primary placeholder:text-foreground-faint outline-none",
           "text-ui-sm leading-none",
           inputClassName,
         )}
@@ -72,7 +72,7 @@ export function SearchField({ className, inputClassName, icon, ...props }: Searc
       <input
         type="search"
         className={cn(
-          "flex-1 min-w-0 bg-transparent text-text-primary placeholder:text-text-faint outline-none",
+          "flex-1 min-w-0 bg-transparent text-text-primary placeholder:text-foreground-faint outline-none",
           "text-ui-sm leading-none",
           inputClassName,
         )}

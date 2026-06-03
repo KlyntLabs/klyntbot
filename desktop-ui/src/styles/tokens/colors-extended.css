@@ -1,0 +1,70 @@
+/* ============================================================================
+   Design Tokens — Extended Colors (Layer 2.5)
+   ============================================================================
+   Specialized color palettes: CodeMirror chips, tool families, diff colors.
+   These derive from primitives but are specialized for specific features.
+   ============================================================================ */
+
+:root {
+  /* ── CodeMirror / Event Chip Colors ──
+     Each family: bg = 15% opacity, fg = solid, border = 30% opacity */
+  --cm-color-blue-bg: color-mix(in oklch, oklch(60% 0.18 255) 15%, transparent);
+  --cm-color-blue-fg: oklch(65% 0.15 255);
+  --cm-color-blue-border: color-mix(in oklch, oklch(60% 0.18 255) 30%, transparent);
+
+  --cm-color-purple-bg: color-mix(in oklch, oklch(60% 0.18 300) 15%, transparent);
+  --cm-color-purple-fg: oklch(65% 0.15 300);
+  --cm-color-purple-border: color-mix(in oklch, oklch(60% 0.18 300) 30%, transparent);
+
+  --cm-color-green-bg: color-mix(in oklch, oklch(65% 0.16 155) 15%, transparent);
+  --cm-color-green-fg: oklch(70% 0.14 155);
+  --cm-color-green-border: color-mix(in oklch, oklch(65% 0.16 155) 30%, transparent);
+
+  --cm-color-orange-bg: color-mix(in oklch, oklch(65% 0.16 55) 15%, transparent);
+  --cm-color-orange-fg: oklch(70% 0.14 55);
+  --cm-color-orange-border: color-mix(in oklch, oklch(65% 0.16 55) 30%, transparent);
+
+  --cm-color-amber-bg: color-mix(in oklch, oklch(75% 0.14 80) 15%, transparent);
+  --cm-color-amber-fg: oklch(75% 0.14 80);
+  --cm-color-amber-border: color-mix(in oklch, oklch(75% 0.14 80) 30%, transparent);
+
+  --cm-color-cyan-bg: color-mix(in oklch, oklch(70% 0.14 190) 15%, transparent);
+  --cm-color-cyan-fg: oklch(75% 0.12 190);
+  --cm-color-cyan-border: color-mix(in oklch, oklch(70% 0.14 190) 30%, transparent);
+
+  --cm-color-indigo-bg: color-mix(in oklch, oklch(60% 0.16 270) 15%, transparent);
+  --cm-color-indigo-fg: oklch(65% 0.14 270);
+  --cm-color-indigo-border: color-mix(in oklch, oklch(60% 0.16 270) 30%, transparent);
+
+  --cm-color-teal-bg: color-mix(in oklch, oklch(65% 0.14 175) 15%, transparent);
+  --cm-color-teal-fg: oklch(70% 0.12 175);
+  --cm-color-teal-border: color-mix(in oklch, oklch(65% 0.14 175) 30%, transparent);
+
+  --cm-color-pink-bg: color-mix(in oklch, oklch(65% 0.16 340) 15%, transparent);
+  --cm-color-pink-fg: oklch(70% 0.14 340);
+  --cm-color-pink-border: color-mix(in oklch, oklch(65% 0.16 340) 30%, transparent);
+
+  --cm-color-neutral-bg: color-mix(in oklch, oklch(60% 0.02 255) 15%, transparent);
+  --cm-color-neutral-fg: var(--color-fg-muted);
+  --cm-color-neutral-border: var(--color-border);
+
+  /* ── Tool Family Colors ── */
+  --tool-family-filesystem: var(--cm-color-blue-fg);
+  --tool-family-shell: var(--cm-color-orange-fg);
+  --tool-family-search: var(--cm-color-green-fg);
+  --tool-family-web: var(--cm-color-purple-fg);
+  --tool-family-domain: var(--cm-color-indigo-fg);
+  --tool-family-agent: var(--cm-color-pink-fg);
+  --tool-family-mcp: var(--cm-color-teal-fg);
+  --tool-family-system: var(--color-fg-muted);
+  --tool-family-approval: var(--cm-color-amber-fg);
+
+  /* ── Warning / Danger Highlights ── */
+  --cm-color-warning-fg: var(--cm-color-amber-fg);
+  --cm-color-warning-line: color-mix(in oklch, var(--cm-color-amber-fg) 35%, transparent);
+  --cm-color-danger-fg: oklch(60% 0.16 25);
+  --cm-color-danger-line: color-mix(in oklch, oklch(60% 0.16 25) 40%, transparent);
+
+  /* ── Diff Colors ── */
+  --ds-diff-lib-bg: color-mix(in oklch, var(--color-fg) 8%, transparent);
+}

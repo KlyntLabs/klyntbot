@@ -20,7 +20,7 @@ export interface ChipProps extends Omit<HTMLAttributes<HTMLSpanElement>, "classN
 }
 
 const variantMap = {
-  default: "bg-surface-card-strong text-text-strong border-border-subtle",
+  default: "bg-surface-elevated text-foreground border-border",
   primary: "bg-cm-blue-bg text-cm-blue-fg border-cm-blue-border",
   success: "bg-cm-green-bg text-cm-green-fg border-cm-green-border",
   warning: "bg-cm-amber-bg text-cm-amber-fg border-cm-amber-border",
