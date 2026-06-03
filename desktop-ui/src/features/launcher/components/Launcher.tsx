@@ -19,7 +19,6 @@ import { LauncherInput } from "./LauncherInput";
 import { ResultsList } from "./ResultsList";
 import { VoiceRecorder } from "./VoiceRecorder";
 
-import "../launcher.css";
 
 export function Launcher() {
   return (

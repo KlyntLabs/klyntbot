@@ -1,4 +1,3 @@
-import "../../../styles/mobile-setup-wizard.css";
 import X from "lucide-react/dist/esm/icons/x";
 import { ModalShell } from "@/features/design-system/components/modal/ModalShell";
 

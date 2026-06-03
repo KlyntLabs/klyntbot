@@ -6,7 +6,6 @@ import { useWindowAutoResize } from "@/hooks/window/useWindowAutoResize";
 import { useTauriMutation } from "@/lib/query";
 import { getCurrentWindow, isTauri } from "@/utils/tauri-bridge";
 
-import "../distraction.css";
 
 interface InterventionPayload {
   appName: string;

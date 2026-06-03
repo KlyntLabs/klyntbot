@@ -19,7 +19,6 @@ import { Checkbox } from "./Checkbox";
 import { FocusControl } from "./FocusControl";
 import { useCoachingNudge } from "./stubs";
 
-import "../tray.css";
 
 const MAX_TRAY_HEIGHT = 800;
 const TRAY_WIDTH = 320;

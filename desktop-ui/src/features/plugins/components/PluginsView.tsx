@@ -1,10 +1,4 @@
-import { useEffect } from "react";
-
 export function PluginsView() {
-  useEffect(() => {
-    import("@/styles/plugins.css");
-  }, []);
-
   return (
     <section className="plugins-view">
       <div className="flex-1 min-h-0 overflow-hidden" data-testid="plugins-active-pane">

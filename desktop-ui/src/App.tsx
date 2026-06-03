@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react";
-import "./styles/index.css";
+import "./styles/app.css";
 
 import { AppErrorBoundary } from "@app/components/AppErrorBoundary";
 import MainApp from "@app/components/MainApp";

@@ -1,7 +1,0 @@
-.approval-preview {
-  margin-top: var(--space-3);
-  border: 1px solid var(--border-muted);
-  border-radius: var(--radius-md);
-  overflow: hidden;
-  font-size: var(--fs-xs);
-}

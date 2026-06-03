@@ -1,218 +1,181 @@
-# Tailwind CSS v4 Migration Guide
+# Klynt Design System — Tailwind CSS v4
 
-## What Changed
+## Architecture
 
-Tailwind CSS v4 is now available **globally** across the entire app (not just `src/tracing/`).
+All app styles are now consolidated into a single entry point:
 
-### New Files
+```
+src/styles/app.css          ← Unified CSS (Tailwind v4 + all legacy styles)
+src/styles/themes.css       ← Theme imports (dark/dim/light/system)
+src/styles/themes.*.css     ← Theme variable definitions
+src/styles/ds-tokens.css    ← Design system token aliases
+```
 
-| File | Purpose |
-|------|---------|
-| `src/styles/tailwind-theme.css` | Bridges all existing CSS custom properties into Tailwind's `@theme inline` system |
-| `src/features/design-system/tailwind/` | CVA-based design system primitives (Button, Badge, Input, Card, Panel) |
+**Legacy `src/styles/index.css` and 50+ scattered CSS files have been removed.**
 
-### Modified Files
+## File Structure
 
-| File | Change |
-|------|--------|
-| `src/styles/index.css` | Added `@import "./tailwind-theme.css"` at the top |
-| `src/features/app/components/MainTopbar.tsx` | Converted from BEM classes to Tailwind utilities |
-| `src/features/design-system/components/panel/PanelPrimitives.tsx` | Converted from BEM classes to Tailwind utilities |
-| `src/features/settings/components/SettingsShell.tsx` | Replaced arbitrary values with semantic tokens |
+```
+src/styles/
+  app.css              ← One file to rule them all
+  themes.css           ← Imports all theme files
+  themes.dark.css      ← Dark theme tokens
+  themes.dim.css       ← Dim theme tokens
+  themes.light.css     ← Light theme tokens
+  themes.system.css    ← System theme tokens
+  ds-tokens.css        ← Design system aliases
 
-## Available Utilities
+src/features/design-system/tailwind/
+  index.ts             ← Export all primitives
+  box.tsx              ← Generic container
+  stack.tsx            ← Stack, HStack, VStack
+  grid.tsx             ← Grid, Container
+  text.tsx             ← Text, Heading
+  surface.tsx          ← Surface, Divider
+  skeleton.tsx         ← Loading placeholder
+  spinner.tsx          ← Loading spinner
+  label.tsx            ← Form label
+  textarea.tsx         ← Multi-line input
+  switch.tsx           ← Toggle switch
+  avatar.tsx           ← User avatar
+  chip.tsx             ← Tag/chip
+  button.tsx           ← Button (CVA)
+  badge.tsx            ← Badge (CVA)
+  input.tsx            ← Input, SearchField
+  card.tsx             ← Card compound
+  panel.tsx            ← Panel compound
+```
 
-Because the theme bridges your existing CSS custom properties, **theme switching still works automatically**. When `data-theme` changes on `<html>`, all Tailwind utilities update.
+## Quick Reference
 
-### Colors
+### Layout Primitives
 
 ```tsx
-// Surfaces
-"bg-surface-sidebar"
-"bg-surface-messages"
-"bg-surface-card"
-"bg-surface-active"
-"bg-surface-hover"
+import { Box, Stack, HStack, VStack, Grid, Container } from "@/features/design-system/tailwind";
 
-// Text
-"text-text-primary"
-"text-text-strong"
-"text-text-muted"
-"text-text-faint"
-"text-text-accent-cyan"
-
-// Borders
-"border-border-subtle"
-"border-border-strong"
-"border-border-accent"
-
-// Status
-"text-status-success"
-"text-status-error"
-"bg-status-warning"
-
-// CodeMirror chips
-"bg-cm-blue-bg"
-"text-cm-blue-fg"
-"border-cm-blue-border"
-
-// Tool families
-"text-tool-filesystem"
-"text-tool-shell"
+<Box className="p-4">...</Box>
+<Stack gap="4" align="center">...</Stack>
+<HStack gap="2" justify="between">...</HStack>
+<Grid cols={3} gap="4">...</Grid>
+<Container size="lg">...</Container>
 ```
 
 ### Typography
 
 ```tsx
-"text-ui-3xs"   // 9px
-"text-ui-2xs"   // 10.5px
-"text-ui-xs"    // 11.5px
-"text-ui-sm"    // 12.5px
-"text-ui-md"    // 13.5px
-"text-ui-lg"    // 15px
-"text-ui-xl"    // 17px
-"font-family-ui"
-"font-family-code"
+import { Text, Heading } from "@/features/design-system/tailwind";
+
+<Text size="sm" color="muted" truncate>Hello</Text>
+<Heading as="h2" size="lg" color="strong">Title</Heading>
 ```
 
-### Spacing
+### Surfaces
 
 ```tsx
-"p-ui-0-5"   // 2px
-"p-ui-1"     // 4px
-"gap-ui-2"   // 8px
-"m-ui-3"     // 12px
-"space-ui-4" // 16px
+import { Surface, Divider } from "@/features/design-system/tailwind";
+
+<Surface variant="card" radius="lg" border>
+  <Divider color="subtle" spacing="2" />
+</Surface>
 ```
 
-### Motion
+### Forms
 
 ```tsx
-"duration-ui-fast"     // 120ms
-"duration-ui-normal"   // 160ms
-"duration-ui-slow"     // 220ms
-"ease-ui-out"          // cubic-bezier(0.16, 1, 0.3, 1)
-"ease-ui-spring"       // cubic-bezier(0.34, 1.56, 0.64, 1)
-"animate-ui-spin"
-"animate-ui-fade-in"
+import { Label, Input, Textarea, Switch } from "@/features/design-system/tailwind";
+
+<Label required>Email</Label>
+<Input placeholder="Type here..." />
+<Textarea error="Invalid input" />
+<Switch label="Enable feature" />
 ```
 
-### Radius
+### Feedback
 
 ```tsx
-"rounded-ui-sm"   // 6px
-"rounded-ui-md"   // 8px
-"rounded-ui-lg"   // 10px
-"rounded-ui-xl"   // 14px
-"rounded-ui-full"
+import { Skeleton, Spinner } from "@/features/design-system/tailwind";
+
+<Skeleton variant="text" width="120px" />
+<Spinner size="md" color="accent" />
 ```
 
-### Dark Mode
+### Data Display
 
-Use `dark:` prefix for overrides. Both `data-theme="dark"` and `data-theme="dim"` trigger it:
+```tsx
+import { Avatar, Chip, Badge } from "@/features/design-system/tailwind";
+
+<Avatar size="md" alt="John Doe" />
+<Chip variant="success" size="sm">Active</Chip>
+<Badge variant="primary">New</Badge>
+```
+
+## Custom Utilities
+
+The unified CSS defines `@utility` directives for common patterns:
+
+```tsx
+// Buttons (legacy compat)
+className="btn-primary"
+className="btn-secondary"
+className="btn-ghost"
+className="btn-danger"
+className="btn-link"
+className="icon-button"
+
+// Layout
+className="flex-center"
+className="flex-between"
+className="truncate-text"
+className="no-drag"
+className="no-select"
+
+// Surfaces
+className="surface-card"
+className="surface-hover-effect"
+className="focus-ring"
+
+// Animations
+className="animate-spin-slow"
+className="animate-fade-in"
+className="animate-slide-in"
+```
+
+## Design Tokens
+
+All CSS custom properties are bridged to Tailwind utilities:
+
+| Token Type | Utility Prefix | Example |
+|-----------|---------------|---------|
+| Surfaces | `bg-surface-*` | `bg-surface-card` |
+| Text | `text-text-*` | `text-text-muted` |
+| Borders | `border-border-*` | `border-border-strong` |
+| Status | `text-status-*` | `text-status-error` |
+| Typography | `text-ui-*` | `text-ui-sm` |
+| Spacing | `gap-ui-*` / `p-ui-*` | `gap-ui-2` |
+| Radius | `rounded-ui-*` | `rounded-ui-lg` |
+| Motion | `duration-ui-*` | `duration-ui-fast` |
+
+## Theme Switching
+
+Themes continue to work via `data-theme` on `<html>`:
+
+```tsx
+document.documentElement.dataset.theme = "dark" | "dim" | "light";
+```
+
+All Tailwind utilities referencing CSS custom properties update automatically.
+
+## Migration Rules
+
+1. **New components** → Use atomic primitives + Tailwind utilities
+2. **Refactoring legacy** → Replace BEM classes with utilities or atomic components
+3. **Custom patterns** → Add `@utility` in `app.css` if reused across components
+4. **One-off styles** → Use `className={cn("...", className)}` with Tailwind utilities
+
+## Dark Mode
+
+Use `dark:` prefix for theme overrides. Both `data-theme="dark"` and `data-theme="dim"` trigger it:
 
 ```tsx
 <div className="bg-surface-card dark:bg-surface-card-strong" />
 ```
-
-## Design System Primitives
-
-Import from the new Tailwind design system:
-
-```tsx
-import { Button, Badge, Input, Card, SearchField, PanelNavItem } from "@/features/design-system/tailwind";
-
-<Button variant="primary" size="lg">Save</Button>
-<Button variant="ghost" size="icon"><Icon /></Button>
-
-<Badge variant="success">Connected</Badge>
-<Badge variant="error" size="sm">Failed</Badge>
-
-<SearchField icon={<SearchIcon />} placeholder="Search..." />
-
-<Card>
-  <CardHeader>
-    <CardTitle>Settings</CardTitle>
-    <CardDescription>Manage your preferences</CardDescription>
-  </CardHeader>
-  <CardContent>...</CardContent>
-</Card>
-```
-
-## Migration Strategy
-
-### Phase 1: New Components (Now)
-Write all new components with Tailwind utilities + `cn()`.
-
-### Phase 2: Refactor on Touch (Ongoing)
-When you edit a component, convert its BEM classes to Tailwind utilities:
-
-**Before:**
-```tsx
-<div className={`main-topbar ${className}`}>
-  <div className="main-topbar-left">{leftNode}</div>
-  <div className="actions">{actionsNode}</div>
-</div>
-```
-
-**After:**
-```tsx
-<div className={cn(
-  "flex items-center justify-between gap-3",
-  "h-[var(--main-topbar-height,44px)]",
-  "border-b border-border-subtle bg-surface-topbar",
-  className
-)}>
-  <div className="flex items-center gap-2 min-w-0">{leftNode}</div>
-  <div className="flex items-center gap-1 shrink-0">{actionsNode}</div>
-</div>
-```
-
-### Phase 3: Remove Legacy CSS (Later)
-As a component's CSS file is fully migrated, delete or trim it from `src/styles/index.css`.
-
-## Rules of Thumb
-
-1. **Use `cn()` for all className composition** — it handles conditional classes and resolves Tailwind conflicts.
-2. **Prefer semantic tokens** — `bg-surface-card` not `bg-[rgba(255,255,255,0.04)]`.
-3. **Keep layout CSS in CSS files** — Complex grid layouts like `.app` and `.sidebar-resizer` are poorly suited to utilities. Leave them in CSS until you have a reason to move them.
-4. **Don't delete legacy CSS until all consumers are migrated** — The hybrid approach is safe; both systems work together.
-5. **React 19: ref is a prop** — No `forwardRef` needed.
-
-## Utility Patterns
-
-### Focus Ring
-```tsx
-"focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-accent focus-visible:ring-offset-2"
-```
-
-### Truncate
-```tsx
-"truncate" // overflow-hidden text-ellipsis whitespace-nowrap
-```
-
-### Flex Center
-```tsx
-"flex items-center justify-center"
-```
-
-### Disabled State
-```tsx
-"disabled:opacity-50 disabled:cursor-not-allowed"
-```
-
-### Reduced Motion
-```tsx
-"motion-reduce:transition-none motion-reduce:animate-none"
-```
-
-## Troubleshooting
-
-### "Utility class not working"
-Make sure the CSS variable is bridged in `src/styles/tailwind-theme.css`. Add it to `@theme inline` if missing.
-
-### "Colors don't update on theme switch"
-Verify you're using the bridged token (e.g. `text-text-primary`) not a hardcoded value. The bridge references CSS vars which update dynamically.
-
-### "Tracing app looks wrong"
-The tracing app already had its own Tailwind setup. The global theme now extends it. If you see conflicts, the tracing-specific `@theme inline` in `src/tracing/styles/tracing.css` takes precedence for tracing-scoped components because of CSS cascade.

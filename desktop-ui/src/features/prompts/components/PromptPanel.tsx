@@ -85,10 +85,6 @@ export function PromptPanel({
   canRevealGeneralPrompts,
   loadedContextFiles = [],
 }: PromptPanelProps) {
-  useEffect(() => {
-    import("@/styles/prompts.css");
-  }, []);
-
   const [query, setQuery] = useState("");
   const [argsByPrompt, setArgsByPrompt] = useState<Record<string, string>>({});
   const [editor, setEditor] = useState<PromptEditorState | null>(null);

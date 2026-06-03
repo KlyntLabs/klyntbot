@@ -1,0 +1,474 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Architecture review — desktop-ui</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+      mermaid.initialize({ startOnLoad: true, theme: "neutral", securityLevel: "loose" });
+    </script>
+    <style>
+      .seam { stroke-dasharray: 4 4; }
+      .leak { stroke: #dc2626; }
+      .deep { background: linear-gradient(135deg, #0f172a, #1e293b); }
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+      body { font-family: 'Inter', sans-serif; }
+    </style>
+  </head>
+  <body class="bg-stone-50 text-slate-900">
+    <main class="max-w-5xl mx-auto px-6 py-12 space-y-12">
+
+      <!-- Header -->
+      <header class="border-b border-slate-200 pb-6">
+        <div class="flex items-center justify-between">
+          <div>
+            <h1 class="text-2xl font-bold tracking-tight text-slate-900">Architecture review</h1>
+            <p class="text-sm text-slate-500 mt-1">desktop-ui &middot; 2026-06-03</p>
+          </div>
+          <div class="flex gap-3 text-xs">
+            <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm border border-slate-400 bg-white"></span> module</div>
+            <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm border border-dashed border-slate-400 bg-white"></span> seam</div>
+            <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-emerald-600"></span> deep</div>
+            <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-red-500"></span> leak</div>
+          </div>
+        </div>
+      </header>
+
+      <section id="candidates" class="space-y-10">
+
+        <!-- Candidate 1: Settings section-hook pyramid -->
+        <article class="bg-white rounded-xl border border-slate-200 p-6 space-y-5">
+          <div class="flex items-start justify-between">
+            <div>
+              <h2 class="text-lg font-semibold text-slate-900">Collapse the Settings section-hook pyramid</h2>
+              <div class="flex gap-2 mt-2">
+                <span class="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700">Strong</span>
+                <span class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">in-process</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="font-mono text-xs text-slate-600 bg-slate-50 rounded-lg p-3">
+            features/settings/hooks/useSettingsViewOrchestration.ts<br>
+            features/settings/hooks/useSettings*Section.ts (×10)<br>
+            features/settings/components/sections/*.tsx (×17)
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <!-- Before -->
+            <div class="rounded-lg border border-slate-200 bg-stone-50 p-4">
+              <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">Before</p>
+              <div class="space-y-2">
+                <div class="relative">
+                  <div class="flex flex-col gap-2">
+                    <div class="border border-slate-300 rounded bg-white px-3 py-2 text-xs">
+                      <div class="font-medium">useSettingsViewOrchestration</div>
+                      <div class="text-slate-400 mt-1">261 lines, 28 args, 12 props bags</div>
+                    </div>
+                    <div class="flex gap-2 flex-wrap">
+                      <div class="border border-dashed border-slate-300 rounded px-2 py-1.5 text-[10px] bg-white">useSettingsCodexSection</div>
+                      <div class="border border-dashed border-slate-300 rounded px-2 py-1.5 text-[10px] bg-white">useSettingsProjectsSection</div>
+                      <div class="border border-dashed border-slate-300 rounded px-2 py-1.5 text-[10px] bg-white">useSettingsDisplaySection</div>
+                      <div class="border border-dashed border-slate-300 rounded px-2 py-1.5 text-[10px] bg-white">useSettingsServerSection</div>
+                      <div class="border border-dashed border-slate-300 rounded px-2 py-1.5 text-[10px] bg-white">… ×6 more</div>
+                    </div>
+                    <div class="flex gap-2 flex-wrap">
+                      <div class="border border-slate-200 rounded px-2 py-1 text-[10px] bg-white text-slate-500">SettingsCodexSection</div>
+                      <div class="border border-slate-200 rounded px-2 py-1 text-[10px] bg-white text-slate-500">SettingsProjectsSection</div>
+                      <div class="border border-slate-200 rounded px-2 py-1 text-[10px] bg-white text-slate-500">… ×15 more</div>
+                    </div>
+                  </div>
+                  <svg class="absolute -left-3 top-0 h-full w-2" viewBox="0 0 8 100" preserveAspectRatio="none">
+                    <line x1="4" y1="0" x2="4" y2="100" stroke="#dc2626" stroke-width="1" stroke-dasharray="2 2" />
+                  </svg>
+                </div>
+                <p class="text-[10px] text-red-600 mt-1">Interface as wide as implementation. Each section hook returns 20–40 fields.</p>
+              </div>
+            </div>
+            <!-- After -->
+            <div class="rounded-lg border border-slate-200 bg-stone-50 p-4">
+              <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">After</p>
+              <div class="space-y-2">
+                <div class="border-2 border-slate-800 rounded-lg bg-slate-800 px-3 py-2 text-xs text-white">
+                  <div class="font-medium">SettingsStore</div>
+                  <div class="text-slate-400 mt-1">One seam. Sections read/write directly.</div>
+                </div>
+                <div class="flex gap-2 flex-wrap justify-center">
+                  <div class="border border-emerald-200 rounded px-2 py-1.5 text-[10px] bg-emerald-50 text-emerald-800">SettingsCodexSection</div>
+                  <div class="border border-emerald-200 rounded px-2 py-1.5 text-[10px] bg-emerald-50 text-emerald-800">SettingsProjectsSection</div>
+                  <div class="border border-emerald-200 rounded px-2 py-1.5 text-[10px] bg-emerald-50 text-emerald-800">… ×15 more</div>
+                </div>
+              </div>
+              <p class="text-[10px] text-emerald-700 mt-2">Each section imports the store. No orchestrator, no prop bags.</p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-3 gap-4 text-sm">
+            <div>
+              <p class="font-semibold text-slate-900 mb-1">Problem</p>
+              <p class="text-slate-600">The orchestrator is a pass-through. Deleting it would move 3,400 lines of interface surface into one file. Each section hook is shallow — its interface nearly matches its implementation.</p>
+            </div>
+            <div>
+              <p class="font-semibold text-slate-900 mb-1">Solution</p>
+              <p class="text-slate-600">Replace the orchestrator and section hooks with a single Zustand (or context) store. Sections read settings and dispatch updates directly. Async operations (doctor, update) become thunks on the store.</p>
+            </div>
+            <div>
+              <p class="font-semibold text-slate-900 mb-1">Wins</p>
+              <ul class="text-slate-600 space-y-1 list-disc list-inside">
+                <li>Delete 10 shallow section hooks</li>
+                <li>locality: settings logic in one module</li>
+                <li>leverage: one interface, N sections</li>
+                <li>Tests hit a store, not 50 props</li>
+              </ul>
+            </div>
+          </div>
+        </article>
+
+        <!-- Candidate 2: Thread state split brain -->
+        <article class="bg-white rounded-xl border border-slate-200 p-6 space-y-5">
+          <div class="flex items-start justify-between">
+            <div>
+              <h2 class="text-lg font-semibold text-slate-900">Consolidate thread state management</h2>
+              <div class="flex gap-2 mt-2">
+                <span class="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700">Strong</span>
+                <span class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">local-substitutable</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="font-mono text-xs text-slate-600 bg-slate-50 rounded-lg p-3">
+            features/threads/hooks/useThreadsReducer.ts<br>
+            features/threads/hooks/threadReducer/*.ts (×5 slices)<br>
+            features/threads/store/useChatStore.ts<br>
+            features/chat/store/chatStreamStore.ts<br>
+            services/threadEvents.ts
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <!-- Before -->
+            <div class="rounded-lg border border-slate-200 bg-stone-50 p-4">
+              <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">Before</p>
+              <div class="rounded-lg border border-slate-200 bg-white p-3">
+                <pre class="mermaid text-xs">
+flowchart TD
+  A[Component] --> B[useChatStore]
+  B --> C[threadReducer]
+  C --> D[threadLifecycleSlice]
+  C --> E[threadItemsSlice]
+  C --> F[threadQueueSlice]
+  C --> G[threadConfigSlice]
+  C --> H[threadSnapshotSlice]
+  B --> I[ChatStreamStore]
+  I --> J[legacy v1 events]
+  B --> K[threadEvents.ts]
+  K --> L[global mutable maps]
+  style I fill:#dc2626,color:#fff
+  style K fill:#dc2626,color:#fff
+                </pre>
+              </div>
+              <p class="text-[10px] text-red-600 mt-2">Three state seams for one domain. Leakage between v1 and v2.</p>
+            </div>
+            <!-- After -->
+            <div class="rounded-lg border border-slate-200 bg-stone-50 p-4">
+              <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">After</p>
+              <div class="rounded-lg border-2 border-slate-800 bg-slate-800 p-3">
+                <pre class="mermaid text-xs">
+flowchart TD
+  A[Component] --> B[ThreadState]
+  B --> C[EventAdapter]
+  C --> D[Tauri v2]
+  C --> E[Browser SSE]
+  B --> F[StreamAdapter]
+  F --> G[legacy v1 bridge]
+  style B fill:#0f172a,color:#fff,stroke:#334155,stroke-width:3px
+                </pre>
+              </div>
+              <p class="text-[10px] text-emerald-200 mt-2">One deep module. Adapters sit at the seam, not inside.</p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-3 gap-4 text-sm">
+            <div>
+              <p class="font-semibold text-slate-900 mb-1">Problem</p>
+              <p class="text-slate-600">Thread state lives across a hand-rolled reducer (5 slices), a Zustand store, a legacy class (`ChatStreamStore`, 1152 lines), and a global mutable module (`threadEvents.ts`). Understanding one thread concept requires bouncing between four modules.</p>
+            </div>
+            <div>
+              <p class="font-semibold text-slate-900 mb-1">Solution</p>
+              <p class="text-slate-600">Fold the 5 reducer slices and the Zustand wrapper into one deep `ThreadState` module. Move the legacy v1 bridge behind an adapter at the seam. Evict `threadEvents.ts` global mutable state — its ring-buffer logic belongs inside `ThreadState`.</p>
+            </div>
+            <div>
+              <p class="font-semibold text-slate-900 mb-1">Wins</p>
+              <ul class="text-slate-600 space-y-1 list-disc list-inside">
+                <li>locality: thread bugs in one place</li>
+                <li>One seam, two adapters (Tauri, browser)</li>
+                <li>Delete 3 shallow wrappers</li>
+                <li>Tests exercise one interface</li>
+              </ul>
+            </div>
+          </div>
+        </article>
+
+        <!-- Candidate 3: Event hub subscribe surface -->
+        <article class="bg-white rounded-xl border border-slate-200 p-6 space-y-5">
+          <div class="flex items-start justify-between">
+            <div>
+              <h2 class="text-lg font-semibold text-slate-900">Collapse the event-hub subscribe surface</h2>
+              <div class="flex gap-2 mt-2">
+                <span class="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700">Worth exploring</span>
+                <span class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">in-process</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="font-mono text-xs text-slate-600 bg-slate-50 rounded-lg p-3">
+            services/events.ts<br>
+            services/tauri.ts
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <!-- Before: mass diagram -->
+            <div class="rounded-lg border border-slate-200 bg-stone-50 p-4">
+              <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">Before</p>
+              <div class="space-y-3">
+                <div class="flex items-center gap-3">
+                  <div class="w-24 text-[10px] text-slate-500 text-right">createEventHub</div>
+                  <div class="flex-1 h-6 bg-emerald-600 rounded-sm relative">
+                    <div class="absolute inset-0 flex items-center justify-center text-[10px] text-white font-medium">deep — 60 lines</div>
+                  </div>
+                </div>
+                <div class="flex items-center gap-3">
+                  <div class="w-24 text-[10px] text-slate-500 text-right">subscribeAppServerEvents</div>
+                  <div class="flex-1 h-4 bg-slate-300 rounded-sm relative">
+                    <div class="absolute inset-0 flex items-center justify-center text-[9px] text-slate-700">shallow — 4 lines</div>
+                  </div>
+                </div>
+                <div class="flex items-center gap-3">
+                  <div class="w-24 text-[10px] text-slate-500 text-right">subscribeDictationEvents</div>
+                  <div class="flex-1 h-4 bg-slate-300 rounded-sm relative">
+                    <div class="absolute inset-0 flex items-center justify-center text-[9px] text-slate-700">shallow — 4 lines</div>
+                  </div>
+                </div>
+                <div class="flex items-center gap-3">
+                  <div class="w-24 text-[10px] text-slate-500 text-right">…</div>
+                  <div class="flex-1 h-4 bg-slate-300 rounded-sm relative">
+                    <div class="absolute inset-0 flex items-center justify-center text-[9px] text-slate-700">×28 more identical wrappers</div>
+                  </div>
+                </div>
+              </div>
+              <p class="text-[10px] text-slate-500 mt-3">Total interface surface: ~340 lines. Implementation hidden: 60 lines.</p>
+            </div>
+            <!-- After -->
+            <div class="rounded-lg border border-slate-200 bg-stone-50 p-4">
+              <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">After</p>
+              <div class="space-y-3">
+                <div class="flex items-center gap-3">
+                  <div class="w-24 text-[10px] text-slate-500 text-right">eventHubFor</div>
+                  <div class="flex-1 h-8 bg-emerald-600 rounded-sm relative">
+                    <div class="absolute inset-0 flex items-center justify-center text-[10px] text-white font-medium">deep — 60 lines</div>
+                  </div>
+                </div>
+                <div class="flex items-center gap-3">
+                  <div class="w-24 text-[10px] text-slate-500 text-right">callers</div>
+                  <div class="flex-1 h-3 bg-emerald-100 border border-emerald-300 rounded-sm relative">
+                    <div class="absolute inset-0 flex items-center justify-center text-[9px] text-emerald-800">eventHubFor("app-server-event").subscribe(fn)</div>
+                  </div>
+                </div>
+              </div>
+              <p class="text-[10px] text-emerald-700 mt-3">One factory function. Callers pass the event name. Interface shrinks from 30 functions to 1.</p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-3 gap-4 text-sm">
+            <div>
+              <p class="font-semibold text-slate-900 mb-1">Problem</p>
+              <p class="text-slate-600">`createEventHub` is deep, but every exported `subscribeX` is a shallow pass-through. The module's interface is 30× wider than it needs to be. Adding a new event requires copy-pasting 6 lines.</p>
+            </div>
+            <div>
+              <p class="font-semibold text-slate-900 mb-1">Solution</p>
+              <p class="text-slate-600">Export `eventHubFor(eventName)` instead of 30 named subscribers. Callers write `eventHubFor("terminal-output").subscribe(handler)`. Type safety via a registry map or discriminated union.</p>
+            </div>
+            <div>
+              <p class="font-semibold text-slate-900 mb-1">Wins</p>
+              <ul class="text-slate-600 space-y-1 list-disc list-inside">
+                <li>Delete ~28 shallow wrappers</li>
+                <li>leverage: one interface, all events</li>
+                <li>New events need 1 line, not 6</li>
+                <li>Tests mock one factory</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-800">
+            Also noted: <code>services/tauri.ts</code> is a 4-line re-export shim. Delete it and migrate imports to <code>@/api</code>.
+          </div>
+        </article>
+
+        <!-- Candidate 4: MainApp god component -->
+        <article class="bg-white rounded-xl border border-slate-200 p-6 space-y-5">
+          <div class="flex items-start justify-between">
+            <div>
+              <h2 class="text-lg font-semibold text-slate-900">Break MainApp.tsx into surface-level modules</h2>
+              <div class="flex gap-2 mt-2">
+                <span class="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700">Worth exploring</span>
+                <span class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">in-process</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="font-mono text-xs text-slate-600 bg-slate-50 rounded-lg p-3">
+            features/app/components/MainApp.tsx<br>
+            features/app/orchestration/*<br>
+            features/app/hooks/*
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <!-- Before -->
+            <div class="rounded-lg border border-slate-200 bg-stone-50 p-4">
+              <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">Before</p>
+              <div class="rounded-lg border border-red-200 bg-red-50 p-3 relative">
+                <div class="text-xs font-medium text-red-900">MainApp.tsx</div>
+                <div class="text-[10px] text-red-700 mt-1">Implicit DI container. Mounts layout nodes, providers, side-effects, routing.</div>
+                <div class="mt-2 flex flex-wrap gap-1">
+                  <span class="text-[9px] bg-white border border-red-200 rounded px-1.5 py-0.5">layout nodes</span>
+                  <span class="text-[9px] bg-white border border-red-200 rounded px-1.5 py-0.5">query providers</span>
+                  <span class="text-[9px] bg-white border border-red-200 rounded px-1.5 py-0.5">event bridges</span>
+                  <span class="text-[9px] bg-white border border-red-200 rounded px-1.5 py-0.5">shortcuts</span>
+                  <span class="text-[9px] bg-white border border-red-200 rounded px-1.5 py-0.5">bootstrap</span>
+                </div>
+              </div>
+              <p class="text-[10px] text-red-600 mt-2">One component owns the entire app surface. No seam between shell and content.</p>
+            </div>
+            <!-- After -->
+            <div class="rounded-lg border border-slate-200 bg-stone-50 p-4">
+              <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">After</p>
+              <div class="space-y-2">
+                <div class="border-2 border-slate-800 rounded-lg bg-slate-800 px-3 py-2">
+                  <div class="text-xs font-medium text-white">AppShell</div>
+                  <div class="text-[10px] text-slate-400">Providers, layout, shortcuts only</div>
+                </div>
+                <div class="flex gap-2">
+                  <div class="flex-1 border border-emerald-200 rounded bg-emerald-50 px-2 py-1.5 text-[10px] text-emerald-800">WorkspacesSurface</div>
+                  <div class="flex-1 border border-emerald-200 rounded bg-emerald-50 px-2 py-1.5 text-[10px] text-emerald-800">ThreadsSurface</div>
+                </div>
+                <div class="flex gap-2">
+                  <div class="flex-1 border border-emerald-200 rounded bg-emerald-50 px-2 py-1.5 text-[10px] text-emerald-800">ComposerSurface</div>
+                  <div class="flex-1 border border-emerald-200 rounded bg-emerald-50 px-2 py-1.5 text-[10px] text-emerald-800">SidebarSurface</div>
+                </div>
+              </div>
+              <p class="text-[10px] text-emerald-700 mt-2">Shell mounts surfaces by label. Each surface is independently testable.</p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-3 gap-4 text-sm">
+            <div>
+              <p class="font-semibold text-slate-900 mb-1">Problem</p>
+              <p class="text-slate-600">`MainApp.tsx` functions as an implicit dependency-injection container and god component. It couples layout orchestration, bootstrap, global shortcuts, and feature mounting in one place. Changing any surface requires touching MainApp.</p>
+            </div>
+            <div>
+              <p class="font-semibold text-slate-900 mb-1">Solution</p>
+              <p class="text-slate-600">Split into `AppShell` (providers + layout frame) and `XxxSurface` modules for each major area. Surfaces register themselves or are declared in a flat route map. Bootstrap logic moves to a `useAppBootstrap` hook consumed only by the shell.</p>
+            </div>
+            <div>
+              <p class="font-semibold text-slate-900 mb-1">Wins</p>
+              <ul class="text-slate-600 space-y-1 list-disc list-inside">
+                <li>locality: surface changes stay in surface</li>
+                <li>Tests mount one surface, not MainApp</li>
+                <li>Delete alias hooks (useAppBootstrapOrchestration)</li>
+              </ul>
+            </div>
+          </div>
+        </article>
+
+        <!-- Candidate 5: Thread messaging hook -->
+        <article class="bg-white rounded-xl border border-slate-200 p-6 space-y-5">
+          <div class="flex items-start justify-between">
+            <div>
+              <h2 class="text-lg font-semibold text-slate-900">Deepen the thread messaging module</h2>
+              <div class="flex gap-2 mt-2">
+                <span class="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700">Strong</span>
+                <span class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">ports &amp; adapters</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="font-mono text-xs text-slate-600 bg-slate-50 rounded-lg p-3">
+            features/threads/hooks/useThreadMessaging.ts<br>
+            features/threads/hooks/threadMessagingHelpers.ts
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <!-- Before: cross-section -->
+            <div class="rounded-lg border border-slate-200 bg-stone-50 p-4">
+              <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">Before</p>
+              <div class="space-y-1">
+                <div class="h-8 border-l-4 border-slate-300 bg-white rounded-r px-2 flex items-center text-[10px]">sendUserMessage options (30 fields)</div>
+                <div class="h-8 border-l-4 border-slate-300 bg-white rounded-r px-2 flex items-center text-[10px]">useThreadMessaging hook (896 lines)</div>
+                <div class="h-6 border-l-4 border-slate-300 bg-white rounded-r px-2 flex items-center text-[10px]">threadMessagingHelpers</div>
+                <div class="h-6 border-l-4 border-slate-300 bg-white rounded-r px-2 flex items-center text-[10px]">API endpoints</div>
+                <div class="h-6 border-l-4 border-slate-300 bg-white rounded-r px-2 flex items-center text-[10px]">Dispatch to store</div>
+              </div>
+              <p class="text-[10px] text-red-600 mt-2">Interface is 30 parameters wide. Every caller must thread all dependencies through.</p>
+            </div>
+            <!-- After -->
+            <div class="rounded-lg border border-slate-200 bg-stone-50 p-4">
+              <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">After</p>
+              <div class="border-2 border-slate-800 bg-slate-800 rounded-lg p-3">
+                <div class="text-xs font-medium text-white mb-2">ThreadMessaging</div>
+                <div class="space-y-1">
+                  <div class="h-5 bg-slate-700 rounded px-2 flex items-center text-[10px] text-slate-300">send(message: SendRequest): Promise&lt;SendResult&gt;</div>
+                  <div class="h-5 bg-slate-700 rounded px-2 flex items-center text-[10px] text-slate-300">interrupt(threadId): void</div>
+                  <div class="h-5 bg-slate-700 rounded px-2 flex items-center text-[10px] text-slate-300">review(target): Promise&lt;boolean&gt;</div>
+                  <div class="h-5 bg-slate-700 rounded px-2 flex items-center text-[10px] text-slate-300">fork(threadId, text?): Promise&lt;string&gt;</div>
+                </div>
+                <div class="mt-2 pt-2 border-t border-slate-600">
+                  <div class="text-[9px] text-slate-400">Adapters: TauriRpc, InMemoryFake</div>
+                </div>
+              </div>
+              <p class="text-[10px] text-emerald-700 mt-2">4 entry points. All orchestration (turn IDs, error handling, debug logging) hidden inside.</p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-3 gap-4 text-sm">
+            <div>
+              <p class="font-semibold text-slate-900 mb-1">Problem</p>
+              <p class="text-slate-600">`useThreadMessaging` is 896 lines and takes 30+ parameters. It returns 25+ functions. The interface is as complex as the implementation — shallow. Every test must construct the full options object or mock the hook entirely.</p>
+            </div>
+            <div>
+              <p class="font-semibold text-slate-900 mb-1">Solution</p>
+              <p class="text-slate-600">Extract a plain `ThreadMessaging` module with a small interface: `send`, `interrupt`, `review`, `fork`. It owns turn lifecycle, error handling, and debug logging internally. The React hook becomes a thin adapter that reads workspace/thread context from the store and delegates to the module.</p>
+            </div>
+            <div>
+              <p class="font-semibold text-slate-900 mb-1">Wins</p>
+              <ul class="text-slate-600 space-y-1 list-disc list-inside">
+                <li>leverage: 4 methods, all messaging</li>
+                <li>locality: protocol logic in one place</li>
+                <li>In-memory adapter enables fast tests</li>
+                <li>Hook shrinks to ~60 lines</li>
+              </ul>
+            </div>
+          </div>
+        </article>
+
+      </section>
+
+      <!-- Top recommendation -->
+      <section id="top-recommendation" class="bg-slate-900 rounded-xl p-6 text-white">
+        <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-3">Top recommendation</h2>
+        <div class="flex items-start gap-4">
+          <div class="w-10 h-10 rounded-lg bg-emerald-600 flex items-center justify-center text-lg font-bold shrink-0">1</div>
+          <div>
+            <h3 class="text-lg font-semibold">Consolidate thread state management</h3>
+            <p class="text-slate-300 mt-1 text-sm">It sits at the centre of the app. Threads, chat, approvals, and streaming all leak across its current seams. Deepening this module concentrates the hardest-to-test logic (turn lifecycle, event ordering, ring buffers) behind one interface. Every other candidate on this list touches thread state — fix this first and the rest get easier.</p>
+            <a href="#candidates" class="inline-block mt-3 text-xs text-emerald-400 hover:text-emerald-300">Jump to candidate &rarr;</a>
+          </div>
+        </div>
+      </section>
+
+      <footer class="text-center text-xs text-slate-400 pt-6">
+        Generated by improve-codebase-architecture &middot; No CONTEXT.md found &middot; No ADRs found
+      </footer>
+
+    </main>
+  </body>
+</html>
