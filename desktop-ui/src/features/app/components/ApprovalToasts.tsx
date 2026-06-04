@@ -10,6 +10,7 @@ import {
   ToastViewport,
 } from "@/features/design-system/components/toast/ToastPrimitives";
 import type { ApprovalRequest, WorkspaceInfo } from "@/types";
+import "./ApprovalToasts.css";
 
 type ApprovalToastsProps = {
   approvals: ApprovalRequest[];

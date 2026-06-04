@@ -1,0 +1,47 @@
+/* ── plugins.css ── */
+.plugins-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  background: var(--surface-messages);
+}
+
+/* Event chip — used in WireFilters and WireEventCard */
+
+/* Timeline gap row — shown between events when delta > threshold */
+
+/* WireEventCard */
+
+/* WireFilters */
+
+/* TurnTree */
+
+/* WireViewer */
+
+/* ToolCallDetail */
+
+/* ProviderChips */
+
+/* SessionList */
+
+/* CodingMemoryPlugin layout */
+
+/* RecallOverlay */
+
+/* MirrorAlertSidecar */
+
+/* CausalGraphInspector */
+
+/* EffectivenessTrendsChart */
+
+/* ReforgeCycleDiff */
+
+/* States */
+.cm-state {
+  padding: 24px;
+  color: var(--ds-text-faint);
+  font-size: var(--fs-xs);
+  text-align: center;
+}

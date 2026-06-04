@@ -23,6 +23,7 @@ import {
 } from "./MessageRows";
 import { useMessagesViewState } from "./useMessagesViewState";
 import { VirtualizedMessageList } from "./VirtualizedMessageList";
+import "./Messages.css";
 
 type MessagesProps = {
   items: ConversationItem[];

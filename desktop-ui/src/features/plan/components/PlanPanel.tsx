@@ -1,4 +1,5 @@
 import type { TurnPlan } from "@/types";
+import "./Plan.css";
 
 type PlanPanelProps = {
   plan: TurnPlan | null;

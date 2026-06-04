@@ -1,5 +1,6 @@
 import X from "lucide-react/dist/esm/icons/x";
 import { ModalShell } from "@/features/design-system/components/modal/ModalShell";
+import "./MobileSetupWizard.css";
 
 export type MobileServerSetupWizardProps = {
   remoteHostDraft: string;

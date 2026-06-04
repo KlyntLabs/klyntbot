@@ -99,7 +99,7 @@ export function HourlyHeatmap({ startDate, endDate }: Props) {
                 <span className="text-ui-2xs text-[color-mix(in_srgb,var(--ds-text-subtle)_60%,transparent)] w-4 text-right tabular-nums">{h.hour}</span>
                 <div className="flex-1 h-1 rounded-full bg-surface-control overflow-hidden">
                   <div
-                    className="h-full rounded-full dashboard__hourly-bar-fill"
+                    className="h-full rounded-full transition-all duration-300 ease-out"
                     style={{ width: `${width}%`, backgroundColor: heatColor(h.productiveRatio) }}
                   />
                 </div>

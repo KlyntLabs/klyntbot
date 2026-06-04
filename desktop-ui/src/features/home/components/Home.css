@@ -1,0 +1,214 @@
+/* ── home.css ── */
+.home {
+  height: 100%;
+  width: 100%;
+  grid-column: 1 / -1;
+  grid-row: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 20px;
+  justify-content: flex-start;
+  justify-self: stretch;
+  align-self: stretch;
+  max-width: none;
+  margin: 0;
+  text-align: left;
+  padding: calc(36px + var(--home-scroll-offset, 0px)) 32px 24px;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.app.layout-desktop .home {
+  height: 100%;
+}
+
+.app.layout-desktop .home > * {
+  width: min(100%, 720px);
+  margin-inline: auto;
+}
+
+.home-usage-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.home-usage-card {
+  padding: 12px 14px;
+  border-radius: 14px;
+  background:
+    linear-gradient(135deg, rgba(98, 176, 255, 0.15), transparent 60%), var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 96px;
+  overflow: hidden;
+  position: relative;
+}
+
+.home-usage-card.is-compact {
+  min-height: 82px;
+  padding: 10px 12px;
+}
+
+.home-usage-card.is-up {
+  background:
+    linear-gradient(135deg, rgba(88, 190, 255, 0.18), transparent 58%), var(--surface-card);
+}
+
+.home-usage-card.is-down {
+  background:
+    linear-gradient(135deg, rgba(255, 177, 124, 0.16), transparent 58%), var(--surface-card);
+}
+
+.home-usage-chart-card {
+  padding: 12px 14px;
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at top, rgba(62, 156, 255, 0.16), transparent 60%), var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.2);
+}
+
+.home-usage-bar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  height: 100%;
+  position: relative;
+}
+
+.home-usage-bar-fill {
+  display: block;
+  width: 100%;
+  border-radius: 2px;
+  background: linear-gradient(180deg, rgba(99, 186, 255, 0.9), rgba(78, 132, 255, 0.65));
+  box-shadow: 0 6px 14px rgba(30, 100, 200, 0.25);
+}
+
+.home-usage-bar::after {
+  content: attr(data-value);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translate(-50%, -8px);
+  background: var(--surface-popover);
+  color: var(--text-stronger);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: var(--fs-xs);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+  z-index: 2;
+}
+
+.home-usage-bar:hover::after {
+  opacity: 1;
+}
+
+.home-account-grid {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.home-usage-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.home-latest-skeleton {
+  height: 8px;
+  border-radius: 999px;
+  background: linear-gradient(
+    110deg,
+    rgba(255, 255, 255, 0.04) 8%,
+    rgba(255, 255, 255, 0.18) 18%,
+    rgba(255, 255, 255, 0.04) 33%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+@media (max-width: 900px) {
+
+  .home-usage-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .home {
+    padding: 28px 22px 20px;
+  }
+
+  .home-usage-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .home-actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .home-button {
+    white-space: normal;
+    width: 100%;
+  }
+
+  .home-actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.home-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+}
+
+.home-button {
+  width: 100%;
+  min-width: 0;
+  justify-content: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 20px;
+  border-radius: 18px;
+  font-size: var(--fs-lg);
+  min-height: 56px;
+  white-space: nowrap;
+}
+
+.home-icon {
+  font-size: var(--fs-xl);
+  line-height: 1;
+}
+
+.home-actions .home-button {
+  background: var(--surface-card);
+  color: var(--text-stronger);
+  border: 1px solid var(--border-subtle);
+  box-shadow: none;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease;
+}
+
+.home-actions .home-button:hover:not(:disabled) {
+  background: var(--surface-card-muted);
+  border-color: var(--border-strong);
+}
+
+.home-actions .home-button:disabled {
+  opacity: 0.4;
+}

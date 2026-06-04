@@ -1,0 +1,11 @@
+/* ── features/launcher/launcher.css ── */
+/* Launcher — plain CSS using project design tokens (--text-*, --surface-*, --border-*).
+   Class prefix `lc-` namespaces everything to the launcher window. */
+
+/* Window-level transparent background + rounded clip live in
+   src/hooks/window/aux-window.css (loaded by useTransparentBackground).
+   This file only defines launcher-specific styles. */
+
+.lc-body {
+  @apply relative rounded-xl overflow-hidden;
+}

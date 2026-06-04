@@ -39,6 +39,7 @@ import {
   threadMatchesQuery,
   workspaceMatchesQuery,
 } from "./threadSearchUtils";
+import "./Sidebar.css";
 
 const COLLAPSED_GROUPS_STORAGE_KEY = "klynt.collapsedGroups";
 const UNGROUPED_COLLAPSE_ID = "__ungrouped__";

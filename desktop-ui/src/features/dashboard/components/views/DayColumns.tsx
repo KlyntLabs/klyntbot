@@ -670,7 +670,7 @@ function NowLine({ pxPerMin }: { pxPerMin: number }) {
   const mins = now.getHours() * 60 + now.getMinutes();
   const top = mins * pxPerMin;
   return (
-    <div className="absolute w-full pointer-events-none dashboard__now-line" style={{ top, left: HOUR_GUTTER }}>
+    <div className="absolute w-full pointer-events-none z-10" style={{ top, left: HOUR_GUTTER }}>
       <div className="flex items-center">
         <div
           className="w-2 h-2 rounded-full bg-destructive -ml-1"

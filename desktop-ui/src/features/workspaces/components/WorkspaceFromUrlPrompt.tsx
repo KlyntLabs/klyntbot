@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { ModalShell } from "@/features/design-system/components/modal/ModalShell";
+import "./WorkspaceFromUrlModal.css";
 
 type WorkspaceFromUrlPromptProps = {
   url: string;

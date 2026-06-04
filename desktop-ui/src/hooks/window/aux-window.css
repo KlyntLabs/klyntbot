@@ -1,0 +1,83 @@
+/* Aux Tauri windows (launcher, tray, distraction) opt into this layout by
+   having `useTransparentBackground` set `data-launcher="true"` on <html>.
+
+   Why CSS, not inline styles: inline styles on body/#root were tested and
+   did NOT take effect on macOS transparent webviews — the engine paints
+   its own compositor mask before our inline styles apply. CSS classes
+   targeting the data-attribute work reliably across all three windows. */
+
+/* Neutralize the project-wide `button { padding:8px 14px; font-weight:600 }`
+   and the `button:hover { transform: translateY(-1px); box-shadow: … }`
+   defaults from `styles/buttons.css`. Aux windows lean on tightly-sized
+   icon buttons (28–32px squares) where 14px horizontal padding leaves
+   2–4px for the SVG — which is why the lucide icons were rendering as
+   dots. `:where(html[data-launcher])` keeps the selector at 0,0,1
+   specificity (same as the global `button` rule), so per-class overrides
+   inside each feature still win the cascade. Because aux-window.css is
+   side-imported by useTransparentBackground (and thus loaded after
+   buttons.css), source order resolves the tie in our favor. */
+
+.lc-body {
+  position: relative;
+  border-radius: 0.75rem;
+  overflow: hidden;
+}
+
+/* ── Drag handle ─────────────────────────────────────── */
+.lc-drag-handle {
+  height: 0.75rem;
+  width: 100%;
+  cursor: grab;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.lc-drag-handle:active {
+  cursor: grabbing;
+}
+.lc-drag-grip {
+  width: 2rem;
+  height: 3px;
+  border-radius: 9999px;
+  opacity: 0.5;
+  background: var(--border-subtle, rgba(255, 255, 255, 0.18));
+}
+
+/* ── Input ───────────────────────────────────────────── */
+.lc-input-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+}
+.lc-input-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  flex-shrink: 0;
+  color: var(--text-muted, rgba(255, 255, 255, 0.6));
+}
+.lc-input-spinner {
+  display: flex;
+  gap: 3px;
+  align-items: flex-end;
+  width: 1.25rem;
+  height: 1.25rem;
+  justify-content: center;
+}
+.lc-input-spinner span {
+  width: 0.25rem;
+  height: 0.25rem;
+  border-radius: 9999px;
+  background: var(--text-muted, rgba(255, 255, 255, 0.6));
+  animation: lc-bounce 0.9s ease-in-out infinite both;
+}
+.lc-input-field {
+  flex: 1 1 0%;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: var(--fs-md);
+  border: none;
+  outline: none;
+  font-family: inherit;
+}

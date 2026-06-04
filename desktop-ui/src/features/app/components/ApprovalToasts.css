@@ -1,0 +1,11 @@
+/* ── approval-toasts.css ── */
+
+.approval-toast-detail {
+  display: grid;
+  gap: 4px;
+}
+
+.approval-toast-detail-empty {
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}

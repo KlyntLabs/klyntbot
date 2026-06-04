@@ -29,7 +29,7 @@ export function DueTodayTray({
             key={entry.id}
             type="button"
             className={cn(
-              "border-none px-1.5 py-0.5 rounded text-ui-2xs cursor-grab max-w-[120px] whitespace-nowrap overflow-hidden text-ellipsis transition-colors duration-ui-fast ease-out dashboard__due-today-chip",
+              "border-none px-1.5 py-0.5 rounded text-ui-2xs cursor-grab max-w-[120px] whitespace-nowrap overflow-hidden text-ellipsis transition-colors duration-ui-fast ease-out motion-reduce:transition-none",
               isSelected && "outline outline-1 outline-border-accent",
             )}
             title={entry.title}

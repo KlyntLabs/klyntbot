@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 
+import "./aux-window.css";
 // Sets `data-launcher="true"` on <html> so the rules in aux-window.css
 // apply: transparent background chain + 16px rounded clip on html/body/#root
 // (matches Tauri's HUD effect radius from lazy_window.rs::hud_effects).

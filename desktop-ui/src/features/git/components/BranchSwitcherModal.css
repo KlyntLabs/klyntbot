@@ -1,0 +1,45 @@
+/* ── branch-switcher-modal.css ── */
+.branch-switcher-modal .ds-modal-card {
+  width: min(480px, calc(100vw - 48px));
+  max-height: calc(100vh - 120px);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.branch-switcher-modal-input {
+  border: none;
+  border-bottom: 1px solid var(--ds-border-subtle);
+  background: transparent;
+  color: var(--ds-text-strong);
+  padding: 14px 16px;
+  font-size: var(--fs-md);
+}
+
+.branch-switcher-modal-input::placeholder {
+  color: var(--ds-text-faint);
+}
+
+.branch-switcher-modal-item-meta {
+  display: flex;
+  gap: 6px;
+  margin-left: 8px;
+  flex-shrink: 0;
+}
+
+.branch-switcher-modal-item-current {
+  font-size: var(--fs-xs);
+  color: var(--ds-text-faint);
+  background: var(--surface-secondary);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.branch-switcher-modal-item-worktree {
+  font-size: var(--fs-xs);
+  color: #7dd3fc;
+  background: rgba(125, 211, 252, 0.15);
+  padding: 2px 6px;
+  border-radius: 4px;
+}

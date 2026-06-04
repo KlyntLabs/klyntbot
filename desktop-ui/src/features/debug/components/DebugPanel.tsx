@@ -1,6 +1,7 @@
 import type { MouseEvent as ReactMouseEvent } from "react";
 import { useMemo, useRef } from "react";
 import type { DebugEntry } from "@/types";
+import "./Debug.css";
 
 type DebugPanelProps = {
   entries: DebugEntry[];

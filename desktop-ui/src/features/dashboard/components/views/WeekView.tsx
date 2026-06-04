@@ -280,7 +280,7 @@ export function WeekView() {
                         <button
                           key={`activity-${s.startMin}`}
                           type="button"
-                          className="absolute rounded-[3px] cursor-pointer transition-[filter] duration-150 ease-out overflow-hidden border-none dashboard__week-session hover:brightness-[1.15]"
+                          className="absolute rounded-[3px] cursor-pointer transition-[filter] duration-150 ease-out overflow-hidden border-none bg-[var(--success)] hover:brightness-[1.15]"
                           aria-label={`${s.label}, ${formatHumanDuration(s.totalSecs)}`}
                           style={{
                             top,
@@ -347,7 +347,7 @@ function WeekNowLine() {
   const mins = now.getHours() * 60 + now.getMinutes();
   const top = mins * PX_PER_MIN;
   return (
-    <div className="absolute w-full pointer-events-none dashboard__now-line" style={{ top }}>
+    <div className="absolute w-full pointer-events-none z-10" style={{ top }}>
       <div className="border-t border-destructive" />
     </div>
   );

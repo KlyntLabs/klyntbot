@@ -1,0 +1,79 @@
+/* ── dashboard.css ── */
+/* Visually hidden element for screen readers */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* ── Root + layout ───────────────────────────────────────────── */
+
+/* ── Topbar ──────────────────────────────────────────────────── */
+
+/* ── View switcher pill group ────────────────────────────────── */
+
+/* ── Icon buttons (layers, sidebar toggle, nav arrows) ──────── */
+
+/* ── Popovers (layers menu, mini calendar) ──────────────────── */
+
+/* ── Day grid ────────────────────────────────────────────────── */
+
+/* ── Task block (DraggableTaskBlock) ─────────────────────────── */
+
+/* ── Due-today tray ──────────────────────────────────────────── */
+
+/* ── Calendar sync button ────────────────────────────────────── */
+
+/* ── MiniCalendar ────────────────────────────────────────────── */
+
+/* ── Phase 1 placeholder for non-day views ──────────────────── */
+
+/* ── Day columns header ─────────────────────────────────────── */
+
+/* ── Spinner ─────────────────────────────────────────────────── */
+.lc-spin {
+  animation: dashboard-spin 1s linear infinite;
+}
+
+/* ── Calendar events (CalendarTrack) ───────────────────────── */
+
+/* ── Week view ─────────────────────────────────────────────── */
+
+/* ── Month view ────────────────────────────────────────────── */
+
+/* ── Year view ─────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .lc-spin {
+    animation: none;
+  }
+}
+/* ── SummaryPanel ──────────────────────────────────────────────────── */
+
+/* Detail variants */
+/* ── WeeklySparkline ──────────────────────────────────────────────── */
+
+/* ── ProductivityScoreRing ────────────────────────────────────────── */
+
+/* ── PatternsCard ─────────────────────────────────────────────────── */
+
+/* ── HourlyHeatmap ────────────────────────────────────────────────── */
+/* ── GoalsProgress + AddGoalDialog ────────────────────────────────── */
+
+/* ── ActivityFeed ─────────────────────────────────────────────────── */
+/* ── AppIcon ──────────────────────────────────────────────────────── */
+
+/* ── ActivityTrack ────────────────────────────────────────────────── */
+
+/* Focus-visible for keyboard navigation */
+
+/* ── Focus overlays ───────────────────────────────────────────────── */
+/* ── ProductivityStrip (orphan) ───────────────────────────────────── */
+
+/* ── Phase-2 follow-up: extracted inline styles ───────────────────── */

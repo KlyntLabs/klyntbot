@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { ModalShell } from "@/features/design-system/components/modal/ModalShell";
 import { validateBranchName } from "../utils/branchValidation";
+import "./GitInitModal.css";
 
 type InitGitRepoPromptProps = {
   workspaceName: string;

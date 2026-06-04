@@ -1,0 +1,8 @@
+/* ============================================================================
+   Legacy Component Styles — MIGRATED
+   ============================================================================
+   All BEM component styles have been migrated to:
+   - Tailwind @utility definitions in tokens/utilities.css
+   - Feature-specific CSS modules co-located with components
+   - Atomic design system components
+   ============================================================================ */

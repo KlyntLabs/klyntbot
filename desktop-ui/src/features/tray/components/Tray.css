@@ -1,0 +1,18 @@
+/* ── features/tray/tray.css ── */
+/* Tray window — plain CSS using project tokens. Class prefixes:
+   `tray-*` for the outer page, `tc-*` for FocusControl.
+
+   Semantic aliases (--tray-brand, --tray-destructive, …) are scoped to the
+   tray shell so they don't leak into other features. They map to the project's
+   real palette (`themes.dark.css` / `themes.light.css` / `themes.dim.css`),
+   so theme switches reach the tray automatically. */
+
+/* The global `button { padding:8px 14px; font-weight:600 }` reset that was
+   squashing icon buttons into dots lives in src/hooks/window/aux-window.css
+   so all three aux windows share it. */
+
+/* Body sizes to content (NOT the shell). The shared useWindowAutoResize
+   hook observes this element's scrollHeight and resizes the OS window
+   to match. Mirrors the launcher's `.lc-body` exactly. */
+
+/* Tasks list grows with content — window auto-resizes up to its maxHeight. */

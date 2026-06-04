@@ -56,7 +56,7 @@ export function DraggableTaskBlock({
       <button
         type="button"
         className={cn(
-          "absolute rounded-md px-1.5 py-0.5 text-ui-2xs leading-snug overflow-hidden cursor-grab transition-colors duration-ui-fast ease-out text-left dashboard__task-block",
+          "absolute rounded-md px-1.5 py-0.5 text-ui-2xs leading-snug overflow-hidden cursor-grab transition-colors duration-ui-fast ease-out text-left motion-reduce:transition-none focus-visible:outline-2 focus-visible:outline-[var(--border-accent)] focus-visible:outline-offset-1 focus-visible:z-[5]",
           isDragging && "opacity-50 cursor-grabbing",
           selected && "outline outline-1 outline-border-accent",
         )}

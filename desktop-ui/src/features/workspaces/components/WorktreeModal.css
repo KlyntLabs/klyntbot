@@ -1,0 +1,45 @@
+/* ── worktree-modal.css ── */
+.worktree-modal .ds-modal-card {
+  width: min(560px, calc(100vw - 48px));
+  max-height: calc(100vh - 64px);
+  overflow: auto;
+  border-radius: 16px;
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.worktree-modal-branch {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.worktree-modal-checkbox-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: var(--fs-sm);
+  color: var(--ds-text-subtle);
+}
+
+.worktree-modal-checkbox-input {
+  margin-top: 2px;
+}
+
+.worktree-modal-checkbox-label code {
+  font-family: var(--code-font-family, Menlo, Monaco, "Courier New", monospace);
+  color: var(--ds-text-strong);
+}
+
+.worktree-modal-section-title {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--ds-text-strong);
+}
+
+.worktree-modal-hint {
+  font-size: var(--fs-sm);
+  color: var(--ds-text-subtle);
+}

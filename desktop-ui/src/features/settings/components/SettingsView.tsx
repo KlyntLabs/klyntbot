@@ -17,6 +17,7 @@ import { SettingsNav } from "./SettingsNav";
 import { SettingsSectionContainers } from "./sections/SettingsSectionContainers";
 import type { CodexSection } from "./settingsTypes";
 import { SETTINGS_SECTION_LABELS } from "./settingsViewConstants";
+import "./Settings.css";
 
 export type SettingsViewProps = {
   workspaceGroups: WorkspaceGroup[];

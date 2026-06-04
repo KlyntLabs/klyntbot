@@ -35,6 +35,7 @@ import { ComposerInput } from "./ComposerInput";
 import { cn } from "@/utils/cn";
 import { ComposerMetaBar } from "./ComposerMetaBar";
 import { ComposerQueue } from "./ComposerQueue";
+import "./Composer.css";
 
 type ComposerProps = {
   onSend: (

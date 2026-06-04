@@ -1,0 +1,308 @@
+/* ============================================================================
+   Custom Utilities — Reusable patterns converted from legacy BEM
+   ============================================================================ */
+@utility btn-primary {
+  background: linear-gradient(135deg, #62b7ff, #4fe3a3);
+  color: #0b0f1a;
+  box-shadow: 0 12px 22px var(--shadow-accent);
+}
+@utility btn-secondary {
+  background: var(--surface-card-strong);
+  color: inherit;
+}
+@utility btn-ghost {
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid var(--border-strong);
+}
+@utility btn-danger {
+  background: var(--status-error);
+  color: white;
+}
+@utility btn-link {
+  background: transparent;
+  color: var(--text-accent-cyan);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+@utility icon-button {
+  padding: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+@utility icon-button-svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* ── Common layout utilities ── */
+@utility flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+@utility flex-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+@utility truncate-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@utility no-drag {
+  -webkit-app-region: no-drag;
+}
+@utility drag {
+  -webkit-app-region: drag;
+}
+@utility no-select {
+  -webkit-user-select: none;
+  user-select: none;
+}
+@utility select-text {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* ── Surface utilities ── */
+@utility surface-card {
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-ui-lg);
+}
+@utility surface-hover-effect {
+  transition: background-color var(--ds-dur-fast) var(--ds-ease-out);
+
+  &:hover {
+    background: var(--surface-hover);
+  }
+}
+
+/* ── Focus ring ── */
+@utility focus-ring {
+  outline: none;
+
+  &:focus-visible {
+    outline: 2px solid var(--border-accent);
+    outline-offset: 2px;
+  }
+}
+
+/* ── Animations ── */
+@utility animate-spin-slow {
+  animation: spin var(--ds-spinner-dur) linear infinite;
+}
+@utility animate-fade-in {
+  animation: fade-in 0.2s var(--ds-ease-out) both;
+}
+@utility animate-fade-out {
+  animation: fade-out 0.15s ease-in both;
+}
+@utility animate-slide-in {
+  animation: slide-in 0.2s var(--ds-ease-out) both;
+}
+@utility animate-slide-out {
+  animation: slide-out 0.15s ease-in both;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   @layer components — Feature-specific styles (legacy BEM, organized)
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Legacy component styles (being migrated to Tailwind)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Legacy button aliases (migrated from components.css) ── */
+@utility primary {
+  background: linear-gradient(135deg, #62b7ff, #4fe3a3);
+  color: #0b0f1a;
+  box-shadow: 0 12px 22px var(--shadow-accent);
+
+  &:active:not(:disabled) {
+    filter: brightness(0.92);
+  }
+}
+
+@utility secondary {
+  background: var(--surface-card-strong);
+  color: inherit;
+}
+
+@utility ghost {
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid var(--border-strong);
+
+  &:active:not(:disabled) {
+    background: rgba(255, 255, 255, 0.06);
+  }
+}
+
+@utility icon-button {
+  padding: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  &:active:not(:disabled) {
+    background: rgba(255, 255, 255, 0.06);
+  }
+
+  & svg {
+    width: 16px;
+    height: 16px;
+  }
+}
+
+/* ── Legacy button base + empty state ── */
+@utility empty {
+  color: var(--text-faint);
+  font-size: var(--fs-sm);
+}
+
+@utility primary {
+  border: none;
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease,
+    background-color 0.15s ease,
+    filter 0.15s ease;
+  -webkit-app-region: no-drag;
+  background: linear-gradient(135deg, #62b7ff, #4fe3a3);
+  color: #0b0f1a;
+  box-shadow: 0 12px 22px var(--shadow-accent);
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  &:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 12px 18px rgba(0, 0, 0, 0.2);
+  }
+
+  &:active:not(:disabled) {
+    transform: scale(var(--ds-active-scale));
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    transition-duration: 50ms;
+    filter: brightness(0.92);
+  }
+}
+
+@utility secondary {
+  border: none;
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease,
+    background-color 0.15s ease,
+    filter 0.15s ease;
+  -webkit-app-region: no-drag;
+  background: var(--surface-card-strong);
+  color: inherit;
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  &:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 12px 18px rgba(0, 0, 0, 0.2);
+  }
+
+  &:active:not(:disabled) {
+    transform: scale(var(--ds-active-scale));
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    transition-duration: 50ms;
+  }
+}
+
+@utility ghost {
+  border: none;
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease,
+    background-color 0.15s ease,
+    filter 0.15s ease;
+  -webkit-app-region: no-drag;
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid var(--border-strong);
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  &:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 12px 18px rgba(0, 0, 0, 0.2);
+  }
+
+  &:active:not(:disabled) {
+    transform: scale(var(--ds-active-scale));
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    transition-duration: 50ms;
+    background: rgba(255, 255, 255, 0.06);
+  }
+}
+
+@utility icon-button {
+  border: none;
+  border-radius: 10px;
+  padding: 6px;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease,
+    background-color 0.15s ease,
+    filter 0.15s ease;
+  -webkit-app-region: no-drag;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  &:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 12px 18px rgba(0, 0, 0, 0.2);
+  }
+
+  &:active:not(:disabled) {
+    transform: scale(var(--ds-active-scale));
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    transition-duration: 50ms;
+    background: rgba(255, 255, 255, 0.06);
+  }
+
+  & svg {
+    width: 16px;
+    height: 16px;
+  }
+}

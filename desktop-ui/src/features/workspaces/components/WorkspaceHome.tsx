@@ -27,6 +27,7 @@ import { WorkspaceHomeGitInitBanner } from "./WorkspaceHomeGitInitBanner";
 import { WorkspaceHomeHistory } from "./WorkspaceHomeHistory";
 import { WorkspaceHomeRunControls } from "./WorkspaceHomeRunControls";
 import { buildIconPath } from "./workspaceHomeHelpers";
+import "./WorkspaceHome.css";
 
 type WorkspaceHomeProps = {
   workspace: WorkspaceInfo;

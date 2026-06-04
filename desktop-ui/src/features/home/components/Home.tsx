@@ -3,6 +3,7 @@ import type { LatestAgentRun, UsageMetric, UsageWorkspaceOption } from "../homeT
 import { HomeActions } from "./HomeActions";
 import { HomeLatestAgentsSection } from "./HomeLatestAgentsSection";
 import { HomeUsageSection } from "./HomeUsageSection";
+import "./Home.css";
 
 type HomeProps = {
   onAddWorkspace: () => void;

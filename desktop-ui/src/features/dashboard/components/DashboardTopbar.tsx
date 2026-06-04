@@ -12,6 +12,7 @@ import { LAYERS, useEnabledLayers, useSidebarOpen } from "../lib/layers";
 import { CalendarSync } from "./CalendarSync";
 import { MiniCalendar } from "./MiniCalendar";
 import { FocusTrayIndicator } from "./productivity/FocusTrayIndicator";
+import "./Dashboard.css";
 
 const VIEWS: { key: DashboardViewMode; label: string }[] = [
   { key: "day", label: "Day" },

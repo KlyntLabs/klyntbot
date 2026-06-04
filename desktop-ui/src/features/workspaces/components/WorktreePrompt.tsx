@@ -4,6 +4,7 @@ import { ModalShell } from "@/features/design-system/components/modal/ModalShell
 import { BranchList } from "@/features/git/components/BranchList";
 import { filterBranches } from "@/features/git/utils/branchSearch";
 import type { BranchInfo } from "@/types";
+import "./WorktreeModal.css";
 
 type WorktreePromptProps = {
   workspaceName: string;

@@ -38,6 +38,7 @@ import {
   GitRootCurrentPath,
 } from "./GitDiffPanelModeContent";
 import { SidebarError, type SidebarErrorAction } from "./GitDiffPanelShared";
+import "./Diff.css";
 
 type GitDiffPanelProps = {
   workspaceId?: string | null;

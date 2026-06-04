@@ -1,0 +1,26 @@
+/* ── review-inline.css ── */
+
+.review-inline-textarea {
+  border-radius: 10px;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-card-muted);
+  color: var(--text-strong);
+  padding: 9px 11px;
+  font-size: var(--fs-sm);
+}
+
+.review-inline-textarea:focus {
+  outline: 2px solid rgba(77, 163, 255, 0.35);
+  outline-offset: 1px;
+}
+
+.review-inline-textarea {
+  resize: vertical;
+  min-height: 110px;
+}
+
+.review-inline-button,
+.review-inline-back,
+.review-inline-confirm {
+  min-width: 88px;
+}

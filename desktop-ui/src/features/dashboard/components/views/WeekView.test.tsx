@@ -110,7 +110,7 @@ describe("WeekView", () => {
     await waitFor(() => expect(screen.getAllByText("VSCode").length).toBeGreaterThan(0));
     const sessionBtn = screen
       .getAllByText("VSCode")
-      .find((el) => el.closest("button")?.classList.contains("dashboard__week-session"))
+      .find((el) => el.closest("button"))
       ?.closest("button");
     if (!sessionBtn) throw new Error("session button not found");
     fireEvent.click(sessionBtn);
