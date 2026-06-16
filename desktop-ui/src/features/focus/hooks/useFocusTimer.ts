@@ -54,6 +54,15 @@ interface CoachingIntervention {
   interventionType: string;
 }
 
+interface FocusDefaultsUpdate {
+  workMins: number | null;
+  shortBreakMins: number | null;
+  longBreakMins: number | null;
+  longBreakAfter: number | null;
+  autoStartWork: boolean | null;
+  autoStartBreak: boolean | null;
+}
+
 export type { FocusPhase, FocusPreset, FocusSettings } from "../types";
 
 export function useFocusTimer() {
@@ -64,6 +73,22 @@ export function useFocusTimer() {
   });
   const initialStatus = initialStatusQuery.data;
   const refetch = useCallback(() => initialStatusQuery.refetch(), [initialStatusQuery]);
+
+  const defaultsQuery = useTauriQuery<{
+    workMins: number;
+    shortBreakMins: number;
+    longBreakMins: number;
+    longBreakAfter: number;
+  }>({
+    queryKey: qk.focus.defaults(),
+    command: "focus_defaults_get",
+    fallback: {
+      workMins: DEFAULT_SETTINGS.focusDuration,
+      shortBreakMins: DEFAULT_SETTINGS.shortBreak,
+      longBreakMins: DEFAULT_SETTINGS.longBreak,
+      longBreakAfter: DEFAULT_SETTINGS.longBreakAfter,
+    },
+  });
 
   const startMut = useTauriMutation<FocusSession, Record<string, unknown>>({
     command: "focus_session_start",
@@ -92,6 +117,9 @@ export function useFocusTimer() {
   const takeBreakMut = useTauriMutation<boolean, Record<string, never>>({
     command: "focus_session_take_break",
   });
+  const saveDefaultsMut = useTauriMutation<unknown, { update: FocusDefaultsUpdate }>({
+    command: "focus_defaults_set",
+  });
   const logDistractionMut = useTauriMutation<void, { appName: string }>({
     command: "distraction_dismiss",
   });
@@ -108,7 +136,37 @@ export function useFocusTimer() {
 
   const [serverState, setServerState] = useState<FocusSyncPayload | null>(null);
   const [_receivedAt, setReceivedAt] = useState<number>(0);
-  const [settings, setSettings] = useState(loadSettings);
+  const [settings, setSettings] = useState(() => {
+    const backendDefaults = defaultsQuery.data;
+    return {
+      ...DEFAULT_SETTINGS,
+      ...(backendDefaults && {
+        focusDuration: backendDefaults.workMins,
+        shortBreak: backendDefaults.shortBreakMins,
+        longBreak: backendDefaults.longBreakMins,
+        longBreakAfter: backendDefaults.longBreakAfter,
+      }),
+      ...loadSettings(),
+    };
+  });
+
+  useEffect(() => {
+    const backendDefaults = defaultsQuery.data;
+    if (!backendDefaults) return;
+    setSettings((prev) => {
+      // Local storage overrides backend defaults; only seed from backend when no
+      // local settings have been saved yet.
+      if (localStorage.getItem(SETTINGS_KEY)) return prev;
+      return {
+        ...prev,
+        focusDuration: backendDefaults.workMins,
+        shortBreak: backendDefaults.shortBreakMins,
+        longBreak: backendDefaults.longBreakMins,
+        longBreakAfter: backendDefaults.longBreakAfter,
+      };
+    });
+  }, [defaultsQuery.data]);
+
   const [selectedTask, setSelectedTask] = useState<{
     id: string;
     title: string;
@@ -186,13 +244,26 @@ export function useFocusTimer() {
   const longBreakAfter = serverState?.longBreakAfter ?? settings.longBreakAfter;
   const actionTitle = serverState?.actionTitle ?? null;
 
-  const updateSettings = useCallback((partial: Partial<FocusSettings>) => {
-    setSettings((prev) => {
-      const next = { ...prev, ...partial };
-      saveSettings(next);
-      return next;
-    });
-  }, []);
+  const updateSettings = useCallback(
+    (partial: Partial<FocusSettings>) => {
+      setSettings((prev) => {
+        const next = { ...prev, ...partial };
+        saveSettings(next);
+        void saveDefaultsMut.mutate({
+          update: {
+            workMins: next.focusDuration,
+            shortBreakMins: next.shortBreak,
+            longBreakMins: next.longBreak,
+            longBreakAfter: next.longBreakAfter,
+            autoStartWork: null,
+            autoStartBreak: null,
+          },
+        });
+        return next;
+      });
+    },
+    [saveDefaultsMut],
+  );
 
   const { completedSessions, todayStats } = useMemo(() => {
     let sessions = 0;
