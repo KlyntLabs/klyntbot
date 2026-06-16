@@ -22,9 +22,6 @@ const baseProps = {
   usageWorkspaceId: null,
   usageWorkspaceOptions: [],
   onUsageWorkspaceChange: vi.fn(),
-  accountRateLimits: null,
-  usageShowRemaining: false,
-  accountInfo: null,
   onSelectThread: vi.fn(),
 };
 
@@ -254,30 +251,6 @@ describe("Home", () => {
           },
           topModels: [{ model: "gpt-5", tokens: 300, sharePercent: 87.5 }],
         }}
-        accountRateLimits={{
-          primary: {
-            usedPercent: 62,
-            windowDurationMins: 300,
-            resetsAt: Math.round(Date.now() / 1000) + 3600,
-          },
-          secondary: {
-            usedPercent: 34,
-            windowDurationMins: 10080,
-            resetsAt: Math.round(Date.now() / 1000) + 86400,
-          },
-          credits: {
-            hasCredits: true,
-            unlimited: true,
-            balance: null,
-          },
-          planType: "pro",
-        }}
-        accountInfo={{
-          type: "chatgpt",
-          email: "user@example.com",
-          planType: "pro",
-          requiresOpenaiAuth: false,
-        }}
       />,
     );
 
@@ -285,10 +258,6 @@ describe("Home", () => {
     expect(screen.getByText("Avg / run")).toBeTruthy();
     expect(screen.getByText("Longest streak")).toBeTruthy();
     expect(screen.getByText("4 days")).toBeTruthy();
-    expect(screen.getByText("Account limits")).toBeTruthy();
-    expect(screen.getByText("Unlimited")).toBeTruthy();
-    expect(screen.getByText("Pro")).toBeTruthy();
-    expect(screen.getByText(/user@example\.com/)).toBeTruthy();
     expect(screen.queryByText("Workspace Klynt")).toBeNull();
 
     const todayCard = screen.getByText("Today").closest(".home-usage-card");
@@ -319,38 +288,5 @@ describe("Home", () => {
     expect(
       (screen.getByRole("button", { name: "Show next week" }) as HTMLButtonElement).disabled,
     ).toBe(true);
-  });
-
-  it("renders account limits even when no local usage snapshot exists", () => {
-    render(
-      <Home
-        {...baseProps}
-        accountRateLimits={{
-          primary: {
-            usedPercent: 62,
-            windowDurationMins: 300,
-            resetsAt: Math.round(Date.now() / 1000) + 3600,
-          },
-          secondary: null,
-          credits: {
-            hasCredits: true,
-            unlimited: false,
-            balance: "120",
-          },
-          planType: "pro",
-        }}
-        accountInfo={{
-          type: "chatgpt",
-          email: "user@example.com",
-          planType: "pro",
-          requiresOpenaiAuth: false,
-        }}
-      />,
-    );
-
-    expect(screen.getByText("Account limits")).toBeTruthy();
-    expect(screen.getByText("120")).toBeTruthy();
-    expect(screen.getByText(/user@example\.com/)).toBeTruthy();
-    expect(screen.getByText("No usage data yet")).toBeTruthy();
   });
 });

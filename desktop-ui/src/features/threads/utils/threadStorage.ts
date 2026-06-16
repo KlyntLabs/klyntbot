@@ -1,4 +1,4 @@
-import type { AccessMode, ServiceTier } from "@/types";
+import type { AccessMode } from "@/types";
 
 const STORAGE_KEY_THREAD_ACTIVITY = "klynt.threadLastUserActivity";
 export const STORAGE_KEY_PINNED_THREADS = "klynt.pinnedThreads";
@@ -17,10 +17,6 @@ type DetachedReviewLinksMap = Record<string, Record<string, string>>;
 export type ThreadCodexParams = {
   modelId: string | null;
   effort: string | null;
-  // string => explicit per-thread tier override
-  // null => explicit "Default/off" override
-  // undefined => legacy/unset thread value that should inherit no-thread scope
-  serviceTier: ServiceTier | null | undefined;
   accessMode: AccessMode | null;
   collaborationModeId: string | null;
   // string => explicit per-thread override

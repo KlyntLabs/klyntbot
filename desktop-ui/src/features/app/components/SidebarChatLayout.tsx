@@ -7,6 +7,7 @@ import Settings from "lucide-react/dist/esm/icons/settings";
 import SquarePen from "lucide-react/dist/esm/icons/square-pen";
 import { memo } from "react";
 import type { ChatThread } from "@/features/chat/types";
+
 type SidebarChatLayoutProps = {
   onOpenSettings: () => void;
   onNewChat: () => void;
@@ -118,9 +119,6 @@ export const SidebarChatLayout = memo(function SidebarChatLayout({
         <button type="button" className="sidebar-chat__settings" onClick={onOpenSettings}>
           <Settings aria-hidden />
           <span>Settings</span>
-        </button>
-        <button type="button" className="sidebar-chat__upgrade">
-          Upgrade
         </button>
       </div>
     </aside>

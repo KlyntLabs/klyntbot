@@ -23,7 +23,6 @@ import type {
   DictationTranscript,
   FollowUpMessageBehavior,
   QueuedMessage,
-  ServiceTier,
   ThreadTokenUsage,
 } from "@/types";
 import { useComposerAutocompleteState } from "../hooks/useComposerAutocompleteState";
@@ -63,7 +62,6 @@ type ComposerProps = {
   reasoningOptions: string[];
   selectedEffort: string | null;
   onSelectEffort: (effort: string) => void;
-  selectedServiceTier: ServiceTier | null;
   reasoningSupported: boolean;
   codexArgsOptions?: CodexArgsOption[];
   selectedCodexArgsOverride?: string | null;
@@ -176,7 +174,6 @@ export const Composer = memo(function Composer({
   reasoningOptions,
   selectedEffort,
   onSelectEffort,
-  selectedServiceTier,
   reasoningSupported,
   codexArgsOptions = [],
   selectedCodexArgsOverride = null,
@@ -333,7 +330,8 @@ export const Composer = memo(function Composer({
     textareaRef,
     setText: setComposerText,
     setSelectionStart,
-    onItemApplied: (item, context) => {      if (context.triggerChar !== "$" || item.group !== "Apps" || !item.mentionPath) {
+    onItemApplied: (item, context) => {
+      if (context.triggerChar !== "$" || item.group !== "Apps" || !item.mentionPath) {
         return;
       }
       const slug = context.insertedText.trim().toLowerCase();
@@ -397,7 +395,7 @@ export const Composer = memo(function Composer({
       if (disabled) {
         return;
       }
-      let trimmed = text.trim();
+      const trimmed = text.trim();
       if (!trimmed && attachedImages.length === 0) {
         return;
       }
@@ -693,15 +691,13 @@ export const Composer = memo(function Composer({
           reasoningOptions={reasoningOptions}
           selectedEffort={selectedEffort}
           onSelectEffort={onSelectEffort}
-          selectedServiceTier={selectedServiceTier}
           reasoningSupported={reasoningSupported}
           codexArgsOptions={codexArgsOptions}
           selectedCodexArgsOverride={selectedCodexArgsOverride}
           onSelectCodexArgsOverride={onSelectCodexArgsOverride}
           accessMode={accessMode}
           onSelectAccessMode={onSelectAccessMode}
-        >
-        </ComposerMetaBar>
+        ></ComposerMetaBar>
       </div>
     </footer>
   );

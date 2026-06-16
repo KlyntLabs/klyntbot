@@ -1,9 +1,7 @@
 import { useAppBootstrapOrchestration } from "@app/bootstrap/useAppBootstrapOrchestration";
 import { MainAppShell } from "@app/components/MainAppShell";
 import { AppView } from "@app/constants/appViews";
-import { useAccountSwitching } from "@app/hooks/useAccountSwitching";
 import { useArchiveShortcut } from "@app/hooks/useArchiveShortcut";
-import { useHomeAccount } from "@app/hooks/useHomeAccount";
 import { useInterruptShortcut } from "@app/hooks/useInterruptShortcut";
 import { useLayoutController } from "@app/hooks/useLayoutController";
 import { useMainAppComposerWorkspaceState } from "@app/hooks/useMainAppComposerWorkspaceState";
@@ -31,7 +29,6 @@ import { useThreadListActions } from "@app/hooks/useThreadListActions";
 import { useThreadListSortKey } from "@app/hooks/useThreadListSortKey";
 import { useThreadRows } from "@app/hooks/useThreadRows";
 import { useTrayRecentThreads } from "@app/hooks/useTrayRecentThreads";
-import { useTraySessionUsage } from "@app/hooks/useTraySessionUsage";
 import { useUpdaterController } from "@app/hooks/useUpdaterController";
 import { useWorkspaceController } from "@app/hooks/useWorkspaceController";
 import { useWorkspaceLaunchScript } from "@app/hooks/useWorkspaceLaunchScript";
@@ -83,7 +80,7 @@ import { useTerminalController } from "@/features/terminal/hooks/useTerminalCont
 import { useRenameWorktreePrompt } from "@/features/workspaces/hooks/useRenameWorktreePrompt";
 import { useWorkspaceFromUrlPrompt } from "@/features/workspaces/hooks/useWorkspaceFromUrlPrompt";
 import { useWorkspaceSelection } from "@/features/workspaces/hooks/useWorkspaceSelection";
-import type { ComposerEditorSettings, ServiceTier, WorkspaceInfo } from "@/types";
+import type { ComposerEditorSettings, WorkspaceInfo } from "@/types";
 import { normalizeCodexArgsInput } from "@/utils/codexArgsInput";
 
 const SettingsView = lazy(() =>
@@ -223,8 +220,6 @@ export default function MainApp() {
     setPreferredModelId,
     preferredEffort,
     setPreferredEffort,
-    preferredServiceTier,
-    setPreferredServiceTier,
     preferredCollabModeId,
     setPreferredCollabModeId,
     preferredCodexArgsOverride,
@@ -405,15 +400,9 @@ export default function MainApp() {
   });
 
   const [selectedCodexArgsOverride, setSelectedCodexArgsOverride] = useState<string | null>(null);
-  const [selectedServiceTier, setSelectedServiceTier] = useState<ServiceTier | null | undefined>(
-    undefined,
-  );
   useEffect(() => {
     setSelectedCodexArgsOverride(normalizeCodexArgsInput(preferredCodexArgsOverride));
   }, [preferredCodexArgsOverride]);
-  useEffect(() => {
-    setSelectedServiceTier(preferredServiceTier);
-  }, [preferredServiceTier]);
 
   const [appView, setAppView] = useState<AppView>(AppView.Home);
   const [selectedSessionKey, setSelectedSessionKey] = useState<string | null>(null);
@@ -451,7 +440,6 @@ export default function MainApp() {
   const {
     handleSelectModel,
     handleSelectEffort,
-    handleSelectServiceTier,
     handleSelectCollaborationMode,
     handleSelectAccessMode,
     handleSelectCodexArgsOverride,
@@ -462,7 +450,6 @@ export default function MainApp() {
     activeThreadIdRef,
     setSelectedModelId,
     setSelectedEffort,
-    setSelectedServiceTier,
     setSelectedCollaborationModeId,
     setAccessMode,
     setSelectedCodexArgsOverride,
@@ -492,7 +479,6 @@ export default function MainApp() {
       reasoningOptions,
       selectedEffort,
       onSelectEffort: handleSelectEffort,
-      selectedServiceTier: selectedServiceTier ?? null,
       reasoningSupported,
     }),
     [
@@ -512,7 +498,6 @@ export default function MainApp() {
       reasoningOptions,
       selectedEffort,
       handleSelectEffort,
-      selectedServiceTier,
       reasoningSupported,
     ],
   );
@@ -592,8 +577,6 @@ export default function MainApp() {
     threadListCursorByWorkspace,
     activeTurnIdByThread,
     tokenUsageByThread,
-    rateLimitsByWorkspace,
-    accountByWorkspace,
     planByThread,
     lastAgentMessageByThread,
     pinnedThreadsVersion,
@@ -619,7 +602,6 @@ export default function MainApp() {
     startCompact,
     startApps,
     startMcp,
-    startFast,
     startStatus,
     reviewPrompt,
     closeReviewPrompt,
@@ -643,17 +625,13 @@ export default function MainApp() {
     handleApprovalDecision,
     handleApprovalRemember,
     handleUserInputSubmit,
-    refreshAccountInfo,
-    refreshAccountRateLimits,
   } = useThreads({
     activeWorkspace,
     onWorkspaceConnected: markWorkspaceConnected,
     onDebug: addDebugEntry,
     model: resolvedModel,
     effort: resolvedEffort,
-    serviceTier: selectedServiceTier,
     collaborationMode: collaborationModePayload,
-    onSelectServiceTier: handleSelectServiceTier,
     accessMode,
     ensureWorkspaceRuntimeCodexArgs,
     reviewDeliveryMode: appSettings.reviewDeliveryMode,
@@ -839,14 +817,12 @@ export default function MainApp() {
     setAccessMode,
     setPreferredModelId,
     setPreferredEffort,
-    setPreferredServiceTier,
     setPreferredCollabModeId,
     setPreferredCodexArgsOverride,
     activeThreadIdRef,
     pendingNewThreadSeedRef,
     selectedModelId,
     resolvedEffort,
-    selectedServiceTier,
     accessMode,
     selectedCollaborationModeId,
     selectedCodexArgsOverride,
@@ -871,14 +847,6 @@ export default function MainApp() {
     onDebug: addDebugEntry,
   });
 
-  const { activeAccount, accountSwitching, handleSwitchAccount, handleCancelSwitchAccount } =
-    useAccountSwitching({
-      activeWorkspaceId,
-      accountByWorkspace,
-      refreshAccountInfo,
-      refreshAccountRateLimits,
-      alertError,
-    });
   const {
     newAgentDraftWorkspaceId,
     startingDraftThreadWorkspaceId,
@@ -1206,25 +1174,7 @@ export default function MainApp() {
     getWorkspaceGroupName,
   });
 
-  const activeRateLimits = activeWorkspaceId
-    ? (rateLimitsByWorkspace[activeWorkspaceId] ?? null)
-    : null;
-  const { homeAccount, homeRateLimits } = useHomeAccount({
-    showHome,
-    usageWorkspaceId,
-    workspaces,
-    threadsByWorkspace,
-    threadListLoadingByWorkspace,
-    rateLimitsByWorkspace,
-    accountByWorkspace,
-    refreshAccountInfo,
-    refreshAccountRateLimits,
-  });
   const activeTokenUsage = activeThreadId ? (tokenUsageByThread[activeThreadId] ?? null) : null;
-  useTraySessionUsage({
-    accountRateLimits: activeRateLimits,
-    showRemaining: appSettings.usageShowRemaining,
-  });
   const activePlan = activeThreadId ? (planByThread[activeThreadId] ?? null) : null;
   const hasActivePlan = Boolean(
     activePlan && (activePlan.steps.length > 0 || activePlan.explanation),
@@ -1263,7 +1213,6 @@ export default function MainApp() {
       models: filteredModels,
       selectedModelId,
       resolvedEffort,
-      selectedServiceTier,
       collaborationModePayload,
     },
     refs: {
@@ -1282,7 +1231,6 @@ export default function MainApp() {
       startCompact,
       startApps,
       startMcp,
-      startFast,
       startStatus,
       addWorktreeAgent,
       handleWorktreeCreated,
@@ -1462,7 +1410,6 @@ export default function MainApp() {
     activeWorkspaceId,
     activeThreadId,
     accessMode,
-    selectedServiceTier,
     selectedCollaborationModeId,
     selectedCodexArgsOverride,
     pendingNewThreadSeedRef,
@@ -1690,7 +1637,6 @@ export default function MainApp() {
   const layoutSurfaces = useMainAppLayoutSurfaces({
     appSettings: useMemo(
       () => ({
-        usageShowRemaining: appSettings.usageShowRemaining,
         composerCodeBlockCopyUseModifier: appSettings.composerCodeBlockCopyUseModifier,
         showMessageFilePath: appSettings.showMessageFilePath,
         openAppTargets: appSettings.openAppTargets,
@@ -1703,7 +1649,6 @@ export default function MainApp() {
         gitDiffIgnoreWhitespaceChanges: appSettings.gitDiffIgnoreWhitespaceChanges,
       }),
       [
-        appSettings.usageShowRemaining,
         appSettings.composerCodeBlockCopyUseModifier,
         appSettings.showMessageFilePath,
         appSettings.openAppTargets,
@@ -1741,13 +1686,6 @@ export default function MainApp() {
     activeItems,
     userInputRequests,
     approvals,
-    activeRateLimits,
-    activeAccount,
-    homeRateLimits,
-    homeAccount,
-    accountSwitching,
-    onSwitchAccount: handleSwitchAccount,
-    onCancelSwitchAccount: handleCancelSwitchAccount,
     onDecision: handleApprovalDecision,
     onRemember: handleApprovalRemember,
     onUserInputSubmit: handleUserInputSubmit,
@@ -1769,7 +1707,6 @@ export default function MainApp() {
     usageWorkspaceOptions,
     onUsageWorkspaceChange: setUsageWorkspaceId,
     gitState,
-    selectedServiceTier: selectedServiceTier ?? null,
     composerWorkspaceState,
     promptActions,
     worktreeState,

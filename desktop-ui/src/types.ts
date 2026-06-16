@@ -244,7 +244,6 @@ export type PullRequestSelectionRange = {
 };
 
 export type AccessMode = "read-only" | "current" | "full-access";
-export type ServiceTier = "fast" | "flex";
 export type BackendMode = "local" | "remote";
 export type RemoteBackendProvider = "tcp";
 export type RemoteBackendTarget = {
@@ -321,7 +320,6 @@ export type AppSettings = {
   lastComposerReasoningEffort: string | null;
   uiScale: number;
   theme: ThemePreference;
-  usageShowRemaining: boolean;
   showMessageFilePath: boolean;
   chatHistoryScrollbackItems: number | null;
   threadTitleAutogenerationEnabled: boolean;
@@ -628,32 +626,6 @@ export type TurnPlan = {
   turnId: string;
   explanation: string | null;
   steps: TurnPlanStep[];
-};
-
-export type RateLimitWindow = {
-  usedPercent: number;
-  windowDurationMins: number | null;
-  resetsAt: number | null;
-};
-
-export type CreditsSnapshot = {
-  hasCredits: boolean;
-  unlimited: boolean;
-  balance: string | null;
-};
-
-export type RateLimitSnapshot = {
-  primary: RateLimitWindow | null;
-  secondary: RateLimitWindow | null;
-  credits: CreditsSnapshot | null;
-  planType: string | null;
-};
-
-export type AccountSnapshot = {
-  type: "chatgpt" | "apikey" | "unknown";
-  email: string | null;
-  planType: string | null;
-  requiresOpenaiAuth: boolean | null;
 };
 
 export type QueuedMessage = {

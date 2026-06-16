@@ -4,11 +4,10 @@ import { interruptTurn } from "@services/tauri";
 import { act, renderHook } from "@testing-library/react";
 import {
   normalizePlanUpdate,
-  normalizeRateLimits,
   normalizeTokenUsage,
 } from "@threads/utils/threadNormalize";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { RateLimitSnapshot, TurnPlan } from "@/types";
+import type { TurnPlan } from "@/types";
 import { useThreadTurnEvents } from "./useThreadTurnEvents";
 
 vi.mock("@services/tauri", () => ({
@@ -18,7 +17,6 @@ vi.mock("@services/tauri", () => ({
 vi.mock("@threads/utils/threadNormalize", () => ({
   asString: (value: unknown) => (typeof value === "string" ? value : value ? String(value) : ""),
   normalizePlanUpdate: vi.fn(),
-  normalizeRateLimits: vi.fn(),
   normalizeTokenUsage: vi.fn(),
 }));
 
@@ -26,7 +24,6 @@ type SetupOverrides = {
   pendingInterrupts?: string[];
   planByThread?: Record<string, TurnPlan | null>;
   activeTurnByThread?: Record<string, string | null>;
-  rateLimitsByWorkspace?: Record<string, RateLimitSnapshot | null>;
 };
 
 const makeOptions = (overrides: SetupOverrides = {}) => {
@@ -41,9 +38,6 @@ const makeOptions = (overrides: SetupOverrides = {}) => {
     (threadId: string) => overrides.activeTurnByThread?.[threadId] ?? null,
   );
   const getTurnGeneration = vi.fn(() => 0);
-  const getCurrentRateLimits = vi.fn(
-    (workspaceId: string) => overrides.rateLimitsByWorkspace?.[workspaceId] ?? null,
-  );
   const pushThreadErrorMessage = vi.fn();
   const safeMessageActivity = vi.fn();
   const recordThreadActivity = vi.fn();
@@ -58,7 +52,6 @@ const makeOptions = (overrides: SetupOverrides = {}) => {
     useThreadTurnEvents({
       dispatch,
       planByThreadRef,
-      getCurrentRateLimits,
       getCustomName,
       isThreadHidden,
       markProcessing,
@@ -85,7 +78,6 @@ const makeOptions = (overrides: SetupOverrides = {}) => {
     setActiveTurnId,
     getActiveTurnId,
     getTurnGeneration,
-    getCurrentRateLimits,
     pushThreadErrorMessage,
     safeMessageActivity,
     recordThreadActivity,
@@ -746,37 +738,6 @@ describe("useThreadTurnEvents", () => {
     });
   });
 
-  it("dispatches normalized rate limits updates", () => {
-    const previousRateLimits = {
-      primary: {
-        usedPercent: 35,
-        windowDurationMins: 60,
-        resetsAt: 1_700_000_000,
-      },
-      secondary: null,
-      credits: null,
-      planType: null,
-    } satisfies RateLimitSnapshot;
-
-    const { result, dispatch, getCurrentRateLimits } = makeOptions({
-      rateLimitsByWorkspace: { "ws-1": previousRateLimits },
-    });
-    const normalized = { primary: { usedPercent: 10 } };
-
-    vi.mocked(normalizeRateLimits).mockReturnValue(normalized as never);
-
-    act(() => {
-      result.current.onAccountRateLimitsUpdated("ws-1", { primary: {} });
-    });
-
-    expect(getCurrentRateLimits).toHaveBeenCalledWith("ws-1");
-    expect(normalizeRateLimits).toHaveBeenCalledWith({ primary: {} }, previousRateLimits);
-    expect(dispatch).toHaveBeenCalledWith({
-      type: "setRateLimits",
-      workspaceId: "ws-1",
-      rateLimits: normalized,
-    });
-  });
 
   it("handles turn errors when retries are disabled", () => {
     const {

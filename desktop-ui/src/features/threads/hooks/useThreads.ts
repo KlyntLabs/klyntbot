@@ -18,18 +18,15 @@ import type {
   CollabAgentRef,
   CustomPromptOption,
   DebugEntry,
-  ServiceTier,
   ThreadListSortKey,
   WorkspaceInfo,
 } from "@/types";
 import { useDetachedReviewTracking } from "./useDetachedReviewTracking";
-import { useThreadAccountInfo } from "./useThreadAccountInfo";
 import { useThreadActions } from "./useThreadActions";
 import { useThreadApprovals } from "./useThreadApprovals";
 import { useThreadEventHandlers } from "./useThreadEventHandlers";
 import { useThreadLinking } from "./useThreadLinking";
 import { useThreadMessaging } from "./useThreadMessaging";
-import { useThreadRateLimits } from "./useThreadRateLimits";
 import { useThreadSelectors } from "./useThreadSelectors";
 import { useThreadStatus } from "./useThreadStatus";
 import { useThreadStorage } from "./useThreadStorage";
@@ -44,10 +41,8 @@ type UseThreadsOptions = {
   ensureWorkspaceRuntimeCodexArgs?: (workspaceId: string, threadId: string | null) => Promise<void>;
   model?: string | null;
   effort?: string | null;
-  serviceTier?: ServiceTier | null | undefined;
   collaborationMode?: Record<string, unknown> | null;
   accessMode?: "read-only" | "current" | "full-access";
-  onSelectServiceTier?: (tier: ServiceTier | null | undefined) => void;
   reviewDeliveryMode?: "inline" | "detached";
   steerEnabled?: boolean;
   threadTitleAutogenerationEnabled?: boolean;
@@ -75,10 +70,8 @@ export function useThreads({
   ensureWorkspaceRuntimeCodexArgs,
   model,
   effort,
-  serviceTier,
   collaborationMode,
   accessMode,
-  onSelectServiceTier,
   reviewDeliveryMode = "inline",
   steerEnabled = false,
   threadTitleAutogenerationEnabled = false,
@@ -112,8 +105,6 @@ export function useThreads({
   threadsByWorkspaceRef.current = state.threadsByWorkspace;
   activeTurnIdByThreadRef.current = state.activeTurnIdByThread;
   threadParentByIdRef.current = state.threadParentById;
-  const rateLimitsByWorkspaceRef = useRef(state.rateLimitsByWorkspace);
-  rateLimitsByWorkspaceRef.current = state.rateLimitsByWorkspace;
   const { approvalAllowlistRef, handleApprovalDecision, handleApprovalRemember } =
     useThreadApprovals({ dispatch, onDebug });
   const { handleUserInputSubmit } = useThreadUserInput({ dispatch });
@@ -135,25 +126,6 @@ export function useThreads({
     activeThreadIdByWorkspace: state.activeThreadIdByWorkspace,
     itemsByThread: state.itemsByThread,
     threadsByWorkspace: state.threadsByWorkspace,
-  });
-
-  const getCurrentRateLimits = useCallback(
-    (workspaceId: string) => rateLimitsByWorkspaceRef.current[workspaceId] ?? null,
-    [],
-  );
-
-  const { refreshAccountRateLimits } = useThreadRateLimits({
-    activeWorkspaceId,
-    activeWorkspaceConnected: activeWorkspace?.connected,
-    getCurrentRateLimits,
-    dispatch,
-    onDebug,
-  });
-  const { refreshAccountInfo } = useThreadAccountInfo({
-    activeWorkspaceId,
-    activeWorkspaceConnected: activeWorkspace?.connected,
-    dispatch,
-    onDebug,
   });
 
   const { markProcessing, markReviewing, setActiveTurnId } = useThreadStatus({
@@ -231,18 +203,8 @@ export function useThreads({
   const handleWorkspaceConnected = useCallback(
     (workspaceId: string) => {
       onWorkspaceConnected(workspaceId);
-      void refreshAccountRateLimits(workspaceId);
-      void refreshAccountInfo(workspaceId);
     },
-    [onWorkspaceConnected, refreshAccountRateLimits, refreshAccountInfo],
-  );
-
-  const handleAccountUpdated = useCallback(
-    (workspaceId: string) => {
-      void refreshAccountRateLimits(workspaceId);
-      void refreshAccountInfo(workspaceId);
-    },
-    [refreshAccountRateLimits, refreshAccountInfo],
+    [onWorkspaceConnected],
   );
 
   const isThreadHidden = useCallback(
@@ -385,7 +347,6 @@ export function useThreads({
     dispatch,
     getItemsForThread: (threadId) => itemsByThreadRef.current[threadId] ?? [],
     planByThreadRef,
-    getCurrentRateLimits,
     getCustomName,
     isThreadHidden,
     setThreadLoaded,
@@ -405,13 +366,6 @@ export function useThreads({
     approvalAllowlistRef,
     pendingInterruptsRef,
   });
-
-  const handleAccountLoginCompleted = useCallback(
-    (workspaceId: string) => {
-      handleAccountUpdated(workspaceId);
-    },
-    [handleAccountUpdated],
-  );
 
   const handleThreadStarted = useCallback(
     (workspaceId: string, thread: Record<string, unknown>) => {
@@ -517,16 +471,12 @@ export function useThreads({
       onThreadStarted: handleThreadStarted,
       onThreadArchived: handleThreadArchived,
       onThreadUnarchived: handleThreadUnarchived,
-      onAccountUpdated: handleAccountUpdated,
-      onAccountLoginCompleted: handleAccountLoginCompleted,
     }),
     [
       threadHandlers,
       handleThreadStarted,
       handleThreadArchived,
       handleThreadUnarchived,
-      handleAccountUpdated,
-      handleAccountLoginCompleted,
     ],
   );
 
@@ -702,7 +652,6 @@ export function useThreads({
     startCompact,
     startApps,
     startMcp,
-    startFast,
     startStatus,
     reviewPrompt,
     openReviewPrompt,
@@ -730,9 +679,7 @@ export function useThreads({
     accessMode,
     model,
     effort,
-    serviceTier,
     collaborationMode,
-    onSelectServiceTier,
     reviewDeliveryMode,
     steerEnabled,
     customPrompts,
@@ -740,7 +687,6 @@ export function useThreads({
     shouldPreflightRuntimeCodexArgsForSend,
     threadStatusById: state.threadStatusById,
     activeTurnIdByThread: state.activeTurnIdByThread,
-    rateLimitsByWorkspace: state.rateLimitsByWorkspace,
     pendingInterruptsRef,
     dispatch,
     getCustomName,
@@ -831,14 +777,10 @@ export function useThreads({
       turnDiffByThread: state.turnDiffByThread,
       turnGenerationByThread: state.turnGenerationByThread,
       tokenUsageByThread: state.tokenUsageByThread,
-      rateLimitsByWorkspace: state.rateLimitsByWorkspace,
-      accountByWorkspace: state.accountByWorkspace,
       planByThread: state.planByThread,
       lastAgentMessageByThread: state.lastAgentMessageByThread,
       pinnedThreadsVersion,
       markProcessing,
-      refreshAccountRateLimits,
-      refreshAccountInfo,
       interruptTurn,
       removeThread,
       pinThread,
@@ -863,7 +805,6 @@ export function useThreads({
       startCompact,
       startApps,
       startMcp,
-      startFast,
       startStatus,
       reviewPrompt,
       openReviewPrompt,
@@ -898,8 +839,6 @@ export function useThreads({
       isSubagentThread,
       pinnedThreadsVersion,
       markProcessing,
-      refreshAccountRateLimits,
-      refreshAccountInfo,
       interruptTurn,
       removeThread,
       pinThread,
@@ -924,7 +863,6 @@ export function useThreads({
       startCompact,
       startApps,
       startMcp,
-      startFast,
       startStatus,
       reviewPrompt,
       openReviewPrompt,

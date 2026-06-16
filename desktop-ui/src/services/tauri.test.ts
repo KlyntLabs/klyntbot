@@ -721,21 +721,6 @@ describe("tauri invoke wrappers", () => {
     });
   });
 
-  it("preserves explicit null serviceTier overrides", async () => {
-    const invokeMock = vi.mocked(invoke);
-    invokeMock.mockResolvedValueOnce({});
-
-    await sendUserMessage("ws-4", "thread-1", "hello", {
-      serviceTier: null,
-    });
-
-    expect(invokeMock).toHaveBeenLastCalledWith("coding_message_send", {
-      threadId: "thread-1",
-      text: "hello",
-      model: null,
-    });
-  });
-
   it("maps read_image_as_data_url", async () => {
     const invokeMock = vi.mocked(invoke);
     invokeMock.mockResolvedValueOnce("data:image/png;base64,abc");

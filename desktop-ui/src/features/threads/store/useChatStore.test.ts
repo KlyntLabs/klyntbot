@@ -23,8 +23,6 @@ describe("useChatStore", () => {
       approvals: [],
       userInputRequests: [],
       tokenUsageByThread: {},
-      rateLimitsByWorkspace: {},
-      accountByWorkspace: {},
       planByThread: {},
       lastAgentMessageByThread: {},
       streamSnapshots: {},

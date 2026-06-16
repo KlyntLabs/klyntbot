@@ -31,7 +31,6 @@ const makeOptions = (overrides: Partial<Parameters<typeof useQueuedSend>[0]> = {
   startCompact: vi.fn().mockResolvedValue(undefined),
   startApps: vi.fn().mockResolvedValue(undefined),
   startMcp: vi.fn().mockResolvedValue(undefined),
-  startFast: vi.fn().mockResolvedValue(undefined),
   startStatus: vi.fn().mockResolvedValue(undefined),
   clearActiveImages: vi.fn(),
   ...overrides,
@@ -353,22 +352,6 @@ describe("useQueuedSend", () => {
     });
 
     expect(startStatus).toHaveBeenCalledWith("/status now");
-    expect(options.sendUserMessage).not.toHaveBeenCalled();
-    expect(options.startReview).not.toHaveBeenCalled();
-  });
-
-  it("routes /fast to the fast-mode handler", async () => {
-    const startFast = vi.fn().mockResolvedValue(undefined);
-    const options = makeOptions({ startFast });
-    const { result } = renderHook((props) => useQueuedSend(props), {
-      initialProps: options,
-    });
-
-    await act(async () => {
-      await result.current.handleSend("/fast on", ["img-1"]);
-    });
-
-    expect(startFast).toHaveBeenCalledWith("/fast on");
     expect(options.sendUserMessage).not.toHaveBeenCalled();
     expect(options.startReview).not.toHaveBeenCalled();
   });

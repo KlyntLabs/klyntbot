@@ -30,7 +30,6 @@ const DEFAULTS: Required<UiConfig> = {
   chatHistoryScrollbackItems: 100,
   showMessageFilePath: true,
   splitChatDiffView: false,
-  usageShowRemaining: false,
 };
 
 export function SettingsAppSection() {
@@ -190,16 +189,6 @@ export function SettingsAppSection() {
           onChange={(v) => {
             updateDraft("splitChatDiffView", v);
             commit({ splitChatDiffView: v });
-          }}
-        />
-
-        <ToggleField
-          label="Show remaining usage"
-          description="Display token / credit estimates in the usage bar"
-          value={draft.usageShowRemaining ?? false}
-          onChange={(v) => {
-            updateDraft("usageShowRemaining", v);
-            commit({ usageShowRemaining: v });
           }}
         />
       </div>

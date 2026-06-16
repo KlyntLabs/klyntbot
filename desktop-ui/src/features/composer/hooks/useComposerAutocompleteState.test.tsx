@@ -100,7 +100,6 @@ describe("useComposerAutocompleteState slash commands", () => {
       expect.arrayContaining([
         "apps",
         "compact",
-        "fast",
         "fork",
         "mcp",
         "new",
@@ -155,16 +154,7 @@ describe("useComposerAutocompleteState slash commands", () => {
     expect(labels).not.toContain("apps");
     // Generic slashes still present
     expect(labels).toEqual(
-      expect.arrayContaining([
-        "compact",
-        "fast",
-        "fork",
-        "mcp",
-        "new",
-        "resume",
-        "review",
-        "status",
-      ]),
+      expect.arrayContaining(["compact", "fork", "mcp", "new", "resume", "review", "status"]),
     );
     // Phase 2 entries still present (independent of appsEnabled)
     expect(labels).toEqual(expect.arrayContaining(["sessions rewind", "dead-ends", "mirror"]));

@@ -1,29 +1,17 @@
 import { formatRelativeTime } from "@utils/time";
-import type {
-  AccountSnapshot,
-  LocalUsageDay,
-  LocalUsageSnapshot,
-  RateLimitSnapshot,
-} from "@/types";
-import { getUsageLabels } from "../app/utils/usageLabels";
+import type { LocalUsageDay, LocalUsageSnapshot } from "@/types";
 import {
-  buildWindowCaption,
-  formatAccountTypeLabel,
   formatCompactNumber,
   formatCount,
-  formatCreditsBalance,
   formatDayCount,
   formatDayLabel,
   formatDuration,
   formatDurationCompact,
-  formatPlanType,
   isUsageDayActive,
 } from "./homeFormatters";
 import type { HomeStatCard, UsageMetric } from "./homeTypes";
 
 type HomeUsageViewModel = {
-  accountCards: HomeStatCard[];
-  accountMeta: string | null;
   updatedLabel: string | null;
   usageCards: HomeStatCard[];
   usageDays: LocalUsageDay[];
@@ -31,17 +19,11 @@ type HomeUsageViewModel = {
 };
 
 export function buildHomeUsageViewModel({
-  accountInfo,
-  accountRateLimits,
   localUsageSnapshot,
   usageMetric,
-  usageShowRemaining,
 }: {
-  accountInfo: AccountSnapshot | null;
-  accountRateLimits: RateLimitSnapshot | null;
   localUsageSnapshot: LocalUsageSnapshot | null;
   usageMetric: UsageMetric;
-  usageShowRemaining: boolean;
 }): HomeUsageViewModel {
   const usageTotals = localUsageSnapshot?.totals ?? null;
   const usageDays = localUsageSnapshot?.days ?? [];
@@ -200,63 +182,7 @@ export function buildHomeUsageViewModel({
     },
   ] satisfies HomeStatCard[];
 
-  const usagePercentLabels = getUsageLabels(accountRateLimits, usageShowRemaining);
-  const planLabel = formatPlanType(accountRateLimits?.planType ?? accountInfo?.planType);
-  const creditsBalance = formatCreditsBalance(accountRateLimits?.credits?.balance);
-  const accountCards: HomeStatCard[] = [];
-
-  if (usagePercentLabels.sessionPercent !== null) {
-    accountCards.push({
-      label: usageShowRemaining ? "Session left" : "Session usage",
-      value: `${usagePercentLabels.sessionPercent}%`,
-      caption: buildWindowCaption(
-        usagePercentLabels.sessionResetLabel,
-        accountRateLimits?.primary?.windowDurationMins,
-        "Current window",
-      ),
-    });
-  }
-
-  if (usagePercentLabels.showWeekly && usagePercentLabels.weeklyPercent !== null) {
-    accountCards.push({
-      label: usageShowRemaining ? "Weekly left" : "Weekly usage",
-      value: `${usagePercentLabels.weeklyPercent}%`,
-      caption: buildWindowCaption(
-        usagePercentLabels.weeklyResetLabel,
-        accountRateLimits?.secondary?.windowDurationMins,
-        "Longer window",
-      ),
-    });
-  }
-
-  if (accountRateLimits?.credits?.hasCredits) {
-    accountCards.push(
-      accountRateLimits.credits.unlimited
-        ? {
-            label: "Credits",
-            value: "Unlimited",
-            caption: "Available balance",
-          }
-        : {
-            label: "Credits",
-            value: creditsBalance ?? "--",
-            suffix: creditsBalance ? "credits" : null,
-            caption: "Available balance",
-          },
-    );
-  }
-
-  if (planLabel) {
-    accountCards.push({
-      label: "Plan",
-      value: planLabel,
-      caption: formatAccountTypeLabel(accountInfo?.type),
-    });
-  }
-
   return {
-    accountCards,
-    accountMeta: accountInfo?.email ?? null,
     updatedLabel: localUsageSnapshot
       ? `Updated ${formatRelativeTime(localUsageSnapshot.updatedAt)}`
       : null,

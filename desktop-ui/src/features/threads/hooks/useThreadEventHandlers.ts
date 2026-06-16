@@ -6,7 +6,6 @@ import type {
   CollabAgentRef,
   ConversationItem,
   DebugEntry,
-  RateLimitSnapshot,
   TurnPlan,
 } from "@/types";
 import { useThreadApprovalEvents } from "./useThreadApprovalEvents";
@@ -21,7 +20,6 @@ type ThreadEventHandlersOptions = {
   dispatch: Dispatch<ThreadAction>;
   getItemsForThread: (threadId: string) => ConversationItem[];
   planByThreadRef: MutableRefObject<Record<string, TurnPlan | null>>;
-  getCurrentRateLimits?: (workspaceId: string) => RateLimitSnapshot | null;
   getCustomName: (workspaceId: string, threadId: string) => string | undefined;
   isThreadHidden: (workspaceId: string, threadId: string) => boolean;
   setThreadLoaded: (threadId: string, isLoaded: boolean) => void;
@@ -58,7 +56,6 @@ export function useThreadEventHandlers({
   dispatch,
   getItemsForThread,
   planByThreadRef,
-  getCurrentRateLimits,
   getCustomName,
   isThreadHidden,
   setThreadLoaded,
@@ -160,12 +157,10 @@ export function useThreadEventHandlers({
     onTurnPlanUpdated,
     onTurnDiffUpdated,
     onThreadTokenUsageUpdated,
-    onAccountRateLimitsUpdated,
     onTurnError,
   } = useThreadTurnEvents({
     dispatch,
     planByThreadRef,
-    getCurrentRateLimits,
     getCustomName,
     isThreadHidden,
     setThreadLoaded,
@@ -236,7 +231,6 @@ export function useThreadEventHandlers({
       onTurnPlanUpdated,
       onTurnDiffUpdated,
       onThreadTokenUsageUpdated,
-      onAccountRateLimitsUpdated,
       onTurnError,
     }),
     [
@@ -269,7 +263,6 @@ export function useThreadEventHandlers({
       onTurnPlanUpdated,
       onTurnDiffUpdated,
       onThreadTokenUsageUpdated,
-      onAccountRateLimitsUpdated,
       onTurnError,
     ],
   );

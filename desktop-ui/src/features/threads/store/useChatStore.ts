@@ -179,8 +179,6 @@ export function selectThreadState(store: ChatStore): ThreadState {
     approvals: store.approvals,
     userInputRequests: store.userInputRequests,
     tokenUsageByThread: store.tokenUsageByThread,
-    rateLimitsByWorkspace: store.rateLimitsByWorkspace,
-    accountByWorkspace: store.accountByWorkspace,
     planByThread: store.planByThread,
     lastAgentMessageByThread: store.lastAgentMessageByThread,
   };

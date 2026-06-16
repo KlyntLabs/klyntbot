@@ -5,8 +5,6 @@ import type { MouseEvent, RefObject } from "react";
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import type {
-  AccountSnapshot,
-  RateLimitSnapshot,
   RequestUserInputRequest,
   ThreadListOrganizeMode,
   ThreadListSortKey,
@@ -18,7 +16,6 @@ import { useMenuController } from "../hooks/useMenuController";
 import { useSidebarMenus } from "../hooks/useSidebarMenus";
 import { useSidebarScrollFade } from "../hooks/useSidebarScrollFade";
 import { useThreadRows } from "../hooks/useThreadRows";
-import { getUsageLabels } from "../utils/usageLabels";
 import { PinnedThreadList } from "./PinnedThreadList";
 import { SidebarBottomRail } from "./SidebarBottomRail";
 import { SidebarHeader } from "./SidebarHeader";
@@ -118,12 +115,6 @@ export type SidebarProps = {
   activeWorkspaceId: string | null;
   activeThreadId: string | null;
   userInputRequests?: RequestUserInputRequest[];
-  accountRateLimits: RateLimitSnapshot | null;
-  usageShowRemaining: boolean;
-  accountInfo: AccountSnapshot | null;
-  onSwitchAccount: () => void;
-  onCancelSwitchAccount: () => void;
-  accountSwitching: boolean;
   onOpenSettings: () => void;
   onOpenDebug: () => void;
   showDebugButton: boolean;
@@ -179,12 +170,6 @@ export const Sidebar = memo(function Sidebar({
   activeWorkspaceId,
   activeThreadId,
   userInputRequests = [],
-  accountRateLimits,
-  usageShowRemaining,
-  accountInfo,
-  onSwitchAccount,
-  onCancelSwitchAccount,
-  accountSwitching,
   onOpenSettings,
   onOpenDebug,
   showDebugButton,
@@ -247,14 +232,6 @@ export const Sidebar = memo(function Sidebar({
     onDeleteWorkspace,
     onDeleteWorktree,
   });
-  const {
-    sessionPercent,
-    weeklyPercent,
-    sessionResetLabel,
-    weeklyResetLabel,
-    creditsLabel,
-    showWeekly,
-  } = getUsageLabels(accountRateLimits, usageShowRemaining);
   const debouncedQuery = useDebouncedValue(searchQuery, 150);
   const normalizedQuery = debouncedQuery.trim().toLowerCase();
   const isSearchActive = Boolean(normalizedQuery);
@@ -348,16 +325,6 @@ export const Sidebar = memo(function Sidebar({
     [normalizedQuery],
   );
 
-  const accountEmail = accountInfo?.email?.trim() ?? "";
-  const accountButtonLabel = accountEmail
-    ? accountEmail
-    : accountInfo?.type === "apikey"
-      ? "API key"
-      : "Sign in to Codex";
-  const accountActionLabel = accountEmail ? "Switch account" : "Sign in";
-  const showAccountSwitcher = Boolean(activeWorkspaceId);
-  const accountSwitchDisabled = accountSwitching || !activeWorkspaceId;
-  const accountCancelDisabled = !accountSwitching || !activeWorkspaceId;
   const refreshDisabled =
     workspaces.length === 0 || workspaces.every((workspace) => !workspace.connected);
   const refreshInProgress = workspaces.some(
@@ -1013,23 +980,9 @@ export const Sidebar = memo(function Sidebar({
         </div>
       </div>
       <SidebarBottomRail
-        sessionPercent={sessionPercent}
-        weeklyPercent={weeklyPercent}
-        sessionResetLabel={sessionResetLabel}
-        weeklyResetLabel={weeklyResetLabel}
-        creditsLabel={creditsLabel}
-        showWeekly={showWeekly}
         onOpenSettings={onOpenSettings}
         onOpenDebug={onOpenDebug}
         showDebugButton={showDebugButton}
-        showAccountSwitcher={showAccountSwitcher}
-        accountLabel={accountButtonLabel}
-        accountActionLabel={accountActionLabel}
-        accountDisabled={accountSwitchDisabled}
-        accountSwitching={accountSwitching}
-        accountCancelDisabled={accountCancelDisabled}
-        onSwitchAccount={onSwitchAccount}
-        onCancelSwitchAccount={onCancelSwitchAccount}
       />
     </aside>
   );

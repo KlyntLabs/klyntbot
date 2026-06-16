@@ -10,12 +10,7 @@ import { useCallback, useMemo } from "react";
 type ThreadCodexParamsPatch = Partial<
   Pick<
     ThreadCodexParams,
-    | "modelId"
-    | "effort"
-    | "serviceTier"
-    | "accessMode"
-    | "collaborationModeId"
-    | "codexArgsOverride"
+    "modelId" | "effort" | "accessMode" | "collaborationModeId" | "codexArgsOverride"
   >
 >;
 

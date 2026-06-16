@@ -1,26 +1,20 @@
 import { clampThreadName } from "@threads/utils/threadNaming";
-import { formatRelativeTime } from "@utils/time";
 import type {
   AccessMode,
   AppMention,
   ComposerSendIntent,
-  RateLimitSnapshot,
   ReviewTarget,
-  ServiceTier,
 } from "@/types";
 
 export type SendMessageOptions = {
   skipPromptExpansion?: boolean;
   model?: string | null;
   effort?: string | null;
-  serviceTier?: ServiceTier | null | undefined;
   collaborationMode?: Record<string, unknown> | null;
   accessMode?: AccessMode;
   appMentions?: AppMention[];
   sendIntent?: ComposerSendIntent;
 };
-
-type FastCommandAction = "toggle" | "on" | "off" | "status" | "invalid";
 
 type ResolveSendMessageOptionsArgs = {
   options?: SendMessageOptions;
@@ -28,7 +22,6 @@ type ResolveSendMessageOptionsArgs = {
     accessMode?: AccessMode;
     model?: string | null;
     effort?: string | null;
-    serviceTier?: ServiceTier | null | undefined;
     collaborationMode?: Record<string, unknown> | null;
     steerEnabled: boolean;
     isProcessing: boolean;
@@ -39,7 +32,6 @@ type ResolveSendMessageOptionsArgs = {
 export type ResolvedSendMessageOptions = {
   resolvedModel?: string | null;
   resolvedEffort?: string | null;
-  resolvedServiceTier?: ServiceTier | null | undefined;
   sanitizedCollaborationMode: Record<string, unknown> | null;
   resolvedAccessMode?: AccessMode;
   appMentions: AppMention[];
@@ -51,7 +43,6 @@ export type ResolvedSendMessageOptions = {
 export type TurnStartPayload = {
   model?: string | null;
   effort?: string | null;
-  serviceTier?: ServiceTier | null | undefined;
   collaborationMode?: Record<string, unknown> | null;
   accessMode?: AccessMode;
   images?: string[];
@@ -95,34 +86,12 @@ export function isStaleSteerTurnError(message: string): boolean {
   return normalized.includes("storage not found") && normalized.includes("turn ");
 }
 
-export function parseFastCommand(text: string): FastCommandAction {
-  const arg = text
-    .replace(/^\/fast\b/i, "")
-    .trim()
-    .toLowerCase();
-  if (!arg) {
-    return "toggle";
-  }
-  if (arg === "on") {
-    return "on";
-  }
-  if (arg === "off") {
-    return "off";
-  }
-  if (arg === "status") {
-    return "status";
-  }
-  return "invalid";
-}
-
 export function resolveSendMessageOptions({
   options,
   defaults,
 }: ResolveSendMessageOptionsArgs): ResolvedSendMessageOptions {
   const resolvedModel = options?.model !== undefined ? options.model : defaults.model;
   const resolvedEffort = options?.effort !== undefined ? options.effort : defaults.effort;
-  const resolvedServiceTier =
-    options?.serviceTier !== undefined ? options.serviceTier : defaults.serviceTier;
   const resolvedCollaborationMode =
     options?.collaborationMode !== undefined
       ? options.collaborationMode
@@ -149,7 +118,6 @@ export function resolveSendMessageOptions({
   return {
     resolvedModel,
     resolvedEffort,
-    resolvedServiceTier,
     sanitizedCollaborationMode,
     resolvedAccessMode,
     appMentions,
@@ -162,7 +130,6 @@ export function resolveSendMessageOptions({
 export function buildTurnStartPayload({
   model,
   effort,
-  serviceTier,
   collaborationMode,
   accessMode,
   images,
@@ -170,7 +137,6 @@ export function buildTurnStartPayload({
 }: {
   model?: string | null;
   effort?: string | null;
-  serviceTier?: ServiceTier | null | undefined;
   collaborationMode?: Record<string, unknown> | null;
   accessMode?: AccessMode;
   images: string[];
@@ -183,25 +149,10 @@ export function buildTurnStartPayload({
     accessMode,
     images,
   };
-  if (serviceTier !== undefined) {
-    payload.serviceTier = serviceTier;
-  }
   if (appMentions.length > 0) {
     payload.appMentions = appMentions;
   }
   return payload;
-}
-
-function normalizeReset(value?: number | null): number | null {
-  if (typeof value !== "number" || !Number.isFinite(value)) {
-    return null;
-  }
-  return value > 1_000_000_000_000 ? value : value * 1000;
-}
-
-function resetLabel(value?: number | null): string | null {
-  const resetAt = normalizeReset(value);
-  return resetAt ? formatRelativeTime(resetAt) : null;
 }
 
 function getCollaborationModeId(collaborationMode?: Record<string, unknown> | null): string {
@@ -220,50 +171,22 @@ function getCollaborationModeId(collaborationMode?: Record<string, unknown> | nu
 
 export function buildStatusLines({
   model,
-  serviceTier,
   effort,
   accessMode,
   collaborationMode,
-  rateLimits,
 }: {
   model?: string | null;
-  serviceTier?: ServiceTier | null | undefined;
   effort?: string | null;
   accessMode?: AccessMode;
   collaborationMode?: Record<string, unknown> | null;
-  rateLimits: RateLimitSnapshot | null;
 }): string[] {
-  const lines = [
+  return [
     "Session status:",
     `- Model: ${model ?? "default"}`,
-    `- Fast mode: ${serviceTier === "fast" ? "on" : "off"}`,
     `- Reasoning effort: ${effort ?? "default"}`,
     `- Access: ${accessMode ?? "current"}`,
     `- Collaboration: ${getCollaborationModeId(collaborationMode) || "off"}`,
   ];
-
-  const primaryUsed = rateLimits?.primary?.usedPercent;
-  const secondaryUsed = rateLimits?.secondary?.usedPercent;
-
-  if (typeof primaryUsed === "number") {
-    const reset = resetLabel(rateLimits?.primary?.resetsAt);
-    lines.push(`- Session usage: ${Math.round(primaryUsed)}%${reset ? ` (resets ${reset})` : ""}`);
-  }
-  if (typeof secondaryUsed === "number") {
-    const reset = resetLabel(rateLimits?.secondary?.resetsAt);
-    lines.push(`- Weekly usage: ${Math.round(secondaryUsed)}%${reset ? ` (resets ${reset})` : ""}`);
-  }
-
-  const credits = rateLimits?.credits ?? null;
-  if (credits?.hasCredits) {
-    if (credits.unlimited) {
-      lines.push("- Credits: unlimited");
-    } else if (credits.balance) {
-      lines.push(`- Credits: ${credits.balance}`);
-    }
-  }
-
-  return lines;
 }
 
 export function buildMcpStatusLines(data: Array<Record<string, unknown>>): string[] {

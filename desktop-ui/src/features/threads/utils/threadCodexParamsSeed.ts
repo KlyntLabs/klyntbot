@@ -1,4 +1,4 @@
-import type { AccessMode, ServiceTier } from "@/types";
+import type { AccessMode } from "@/types";
 import { buildEffectiveCodexArgsBadgeLabel, sanitizeRuntimeCodexArgs } from "./codexArgsProfiles";
 import type { ThreadCodexParams } from "./threadStorage";
 import { makeThreadCodexParamsKey } from "./threadStorage";
@@ -7,7 +7,6 @@ export const NO_THREAD_SCOPE_SUFFIX = "__no_thread__";
 
 export type PendingNewThreadSeed = {
   workspaceId: string;
-  serviceTier: ServiceTier | null | undefined;
   collaborationModeId: string | null;
   accessMode: AccessMode;
   codexArgsOverride: string | null;
@@ -29,7 +28,6 @@ type ResolvedThreadCodexState = {
   accessMode: AccessMode;
   preferredModelId: string | null;
   preferredEffort: string | null;
-  preferredServiceTier: ServiceTier | null | undefined;
   preferredCollabModeId: string | null;
   preferredCodexArgsOverride: string | null;
 };
@@ -37,7 +35,6 @@ type ResolvedThreadCodexState = {
 type ThreadCodexSeedPatch = {
   modelId: string | null;
   effort: string | null;
-  serviceTier: ServiceTier | null | undefined;
   accessMode: AccessMode;
   collaborationModeId: string | null;
   codexArgsOverride: string | null | undefined;
@@ -83,7 +80,6 @@ export function resolveWorkspaceRuntimeCodexArgsBadgeLabel(options: {
 export function createPendingThreadSeed(options: {
   activeThreadId: string | null;
   activeWorkspaceId: string | null;
-  selectedServiceTier: ServiceTier | null | undefined;
   selectedCollaborationModeId: string | null;
   accessMode: AccessMode;
   codexArgsOverride?: string | null;
@@ -91,7 +87,6 @@ export function createPendingThreadSeed(options: {
   const {
     activeThreadId,
     activeWorkspaceId,
-    selectedServiceTier,
     selectedCollaborationModeId,
     accessMode,
     codexArgsOverride = null,
@@ -101,7 +96,6 @@ export function createPendingThreadSeed(options: {
   }
   return {
     workspaceId: activeWorkspaceId,
-    serviceTier: selectedServiceTier,
     collaborationModeId: selectedCollaborationModeId,
     accessMode,
     codexArgsOverride,
@@ -128,7 +122,6 @@ export function resolveThreadCodexState(
       accessMode: stored?.accessMode ?? defaultAccessMode,
       preferredModelId: stored?.modelId ?? lastComposerModelId ?? null,
       preferredEffort: stored?.effort ?? lastComposerReasoningEffort ?? null,
-      preferredServiceTier: stored?.serviceTier,
       preferredCollabModeId: stored?.collaborationModeId ?? null,
       preferredCodexArgsOverride: stored?.codexArgsOverride ?? null,
     };
@@ -142,8 +135,6 @@ export function resolveThreadCodexState(
     accessMode: stored?.accessMode ?? pendingForWorkspace?.accessMode ?? defaultAccessMode,
     preferredModelId: stored?.modelId ?? lastComposerModelId ?? null,
     preferredEffort: stored?.effort ?? lastComposerReasoningEffort ?? null,
-    preferredServiceTier:
-      stored?.serviceTier !== undefined ? stored.serviceTier : noThreadStored?.serviceTier,
     preferredCollabModeId:
       stored?.collaborationModeId ??
       (pendingForWorkspace ? pendingForWorkspace.collaborationModeId : null),
@@ -181,7 +172,6 @@ export function buildThreadCodexSeedPatch(options: {
   return {
     modelId: selectedModelId,
     effort: resolvedEffort,
-    serviceTier: pendingForWorkspace ? pendingForWorkspace.serviceTier : undefined,
     accessMode: pendingForWorkspace?.accessMode ?? accessMode,
     collaborationModeId: pendingForWorkspace
       ? pendingForWorkspace.collaborationModeId

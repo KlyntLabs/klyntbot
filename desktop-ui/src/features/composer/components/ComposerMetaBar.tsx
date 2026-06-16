@@ -2,10 +2,9 @@ import type { CodexArgsOption } from "@threads/utils/codexArgsProfiles";
 import BrainCog from "lucide-react/dist/esm/icons/brain-cog";
 import Server from "lucide-react/dist/esm/icons/server";
 import SlidersHorizontal from "lucide-react/dist/esm/icons/sliders-horizontal";
-import Zap from "lucide-react/dist/esm/icons/zap";
 import type { CSSProperties, ReactNode } from "react";
 import type { ProviderInfo } from "@/features/models/hooks/useProviders";
-import type { AccessMode, ServiceTier } from "@/types";
+import type { AccessMode } from "@/types";
 
 type ComposerMetaBarProps = {
   disabled: boolean;
@@ -21,7 +20,6 @@ type ComposerMetaBarProps = {
   reasoningOptions: string[];
   selectedEffort: string | null;
   onSelectEffort: (effort: string) => void;
-  selectedServiceTier: ServiceTier | null;
   reasoningSupported: boolean;
   accessMode: AccessMode;
   onSelectAccessMode: (mode: AccessMode) => void;
@@ -45,7 +43,6 @@ export function ComposerMetaBar({
   reasoningOptions,
   selectedEffort,
   onSelectEffort,
-  selectedServiceTier,
   reasoningSupported,
   accessMode,
   onSelectAccessMode,
@@ -193,16 +190,6 @@ export function ComposerMetaBar({
               </>
             )}
           </select>
-          {selectedServiceTier === "fast" && (
-            <span
-              className="composer-fast-indicator"
-              role="status"
-              aria-label="Fast mode enabled"
-              title="Fast mode enabled"
-            >
-              <Zap size={12} strokeWidth={1.8} />
-            </span>
-          )}
         </div>
         <div className="composer-select-wrap composer-select-wrap--effort">
           <span className="composer-icon composer-icon--effort" aria-hidden>

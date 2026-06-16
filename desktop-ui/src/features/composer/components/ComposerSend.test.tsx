@@ -33,7 +33,6 @@ type HarnessProps = {
   isProcessing?: boolean;
   followUpMessageBehavior?: FollowUpMessageBehavior;
   steerAvailable?: boolean;
-  selectedServiceTier?: "fast" | "flex" | null;
 };
 
 function ComposerHarness({
@@ -42,7 +41,6 @@ function ComposerHarness({
   isProcessing = false,
   followUpMessageBehavior = "queue",
   steerAvailable = false,
-  selectedServiceTier = null,
 }: HarnessProps) {
   const [draftText, setDraftText] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -69,7 +67,6 @@ function ComposerHarness({
       reasoningOptions={[]}
       selectedEffort={null}
       onSelectEffort={() => {}}
-      selectedServiceTier={selectedServiceTier}
       reasoningSupported={false}
       accessMode="current"
       onSelectAccessMode={() => {}}
@@ -114,13 +111,6 @@ describe("Composer send triggers", () => {
 
     expect(onSend).toHaveBeenCalledTimes(1);
     expect(onSend).toHaveBeenCalledWith("from button", [], undefined, "default");
-  });
-
-  it("shows the fast-mode indicator when enabled", () => {
-    const onSend = vi.fn();
-    render(<ComposerHarness onSend={onSend} selectedServiceTier="fast" />);
-
-    expect(screen.getByLabelText("Fast mode enabled")).toBeTruthy();
   });
 
   it("blurs the textarea after Enter send on mobile", () => {

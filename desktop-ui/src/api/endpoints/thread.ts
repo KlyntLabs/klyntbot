@@ -59,7 +59,6 @@ export async function sendUserMessage(
   options?: {
     model?: string | null;
     effort?: string | null;
-    serviceTier?: "fast" | "flex" | null | undefined;
     accessMode?: "read-only" | "current" | "full-access";
     images?: string[];
     collaborationMode?: Record<string, unknown> | null;
@@ -68,7 +67,6 @@ export async function sendUserMessage(
 ) {
   void workspaceId;
   void options?.effort;
-  void options?.serviceTier;
   void options?.accessMode;
   void options?.collaborationMode;
   void options?.appMentions;
@@ -211,25 +209,5 @@ export async function generateRunMetadata(workspaceId: string, prompt: string) {
   return invoke<{ title: string; worktreeName: string }>("generate_run_metadata", {
     workspaceId,
     prompt,
-  });
-}
-
-export async function getAccountRateLimits(workspaceId: string) {
-  return invoke<Record<string, unknown>>("account_rate_limits", { workspaceId });
-}
-
-export async function getAccountInfo(workspaceId: string) {
-  return invoke<Record<string, unknown>>("account_read", { workspaceId });
-}
-
-export async function runCodexLogin(workspaceId: string) {
-  return invoke<{ loginId: string; authUrl: string; raw?: unknown }>("codex_login", {
-    workspaceId,
-  });
-}
-
-export async function cancelCodexLogin(workspaceId: string) {
-  return invoke<{ canceled: boolean; status?: string; raw?: unknown }>("codex_login_cancel", {
-    workspaceId,
   });
 }

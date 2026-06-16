@@ -2,14 +2,12 @@ import ChevronLeft from "lucide-react/dist/esm/icons/chevron-left";
 import ChevronRight from "lucide-react/dist/esm/icons/chevron-right";
 import RefreshCw from "lucide-react/dist/esm/icons/refresh-cw";
 import { useEffect, useState } from "react";
-import type { AccountSnapshot, LocalUsageSnapshot, RateLimitSnapshot } from "@/types";
+import type { LocalUsageSnapshot } from "@/types";
 import { formatCount, formatDayLabel, formatDuration, formatWeekRange } from "../homeFormatters";
 import type { HomeStatCard, UsageMetric, UsageWorkspaceOption } from "../homeTypes";
 import { buildHomeUsageViewModel } from "../homeUsageViewModel";
 
 type HomeUsageSectionProps = {
-  accountInfo: AccountSnapshot | null;
-  accountRateLimits: RateLimitSnapshot | null;
   isLoadingLocalUsage: boolean;
   localUsageError: string | null;
   localUsageSnapshot: LocalUsageSnapshot | null;
@@ -17,7 +15,6 @@ type HomeUsageSectionProps = {
   onUsageMetricChange: (metric: UsageMetric) => void;
   onUsageWorkspaceChange: (workspaceId: string | null) => void;
   usageMetric: UsageMetric;
-  usageShowRemaining: boolean;
   usageWorkspaceId: string | null;
   usageWorkspaceOptions: UsageWorkspaceOption[];
 };
@@ -36,8 +33,6 @@ function HomeUsageCard({ card }: { card: HomeStatCard }) {
 }
 
 export function HomeUsageSection({
-  accountInfo,
-  accountRateLimits,
   isLoadingLocalUsage,
   localUsageError,
   localUsageSnapshot,
@@ -45,19 +40,14 @@ export function HomeUsageSection({
   onUsageMetricChange,
   onUsageWorkspaceChange,
   usageMetric,
-  usageShowRemaining,
   usageWorkspaceId,
   usageWorkspaceOptions,
 }: HomeUsageSectionProps) {
   const [chartWeekOffset, setChartWeekOffset] = useState(0);
-  const { accountCards, accountMeta, updatedLabel, usageCards, usageDays, usageInsights } =
-    buildHomeUsageViewModel({
-      accountInfo,
-      accountRateLimits,
-      localUsageSnapshot,
-      usageMetric,
-      usageShowRemaining,
-    });
+  const { updatedLabel, usageCards, usageDays, usageInsights } = buildHomeUsageViewModel({
+    localUsageSnapshot,
+    usageMetric,
+  });
 
   const maxHistoricalWeekOffset = Math.max(0, Math.ceil(usageDays.length / 7) - 1);
   useEffect(() => {
@@ -274,23 +264,6 @@ export function HomeUsageSection({
             {localUsageError && <div className="home-usage-error">{localUsageError}</div>}
           </div>
         </>
-      )}
-      {accountCards.length > 0 && (
-        <div className="home-account">
-          <div className="home-section-header">
-            <div className="home-section-title">Account limits</div>
-            {accountMeta && (
-              <div className="home-section-meta-row">
-                <div className="home-section-meta">{accountMeta}</div>
-              </div>
-            )}
-          </div>
-          <div className="home-usage-grid home-account-grid">
-            {accountCards.map((card) => (
-              <HomeUsageCard card={card} key={card.label} />
-            ))}
-          </div>
-        </div>
       )}
     </div>
   );

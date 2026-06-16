@@ -72,5 +72,4 @@ export type UiConfig = {
   chatHistoryScrollbackItems?: number | null;
   showMessageFilePath?: boolean;
   splitChatDiffView?: boolean;
-  usageShowRemaining?: boolean;
 };

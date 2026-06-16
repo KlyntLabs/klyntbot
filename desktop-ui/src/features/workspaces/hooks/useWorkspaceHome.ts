@@ -1,6 +1,6 @@
 import { generateRunMetadata } from "@services/tauri";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { ModelOption, SendMessageResult, ServiceTier, WorkspaceInfo } from "@/types";
+import type { ModelOption, SendMessageResult, WorkspaceInfo } from "@/types";
 
 export type WorkspaceRunMode = "local" | "worktree";
 
@@ -41,7 +41,6 @@ type UseWorkspaceHomeOptions = {
   models: ModelOption[];
   selectedModelId: string | null;
   effort?: string | null;
-  serviceTier?: ServiceTier | null | undefined;
   collaborationMode?: Record<string, unknown> | null;
   seedThreadCodexParams?: (
     workspaceId: string,
@@ -49,7 +48,6 @@ type UseWorkspaceHomeOptions = {
     patch: {
       modelId: string | null;
       effort: string | null;
-      serviceTier: ServiceTier | null | undefined;
     },
   ) => void;
   addWorktreeAgent: (
@@ -70,7 +68,6 @@ type UseWorkspaceHomeOptions = {
     options?: {
       model?: string | null;
       effort?: string | null;
-      serviceTier?: ServiceTier | null | undefined;
       collaborationMode?: Record<string, unknown> | null;
     },
   ) => Promise<undefined | SendMessageResult>;
@@ -188,7 +185,6 @@ export function useWorkspaceHome({
   models,
   selectedModelId,
   effort = null,
-  serviceTier = undefined,
   collaborationMode = null,
   seedThreadCodexParams,
   addWorktreeAgent,
@@ -486,7 +482,6 @@ export function useWorkspaceHome({
             seedThreadCodexParams?.(activeWorkspace.id, threadId, {
               modelId: selectedModelId,
               effort,
-              serviceTier,
             });
             if (prompt) {
               seedThreadPrompt?.(activeWorkspace.id, threadId, prompt);
@@ -502,7 +497,6 @@ export function useWorkspaceHome({
               {
                 model: localModel,
                 effort,
-                serviceTier,
                 collaborationMode,
               },
             );
@@ -559,7 +553,6 @@ export function useWorkspaceHome({
                 seedThreadCodexParams?.(worktreeWorkspace.id, threadId, {
                   modelId: selection.modelId,
                   effort,
-                  serviceTier,
                 });
                 if (prompt) {
                   seedThreadPrompt?.(worktreeWorkspace.id, threadId, prompt);
@@ -572,7 +565,6 @@ export function useWorkspaceHome({
                   {
                     model: selection.model?.model ?? selection.modelId,
                     effort,
-                    serviceTier,
                     collaborationMode,
                   },
                 );
@@ -638,7 +630,6 @@ export function useWorkspaceHome({
       seedThreadCodexParams,
       seedThreadPrompt,
       selectedModelId,
-      serviceTier,
       sendUserMessageToThread,
       setSubmitting,
       setWorkspaceError,

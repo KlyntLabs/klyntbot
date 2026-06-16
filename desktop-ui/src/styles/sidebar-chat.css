@@ -128,7 +128,6 @@
   min-height: 0;
 }
 
-/* Footer: Settings + Upgrade */
 .sidebar-chat__footer {
   display: flex;
   align-items: center;
@@ -160,25 +159,6 @@
   width: 15px;
   height: 15px;
   color: var(--text-muted);
-}
-
-.sidebar-chat__upgrade {
-  background: transparent;
-  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.12));
-  color: var(--text-strong);
-  font-size: var(--fs-xs);
-  font-weight: 500;
-  padding: 4px 12px;
-  border-radius: 999px;
-  cursor: pointer;
-  transition:
-    background 120ms ease,
-    border-color 120ms ease;
-}
-
-.sidebar-chat__upgrade:hover {
-  background: var(--surface-hover);
-  border-color: var(--border-strong, rgba(255, 255, 255, 0.24));
 }
 
 .sidebar-chat__thread-list {

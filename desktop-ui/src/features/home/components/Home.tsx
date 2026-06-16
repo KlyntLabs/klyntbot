@@ -1,4 +1,4 @@
-import type { AccountSnapshot, LocalUsageSnapshot, RateLimitSnapshot } from "@/types";
+import type { LocalUsageSnapshot } from "@/types";
 import type { LatestAgentRun, UsageMetric, UsageWorkspaceOption } from "../homeTypes";
 import { HomeActions } from "./HomeActions";
 import { HomeLatestAgentsSection } from "./HomeLatestAgentsSection";
@@ -18,9 +18,6 @@ type HomeProps = {
   usageWorkspaceId: string | null;
   usageWorkspaceOptions: UsageWorkspaceOption[];
   onUsageWorkspaceChange: (workspaceId: string | null) => void;
-  accountRateLimits: RateLimitSnapshot | null;
-  usageShowRemaining: boolean;
-  accountInfo: AccountSnapshot | null;
   onSelectThread: (workspaceId: string, threadId: string) => void;
 };
 
@@ -38,9 +35,6 @@ export function Home({
   usageWorkspaceId,
   usageWorkspaceOptions,
   onUsageWorkspaceChange,
-  accountRateLimits,
-  usageShowRemaining,
-  accountInfo,
   onSelectThread,
 }: HomeProps) {
   return (
@@ -56,8 +50,6 @@ export function Home({
       />
       <HomeActions onAddWorkspace={onAddWorkspace} onAddWorkspaceFromUrl={onAddWorkspaceFromUrl} />
       <HomeUsageSection
-        accountInfo={accountInfo}
-        accountRateLimits={accountRateLimits}
         isLoadingLocalUsage={isLoadingLocalUsage}
         localUsageError={localUsageError}
         localUsageSnapshot={localUsageSnapshot}
@@ -65,7 +57,6 @@ export function Home({
         onUsageMetricChange={onUsageMetricChange}
         onUsageWorkspaceChange={onUsageWorkspaceChange}
         usageMetric={usageMetric}
-        usageShowRemaining={usageShowRemaining}
         usageWorkspaceId={usageWorkspaceId}
         usageWorkspaceOptions={usageWorkspaceOptions}
       />

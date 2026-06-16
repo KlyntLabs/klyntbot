@@ -92,7 +92,6 @@ describe("useWorkspaceHome", () => {
     expect(seedThreadCodexParams).toHaveBeenCalledWith("wt-1", "thread-1", {
       modelId: "id-1",
       effort: null,
-      serviceTier: undefined,
     });
   });
 
@@ -135,7 +134,6 @@ describe("useWorkspaceHome", () => {
     expect(seedThreadCodexParams).toHaveBeenCalledWith("ws-1", "thread-1", {
       modelId: "id-1",
       effort: null,
-      serviceTier: undefined,
     });
   });
 

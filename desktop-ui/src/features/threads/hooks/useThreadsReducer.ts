@@ -1,9 +1,7 @@
 import { CHAT_SCROLLBACK_DEFAULT } from "@utils/chatScrollback";
 import type {
-  AccountSnapshot,
   ApprovalRequest,
   ConversationItem,
-  RateLimitSnapshot,
   RequestUserInputRequest,
   ThreadListSortKey,
   ThreadSummary,
@@ -43,8 +41,6 @@ export type ThreadState = {
   approvals: ApprovalRequest[];
   userInputRequests: RequestUserInputRequest[];
   tokenUsageByThread: Record<string, ThreadTokenUsage>;
-  rateLimitsByWorkspace: Record<string, RateLimitSnapshot | null>;
-  accountByWorkspace: Record<string, AccountSnapshot | null>;
   planByThread: Record<string, TurnPlan | null>;
   lastAgentMessageByThread: Record<string, { text: string; timestamp: number }>;
 };
@@ -154,16 +150,6 @@ export type ThreadAction =
       workspaceId: string;
     }
   | { type: "setThreadTokenUsage"; threadId: string; tokenUsage: ThreadTokenUsage }
-  | {
-      type: "setRateLimits";
-      workspaceId: string;
-      rateLimits: RateLimitSnapshot | null;
-    }
-  | {
-      type: "setAccountInfo";
-      workspaceId: string;
-      account: AccountSnapshot | null;
-    }
   | { type: "setActiveTurnId"; threadId: string; turnId: string | null }
   | { type: "incrementTurnGeneration"; threadId: string }
   | { type: "setThreadTurnDiff"; threadId: string; diff: string }
@@ -197,8 +183,6 @@ export const initialState: ThreadState = {
   approvals: [],
   userInputRequests: [],
   tokenUsageByThread: {},
-  rateLimitsByWorkspace: {},
-  accountByWorkspace: {},
   planByThread: {},
   lastAgentMessageByThread: {},
 };

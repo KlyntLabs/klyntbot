@@ -11,7 +11,6 @@ import type {
   DebugEntry,
   ModelOption,
   RequestUserInputRequest,
-  ServiceTier,
   ThreadSummary,
   WorkspaceInfo,
 } from "@/types";
@@ -59,7 +58,6 @@ type UseMainAppComposerWorkspaceStateArgs = {
     models: ModelOption[];
     selectedModelId: string | null;
     resolvedEffort: string | null;
-    selectedServiceTier: ServiceTier | null | undefined;
     collaborationModePayload: Record<string, unknown> | null;
   };
   refs: {
@@ -88,7 +86,6 @@ type UseMainAppComposerWorkspaceStateArgs = {
     startCompact: Parameters<typeof useComposerController>[0]["startCompact"];
     startApps: Parameters<typeof useComposerController>[0]["startApps"];
     startMcp: Parameters<typeof useComposerController>[0]["startMcp"];
-    startFast: Parameters<typeof useComposerController>[0]["startFast"];
     startStatus: Parameters<typeof useComposerController>[0]["startStatus"];
     handleWorktreeCreated?: Parameters<typeof useWorkspaceHome>[0]["onWorktreeCreated"];
     addDebugEntry: (entry: DebugEntry) => void;
@@ -126,7 +123,6 @@ export function useMainAppComposerWorkspaceState({
     models: modelOptions,
     selectedModelId,
     resolvedEffort,
-    selectedServiceTier,
     collaborationModePayload,
   } = models;
   const { composerInputRef, workspaceHomeTextareaRef } = refs;
@@ -143,7 +139,6 @@ export function useMainAppComposerWorkspaceState({
     startCompact,
     startApps,
     startMcp,
-    startFast,
     startStatus,
     handleWorktreeCreated,
     addDebugEntry,
@@ -238,7 +233,6 @@ export function useMainAppComposerWorkspaceState({
     startCompact,
     startApps,
     startMcp,
-    startFast,
     startStatus,
   });
 
@@ -265,7 +259,6 @@ export function useMainAppComposerWorkspaceState({
     models: modelOptions,
     selectedModelId,
     effort: resolvedEffort,
-    serviceTier: selectedServiceTier,
     collaborationMode: collaborationModePayload,
     seedThreadCodexParams,
     seedThreadPrompt,

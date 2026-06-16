@@ -9,7 +9,7 @@ describe("useThreadCodexOrchestration", () => {
     localStorage.clear();
   });
 
-  it("mirrors active-thread fast mode changes into the workspace no-thread scope", () => {
+  it("persists thread-scoped codex params", () => {
     const { result } = renderHook(() => {
       const activeWorkspaceIdForParamsRef = useRef<string | null>("ws-1");
       return useThreadCodexOrchestration({ activeWorkspaceIdForParamsRef });
@@ -17,18 +17,21 @@ describe("useThreadCodexOrchestration", () => {
 
     act(() => {
       result.current.activeThreadIdRef.current = "thread-1";
-      result.current.persistThreadCodexParams({ serviceTier: "fast" });
+      result.current.persistThreadCodexParams({
+        modelId: "gpt-5",
+        codexArgsOverride: "--profile dev",
+      });
     });
 
     expect(result.current.getThreadCodexParams("ws-1", "thread-1")).toEqual(
-      expect.objectContaining({ serviceTier: "fast" }),
-    );
-    expect(result.current.getThreadCodexParams("ws-1", "__no_thread__")).toEqual(
-      expect.objectContaining({ serviceTier: "fast" }),
+      expect.objectContaining({
+        modelId: "gpt-5",
+        codexArgsOverride: "--profile dev",
+      }),
     );
   });
 
-  it("keeps workspace-home fast mode changes scoped to the no-thread selection", () => {
+  it("falls back to the no-thread scope when no active thread", () => {
     const { result } = renderHook(() => {
       const activeWorkspaceIdForParamsRef = useRef<string | null>("ws-1");
       return useThreadCodexOrchestration({ activeWorkspaceIdForParamsRef });
@@ -36,11 +39,15 @@ describe("useThreadCodexOrchestration", () => {
 
     act(() => {
       result.current.activeThreadIdRef.current = null;
-      result.current.persistThreadCodexParams({ serviceTier: "fast" });
+      result.current.persistThreadCodexParams({
+        effort: "high",
+      });
     });
 
     expect(result.current.getThreadCodexParams("ws-1", "__no_thread__")).toEqual(
-      expect.objectContaining({ serviceTier: "fast" }),
+      expect.objectContaining({
+        effort: "high",
+      }),
     );
     expect(result.current.getThreadCodexParams("ws-1", "thread-1")).toBeNull();
   });

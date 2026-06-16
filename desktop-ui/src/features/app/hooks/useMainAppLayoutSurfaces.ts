@@ -20,7 +20,6 @@ type GitDiffPanelProps = LayoutNodesOptions["git"]["gitDiffPanelProps"];
 type UseMainAppLayoutSurfacesArgs = {
   appSettings: Pick<
     AppSettings,
-    | "usageShowRemaining"
     | "composerCodeBlockCopyUseModifier"
     | "showMessageFilePath"
     | "openAppTargets"
@@ -61,13 +60,6 @@ type UseMainAppLayoutSurfacesArgs = {
   activeItems: LayoutNodesOptions["primary"]["messagesProps"]["items"];
   userInputRequests: SidebarProps["userInputRequests"];
   approvals: LayoutNodesOptions["primary"]["approvalToastsProps"]["approvals"];
-  activeRateLimits: SidebarProps["accountRateLimits"];
-  activeAccount: SidebarProps["accountInfo"];
-  homeRateLimits: LayoutNodesOptions["primary"]["homeProps"]["accountRateLimits"];
-  homeAccount: LayoutNodesOptions["primary"]["homeProps"]["accountInfo"];
-  accountSwitching: SidebarProps["accountSwitching"];
-  onSwitchAccount: SidebarProps["onSwitchAccount"];
-  onCancelSwitchAccount: SidebarProps["onCancelSwitchAccount"];
   onDecision: LayoutNodesOptions["primary"]["approvalToastsProps"]["onDecision"];
   onRemember: LayoutNodesOptions["primary"]["approvalToastsProps"]["onRemember"];
   onUserInputSubmit: LayoutNodesOptions["primary"]["messagesProps"]["onUserInputSubmit"];
@@ -160,7 +152,6 @@ type UseMainAppLayoutSurfacesArgs = {
   reasoningOptions: ComposerProps["reasoningOptions"];
   selectedEffort: ComposerProps["selectedEffort"];
   onSelectEffort: ComposerProps["onSelectEffort"];
-  selectedServiceTier: ComposerProps["selectedServiceTier"];
   reasoningSupported: boolean;
   codexArgsOptions: ComposerProps["codexArgsOptions"];
   selectedCodexArgsOverride: ComposerProps["selectedCodexArgsOverride"];
@@ -255,8 +246,6 @@ function buildPrimarySurface({
   activeItems,
   userInputRequests,
   approvals,
-  homeRateLimits,
-  homeAccount,
   onDecision,
   onRemember,
   onUserInputSubmit,
@@ -303,7 +292,6 @@ function buildPrimarySurface({
   reasoningOptions,
   selectedEffort,
   onSelectEffort,
-  selectedServiceTier,
   reasoningSupported,
   codexArgsOptions,
   selectedCodexArgsOverride,
@@ -453,7 +441,6 @@ function buildPrimarySurface({
           reasoningOptions,
           selectedEffort,
           onSelectEffort,
-          selectedServiceTier,
           reasoningSupported,
           codexArgsOptions,
           selectedCodexArgsOverride,
@@ -466,9 +453,6 @@ function buildPrimarySurface({
           prompts,
           files: composerWorkspaceState.files,
           textareaRef: composerInputRef,
-          // Thread-scoped composer children (CostPill, etc.) must key off the
-          // active *thread*, never the workspace ID — feeding `ws-…` here
-          // breaks `coding_thread_read` lookups and silently 404s.
           historyKey: activeThreadId ?? null,
           editorSettings: composerEditorSettings,
           editorExpanded: composerEditorExpanded,
@@ -540,9 +524,6 @@ function buildPrimarySurface({
       usageWorkspaceId,
       usageWorkspaceOptions,
       onUsageWorkspaceChange,
-      accountRateLimits: homeRateLimits,
-      usageShowRemaining: appSettings.usageShowRemaining,
-      accountInfo: homeAccount,
       onSelectThread: (workspaceId, threadId) => {
         threadNavigation.exitDiffView();
         threadNavigation.clearDraftState();
@@ -864,13 +845,6 @@ export function useMainAppLayoutSurfaces({
   activeItems,
   userInputRequests,
   approvals,
-  activeRateLimits,
-  activeAccount,
-  homeRateLimits,
-  homeAccount,
-  accountSwitching,
-  onSwitchAccount,
-  onCancelSwitchAccount,
   onDecision,
   onRemember,
   onUserInputSubmit,
@@ -926,7 +900,6 @@ export function useMainAppLayoutSurfaces({
   reasoningOptions,
   selectedEffort,
   onSelectEffort,
-  selectedServiceTier,
   reasoningSupported,
   codexArgsOptions,
   selectedCodexArgsOverride,
@@ -1034,13 +1007,6 @@ export function useMainAppLayoutSurfaces({
     activeItems,
     userInputRequests,
     approvals,
-    activeRateLimits,
-    activeAccount,
-    homeRateLimits,
-    homeAccount,
-    accountSwitching,
-    onSwitchAccount,
-    onCancelSwitchAccount,
     onDecision,
     onRemember,
     onUserInputSubmit,
@@ -1096,7 +1062,6 @@ export function useMainAppLayoutSurfaces({
     reasoningOptions,
     selectedEffort,
     onSelectEffort,
-    selectedServiceTier,
     reasoningSupported,
     codexArgsOptions,
     selectedCodexArgsOverride,
