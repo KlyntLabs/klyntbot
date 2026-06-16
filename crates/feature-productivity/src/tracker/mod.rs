@@ -2,7 +2,10 @@
 //! categorizes the activity, and broadcasts `ActivityTick` events
 //! for independent subscribers to consume.
 
+#![cfg_attr(not(target_os = "macos"), allow(dead_code, unused_imports))]
+
 pub mod categorizer;
+#[cfg(target_os = "macos")]
 pub mod macos;
 
 use std::collections::HashSet;
