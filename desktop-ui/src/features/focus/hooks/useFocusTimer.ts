@@ -215,7 +215,7 @@ export function useFocusTimer() {
   const paused = serverState?.paused ?? false;
   const isActive = phase === "working" || phase === "break";
 
-  const remainingSecs = isActive ? serverState?.remainingSecs ?? null : null;
+  const remainingSecs = isActive ? (serverState?.remainingSecs ?? null) : null;
 
   const totalSecs = serverState?.totalSecs ?? null;
   const cyclePosition = serverState?.cyclePosition ?? 0;
