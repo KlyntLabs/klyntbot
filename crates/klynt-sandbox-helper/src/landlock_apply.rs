@@ -1,7 +1,7 @@
 use klynt_sandbox::policy::{FsConstraints, SandboxPolicy};
 use landlock::{
-    AccessFs, CompatLevel, Compatible, PathBeneath, PathFd, RestrictionStatus, Ruleset, RulesetAttr,
-    RulesetCreatedAttr, ABI,
+    AccessFs, CompatLevel, Compatible, PathBeneath, PathFd, RestrictionStatus, Ruleset,
+    RulesetAttr, RulesetCreatedAttr, ABI,
 };
 
 /// Reserved exit codes for the helper:
