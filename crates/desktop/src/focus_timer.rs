@@ -860,9 +860,8 @@ async fn on_work_complete(app: &AppHandle, duration_mins: u64) {
     let (sound_enabled, notification_enabled) = read_preferences(app).await;
 
     if notification_enabled {
-        let body = format!("{duration_mins}m focus session complete. Break time!");
-        let _ = crate::notify::TauriNotificationSender::new(app.clone())
-            .send_sync("Focus Session Complete", &body);
+        let sender = crate::notify::TauriNotificationSender::new(app.clone());
+        let _ = sender.send_focus_work_complete(duration_mins);
     }
 
     if sound_enabled {
@@ -876,8 +875,8 @@ async fn on_break_complete(app: &AppHandle) {
     let (sound_enabled, notification_enabled) = read_preferences(app).await;
 
     if notification_enabled {
-        let _ = crate::notify::TauriNotificationSender::new(app.clone())
-            .send_sync("Break Over", "Ready for the next focus session!");
+        let sender = crate::notify::TauriNotificationSender::new(app.clone());
+        let _ = sender.send_focus_break_complete();
     }
 
     if sound_enabled {
