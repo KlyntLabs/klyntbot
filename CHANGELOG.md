@@ -26,7 +26,7 @@ Reference issues and PRs as `(#123)`. Group related entries under sub-bullets wh
 
 ## [Unreleased]
 
-The upcoming `0.1.0` release — the first public release of Klyntbot, a local-first personal cognitive agent OS for macOS. On release this section will be renamed to `[0.1.0] — YYYY-MM-DD` and a fresh empty `[Unreleased]` will replace it.
+Active development. The next stable release will use calendar-semver (`YYYY.M.D`) and will be cut from a `stable-vYYYY.M.D` tag by the automated release pipeline.
 
 ### Added
 
@@ -50,7 +50,7 @@ The upcoming `0.1.0` release — the first public release of Klyntbot, a local-f
 
 - macOS only (Apple Silicon and Intel). Linux and Windows are not supported.
 - API keys in `~/.klyntbot/config.json` are stored in plaintext — full-disk encryption is the user's responsibility (see [SECURITY.md](./SECURITY.md)).
-- CI workflows are not yet provided. Contributors must run the local check suite documented in [CONTRIBUTING.md](./CONTRIBUTING.md).
+- CI workflows are in progress; see `.github/workflows/` and `RELEASE.md`.
 - Computer Use and procedural memory are designed but not implemented (see `docs/superpowers/specs/`).
 
 [Unreleased]: https://github.com/KlyntLabs/klyntbot/commits/main

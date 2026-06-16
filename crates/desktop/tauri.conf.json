@@ -1,6 +1,6 @@
 {
   "productName": "Klynt",
-  "version": "0.1.1",
+  "version": "0.1.0",
   "identifier": "com.klynt.app",
   "build": {
     "beforeDevCommand": {
@@ -54,7 +54,7 @@
   "plugins": {
     "updater": {
       "endpoints": [
-        "https://github.com/KlyntLabs/klynt-bot/releases/latest/download/latest.json"
+        "https://github.com/KlyntLabs/klyntbot/releases/latest/download/latest.json"
       ],
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IERCMDBFMjA0OUFEREIyNzUKUldSMXN0MmFCT0lBMjJ5MlQ4dEtzd1Q3SjhieDM5Q2l3cSs1TlArNUpxajMrMkR1SmZzbzl4T3cK"
     }

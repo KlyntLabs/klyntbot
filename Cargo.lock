@@ -14,7 +14,7 @@ dependencies = [
 
 [[package]]
 name = "activity-log"
-version = "0.1.1"
+version = "0.1.0"
 dependencies = [
  "ai-core",
  "async-trait",
@@ -55,7 +55,7 @@ dependencies = [
 
 [[package]]
 name = "agent"
-version = "0.1.1"
+version = "0.1.0"
 dependencies = [
  "activity-log",
  "ai-core",
@@ -277,7 +277,7 @@ dependencies = [
 
 [[package]]
 name = "analytics"
-version = "0.1.1"
+version = "0.1.0"
 dependencies = [
  "common",
  "jiff",
@@ -388,7 +388,7 @@ checksum = "170433209e817da6aae2c51aa0dd443009a613425dd041ebfb2492d1c4c11a25"
 
 [[package]]
 name = "app-core"
-version = "0.1.1"
+version = "0.1.0"
 dependencies = [
  "activity-log",
  "agent",
@@ -455,7 +455,7 @@ dependencies = [
 
 [[package]]
 name = "approval"
-version = "0.1.1"
+version = "0.1.0"
 dependencies = [
  "activity-log",
  "async-trait",
@@ -1091,7 +1091,7 @@ dependencies = [
 
 [[package]]
 name = "autotuner"
-version = "0.1.1"
+version = "0.1.0"
 dependencies = [
  "async-trait",
  "common",
@@ -1928,7 +1928,7 @@ checksum = "5d20789868f4b01b2f2caec9f5c4e0213b41e3e5702a50157d699ae31ced2fcb"
 
 [[package]]
 name = "bus"
-version = "0.1.1"
+version = "0.1.0"
 dependencies = [
  "common",
  "jiff",
@@ -2267,7 +2267,7 @@ dependencies = [
 
 [[package]]
 name = "channels"
-version = "0.1.1"
+version = "0.1.0"
 dependencies = [
  "approval",
  "async-imap",
@@ -2462,7 +2462,7 @@ checksum = "e9b18233253483ce2f65329a24072ec414db782531bdbb7d0bbc4bd2ce6b7e21"
 
 [[package]]
 name = "cognitive"
-version = "0.1.1"
+version = "0.1.0"
 dependencies = [
  "ai-core",
  "async-trait",
@@ -2482,7 +2482,7 @@ dependencies = [
 
 [[package]]
 name = "cognitive-graph"
-version = "0.1.1"
+version = "0.1.0"
 dependencies = [
  "ai-core",
  "ai-core-macros",
@@ -2504,7 +2504,7 @@ dependencies = [
 
 [[package]]
 name = "cognitive-learning"
-version = "0.1.1"
+version = "0.1.0"
 dependencies = [
  "cognitive-schema",
  "common",
@@ -2519,7 +2519,7 @@ dependencies = [
 
 [[package]]
 name = "cognitive-memory"
-version = "0.1.1"
+version = "0.1.0"
 dependencies = [
  "ai-core",
  "async-trait",
@@ -2553,7 +2553,7 @@ dependencies = [
 
 [[package]]
 name = "cognitive-mirror"
-version = "0.1.1"
+version = "0.1.0"
 dependencies = [
  "ai-core",
  "async-trait",
@@ -2578,7 +2578,7 @@ dependencies = [
 
 [[package]]
 name = "cognitive-reforge"
-version = "0.1.1"
+version = "0.1.0"
 dependencies = [
  "ai-core",
  "async-trait",
@@ -2603,7 +2603,7 @@ dependencies = [
 
 [[package]]
 name = "cognitive-schema"
-version = "0.1.1"
+version = "0.1.0"
 dependencies = [
  "common",
  "sqlx",
@@ -2645,7 +2645,7 @@ dependencies = [
 
 [[package]]
 name = "common"
-version = "0.1.1"
+version = "0.1.0"
 dependencies = [
  "async-trait",
  "bitflags 2.11.1",
@@ -2704,7 +2704,7 @@ dependencies = [
 
 [[package]]
 name = "config"
-version = "0.1.1"
+version = "0.1.0"
 dependencies = [
  "common",
  "dirs",
@@ -4328,7 +4328,7 @@ dependencies = [
 
 [[package]]
 name = "desktop"
-version = "0.1.1"
+version = "0.1.0"
 dependencies = [
  "anyhow",
  "app-core",
@@ -4399,7 +4399,7 @@ dependencies = [
 
 [[package]]
 name = "desktop-shared"
-version = "0.1.1"
+version = "0.1.0"
 dependencies = [
  "activity-log",
  "bus",
@@ -5057,7 +5057,7 @@ dependencies = [
 
 [[package]]
 name = "feature-alarms"
-version = "0.1.1"
+version = "0.1.0"
 dependencies = [
  "async-trait",
  "bus",
@@ -5077,7 +5077,7 @@ dependencies = [
 
 [[package]]
 name = "feature-coaching"
-version = "0.1.1"
+version = "0.1.0"
 dependencies = [
  "ai-core",
  "ai-core-macros",
@@ -5099,7 +5099,7 @@ dependencies = [
 
 [[package]]
 name = "feature-focus"
-version = "0.1.1"
+version = "0.1.0"
 dependencies = [
  "async-trait",
  "common",
@@ -5117,7 +5117,7 @@ dependencies = [
 
 [[package]]
 name = "feature-insights"
-version = "0.1.1"
+version = "0.1.0"
 dependencies = [
  "async-trait",
  "bus",
@@ -5138,7 +5138,7 @@ dependencies = [
 
 [[package]]
 name = "feature-language-learning"
-version = "0.1.1"
+version = "0.1.0"
 dependencies = [
  "ai-core",
  "ai-core-macros",
@@ -5158,7 +5158,7 @@ dependencies = [
 
 [[package]]
 name = "feature-launcher"
-version = "0.1.1"
+version = "0.1.0"
 dependencies = [
  "arc-swap",
  "async-trait",
@@ -5197,7 +5197,7 @@ dependencies = [
 
 [[package]]
 name = "feature-learning"
-version = "0.1.1"
+version = "0.1.0"
 dependencies = [
  "ai-core",
  "ai-core-macros",
@@ -5216,7 +5216,7 @@ dependencies = [
 
 [[package]]
 name = "feature-notes"
-version = "0.1.1"
+version = "0.1.0"
 dependencies = [
  "ai-core",
  "ai-core-macros",
@@ -5237,7 +5237,7 @@ dependencies = [
 
 [[package]]
 name = "feature-productivity"
-version = "0.1.1"
+version = "0.1.0"
 dependencies = [
  "activity-log",
  "ai-core",
@@ -5265,7 +5265,7 @@ dependencies = [
 
 [[package]]
 name = "feature-tasks"
-version = "0.1.1"
+version = "0.1.0"
 dependencies = [
  "ai-core",
  "ai-core-macros",
@@ -7676,7 +7676,7 @@ dependencies = [
 
 [[package]]
 name = "klynt-git-utils"
-version = "0.1.1"
+version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
  "common",
@@ -7715,7 +7715,7 @@ dependencies = [
 
 [[package]]
 name = "klynt-process-hardening"
-version = "0.1.1"
+version = "0.1.0"
 dependencies = [
  "libc",
  "pretty_assertions",
@@ -7734,7 +7734,7 @@ dependencies = [
 
 [[package]]
 name = "klynt-pty"
-version = "0.1.1"
+version = "0.1.0"
 dependencies = [
  "async-trait",
  "libc",
@@ -7798,7 +7798,7 @@ dependencies = [
 
 [[package]]
 name = "klynt-truncation"
-version = "0.1.1"
+version = "0.1.0"
 dependencies = [
  "pretty_assertions",
  "serde",
@@ -7807,7 +7807,7 @@ dependencies = [
 
 [[package]]
 name = "klyntbot"
-version = "0.1.1"
+version = "0.1.0"
 dependencies = [
  "activity-log",
  "agent",
@@ -7851,7 +7851,7 @@ dependencies = [
 
 [[package]]
 name = "klyntbot-server"
-version = "0.1.1"
+version = "0.1.0"
 dependencies = [
  "agent",
  "anyhow",
@@ -9099,7 +9099,7 @@ dependencies = [
 
 [[package]]
 name = "mcp"
-version = "0.1.1"
+version = "0.1.0"
 dependencies = [
  "ai-core",
  "anyhow",
@@ -10971,7 +10971,7 @@ dependencies = [
 
 [[package]]
 name = "platform-macos"
-version = "0.1.1"
+version = "0.1.0"
 dependencies = [
  "async-trait",
  "core-foundation 0.10.1",
@@ -11337,7 +11337,7 @@ dependencies = [
 
 [[package]]
 name = "providers"
-version = "0.1.1"
+version = "0.1.0"
 dependencies = [
  "async-trait",
  "common",
@@ -12656,7 +12656,7 @@ dependencies = [
 
 [[package]]
 name = "scheduling"
-version = "0.1.1"
+version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -13179,7 +13179,7 @@ dependencies = [
 
 [[package]]
 name = "session"
-version = "0.1.1"
+version = "0.1.0"
 dependencies = [
  "common",
  "dashmap",
@@ -13363,7 +13363,7 @@ dependencies = [
 
 [[package]]
 name = "skill-system"
-version = "0.1.1"
+version = "0.1.0"
 dependencies = [
  "async-trait",
  "common",
@@ -13957,7 +13957,7 @@ dependencies = [
 
 [[package]]
 name = "storage"
-version = "0.1.1"
+version = "0.1.0"
 dependencies = [
  "ai-core",
  "arrow-array",
@@ -15415,7 +15415,7 @@ checksum = "756daf9b1013ebe47a8776667b466417e2d4c5679d441c26230efd9ef78692db"
 
 [[package]]
 name = "tools"
-version = "0.1.1"
+version = "0.1.0"
 dependencies = [
  "async-trait",
  "bus",
@@ -15443,7 +15443,7 @@ dependencies = [
 
 [[package]]
 name = "tools-core"
-version = "0.1.1"
+version = "0.1.0"
 dependencies = [
  "async-trait",
  "bus",
@@ -15464,7 +15464,7 @@ dependencies = [
 
 [[package]]
 name = "tools-core-macros"
-version = "0.1.1"
+version = "0.1.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -16046,7 +16046,7 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
 name = "voice-engine"
-version = "0.1.1"
+version = "0.1.0"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
