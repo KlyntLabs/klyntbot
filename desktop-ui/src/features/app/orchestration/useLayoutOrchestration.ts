@@ -8,7 +8,7 @@ type UseAppShellOrchestrationOptions = {
   rightPanelCollapsed: boolean;
   shouldReduceTransparency: boolean;
   isWorkspaceDropActive: boolean;
-  centerMode: "chat" | "diff" | "calendar" | "focus";
+  centerMode: "chat" | "diff" | "calendar";
   appView: AppView;
   selectedDiffPath: string | null;
   showComposer: boolean;
@@ -48,7 +48,7 @@ export function useAppShellOrchestration({
     shouldReduceTransparency ? " reduced-transparency" : ""
   }${sidebarCollapsed ? " sidebar-collapsed" : ""}${
     rightPanelCollapsed ? " right-panel-collapsed" : ""
-  }${appView === "calendar" ? " is-calendar" : ""}${appView === "focus" ? " is-focus" : ""}${isWindows ? " is-windows" : ""}`;
+  }${appView === "calendar" ? " is-calendar" : ""}${isWindows ? " is-windows" : ""}`;
 
   const appStyle = useMemo<CSSProperties>(
     () =>

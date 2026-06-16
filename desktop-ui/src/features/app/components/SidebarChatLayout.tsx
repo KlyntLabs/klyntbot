@@ -2,7 +2,6 @@ import Calendar from "lucide-react/dist/esm/icons/calendar";
 import Search from "lucide-react/dist/esm/icons/search";
 import Settings from "lucide-react/dist/esm/icons/settings";
 import SquarePen from "lucide-react/dist/esm/icons/square-pen";
-import Timer from "lucide-react/dist/esm/icons/timer";
 import { memo } from "react";
 import type { ChatThread } from "@/features/chat/types";
 
@@ -10,7 +9,6 @@ type SidebarChatLayoutProps = {
   onOpenSettings: () => void;
   onNewChat: () => void;
   onSelectCalendar?: () => void;
-  onSelectFocus?: () => void;
   threads: ChatThread[];
   selectedSessionKey: string | null;
   onSelectThread: (sessionKey: string) => void;
@@ -28,14 +26,12 @@ export const SidebarChatLayout = memo(function SidebarChatLayout({
   onOpenSettings,
   onNewChat,
   onSelectCalendar,
-  onSelectFocus,
   threads,
   selectedSessionKey,
   onSelectThread,
   activeNavId,
 }: SidebarChatLayoutProps) {
   const handleSelectCalendar = onSelectCalendar ?? (() => {});
-  const handleSelectFocus = onSelectFocus ?? (() => {});
   const allNavItems: NavItem[] = [
     {
       id: "new-chat",
@@ -49,12 +45,6 @@ export const SidebarChatLayout = memo(function SidebarChatLayout({
       label: "Calendar",
       icon: <Calendar aria-hidden />,
       onClick: handleSelectCalendar,
-    },
-    {
-      id: "focus",
-      label: "Focus",
-      icon: <Timer aria-hidden />,
-      onClick: handleSelectFocus,
     },
   ];
 

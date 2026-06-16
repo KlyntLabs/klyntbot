@@ -2,7 +2,7 @@ import { MainTopbar } from "@app/components/MainTopbar";
 import { type MouseEvent, type ReactNode, useEffect, useRef } from "react";
 import { ChatPane } from "./ChatPane";
 
-type CenterMode = "chat" | "diff" | "calendar" | "focus";
+type CenterMode = "chat" | "diff" | "calendar";
 
 function shouldRenderDiffViewer({
   splitChatDiffView,
@@ -61,7 +61,6 @@ type DesktopLayoutProps = {
   errorToastsNode: ReactNode;
   homeNode: ReactNode;
   dashboardNode?: ReactNode;
-  focusNode?: ReactNode;
   showHome: boolean;
   showWorkspace: boolean;
   topbarLeftNode: ReactNode;
@@ -90,7 +89,6 @@ export function DesktopLayout({
   errorToastsNode,
   homeNode,
   dashboardNode,
-  focusNode,
   showHome,
   showWorkspace,
   topbarLeftNode,
@@ -159,7 +157,6 @@ export function DesktopLayout({
         {errorToastsNode}
         {showHome && homeNode}
         {centerMode === "calendar" && dashboardNode}
-        {centerMode === "focus" && focusNode}
 
         {showWorkspace && (
           <>

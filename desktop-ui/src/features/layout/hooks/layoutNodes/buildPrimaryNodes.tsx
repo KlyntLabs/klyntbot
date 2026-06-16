@@ -30,7 +30,6 @@ export function buildPrimaryNodes(options: PrimaryLayoutNodesOptions): PrimaryLa
       onOpenSettings={options.sidebarProps.onOpenSettings}
       onNewChat={options.sidebarProps.onNewChat}
       onSelectCalendar={options.sidebarProps.onSelectCalendar}
-      onSelectFocus={options.sidebarProps.onSelectFocus}
       activeNavId={options.sidebarProps.activeNavId}
       threads={options.sidebarProps.threads}
       selectedSessionKey={options.sidebarProps.selectedSessionKey}

@@ -66,7 +66,6 @@ import { useComposerEditorState } from "@/features/composer/hooks/useComposerEdi
 import { useComposerMenuActions } from "@/features/composer/hooks/useComposerMenuActions";
 import { useComposerShortcuts } from "@/features/composer/hooks/useComposerShortcuts";
 import { Dashboard } from "@/features/dashboard";
-import { FocusPage } from "@/features/focus/components/FocusPage";
 import { useAutoExitEmptyDiff } from "@/features/git/hooks/useAutoExitEmptyDiff";
 import { useBranchSwitcherShortcut } from "@/features/git/hooks/useBranchSwitcherShortcut";
 import { usePullRequestComposer } from "@/features/git/hooks/usePullRequestComposer";
@@ -425,10 +424,6 @@ export default function MainApp() {
 
   const onSelectCalendar = useCallback(() => {
     setAppView("calendar");
-  }, []);
-
-  const onSelectFocus = useCallback(() => {
-    setAppView("focus");
   }, []);
 
   const onSelectThread = useCallback((sessionKey: string) => {
@@ -1855,8 +1850,7 @@ export default function MainApp() {
       onNewChat,
       onSelectThread,
       onSelectCalendar,
-      onSelectFocus,
-      activeNavId: appView === "calendar" ? "calendar" : appView === "focus" ? "focus" : null,
+      activeNavId: appView === "calendar" ? "calendar" : null,
       chatThreads,
       refetchChatThreads,
     },
@@ -1962,15 +1956,13 @@ export default function MainApp() {
       selectedPullRequestNumber: selectedPullRequest?.number ?? null,
     },
     appLayout: {
-      showHome: showHome && appView !== "chat" && appView !== "calendar" && appView !== "focus",
+      showHome: showHome && appView !== "chat" && appView !== "calendar",
       centerMode: (() => {
         switch (appView) {
           case "chat":
             return "chat";
           case "calendar":
             return "calendar";
-          case "focus":
-            return "focus";
           default:
             return centerMode;
         }
@@ -1978,10 +1970,7 @@ export default function MainApp() {
       preloadGitDiffs: appSettings.preloadGitDiffs,
       splitChatDiffView: appSettings.splitChatDiffView,
       hasActivePlan: hasActivePlan,
-      activeWorkspace:
-        (Boolean(activeWorkspace) || appView === "chat") &&
-        appView !== "calendar" &&
-        appView !== "focus",
+      activeWorkspace: (Boolean(activeWorkspace) || appView === "chat") && appView !== "calendar",
       sidebarNode,
       messagesNode: showProviderSetup ? (
         <ProviderSetupPrompt onOpenSettings={() => setProviderSetupOpen(true)} />
@@ -1994,7 +1983,6 @@ export default function MainApp() {
       errorToastsNode,
       homeNode,
       dashboardNode: appView === "calendar" ? <Dashboard /> : null,
-      focusNode: appView === "focus" ? <FocusPage /> : null,
       gitDiffPanelNode,
       gitDiffViewerNode,
       planPanelNode,
