@@ -1,4 +1,4 @@
-//! Desktop focus timer — backend-owned phase state machine with 5-second sync
+//! Desktop focus timer — backend-owned phase state machine with 1-second sync
 //! ticks, macOS DND integration, and automatic cycle progression.
 //!
 //! Phases: Working → BreakPending (5s) → Break → Working (auto-continues).
@@ -284,7 +284,7 @@ fn restore_dnd_state(dnd_enabled: bool, dnd_was_active_before: bool) {
 
 const WARNING_SECS: u64 = 30;
 const BREAK_PENDING_SECS: u64 = 5;
-const SYNC_INTERVAL: u64 = 5;
+const SYNC_INTERVAL: u64 = 1;
 
 async fn session_loop(
     app: AppHandle,
