@@ -412,7 +412,7 @@ export default function MainApp() {
     setSelectedCodexArgsOverride(normalizeCodexArgsInput(preferredCodexArgsOverride));
   }, [preferredCodexArgsOverride]);
 
-  const [appView, setAppView] = useState<AppView>(AppView.Home);
+  const [appView, setAppView] = useState<AppView>(AppView.Calendar);
   const [selectedSessionKey, setSelectedSessionKey] = useState<string | null>(null);
   const [providerSetupOpen, setProviderSetupOpen] = useState(false);
   const { threads: chatThreads, refetch: refetchChatThreads } = useChatThreads();

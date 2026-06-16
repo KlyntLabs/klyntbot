@@ -34,18 +34,18 @@ export const SidebarChatLayout = memo(function SidebarChatLayout({
   const handleSelectCalendar = onSelectCalendar ?? (() => {});
   const allNavItems: NavItem[] = [
     {
+      id: "calendar",
+      label: "Calendar",
+      icon: <Calendar aria-hidden />,
+      onClick: handleSelectCalendar,
+    },
+    {
       id: "new-chat",
       label: "New chat",
       icon: <SquarePen aria-hidden />,
       onClick: onNewChat,
     },
     { id: "search", label: "Search", icon: <Search aria-hidden /> },
-    {
-      id: "calendar",
-      label: "Calendar",
-      icon: <Calendar aria-hidden />,
-      onClick: handleSelectCalendar,
-    },
   ];
 
   return (
