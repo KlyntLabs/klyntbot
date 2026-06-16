@@ -865,14 +865,11 @@ async fn on_work_complete(app: &AppHandle, duration_mins: u64) {
             .send_sync("Focus Session Complete", &body);
     }
 
-    #[cfg(target_os = "macos")]
     if sound_enabled {
-        let _ = tokio::process::Command::new("afplay")
-            .arg("/System/Library/Sounds/Glass.aiff")
-            .spawn();
+        if let Some(audio) = app.try_state::<Arc<crate::focus_audio::FocusAudioManager>>() {
+            audio.play(crate::focus_audio::FocusCue::WorkComplete, 0.8);
+        }
     }
-    #[cfg(not(target_os = "macos"))]
-    let _ = sound_enabled;
 }
 
 async fn on_break_complete(app: &AppHandle) {
@@ -883,14 +880,11 @@ async fn on_break_complete(app: &AppHandle) {
             .send_sync("Break Over", "Ready for the next focus session!");
     }
 
-    #[cfg(target_os = "macos")]
     if sound_enabled {
-        let _ = tokio::process::Command::new("afplay")
-            .arg("/System/Library/Sounds/Blow.aiff")
-            .spawn();
+        if let Some(audio) = app.try_state::<Arc<crate::focus_audio::FocusAudioManager>>() {
+            audio.play(crate::focus_audio::FocusCue::BreakComplete, 0.8);
+        }
     }
-    #[cfg(not(target_os = "macos"))]
-    let _ = sound_enabled;
 
     open_tray_window(app);
 }
