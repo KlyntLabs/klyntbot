@@ -129,7 +129,6 @@ export function useFocusTimer() {
   const refetchToday = useCallback(() => todaySessionsQuery.refetch(), [todaySessionsQuery]);
 
   const [serverState, setServerState] = useState<FocusSyncPayload | null>(null);
-  const [_receivedAt, setReceivedAt] = useState<number>(0);
   const hasSeededRef = useRef(false);
 
   const [settings, setSettings] = useState(() => {
@@ -173,22 +172,9 @@ export function useFocusTimer() {
   const [showWarning, setShowWarning] = useState(false);
   const [dndHint, setDndHint] = useState<string | null>(null);
 
-  const [localTick, setLocalTick] = useState(0);
-  const isRunning = !!serverState && !serverState.paused;
-  useEffect(() => {
-    if (!isRunning) return;
-    const id = setInterval(() => setLocalTick((t) => t + 1), 1000);
-    return () => clearInterval(id);
-  }, [isRunning]);
-
-  useEffect(() => {
-    setLocalTick(0);
-  }, []);
-
   useEvent<FocusSyncPayload>("focus:sync", (payload) => {
     if (payload) {
       setServerState(payload);
-      setReceivedAt(Date.now());
       setShowWarning(false);
     }
   });
@@ -196,7 +182,6 @@ export function useFocusTimer() {
   useEvent<FocusSyncPayload>("focus:phase_changed", (payload) => {
     if (payload) {
       setServerState(payload);
-      setReceivedAt(Date.now());
       setShowWarning(false);
       refetchToday();
     }
@@ -217,7 +202,6 @@ export function useFocusTimer() {
   useEffect(() => {
     if (initialStatus.active && initialStatus.sync) {
       setServerState(initialStatus.sync);
-      setReceivedAt(Date.now());
     }
   }, [initialStatus.active, initialStatus.sync]);
 
@@ -231,11 +215,7 @@ export function useFocusTimer() {
   const paused = serverState?.paused ?? false;
   const isActive = phase === "working" || phase === "break";
 
-  const remainingSecs = useMemo(() => {
-    if (!serverState || !isActive) return null;
-    const elapsed = localTick;
-    return Math.max(0, serverState.remainingSecs - elapsed);
-  }, [serverState, isActive, localTick]);
+  const remainingSecs = isActive ? serverState?.remainingSecs ?? null : null;
 
   const totalSecs = serverState?.totalSecs ?? null;
   const cyclePosition = serverState?.cyclePosition ?? 0;
