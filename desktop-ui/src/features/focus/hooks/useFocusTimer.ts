@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { FocusDefaultsUpdate } from "@/bindings";
 import { useEvent } from "@/hooks/useEvent";
 import { todayISO } from "@/lib/dates";
 import { qk, useTauriMutation, useTauriQuery } from "@/lib/query";
@@ -23,6 +24,13 @@ const DEFAULT_SETTINGS: FocusSettings = {
   dndEnabled: false,
   soundEnabled: true,
   notificationEnabled: true,
+};
+
+const FALLBACK_FOCUS_DEFAULTS = {
+  workMins: DEFAULT_SETTINGS.focusDuration,
+  shortBreakMins: DEFAULT_SETTINGS.shortBreak,
+  longBreakMins: DEFAULT_SETTINGS.longBreak,
+  longBreakAfter: DEFAULT_SETTINGS.longBreakAfter,
 };
 
 export const FOCUS_PRESETS: FocusPreset[] = [
@@ -54,15 +62,6 @@ interface CoachingIntervention {
   interventionType: string;
 }
 
-interface FocusDefaultsUpdate {
-  workMins: number | null;
-  shortBreakMins: number | null;
-  longBreakMins: number | null;
-  longBreakAfter: number | null;
-  autoStartWork: boolean | null;
-  autoStartBreak: boolean | null;
-}
-
 export type { FocusPhase, FocusPreset, FocusSettings } from "../types";
 
 export function useFocusTimer() {
@@ -82,12 +81,7 @@ export function useFocusTimer() {
   }>({
     queryKey: qk.focus.defaults(),
     command: "focus_defaults_get",
-    fallback: {
-      workMins: DEFAULT_SETTINGS.focusDuration,
-      shortBreakMins: DEFAULT_SETTINGS.shortBreak,
-      longBreakMins: DEFAULT_SETTINGS.longBreak,
-      longBreakAfter: DEFAULT_SETTINGS.longBreakAfter,
-    },
+    fallback: FALLBACK_FOCUS_DEFAULTS,
   });
 
   const startMut = useTauriMutation<FocusSession, Record<string, unknown>>({
@@ -136,6 +130,8 @@ export function useFocusTimer() {
 
   const [serverState, setServerState] = useState<FocusSyncPayload | null>(null);
   const [_receivedAt, setReceivedAt] = useState<number>(0);
+  const hasSeededRef = useRef(false);
+
   const [settings, setSettings] = useState(() => {
     const backendDefaults = defaultsQuery.data;
     return {
@@ -151,8 +147,10 @@ export function useFocusTimer() {
   });
 
   useEffect(() => {
+    if (hasSeededRef.current) return;
     const backendDefaults = defaultsQuery.data;
     if (!backendDefaults) return;
+    hasSeededRef.current = true;
     setSettings((prev) => {
       // Local storage overrides backend defaults; only seed from backend when no
       // local settings have been saved yet.
