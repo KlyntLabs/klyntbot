@@ -5,6 +5,7 @@
 //! The backend owns cycle position and break-type decisions.
 
 use std::sync::Arc;
+use std::time::Instant;
 
 use desktop_shared::events::{
     FocusDndUnavailablePayload, FocusSyncPayload, FocusWarningPayload, FOCUS_PHASE_CHANGED,
@@ -308,7 +309,10 @@ async fn session_loop(
     let mut paused = false;
     let mut warning_shown = false;
     let mut sync_counter: u64 = 0;
-    let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(1));
+    use std::time::Duration;
+    let tick_duration = Duration::from_secs(1);
+    let mut tick_count: u64 = 0;
+    let mut segment_start = Instant::now();
 
     // Emit initial phase_changed
     emit_phase_changed(
@@ -361,6 +365,7 @@ async fn session_loop(
                             warning_shown = false;
                         }
                     }
+                    reset_segment(&mut segment_start, &mut tick_count);
                     emit_phase_changed(
                         &app,
                         &phase,
@@ -380,6 +385,7 @@ async fn session_loop(
                         };
                         warning_shown = false;
                         sync_counter = 0;
+                        reset_segment(&mut segment_start, &mut tick_count);
                         // Start break session in AppCore
                         start_break_session(&app, break_secs).await;
                         emit_phase_changed(
@@ -401,6 +407,7 @@ async fn session_loop(
                         };
                         warning_shown = false;
                         sync_counter = 0;
+                        reset_segment(&mut segment_start, &mut tick_count);
                         emit_phase_changed(
                             &app,
                             &phase,
@@ -426,6 +433,7 @@ async fn session_loop(
                         };
                         warning_shown = false;
                         sync_counter = 0;
+                        reset_segment(&mut segment_start, &mut tick_count);
                         emit_phase_changed(
                             &app,
                             &phase,
@@ -447,6 +455,7 @@ async fn session_loop(
                         };
                         warning_shown = false;
                         sync_counter = 0;
+                        reset_segment(&mut segment_start, &mut tick_count);
                         open_tray_window(&app);
                         emit_phase_changed(
                             &app,
@@ -474,6 +483,7 @@ async fn session_loop(
                             remaining,
                             total,
                         };
+                        reset_segment(&mut segment_start, &mut tick_count);
                         update_tray_title(
                             &app,
                             phase.remaining(),
@@ -512,6 +522,7 @@ async fn session_loop(
                             },
                         };
                         paused = false;
+                        reset_segment(&mut segment_start, &mut tick_count);
                         emit_phase_changed(
                             &app,
                             &phase,
@@ -526,7 +537,10 @@ async fn session_loop(
             }
         }
 
-        interval.tick().await;
+        let next_tick = segment_start + tick_duration * ((tick_count + 1) as u32);
+        let sleep_for = next_tick.saturating_duration_since(Instant::now());
+        tokio::time::sleep(sleep_for).await;
+        tick_count += 1;
 
         if paused {
             // Don't emit sync while paused — frontend freezes display
@@ -550,6 +564,7 @@ async fn session_loop(
                     };
                     warning_shown = false;
                     sync_counter = 0;
+                    reset_segment(&mut segment_start, &mut tick_count);
                     open_tray_window(&app);
                     emit_phase_changed(
                         &app,
@@ -571,6 +586,7 @@ async fn session_loop(
                     };
                     warning_shown = false;
                     sync_counter = 0;
+                    reset_segment(&mut segment_start, &mut tick_count);
                     emit_phase_changed(
                         &app,
                         &phase,
@@ -601,6 +617,7 @@ async fn session_loop(
                     };
                     warning_shown = false;
                     sync_counter = 0;
+                    reset_segment(&mut segment_start, &mut tick_count);
                     emit_phase_changed(
                         &app,
                         &phase,
@@ -668,6 +685,11 @@ async fn session_loop(
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────
+
+fn reset_segment(segment_start: &mut Instant, tick_count: &mut u64) {
+    *segment_start = Instant::now();
+    *tick_count = 0;
+}
 
 fn compute_break_secs(config: &FocusSessionConfig, cycle_position: u32) -> u64 {
     if is_long_break(cycle_position, config) {
@@ -993,5 +1015,21 @@ mod tests {
     async fn timer_state_machine() {
         let timer = FocusTimer::new();
         assert!(timer.status().await.is_none());
+    }
+
+    #[tokio::test]
+    async fn drift_correction_keeps_timing_accurate() {
+        use std::time::{Duration, Instant};
+        let start = Instant::now();
+        let tick_duration = Duration::from_millis(100);
+        let mut tick_count = 0;
+        for _ in 0..10 {
+            let next = start + tick_duration * (tick_count + 1);
+            tokio::time::sleep(next.saturating_duration_since(Instant::now())).await;
+            tick_count += 1;
+        }
+        let elapsed = start.elapsed();
+        assert!(elapsed >= Duration::from_millis(950), "elapsed: {elapsed:?}");
+        assert!(elapsed < Duration::from_millis(1150), "elapsed: {elapsed:?}");
     }
 }
