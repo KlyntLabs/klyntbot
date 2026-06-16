@@ -38,16 +38,24 @@ export function useWorkspaceRefreshOnFocus({
     };
   });
 
-  useEffect(() => {
-    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
-    let pollTimer: ReturnType<typeof setInterval> | null = null;
-    let refreshInFlight = false;
+  const timersRef = useRef<{
+    debounceTimer: ReturnType<typeof setTimeout> | null;
+    pollTimer: ReturnType<typeof setInterval> | null;
+    refreshInFlight: boolean;
+    updatePolling: (() => void) | null;
+  }>({
+    debounceTimer: null,
+    pollTimer: null,
+    refreshInFlight: false,
+    updatePolling: null,
+  });
 
+  useEffect(() => {
     const runRefreshCycle = () => {
-      if (refreshInFlight) {
+      if (timersRef.current.refreshInFlight) {
         return;
       }
-      refreshInFlight = true;
+      timersRef.current.refreshInFlight = true;
       const {
         workspaces: ws,
         refreshWorkspaces: refresh,
@@ -68,29 +76,29 @@ export function useWorkspaceRefreshOnFocus({
           await listThreads(connected, { preserveState: true });
         }
       })().finally(() => {
-        refreshInFlight = false;
+        timersRef.current.refreshInFlight = false;
       });
     };
 
     const updatePolling = () => {
-      if (pollTimer) {
-        clearInterval(pollTimer);
-        pollTimer = null;
+      if (timersRef.current.pollTimer) {
+        clearInterval(timersRef.current.pollTimer);
+        timersRef.current.pollTimer = null;
       }
       const { backendMode: currentBackendMode, pollIntervalMs: intervalMs } = optionsRef.current;
       if (currentBackendMode !== "remote" || document.visibilityState !== "visible") {
         return;
       }
-      pollTimer = setInterval(() => {
+      timersRef.current.pollTimer = setInterval(() => {
         runRefreshCycle();
       }, intervalMs);
     };
 
     const scheduleRefresh = () => {
-      if (debounceTimer) {
-        clearTimeout(debounceTimer);
+      if (timersRef.current.debounceTimer) {
+        clearTimeout(timersRef.current.debounceTimer);
       }
-      debounceTimer = setTimeout(() => {
+      timersRef.current.debounceTimer = setTimeout(() => {
         runRefreshCycle();
       }, 500);
     };
@@ -107,18 +115,26 @@ export function useWorkspaceRefreshOnFocus({
       updatePolling();
     };
 
+    timersRef.current.updatePolling = updatePolling;
+
     window.addEventListener("focus", handleFocus);
     document.addEventListener("visibilitychange", handleVisibilityChange);
     updatePolling();
     return () => {
       window.removeEventListener("focus", handleFocus);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
-      if (debounceTimer) {
-        clearTimeout(debounceTimer);
+      if (timersRef.current.debounceTimer) {
+        clearTimeout(timersRef.current.debounceTimer);
       }
-      if (pollTimer) {
-        clearInterval(pollTimer);
+      if (timersRef.current.pollTimer) {
+        clearInterval(timersRef.current.pollTimer);
       }
+      timersRef.current.updatePolling = null;
     };
   }, []);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: backendMode/pollIntervalMs are inputs whose changes must reconfigure polling
+  useEffect(() => {
+    timersRef.current.updatePolling?.();
+  }, [backendMode, pollIntervalMs]);
 }
