@@ -1,3 +1,5 @@
+#![recursion_limit = "256"]
+
 pub mod adapters;
 pub mod brain_voice;
 pub mod desktop_approval_channel;

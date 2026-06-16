@@ -1,5 +1,3 @@
-#![recursion_limit = "256"]
-
 pub mod app_core;
 pub mod approval;
 pub mod claude_code_integration;

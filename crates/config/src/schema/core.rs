@@ -234,6 +234,11 @@ pub struct Config {
     /// Notification delivery system configuration (quiet hours, channels, retry).
     #[serde(default)]
     pub notifications: NotificationsConfig,
+
+    /// Free-form frontend app settings. Stored as opaque JSON so the UI can
+    /// evolve its settings schema without backend type churn.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub app_settings: Option<serde_json::Value>,
 }
 
 /// Embedding provider configuration.

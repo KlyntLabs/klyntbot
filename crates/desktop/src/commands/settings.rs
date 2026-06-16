@@ -55,18 +55,14 @@ pub async fn config_mark_setup_completed() -> () {
     state.config_mark_setup_completed().await
 }
 
-/// Returns the full app settings object. Currently returns a default object;
-/// persistence will be wired to the config crate in a follow-up.
 #[klynt_command]
 pub async fn get_app_settings() -> serde_json::Value {
-    Ok(default_app_settings())
+    state.get_app_settings().await
 }
 
-/// Accepts app settings updates. Currently a no-op that echoes the input back;
-/// persistence will be wired to the config crate in a follow-up.
 #[klynt_command]
 pub async fn update_app_settings(settings: serde_json::Value) -> serde_json::Value {
-    Ok(settings)
+    state.update_app_settings(settings).await
 }
 
 #[klynt_command]
@@ -81,82 +77,4 @@ pub async fn app_build_type() -> String {
 #[klynt_command]
 pub async fn is_mobile_runtime() -> bool {
     Ok(false)
-}
-
-fn default_app_settings() -> serde_json::Value {
-    serde_json::json!({
-        "codexBin": null,
-        "codexArgs": null,
-        "backendMode": "local",
-        "remoteBackendProvider": "tcp",
-        "remoteBackendHost": "",
-        "remoteBackendToken": null,
-        "remoteBackends": [],
-        "activeRemoteBackendId": null,
-        "keepDaemonRunningAfterAppClose": false,
-        "defaultAccessMode": "full-access",
-        "reviewDeliveryMode": "inline",
-        "composerModelShortcut": null,
-        "composerAccessShortcut": null,
-        "composerReasoningShortcut": null,
-        "composerCollaborationShortcut": null,
-        "interruptShortcut": null,
-        "newAgentShortcut": null,
-        "newWorktreeAgentShortcut": null,
-        "newCloneAgentShortcut": null,
-        "archiveThreadShortcut": null,
-        "toggleProjectsSidebarShortcut": null,
-        "toggleGitSidebarShortcut": null,
-        "branchSwitcherShortcut": null,
-        "toggleDebugPanelShortcut": null,
-        "toggleTerminalShortcut": null,
-        "cycleAgentNextShortcut": null,
-        "cycleAgentPrevShortcut": null,
-        "cycleWorkspaceNextShortcut": null,
-        "cycleWorkspacePrevShortcut": null,
-        "lastComposerModelId": null,
-        "lastComposerReasoningEffort": null,
-        "uiScale": 1.0,
-        "theme": "system",
-        "showMessageFilePath": false,
-        "chatHistoryScrollbackItems": 100,
-        "threadTitleAutogenerationEnabled": true,
-        "automaticAppUpdateChecksEnabled": true,
-        "uiFontFamily": "system-ui",
-        "codeFontFamily": "monospace",
-        "codeFontSize": 14,
-        "notificationSoundsEnabled": true,
-        "systemNotificationsEnabled": true,
-        "subagentSystemNotificationsEnabled": true,
-        "splitChatDiffView": false,
-        "preloadGitDiffs": true,
-        "gitDiffIgnoreWhitespaceChanges": false,
-        "commitMessagePrompt": "",
-        "commitMessageModelId": null,
-        "collaborationModesEnabled": false,
-        "steerEnabled": true,
-        "followUpMessageBehavior": "queue",
-        "composerFollowUpHintEnabled": true,
-        "pauseQueuedMessagesWhenResponseRequired": false,
-        "unifiedExecEnabled": false,
-        "experimentalAppsEnabled": false,
-        "personality": "pragmatic",
-        "dictationEnabled": false,
-        "dictationModelId": "",
-        "dictationPreferredLanguage": null,
-        "dictationHoldKey": null,
-        "composerEditorPreset": "default",
-        "composerFenceExpandOnSpace": true,
-        "composerFenceExpandOnEnter": true,
-        "composerFenceLanguageTags": true,
-        "composerFenceWrapSelection": true,
-        "composerFenceAutoWrapPasteMultiline": true,
-        "composerFenceAutoWrapPasteCodeLike": true,
-        "composerListContinuation": true,
-        "composerCodeBlockCopyUseModifier": true,
-        "workspaceGroups": [],
-        "globalWorktreesFolder": null,
-        "openAppTargets": [],
-        "selectedOpenAppId": ""
-    })
 }

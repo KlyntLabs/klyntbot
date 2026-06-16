@@ -25,6 +25,84 @@ fn deep_merge(base: &mut Value, patch: Value) {
     }
 }
 
+fn default_app_settings() -> serde_json::Value {
+    serde_json::json!({
+        "codexBin": null,
+        "codexArgs": null,
+        "backendMode": "local",
+        "remoteBackendProvider": "tcp",
+        "remoteBackendHost": "",
+        "remoteBackendToken": null,
+        "remoteBackends": [],
+        "activeRemoteBackendId": null,
+        "keepDaemonRunningAfterAppClose": false,
+        "defaultAccessMode": "full-access",
+        "reviewDeliveryMode": "inline",
+        "composerModelShortcut": null,
+        "composerAccessShortcut": null,
+        "composerReasoningShortcut": null,
+        "composerCollaborationShortcut": null,
+        "interruptShortcut": null,
+        "newAgentShortcut": null,
+        "newWorktreeAgentShortcut": null,
+        "newCloneAgentShortcut": null,
+        "archiveThreadShortcut": null,
+        "toggleProjectsSidebarShortcut": null,
+        "toggleGitSidebarShortcut": null,
+        "branchSwitcherShortcut": null,
+        "toggleDebugPanelShortcut": null,
+        "toggleTerminalShortcut": null,
+        "cycleAgentNextShortcut": null,
+        "cycleAgentPrevShortcut": null,
+        "cycleWorkspaceNextShortcut": null,
+        "cycleWorkspacePrevShortcut": null,
+        "lastComposerModelId": null,
+        "lastComposerReasoningEffort": null,
+        "uiScale": 1.0,
+        "theme": "system",
+        "showMessageFilePath": false,
+        "chatHistoryScrollbackItems": 100,
+        "threadTitleAutogenerationEnabled": true,
+        "automaticAppUpdateChecksEnabled": true,
+        "uiFontFamily": "system-ui",
+        "codeFontFamily": "monospace",
+        "codeFontSize": 14,
+        "notificationSoundsEnabled": true,
+        "systemNotificationsEnabled": true,
+        "subagentSystemNotificationsEnabled": true,
+        "splitChatDiffView": false,
+        "preloadGitDiffs": true,
+        "gitDiffIgnoreWhitespaceChanges": false,
+        "commitMessagePrompt": "",
+        "commitMessageModelId": null,
+        "collaborationModesEnabled": false,
+        "steerEnabled": true,
+        "followUpMessageBehavior": "queue",
+        "composerFollowUpHintEnabled": true,
+        "pauseQueuedMessagesWhenResponseRequired": false,
+        "unifiedExecEnabled": false,
+        "experimentalAppsEnabled": false,
+        "personality": "pragmatic",
+        "dictationEnabled": false,
+        "dictationModelId": "",
+        "dictationPreferredLanguage": null,
+        "dictationHoldKey": null,
+        "composerEditorPreset": "default",
+        "composerFenceExpandOnSpace": true,
+        "composerFenceExpandOnEnter": true,
+        "composerFenceLanguageTags": true,
+        "composerFenceWrapSelection": true,
+        "composerFenceAutoWrapPasteMultiline": true,
+        "composerFenceAutoWrapPasteCodeLike": true,
+        "composerListContinuation": true,
+        "composerCodeBlockCopyUseModifier": true,
+        "workspaceGroups": [],
+        "globalWorktreesFolder": null,
+        "openAppTargets": [],
+        "selectedOpenAppId": ""
+    })
+}
+
 // ── AppCore methods ───────────────────────────────────────────────────
 
 impl AppCore {
@@ -90,6 +168,26 @@ impl AppCore {
         }
 
         Ok(section_result)
+    }
+
+    #[tracing::instrument(skip(self), err)]
+    pub async fn get_app_settings(&self) -> Result<serde_json::Value, ApiError> {
+        let cfg = self.config.read().await;
+        Ok(cfg
+            .app_settings
+            .clone()
+            .unwrap_or_else(|| default_app_settings()))
+    }
+
+    #[tracing::instrument(skip(self, settings), err)]
+    pub async fn update_app_settings(
+        &self,
+        settings: serde_json::Value,
+    ) -> Result<serde_json::Value, ApiError> {
+        let mut cfg = self.config.write().await;
+        cfg.app_settings = Some(settings.clone());
+        config::save(&cfg).await.map_err(map_config_save_err)?;
+        Ok(settings)
     }
 
     #[tracing::instrument(skip(self), err)]
