@@ -4,7 +4,7 @@ import { DesktopLayout } from "@/features/layout/components/DesktopLayout";
 
 type AppLayoutProps = {
   showHome: boolean;
-  centerMode: "chat" | "diff" | "plugins" | "calendar";
+  centerMode: "chat" | "diff" | "calendar";
   preloadGitDiffs: boolean;
   splitChatDiffView: boolean;
   hasActivePlan: boolean;
@@ -16,7 +16,6 @@ type AppLayoutProps = {
   updateToastNode: ReactNode;
   errorToastsNode: ReactNode;
   homeNode: ReactNode;
-  pluginsNode?: ReactNode;
   dashboardNode?: ReactNode;
   desktopTopbarLeftNode: ReactNode;
   topbarActionsNode?: ReactNode;
@@ -45,7 +44,6 @@ export const AppLayout = memo(function AppLayout({
   updateToastNode,
   errorToastsNode,
   homeNode,
-  pluginsNode,
   dashboardNode,
   desktopTopbarLeftNode,
   topbarActionsNode,
@@ -66,7 +64,6 @@ export const AppLayout = memo(function AppLayout({
       approvalToastsNode={approvalToastsNode}
       errorToastsNode={errorToastsNode}
       homeNode={homeNode}
-      pluginsNode={pluginsNode}
       dashboardNode={dashboardNode}
       showHome={showHome}
       showWorkspace={activeWorkspace && !showHome}

@@ -1,7 +1,4 @@
 import Calendar from "lucide-react/dist/esm/icons/calendar";
-import Clock from "lucide-react/dist/esm/icons/clock";
-import FolderPlus from "lucide-react/dist/esm/icons/folder-plus";
-import LayoutGrid from "lucide-react/dist/esm/icons/layout-grid";
 import Search from "lucide-react/dist/esm/icons/search";
 import Settings from "lucide-react/dist/esm/icons/settings";
 import SquarePen from "lucide-react/dist/esm/icons/square-pen";
@@ -11,7 +8,6 @@ import type { ChatThread } from "@/features/chat/types";
 type SidebarChatLayoutProps = {
   onOpenSettings: () => void;
   onNewChat: () => void;
-  onSelectPlugins: () => void;
   onSelectCalendar?: () => void;
   threads: ChatThread[];
   selectedSessionKey: string | null;
@@ -29,7 +25,6 @@ type NavItem = {
 export const SidebarChatLayout = memo(function SidebarChatLayout({
   onOpenSettings,
   onNewChat,
-  onSelectPlugins,
   onSelectCalendar,
   threads,
   selectedSessionKey,
@@ -50,18 +45,6 @@ export const SidebarChatLayout = memo(function SidebarChatLayout({
       label: "Calendar",
       icon: <Calendar aria-hidden />,
       onClick: handleSelectCalendar,
-    },
-    {
-      id: "plugins",
-      label: "Plugins",
-      icon: <LayoutGrid aria-hidden />,
-      onClick: onSelectPlugins,
-    },
-    { id: "automations", label: "Automations", icon: <Clock aria-hidden /> },
-    {
-      id: "project",
-      label: "Project",
-      icon: <FolderPlus aria-hidden />,
     },
   ];
 

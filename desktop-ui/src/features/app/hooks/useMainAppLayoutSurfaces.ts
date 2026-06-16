@@ -220,11 +220,10 @@ type UseMainAppLayoutSurfacesArgs = {
   showDebugButton: boolean;
   handleDebugClick: () => void;
   chatView: {
-    appView: "home" | "chat" | "plugins" | "calendar";
+    appView: "home" | "chat" | "calendar";
     selectedSessionKey: string | null;
     onNewChat: () => void;
     onSelectThread: (sessionKey: string) => void;
-    onSelectPlugins: () => void;
     onSelectCalendar: () => void;
     activeNavId: string | null;
     chatThreads: import("@/features/chat/types").ChatThread[];
@@ -351,7 +350,6 @@ function buildPrimarySurface({
     sidebarProps: {
       onOpenSettings: sidebarHandlers.onOpenSettings,
       onNewChat: chatView.onNewChat,
-      onSelectPlugins: chatView.onSelectPlugins,
       onSelectCalendar: chatView.onSelectCalendar,
       activeNavId: chatView.activeNavId,
       threads: chatView.chatThreads,

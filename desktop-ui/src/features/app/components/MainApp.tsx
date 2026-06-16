@@ -73,7 +73,6 @@ import { useMobileServerSetup } from "@/features/mobile/hooks/useMobileServerSet
 import { useModels } from "@/features/models/hooks/useModels";
 import { useProviders } from "@/features/models/hooks/useProviders";
 import { useErrorToasts } from "@/features/notifications/hooks/useErrorToasts";
-import { PluginsView } from "@/features/plugins/components/PluginsView";
 import { useCustomPrompts } from "@/features/prompts/hooks/useCustomPrompts";
 import { useSkills } from "@/features/skills/hooks/useSkills";
 import { useTerminalController } from "@/features/terminal/hooks/useTerminalController";
@@ -411,10 +410,6 @@ export default function MainApp() {
   const onNewChat = useCallback(() => {
     setSelectedSessionKey(`chat:${crypto.randomUUID()}`);
     setAppView(AppView.Chat);
-  }, []);
-
-  const onSelectPlugins = useCallback(() => {
-    setAppView("plugins");
   }, []);
 
   const onSelectCalendar = useCallback(() => {
@@ -1844,9 +1839,8 @@ export default function MainApp() {
       selectedSessionKey,
       onNewChat,
       onSelectThread,
-      onSelectPlugins,
       onSelectCalendar,
-      activeNavId: appView === "calendar" ? "calendar" : appView === "plugins" ? "plugins" : null,
+      activeNavId: appView === "calendar" ? "calendar" : null,
       chatThreads,
       refetchChatThreads,
     },
@@ -1949,13 +1943,11 @@ export default function MainApp() {
       selectedPullRequestNumber: selectedPullRequest?.number ?? null,
     },
     appLayout: {
-      showHome: showHome && appView !== "chat" && appView !== "plugins" && appView !== "calendar",
+      showHome: showHome && appView !== "chat" && appView !== "calendar",
       centerMode: (() => {
         switch (appView) {
           case "chat":
             return "chat";
-          case "plugins":
-            return "plugins";
           case "calendar":
             return "calendar";
           default:
@@ -1965,10 +1957,7 @@ export default function MainApp() {
       preloadGitDiffs: appSettings.preloadGitDiffs,
       splitChatDiffView: appSettings.splitChatDiffView,
       hasActivePlan: hasActivePlan,
-      activeWorkspace:
-        (Boolean(activeWorkspace) || appView === "chat") &&
-        appView !== "plugins" &&
-        appView !== "calendar",
+      activeWorkspace: (Boolean(activeWorkspace) || appView === "chat") && appView !== "calendar",
       sidebarNode,
       messagesNode: mainMessagesNode,
       composerNode,
@@ -1976,7 +1965,6 @@ export default function MainApp() {
       updateToastNode,
       errorToastsNode,
       homeNode,
-      pluginsNode: appView === "plugins" ? <PluginsView /> : null,
       dashboardNode: appView === "calendar" ? <Dashboard /> : null,
       gitDiffPanelNode,
       gitDiffViewerNode,
