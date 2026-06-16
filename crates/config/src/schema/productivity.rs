@@ -15,6 +15,8 @@ pub struct ProductivityConfig {
     #[serde(default)]
     pub focus: FocusConfig,
     #[serde(default)]
+    pub pomodoro: PomodoroConfig,
+    #[serde(default)]
     pub focus_bubble: FocusBubbleConfig,
     #[serde(default)]
     pub nudges: NudgeConfig,
@@ -62,6 +64,25 @@ pub struct FocusConfig {
     pub learned_rule_threshold: u64,
     #[serde(default = "default_cooldown_grace_secs")]
     pub cooldown_grace_secs: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PomodoroConfig {
+    #[serde(default = "default_pomodoro_focus_duration")]
+    pub focus_duration_mins: u64,
+    #[serde(default = "default_pomodoro_short_break")]
+    pub short_break_mins: u64,
+    #[serde(default = "default_pomodoro_long_break")]
+    pub long_break_mins: u64,
+    #[serde(default = "default_pomodoro_long_break_after")]
+    pub long_break_after: u64,
+    #[serde(default)]
+    pub dnd_enabled: bool,
+    #[serde(default = "default_true")]
+    pub sound_enabled: bool,
+    #[serde(default = "default_true")]
+    pub notification_enabled: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -164,6 +185,18 @@ fn default_learned_rule_threshold() -> u64 {
 fn default_cooldown_grace_secs() -> u64 {
     30
 }
+fn default_pomodoro_focus_duration() -> u64 {
+    25
+}
+fn default_pomodoro_short_break() -> u64 {
+    5
+}
+fn default_pomodoro_long_break() -> u64 {
+    15
+}
+fn default_pomodoro_long_break_after() -> u64 {
+    4
+}
 
 impl Default for ProductivityConfig {
     fn default() -> Self {
@@ -171,6 +204,7 @@ impl Default for ProductivityConfig {
             enabled: true,
             tracking: TrackingConfig::default(),
             focus: FocusConfig::default(),
+            pomodoro: PomodoroConfig::default(),
             focus_bubble: FocusBubbleConfig::default(),
             nudges: NudgeConfig::default(),
             privacy: PrivacyConfig::default(),
@@ -219,5 +253,50 @@ impl Default for NudgeConfig {
             quiet_hours_start: None,
             quiet_hours_end: None,
         }
+    }
+}
+
+impl Default for PomodoroConfig {
+    fn default() -> Self {
+        Self {
+            focus_duration_mins: default_pomodoro_focus_duration(),
+            short_break_mins: default_pomodoro_short_break(),
+            long_break_mins: default_pomodoro_long_break(),
+            long_break_after: default_pomodoro_long_break_after(),
+            dnd_enabled: false,
+            sound_enabled: true,
+            notification_enabled: true,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn pomodoro_config_round_trip() {
+        let cfg = PomodoroConfig::default();
+        let json = serde_json::to_string(&cfg).expect("serialize");
+        let parsed: PomodoroConfig = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(parsed.focus_duration_mins, cfg.focus_duration_mins);
+        assert_eq!(parsed.short_break_mins, cfg.short_break_mins);
+        assert_eq!(parsed.long_break_mins, cfg.long_break_mins);
+        assert_eq!(parsed.long_break_after, cfg.long_break_after);
+        assert_eq!(parsed.dnd_enabled, cfg.dnd_enabled);
+        assert_eq!(parsed.sound_enabled, cfg.sound_enabled);
+        assert_eq!(parsed.notification_enabled, cfg.notification_enabled);
+    }
+
+    #[test]
+    fn pomodoro_config_defaults() {
+        let cfg = PomodoroConfig::default();
+        assert_eq!(cfg.focus_duration_mins, 25);
+        assert_eq!(cfg.short_break_mins, 5);
+        assert_eq!(cfg.long_break_mins, 15);
+        assert_eq!(cfg.long_break_after, 4);
+        assert!(!cfg.dnd_enabled);
+        assert!(cfg.sound_enabled);
+        assert!(cfg.notification_enabled);
     }
 }
