@@ -1,3 +1,8 @@
+#![cfg_attr(
+    not(target_os = "macos"),
+    allow(dead_code, unused_imports, unused_mut, unused_variables)
+)]
+
 pub mod clipboard;
 pub mod migration;
 pub mod repos;
