@@ -29,6 +29,12 @@ jobs:
         with:
           bun-version: latest
 
+      - name: Install protoc
+        run: brew install protobuf
+
+      - name: Install cargo-tauri
+        run: cargo install tauri-cli --locked
+
       - name: Install dependencies
         working-directory: desktop-ui
         run: bun install --frozen-lockfile
@@ -67,7 +73,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf protobuf-compiler
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -81,6 +87,9 @@ jobs:
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
+
+      - name: Install cargo-tauri
+        run: cargo install tauri-cli --locked
 
       - name: Install dependencies
         working-directory: desktop-ui
@@ -121,6 +130,12 @@ jobs:
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
+
+      - name: Install protoc
+        run: choco install protoc
+
+      - name: Install cargo-tauri
+        run: cargo install tauri-cli --locked
 
       - name: Install dependencies
         working-directory: desktop-ui

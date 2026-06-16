@@ -29,6 +29,9 @@ jobs:
         with:
           tool: cargo-nextest
 
+      - name: Install protoc
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+
       - name: cargo fmt
         run: cargo fmt --all --check
 
@@ -79,6 +82,12 @@ jobs:
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
+
+      - name: Install protoc
+        run: brew install protobuf
+
+      - name: Install cargo-tauri
+        run: cargo install tauri-cli --locked
 
       - name: Install dependencies
         working-directory: desktop-ui
