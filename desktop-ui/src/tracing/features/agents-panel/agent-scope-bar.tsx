@@ -35,7 +35,7 @@ export function AgentScopeBar({
     getSubagents(providerId, sessionId, refreshKey > 0)
       .then(setAgents)
       .catch(() => setAgents([]));
-  }, [sessionId, refreshKey]);
+  }, [sessionId, refreshKey, providerId]);
 
   // Don't render if no sub-agents
   if (agents.length === 0) return null;

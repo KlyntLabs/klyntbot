@@ -303,7 +303,7 @@ export function StatisticsView({ providerId }: { providerId: string }) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [providerId]);
 
   if (loading) {
     return (

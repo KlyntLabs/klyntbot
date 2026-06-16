@@ -40,5 +40,5 @@ export function useThreadWatchdog({ threadId, isProcessing, lastHeartbeatAt, onF
         timeoutRef.current = null;
       }
     };
-  }, [threadId, isProcessing, lastHeartbeatAt, onFire]);
+  }, [threadId, isProcessing, onFire]);
 }

@@ -199,7 +199,7 @@ export function DualView({ sessionId, refreshKey = 0, agentScope, providerId }: 
         if (!cancelled) setContextError(err.message);
       })
       .finally(() => setContextLoading(false));
-  }, [sessionId, refreshKey, agentScope]);
+  }, [sessionId, refreshKey, agentScope, providerId]);
 
   // Build bidirectional mapping: tool_call_id -> wire event index
   const wireToolCallIdToIndex = useMemo(() => {

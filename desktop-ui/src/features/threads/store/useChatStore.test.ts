@@ -52,7 +52,7 @@ describe("useChatStore", () => {
         type: "incrementTurnGeneration",
         threadId: "t1",
       });
-      expect(useChatStore.getState().turnGenerationByThread["t1"]).toBe(2);
+      expect(useChatStore.getState().turnGenerationByThread.t1).toBe(2);
     });
 
     it("keeps turn generation independent per thread", () => {
@@ -60,8 +60,8 @@ describe("useChatStore", () => {
         type: "incrementTurnGeneration",
         threadId: "t1",
       });
-      expect(useChatStore.getState().turnGenerationByThread["t1"]).toBe(1);
-      expect(useChatStore.getState().turnGenerationByThread["t2"]).toBeUndefined();
+      expect(useChatStore.getState().turnGenerationByThread.t1).toBe(1);
+      expect(useChatStore.getState().turnGenerationByThread.t2).toBeUndefined();
     });
   });
 
@@ -114,15 +114,15 @@ describe("useChatStore", () => {
 
   describe("generation counter invariants", () => {
     it("generation starts at 0 for unknown threads", () => {
-      expect(useChatStore.getState().turnGenerationByThread["unknown"]).toBeUndefined();
+      expect(useChatStore.getState().turnGenerationByThread.unknown).toBeUndefined();
     });
 
     it("generation is monotonically increasing", () => {
       const store = useChatStore.getState();
       store.dispatchThreadAction({ type: "incrementTurnGeneration", threadId: "t1" });
-      const g1 = useChatStore.getState().turnGenerationByThread["t1"];
+      const g1 = useChatStore.getState().turnGenerationByThread.t1;
       store.dispatchThreadAction({ type: "incrementTurnGeneration", threadId: "t1" });
-      const g2 = useChatStore.getState().turnGenerationByThread["t1"];
+      const g2 = useChatStore.getState().turnGenerationByThread.t1;
       expect(g2).toBeGreaterThan(g1);
       expect(g2).toBe(2);
     });
@@ -132,7 +132,7 @@ describe("useChatStore", () => {
       store.dispatchThreadAction({ type: "incrementTurnGeneration", threadId: "t1" });
       store.dispatchThreadAction({ type: "incrementTurnGeneration", threadId: "t1" });
       store.dispatchThreadAction({ type: "incrementTurnGeneration", threadId: "t1" });
-      expect(useChatStore.getState().turnGenerationByThread["t1"]).toBe(3);
+      expect(useChatStore.getState().turnGenerationByThread.t1).toBe(3);
     });
   });
 });

@@ -4,17 +4,17 @@ import { EventCoalescer } from "../utils/coalesceDeltas";
 describe("coalesceDeltas", () => {
   bench("100 chunks — flush callback only", () => {
     const chunks: string[] = Array.from({ length: 100 }, (_, i) => `tok-${i}`);
-    let result = "";
+    let _result = "";
     for (const c of chunks) {
-      result += c;
+      _result += c;
     }
   });
 
   bench("10,000 chunks — flush callback only", () => {
     const chunks: string[] = Array.from({ length: 10_000 }, (_, i) => `tok-${i}`);
-    let result = "";
+    let _result = "";
     for (const c of chunks) {
-      result += c;
+      _result += c;
     }
   });
 

@@ -108,7 +108,7 @@ export function StateViewer({ sessionId, refreshKey = 0, providerId }: StateView
       .then(setState)
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
-  }, [sessionId, refreshKey]);
+  }, [sessionId, refreshKey, providerId]);
 
   if (loading) {
     return (

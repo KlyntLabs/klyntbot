@@ -311,7 +311,7 @@ function LazyStats({
 
     observer.observe(el);
     return () => observer.disconnect();
-  }, [sessionId, hasWire]);
+  }, [sessionId, hasWire, providerId]);
 
   if (!hasWire) {
     return (

@@ -143,7 +143,7 @@ export function useThreads({
         dispatch({ type: "markUnread", threadId, hasUnread: true });
       }
     },
-    [activeThreadId],
+    [activeThreadId, dispatch],
   );
 
   const safeMessageActivity = useCallback(() => {
@@ -174,7 +174,7 @@ export function useThreads({
         });
       });
     },
-    [customNamesRef, onDebug],
+    [customNamesRef, onDebug, dispatch],
   );
 
   const onSubagentThreadDetected = useCallback((workspaceId: string, threadId: string) => {
@@ -330,7 +330,7 @@ export function useThreads({
         }),
       );
     },
-    [getCustomName, onDebug, onSubagentThreadDetected, updateThreadParent],
+    [getCustomName, onDebug, onSubagentThreadDetected, updateThreadParent, dispatch],
   );
 
   const { onUserMessageCreated } = useThreadTitleAutogeneration({
@@ -633,6 +633,7 @@ export function useThreads({
       resumeThreadForWorkspace,
       startThreadForWorkspace,
       state.activeThreadIdByWorkspace,
+      dispatch,
     ],
   );
 
@@ -739,7 +740,7 @@ export function useThreads({
       hasLocalThreadSnapshot,
       hasProcessingThreadInWorkspace,
       resumeThreadForWorkspace,
-      state.activeThreadIdByWorkspace,
+      dispatch,
     ],
   );
 
@@ -749,7 +750,7 @@ export function useThreads({
       dispatch({ type: "removeThread", workspaceId, threadId });
       void archiveThread(workspaceId, threadId);
     },
-    [archiveThread, unpinThread],
+    [archiveThread, unpinThread, dispatch],
   );
 
   return useMemo(

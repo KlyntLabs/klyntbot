@@ -570,7 +570,7 @@ export function toolRowDescriptor(
       else if (name !== "Read" && (added > 0 || removed > 0)) meta.push(`+${added} −${removed}`);
     }
     if ((item.changes?.length ?? 0) > 1) {
-      meta.push(`${item.changes!.length} files`);
+      meta.push(`${item.changes?.length} files`);
     }
     return { family: "filesystem", name, arg: path, meta };
   }

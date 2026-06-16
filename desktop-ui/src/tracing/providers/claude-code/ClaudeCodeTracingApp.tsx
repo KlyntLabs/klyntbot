@@ -69,7 +69,7 @@ export function ClaudeCodeTracingApp() {
     listSessions(PROVIDER_ID)
       .then(setSessions)
       .catch(() => setSessions([]));
-  }, [refreshKey]);
+  }, []);
 
   // Session detail data when a session is selected.
   useEffect(() => {

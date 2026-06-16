@@ -57,7 +57,7 @@ export function SessionsExplorer({ onSelectSession, providerId }: SessionsExplor
       .then(setSessions)
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, []);
+  }, [providerId]);
 
   // Keyboard: / to focus search
   useEffect(() => {

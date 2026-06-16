@@ -164,7 +164,7 @@ export function ContextViewer({
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
-  }, [sessionId, refreshKey, agentScope]);
+  }, [sessionId, refreshKey, agentScope, providerId]);
 
   const visibleMessages = useMemo(
     () => (showInternal ? allMessages : allMessages.filter((m) => !m.role.startsWith("_"))),

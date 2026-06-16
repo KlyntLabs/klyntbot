@@ -40,9 +40,45 @@ python3 scripts/compute-release-version.py stable --tag stable-v2026.6.16
 python3 scripts/compute-release-version.py alpha
 ```
 
-## Required secrets
+## Required CI secrets
 
-- `TAURI_SIGNING_PRIVATE_KEY` / `TAURI_KEY_PASSWORD`
-- `APPLE_CERTIFICATE` / `APPLE_CERTIFICATE_PASSWORD` / `APPLE_SIGNING_IDENTITY` / `APPLE_ID` / `APPLE_PASSWORD` / `APPLE_TEAM_ID`
-- `WINDOWS_CODE_SIGNING_CERTIFICATE` / `WINDOWS_CODE_SIGNING_CERTIFICATE_PASSWORD` (optional)
-- `GITHUB_TOKEN` (provided automatically)
+Configure these at **Settings → Secrets and variables → Actions** in the GitHub repository.
+
+### Tauri updater signing (required)
+
+Tauri requires an Ed25519 key pair to sign update bundles. The public key is embedded in `crates/desktop/tauri.conf.json`; the private key is the repository secret.
+
+1. Generate a key:
+   ```bash
+   cargo install tauri-cli --locked
+   cargo tauri signer generate --password "" -w ~/.tauri/myapp.key
+   ```
+2. Add the secret value:
+   - `TAURI_SIGNING_PRIVATE_KEY` — contents of the generated `.key` file
+   - `TAURI_KEY_PASSWORD` — the password used when generating the key (can be empty, but the secret must still exist)
+
+### macOS code signing and notarization (required for signed macOS builds)
+
+- `APPLE_CERTIFICATE` — Base64-encoded `.p12` Developer ID Application certificate
+- `APPLE_CERTIFICATE_PASSWORD` — password for the `.p12`
+- `APPLE_SIGNING_IDENTITY` — Common Name of the certificate, e.g., `Developer ID Application: Your Name (TEAM_ID)`
+- `APPLE_ID` — Apple ID email used for notarization
+- `APPLE_PASSWORD` — app-specific password for that Apple ID
+- `APPLE_TEAM_ID` — Apple Developer Team ID
+
+To base64-encode the certificate:
+```bash
+base64 -i certificate.p12 -o certificate.p12.b64
+```
+Paste the contents of `certificate.p12.b64` into the `APPLE_CERTIFICATE` secret.
+
+### Windows code signing (optional)
+
+- `WINDOWS_CODE_SIGNING_CERTIFICATE` — Base64-encoded `.pfx` code-signing certificate
+- `WINDOWS_CODE_SIGNING_CERTIFICATE_PASSWORD` — password for the `.pfx`
+
+If omitted, Windows builds will still run but installers will be unsigned.
+
+### GitHub token
+
+- `GITHUB_TOKEN` — provided automatically by GitHub Actions; do not create manually.

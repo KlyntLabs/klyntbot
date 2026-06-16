@@ -76,6 +76,11 @@
   opacity: 0.7;
 }
 
+.prompt-description {
+  font-size: var(--fs-sm);
+  color: var(--text-subtle);
+}
+
 .prompt-row--file .prompt-row-header {
   flex: 1;
   min-width: 0;
@@ -91,11 +96,6 @@
   font-size: var(--fs-sm);
   font-weight: 600;
   color: var(--text-emphasis);
-}
-
-.prompt-description {
-  font-size: var(--fs-sm);
-  color: var(--text-subtle);
 }
 
 .prompt-hint {

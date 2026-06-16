@@ -227,7 +227,7 @@ export const Messages = memo(function Messages({
       }
       return renderItem(entry);
     },
-    [expandedItems, toggleExpanded],
+    [expandedItems, toggleExpanded, renderItem],
   );
 
   const getEntryKey = useCallback((entry: GroupedEntry, index: number) => {

@@ -52,7 +52,7 @@ describe("useConfigSection", () => {
     expect(result.current.patching).toBe(true);
 
     await act(async () => {
-      resolveUpdate!({ enabled: true });
+      resolveUpdate?.({ enabled: true });
       await updatePromise;
     });
 
@@ -101,14 +101,14 @@ describe("useConfigSection", () => {
 
     // Resolve second (newer) first
     await act(async () => {
-      resolveSecond!({ count: 2 });
+      resolveSecond?.({ count: 2 });
       await secondPromise;
     });
     expect(result.current.value).toEqual({ count: 2 });
 
     // Resolve first (older) — should not overwrite
     await act(async () => {
-      resolveFirst!({ count: 1 });
+      resolveFirst?.({ count: 1 });
       await firstPromise;
     });
     expect(result.current.value).toEqual({ count: 2 });

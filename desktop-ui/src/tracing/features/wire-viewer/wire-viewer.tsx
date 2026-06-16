@@ -132,7 +132,7 @@ export function WireViewer({
       .then((res) => setEvents(res.events))
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
-  }, [sessionId, refreshKey, agentScope]);
+  }, [sessionId, refreshKey, agentScope, providerId]);
 
   const allTypes = useMemo(() => {
     const types = new Set<string>();

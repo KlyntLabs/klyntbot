@@ -1016,14 +1016,6 @@
   right: 0;
 }
 
-.content-layer-diff:not(.is-active) {
-  display: none;
-}
-
-.content-layer-diff:not(.is-active) + .content-split-resizer {
-  display: none;
-}
-
 .content-split-resizer {
   position: absolute;
   top: var(--main-topbar-height);
@@ -1033,6 +1025,14 @@
   cursor: col-resize;
   z-index: 2;
   transition: opacity 160ms ease;
+}
+
+.content-layer-diff:not(.is-active) {
+  display: none;
+}
+
+.content-layer-diff:not(.is-active) + .content-split-resizer {
+  display: none;
 }
 
 .content-split-resizer::after {

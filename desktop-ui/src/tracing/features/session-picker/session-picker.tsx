@@ -32,7 +32,7 @@ export function SessionPicker({ value, onChange, providerId }: SessionPickerProp
       .then(setSessions)
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, []);
+  }, [providerId]);
 
   useEffect(() => {
     setInputValue(value ?? "");

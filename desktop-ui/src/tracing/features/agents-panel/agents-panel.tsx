@@ -103,7 +103,7 @@ export function AgentsPanel({
     return () => {
       cancelled = true;
     };
-  }, [sessionId, refreshKey]);
+  }, [sessionId, refreshKey, providerId]);
 
   const grouped = useMemo(() => {
     const map = new Map<string, SubagentInfo[]>();

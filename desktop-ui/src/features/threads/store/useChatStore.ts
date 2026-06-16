@@ -149,7 +149,7 @@ export const useChatStore = create<ChatStore>()(
     }),
     {
       name: "ChatStore",
-      enabled: typeof import.meta.env !== "undefined" && import.meta.env.DEV,
+      enabled: import.meta.env?.DEV,
     },
   ),
 );

@@ -70,7 +70,7 @@ export function KlyntTracingApp() {
     listSessions(PROVIDER_ID)
       .then(setSessions)
       .catch(() => setSessions([]));
-  }, [refreshKey]);
+  }, []);
 
   useEffect(() => {
     if (!sessionId) {
