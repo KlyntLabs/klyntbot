@@ -34,10 +34,13 @@ jobs:
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Install cargo-tauri
+      - name: Install cargo-binstall
         uses: taiki-e/install-action@v2
         with:
-          tool: cargo-tauri
+          tool: cargo-binstall
+
+      - name: Install cargo-tauri
+        run: cargo binstall tauri-cli -y
 
       - name: Install dependencies
         working-directory: desktop-ui
@@ -97,10 +100,13 @@ jobs:
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Install cargo-tauri
+      - name: Install cargo-binstall
         uses: taiki-e/install-action@v2
         with:
-          tool: cargo-tauri
+          tool: cargo-binstall
+
+      - name: Install cargo-tauri
+        run: cargo binstall tauri-cli -y
 
       - name: Install dependencies
         working-directory: desktop-ui
@@ -147,10 +153,13 @@ jobs:
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Install cargo-tauri
+      - name: Install cargo-binstall
         uses: taiki-e/install-action@v2
         with:
-          tool: cargo-tauri
+          tool: cargo-binstall
+
+      - name: Install cargo-tauri
+        run: cargo binstall tauri-cli -y
 
       - name: Install dependencies
         working-directory: desktop-ui
