@@ -57,6 +57,7 @@ pub fn running_applications() -> Vec<RunningApp> {
 
 /// Disk-backed cache for application icons stored as PNG files.
 pub struct AppIconCache {
+    #[allow(dead_code)]
     cache_dir: PathBuf,
 }
 
@@ -152,6 +153,7 @@ impl AppIconCache {
     }
 
     /// Get the modification time of a path as seconds since UNIX epoch.
+    #[allow(dead_code)]
     fn get_mtime(path: &Path) -> Option<u64> {
         let meta = std::fs::metadata(path).ok()?;
         let mtime = meta.modified().ok()?;

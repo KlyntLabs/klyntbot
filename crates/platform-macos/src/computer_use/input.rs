@@ -7,11 +7,19 @@
 //! synchronous and may run on any thread; callers should dispatch
 //! into a `spawn_blocking` worker if they need to avoid blocking the
 //! tokio reactor.
+//!
+//! On non-macOS platforms the public API is preserved but every
+//! operation returns `PlatformError::NotImplemented` so the crate
+//! remains cross-platform compilable.
 
+#[cfg(target_os = "macos")]
 use async_trait::async_trait;
+#[cfg(target_os = "macos")]
 use core_graphics::event_source::{CGEventSource, CGEventSourceStateID};
+#[cfg(target_os = "macos")]
 use platform_input::{ComputerUseAction, PlatformError, PlatformInput, Point, Result};
 
+#[cfg(target_os = "macos")]
 /// Map a Klynt-canonical key name to a macOS virtual key code.
 /// Returns `None` for unknown names; callers may fall back to
 /// per-character `CGEventKeyboardSetUnicodeString`.
@@ -73,6 +81,7 @@ fn key_name_to_virtual_code(name: &str) -> Option<u16> {
     }
 }
 
+#[cfg(target_os = "macos")]
 /// Map a `KeyMods` to CGEvent flag bits.
 #[allow(dead_code)]
 fn mods_to_flags(m: platform_input::KeyMods) -> core_graphics::event::CGEventFlags {
@@ -93,17 +102,21 @@ fn mods_to_flags(m: platform_input::KeyMods) -> core_graphics::event::CGEventFla
     f
 }
 
+#[cfg(target_os = "macos")]
 pub struct MacInput {
     /// Cached CGEventSource. Apple states a single source can be
     /// reused across all events from the same logical actor.
     source: CGEventSource,
 }
 
+#[cfg(target_os = "macos")]
 // SAFETY: CGEventSource is a reference-counted CoreFoundation object.
 // Apple's documentation states it is safe to use from any thread.
 unsafe impl Send for MacInput {}
+#[cfg(target_os = "macos")]
 unsafe impl Sync for MacInput {}
 
+#[cfg(target_os = "macos")]
 impl MacInput {
     /// Construct a new `MacInput`.
     ///
@@ -153,9 +166,7 @@ impl MacInput {
             );
             down.post(CGEventTapLocation::HID);
             let up = CGEvent::new_mouse_event(self.source.clone(), up_type, point, button)
-                .map_err(|()| {
-                    PlatformError::PlatformCallFailed("CGEventCreate up failed".into())
-                })?;
+                .map_err(|()| PlatformError::PlatformCallFailed("CGEventCreate up failed".into()))?;
             up.set_integer_value_field(
                 core_graphics::event::EventField::MOUSE_EVENT_CLICK_STATE,
                 i,
@@ -183,6 +194,7 @@ impl MacInput {
     }
 }
 
+#[cfg(target_os = "macos")]
 #[async_trait]
 impl PlatformInput for MacInput {
     async fn perform_action(&self, action: ComputerUseAction) -> Result<()> {
@@ -477,5 +489,37 @@ impl PlatformInput for MacInput {
             }
         }
         Ok(())
+    }
+}
+
+// Non-macOS stub implementation.
+#[cfg(not(target_os = "macos"))]
+use async_trait::async_trait;
+#[cfg(not(target_os = "macos"))]
+use platform_input::{ComputerUseAction, PlatformError, PlatformInput, Point, Result};
+
+#[cfg(not(target_os = "macos"))]
+pub struct MacInput;
+
+#[cfg(not(target_os = "macos"))]
+impl MacInput {
+    pub fn new() -> Result<Self> {
+        Err(PlatformError::NotImplemented)
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+#[async_trait]
+impl PlatformInput for MacInput {
+    async fn perform_action(&self, _action: ComputerUseAction) -> Result<()> {
+        Err(PlatformError::NotImplemented)
+    }
+
+    async fn get_cursor_position(&self) -> Result<Point> {
+        Err(PlatformError::NotImplemented)
+    }
+
+    async fn release_all(&self) -> Result<()> {
+        Err(PlatformError::NotImplemented)
     }
 }

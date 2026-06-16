@@ -3,12 +3,20 @@
 //! Uses safe RAII wrappers from [`crate::ax`]; all CoreFoundation objects are
 //! automatically released on drop. There are no raw `*mut c_void` pointers or
 //! manual `CFRelease` calls in this file.
+//!
+//! On non-macOS platforms the public API is preserved but returns an error
+//! so the crate remains cross-platform compilable.
 
+#[cfg(target_os = "macos")]
 use crate::ax::AXUIElement;
+#[cfg(target_os = "macos")]
 use platform_capture::{AccessibilityNode, CaptureError, Result};
+#[cfg(target_os = "macos")]
 use platform_input::Rect;
+#[cfg(target_os = "macos")]
 use std::collections::HashMap;
 
+#[cfg(target_os = "macos")]
 /// Walk the AX tree of the given app, bounded by `max_depth`.
 ///
 /// Returns the focused window's AX root with children populated.
@@ -29,6 +37,7 @@ pub fn walk_focused_app(pid: i32, max_depth: usize) -> Result<AccessibilityNode>
     walk(&focused, max_depth)
 }
 
+#[cfg(target_os = "macos")]
 fn walk(element: &AXUIElement, depth_remaining: usize) -> Result<AccessibilityNode> {
     let role = element.copy_string_attribute("AXRole").unwrap_or_default();
     let label = element
@@ -64,6 +73,7 @@ fn walk(element: &AXUIElement, depth_remaining: usize) -> Result<AccessibilityNo
     })
 }
 
+#[cfg(target_os = "macos")]
 fn read_frame(element: &AXUIElement) -> Result<Rect> {
     use crate::ax::AXValue;
 
@@ -93,4 +103,17 @@ fn read_frame(element: &AXUIElement) -> Result<Rect> {
         w: size.width,
         h: size.height,
     })
+}
+
+#[cfg(not(target_os = "macos"))]
+use platform_capture::{AccessibilityNode, CaptureError, Result};
+
+#[cfg(not(target_os = "macos"))]
+/// Walk the AX tree of the given app, bounded by `max_depth`.
+///
+/// Returns an error on non-macOS platforms.
+pub fn walk_focused_app(pid: i32, _max_depth: usize) -> Result<AccessibilityNode> {
+    Err(CaptureError::AxTreeUnavailable(format!(
+        "AX tree walking is only supported on macOS (pid {pid})"
+    )))
 }

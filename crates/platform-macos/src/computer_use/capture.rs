@@ -2,20 +2,29 @@
 //!
 //! Uses the `screencapturekit` crate (a safe wrapper over `SCStream`).
 //! Single-frame captures wrap `SCScreenshotManager.captureImage`.
+//!
+//! On non-macOS platforms the public API is preserved but every
+//! operation returns `CaptureError::NotImplemented` so the crate
+//! remains cross-platform compilable.
 
+#[cfg(target_os = "macos")]
 use async_trait::async_trait;
+#[cfg(target_os = "macos")]
 use platform_capture::{
     AccessibilityNode, AxScope, CaptureError, DisplayInfo, Frame, PixelFormat, PlatformCapture,
     Result, WindowId, WindowInfo,
 };
+#[cfg(target_os = "macos")]
 use platform_input::Rect;
 
+#[cfg(target_os = "macos")]
 pub struct MacCapture {
     /// Default display id used when `capture_screen(None)` is called
     /// without a region. Resolved at construction via `CGMainDisplayID`.
     default_display_id: u32,
 }
 
+#[cfg(target_os = "macos")]
 impl MacCapture {
     pub fn new() -> Result<Self> {
         // SAFETY: CGMainDisplayID is documented thread-safe.
@@ -29,6 +38,7 @@ impl MacCapture {
     }
 }
 
+#[cfg(target_os = "macos")]
 #[async_trait]
 impl PlatformCapture for MacCapture {
     async fn capture_screen(&self, _region: Option<Rect>) -> Result<Frame> {
@@ -212,5 +222,50 @@ impl PlatformCapture for MacCapture {
         task::spawn_blocking(move || ax_tree::walk_focused_app(pid, 6))
             .await
             .map_err(|e| CaptureError::AxTreeUnavailable(format!("join: {e}")))?
+    }
+}
+
+// Non-macOS stub implementation.
+#[cfg(not(target_os = "macos"))]
+use async_trait::async_trait;
+#[cfg(not(target_os = "macos"))]
+use platform_capture::{
+    AccessibilityNode, AxScope, CaptureError, DisplayInfo, Frame, PlatformCapture, Result, WindowId,
+    WindowInfo,
+};
+#[cfg(not(target_os = "macos"))]
+use platform_input::Rect;
+
+#[cfg(not(target_os = "macos"))]
+pub struct MacCapture;
+
+#[cfg(not(target_os = "macos"))]
+impl MacCapture {
+    pub fn new() -> Result<Self> {
+        Err(CaptureError::NotImplemented)
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+#[async_trait]
+impl PlatformCapture for MacCapture {
+    async fn capture_screen(&self, _region: Option<Rect>) -> Result<Frame> {
+        Err(CaptureError::NotImplemented)
+    }
+
+    async fn capture_window(&self, _window_id: WindowId) -> Result<Frame> {
+        Err(CaptureError::NotImplemented)
+    }
+
+    async fn list_displays(&self) -> Result<Vec<DisplayInfo>> {
+        Err(CaptureError::NotImplemented)
+    }
+
+    async fn get_active_window(&self) -> Result<Option<WindowInfo>> {
+        Err(CaptureError::NotImplemented)
+    }
+
+    async fn get_ax_tree(&self, _scope: AxScope) -> Result<AccessibilityNode> {
+        Err(CaptureError::NotImplemented)
     }
 }

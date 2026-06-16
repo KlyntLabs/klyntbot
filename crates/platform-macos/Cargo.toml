@@ -8,6 +8,9 @@ license.workspace = true
 [dependencies]
 tracing.workspace = true
 tokio = { workspace = true, features = ["sync", "time", "rt"] }
+async-trait = { workspace = true }
+platform-input = { path = "../platform-input" }
+platform-capture = { path = "../platform-capture" }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2.workspace = true
@@ -18,9 +21,6 @@ core-foundation.workspace = true
 screencapturekit.workspace = true
 core-media-rs.workspace = true
 core-video-rs.workspace = true
-async-trait = { workspace = true }
-platform-input = { path = "../platform-input" }
-platform-capture = { path = "../platform-capture" }
 
 [dev-dependencies]
 tempfile.workspace = true
