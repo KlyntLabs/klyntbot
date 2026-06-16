@@ -1,4 +1,5 @@
 import type { SidebarProps } from "@app/components/Sidebar";
+import type { AppView } from "@app/constants/appViews";
 import type { useMainAppComposerWorkspaceState } from "@app/hooks/useMainAppComposerWorkspaceState";
 import type { useMainAppDisplayNodes } from "@app/hooks/useMainAppDisplayNodes";
 import type { useMainAppGitState } from "@app/hooks/useMainAppGitState";
@@ -11,7 +12,6 @@ import type { RefObject } from "react";
 import type { LayoutNodesOptions } from "@/features/layout/hooks/layoutNodes/types";
 import { useLoadedContextFiles } from "@/features/prompts/hooks/useLoadedContextFiles";
 import type { ThreadState } from "@/features/threads/hooks/useThreadsReducer";
-import type { AppView } from "@app/constants/appViews";
 import type { AppSettings, ComposerEditorSettings, WorkspaceInfo } from "@/types";
 
 type ComposerProps = NonNullable<LayoutNodesOptions["primary"]["composerProps"]>;

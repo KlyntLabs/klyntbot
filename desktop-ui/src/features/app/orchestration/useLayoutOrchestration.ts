@@ -1,6 +1,6 @@
+import type { AppView } from "@app/constants/appViews";
 import { isWindowsPlatform } from "@utils/platformPaths";
 import { type CSSProperties, useMemo } from "react";
-import type { AppView } from "@app/constants/appViews";
 import type { AppSettings } from "@/types";
 
 type UseAppShellOrchestrationOptions = {
