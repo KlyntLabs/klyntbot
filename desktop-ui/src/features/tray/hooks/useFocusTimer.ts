@@ -168,7 +168,8 @@ export function useFocusTimer() {
   const phase: FocusPhase =
     serverState?.phase === "working" ||
     serverState?.phase === "break_pending" ||
-    serverState?.phase === "break"
+    serverState?.phase === "break" ||
+    serverState?.phase === "suspended"
       ? serverState.phase
       : "idle";
   const paused = serverState?.paused ?? false;
