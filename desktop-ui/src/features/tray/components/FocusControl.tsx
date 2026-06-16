@@ -1,3 +1,4 @@
+import "../../focus/focus.css";
 import Coffee from "lucide-react/dist/esm/icons/coffee";
 import Eye from "lucide-react/dist/esm/icons/eye";
 import Pause from "lucide-react/dist/esm/icons/pause";
@@ -178,10 +179,10 @@ function TimerView({ timer, onOpenSettings }: { timer: Timer; onOpenSettings: ()
         : formatElapsed(settings.focusDuration * 60);
 
   const ringColor = showWarning
-    ? "var(--tray-warning)"
+    ? "var(--tc-warning)"
     : isBreak
-      ? "var(--tray-info)"
-      : "var(--tray-brand)";
+      ? "var(--tc-info)"
+      : "var(--tc-brand)";
 
   const dotsCount = longBreakAfter;
   const filledDots = cyclePosition;

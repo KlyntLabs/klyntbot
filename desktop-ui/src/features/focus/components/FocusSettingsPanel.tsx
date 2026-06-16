@@ -1,3 +1,4 @@
+import "../focus.css";
 import ChevronRight from "lucide-react/dist/esm/icons/chevron-right";
 import X from "lucide-react/dist/esm/icons/x";
 import { useRef, useState } from "react";

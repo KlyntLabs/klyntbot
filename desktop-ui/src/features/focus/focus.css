@@ -1,0 +1,545 @@
+/* Shared focus/timer styles — used by the tray FocusControl and the main-window
+   focus view. Class prefix: `tc-*` (timer control). */
+
+:root {
+  --tc-brand: rgba(100, 200, 255, 0.95);
+  --tc-brand-bg: var(--surface-active, rgba(100, 200, 255, 0.14));
+  --tc-brand-border: var(--border-accent-soft, rgba(100, 200, 255, 0.3));
+  --tc-info: rgba(100, 200, 255, 0.95);
+  --tc-destructive: var(--status-error, rgba(255, 110, 110, 0.95));
+  --tc-destructive-bg: rgba(255, 110, 110, 0.14);
+  --tc-warning: var(--status-warning, rgba(255, 175, 85, 0.95));
+  --tc-warning-bg: rgba(255, 175, 85, 0.18);
+  --tc-success: var(--status-success, rgba(120, 235, 190, 0.95));
+}
+
+/* ──────────────────────────────────────────────────────────────── */
+/* FocusControl (tc-*)                                                  */
+/* ──────────────────────────────────────────────────────────────── */
+.tc-timer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px;
+}
+
+.tc-icon-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  /* Step up to --border-strong (0.14α) so the circle bezel is visibly there
+		 on the translucent shell — at 0.08α the border read as "missing". */
+  border: 1px solid var(--border-strong, rgba(255, 255, 255, 0.18));
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    color 120ms ease,
+    border-color 120ms ease,
+    background-color 120ms ease;
+}
+.tc-icon-btn:hover:not(:disabled) {
+  color: var(--text-primary);
+  border-color: var(--border-stronger, rgba(255, 255, 255, 0.28));
+  background: var(--surface-hover);
+}
+.tc-icon-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.tc-icon-sm {
+  width: 14px;
+  height: 14px;
+}
+.tc-icon-xs {
+  width: 12px;
+  height: 12px;
+}
+
+.tc-today-stats {
+  font-size: 10px;
+  text-align: center;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.tc-ring-wrap {
+  position: relative;
+}
+.tc-ring-svg {
+  width: 100%;
+  height: 100%;
+}
+.tc-ring-progress {
+  transition: stroke-dashoffset 1s linear;
+}
+.tc-ring-progress.is-paused {
+  opacity: 0.5;
+}
+.tc-ring-progress.is-warning {
+  animation: tc-pulse 1.2s ease-in-out infinite;
+}
+@keyframes tc-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.tc-ring-content {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.tc-mode-icon {
+  width: 16px;
+  height: 16px;
+  margin-bottom: 8px;
+}
+.tc-mode-icon.is-info {
+  color: var(--tc-info);
+}
+.tc-mode-icon.is-brand {
+  color: var(--tc-brand);
+}
+.tc-mode-icon.is-dim {
+  color: var(--text-dim);
+}
+
+.tc-time-edit-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 4px;
+}
+.tc-time-edit-input {
+  width: 64px;
+  text-align: center;
+  font-size: 36px;
+  font-weight: 200;
+  color: var(--text-primary);
+  background: transparent;
+  border: none;
+  outline: none;
+  font-variant-numeric: tabular-nums;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+.tc-time-edit-input::-webkit-outer-spin-button,
+.tc-time-edit-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.tc-time-edit-unit {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-weight: 300;
+}
+.tc-time-button {
+  background: transparent;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+}
+.tc-time-button:disabled {
+  cursor: default;
+}
+.tc-time-button.is-paused {
+  animation: tc-pulse 1.2s ease-in-out infinite;
+}
+.tc-time-display {
+  font-size: 36px;
+  font-weight: 200;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.tc-dots {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+}
+.tc-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--surface-control, rgba(255, 255, 255, 0.18));
+  transition: background-color 300ms ease;
+}
+.tc-dot.is-filled {
+  background: var(--tc-brand);
+}
+
+.tc-phase-label {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  margin-top: 6px;
+  font-weight: 300;
+}
+
+.tc-action-title {
+  font-size: 10px;
+  color: var(--text-muted);
+  max-width: 120px;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tc-learning-banner {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+  margin-top: 6px;
+}
+
+.tc-presets {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  margin-top: 4px;
+}
+.tc-preset {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 300;
+  background: var(--surface-control, rgba(255, 255, 255, 0.06));
+  border: 1px solid transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 120ms ease;
+}
+.tc-preset:hover {
+  color: var(--text-primary);
+}
+.tc-preset.is-active {
+  background: var(--tc-brand-bg);
+  color: var(--tc-brand);
+  border-color: var(--tc-brand-border);
+}
+
+.tc-review-wrap {
+  margin-top: 12px;
+  padding: 0 4px;
+  width: 100%;
+}
+
+.tc-distraction-row {
+  display: flex;
+  gap: 4px;
+  justify-content: center;
+  flex-wrap: wrap;
+  padding: 0 8px;
+  margin-top: 12px;
+}
+.tc-distraction-chip {
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--surface-control, rgba(255, 255, 255, 0.06));
+  border: none;
+  color: var(--text-muted);
+  font-size: 10px;
+  cursor: pointer;
+  transition: color 120ms ease;
+}
+.tc-distraction-chip:hover {
+  color: var(--text-primary);
+}
+
+.tc-warning {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+.tc-warning-text {
+  font-size: 11px;
+  color: var(--tc-warning);
+  font-weight: 300;
+  text-align: center;
+}
+.tc-warning-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.tc-pill {
+  padding: 6px 16px;
+  border-radius: 999px;
+  background: var(--surface-control, rgba(255, 255, 255, 0.08));
+  border: none;
+  color: var(--text-primary);
+  font-size: 11px;
+  font-weight: 300;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+.tc-pill:hover:not(:disabled) {
+  background: var(--surface-control-hover, rgba(255, 255, 255, 0.14));
+}
+.tc-pill:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.tc-pill.is-wide {
+  padding: 8px 32px;
+}
+/* Mirrors the .bak: STOP is RED at rest, RED-tinted on hover.
+   The previous rule only colored on hover, which made the dangerous action
+   look like a neutral pill until cursored — wrong visual hierarchy. */
+.tc-pill.is-danger {
+  color: var(--tc-destructive);
+}
+.tc-pill.is-danger:hover:not(:disabled) {
+  background: var(--tc-destructive-bg);
+}
+.tc-pill.is-warning {
+  background: var(--tc-warning-bg);
+  color: var(--tc-warning);
+}
+.tc-pill.is-warning:hover:not(:disabled) {
+  background: rgba(255, 175, 85, 0.28);
+}
+
+.tc-break-pending {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+.tc-break-pending-text {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 300;
+}
+
+.tc-coaching {
+  margin: 8px;
+  padding: 10px;
+  border-radius: 8px;
+  background: var(--tc-brand-bg);
+  border: 1px solid var(--tc-brand-border);
+}
+.tc-coaching-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.tc-coaching-icon {
+  width: 14px;
+  height: 14px;
+  color: var(--tc-brand);
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+.tc-coaching-text {
+  flex: 1;
+  font-size: 12px;
+  color: var(--text-primary);
+  line-height: 1.5;
+  margin: 0;
+}
+.tc-coaching-close {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.tc-coaching-close:hover {
+  color: var(--text-primary);
+}
+
+.tc-dnd-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  cursor: pointer;
+  user-select: none;
+}
+.tc-dnd-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 300;
+}
+
+.tc-dnd-hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 0 8px;
+}
+.tc-dnd-hint-text {
+  font-size: 10px;
+  color: rgba(255, 175, 85, 0.7);
+  font-weight: 300;
+  line-height: 1.3;
+  flex: 1;
+  margin: 0;
+}
+.tc-dnd-hint-close {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.tc-dnd-hint-close:hover {
+  color: var(--text-primary);
+}
+
+.tc-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin-top: 16px;
+}
+.tc-idle-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+}
+
+/* ── Settings panel ────────────────────────────────────────────── */
+.tc-settings {
+  padding: 16px;
+}
+.tc-settings-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 20px;
+}
+.tc-settings-spacer {
+  flex: 1;
+}
+.tc-settings-spacer-right {
+  display: flex;
+  justify-content: flex-end;
+}
+.tc-settings-title {
+  font-size: 15px;
+  color: var(--text-primary);
+  font-weight: 300;
+}
+
+.tc-tabs {
+  display: flex;
+  padding: 2px;
+  border-radius: 999px;
+  background: var(--surface-control, rgba(255, 255, 255, 0.06));
+  margin-bottom: 20px;
+}
+.tc-tab {
+  flex: 1;
+  padding: 6px 0;
+  border-radius: 999px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-weight: 300;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+.tc-tab:hover {
+  color: var(--text-primary);
+}
+.tc-tab.is-active {
+  background: var(--surface-control-hover, rgba(255, 255, 255, 0.12));
+  color: var(--text-primary);
+}
+
+.tc-settings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.tc-settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+}
+.tc-settings-label {
+  font-size: 13px;
+  color: var(--text-muted);
+  font-weight: 300;
+}
+.tc-settings-edit {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.tc-settings-input {
+  width: 40px;
+  text-align: right;
+  font-size: 13px;
+  font-weight: 300;
+  color: var(--text-primary);
+  background: transparent;
+  border: none;
+  outline: none;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+.tc-settings-input::-webkit-outer-spin-button,
+.tc-settings-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.tc-settings-value {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 120ms ease;
+}
+.tc-settings-value:hover {
+  color: var(--text-primary);
+}
+.tc-settings-num {
+  font-size: 13px;
+  font-weight: 300;
+  font-variant-numeric: tabular-nums;
+}
+.tc-settings-unit {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-weight: 300;
+}
