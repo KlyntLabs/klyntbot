@@ -1,4 +1,5 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{criterion_group, criterion_main, Criterion};
+use std::hint::black_box;
 
 /// Benchmark Phase-2 critical paths that contribute to first-token latency.
 ///
@@ -12,7 +13,6 @@ use criterion::{black_box, criterion_group, criterion_main, Criterion};
 ///     when KLYNTBOT.md has not changed between turns.
 ///   • Tool-registry per-thread cache and SkillActivator LRU remain as future
 ///     optimisations if profiling shows they are needed.
-
 fn bench_tool_search(c: &mut Criterion) {
     let meta: Vec<klynt_core::tools::tool_search::ToolMeta> = vec![
         ("bash", "Run a shell command"),

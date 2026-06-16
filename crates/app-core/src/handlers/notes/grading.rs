@@ -258,7 +258,7 @@ impl AppCore {
                     }
                 }
 
-                if let Some(bus) = self.domain_event_bus().ok() {
+                if let Ok(bus) = self.domain_event_bus() {
                     bus.publish(bus::DomainEvent::Learning(
                         bus::domain_events::LearningEvent::KnowledgeAtomCreated {
                             atom_id,
@@ -395,7 +395,7 @@ Be concise — 2-4 sentences max."#
 
         // Always publish bus event (preserves behavior for coaching subscribers
         // even when atom_repo is None).
-        let saved = if let Some(bus) = self.domain_event_bus().ok() {
+        let saved = if let Ok(bus) = self.domain_event_bus() {
             bus.publish(bus::DomainEvent::Learning(
                 bus::domain_events::LearningEvent::KnowledgeAtomCreated {
                     atom_id: atom_id_for_event,

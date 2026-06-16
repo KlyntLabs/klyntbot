@@ -25,7 +25,7 @@ impl AppCore {
         let result = engine.execute(&item_id, &kind).await?;
 
         // Best-effort publish; non-fatal if bus is absent
-        if let Some(bus) = self.domain_event_bus().ok() {
+        if let Ok(bus) = self.domain_event_bus() {
             let event = bus::DomainEvent::LauncherItemExecuted {
                 item_id,
                 kind,

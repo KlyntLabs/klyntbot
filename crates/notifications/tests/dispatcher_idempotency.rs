@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use bus::{AlarmEvent, DomainEvent, DomainEventBus};
+use bus::{AlarmEvent, DomainEventBus};
 use notifications::{
     channel::{os_native::OsNativeChannel, ChannelRegistry},
     held::HeldReleaseService,

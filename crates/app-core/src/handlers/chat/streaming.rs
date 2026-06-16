@@ -481,12 +481,12 @@ impl AppCore {
                     .subagent_instances
                     .get_by_session(&session_key)
                     .await
-                    .map_err(|e| ApiError::from(common::KlyntbotError::from(e)))?
+                    .map_err(ApiError::from)?
                 {
                     sm.runtime
                         .kill(&row.agent_id)
                         .await
-                        .map_err(|e| ApiError::from(common::KlyntbotError::from(e)))?;
+                        .map_err(ApiError::from)?;
                     return Ok(());
                 }
             }

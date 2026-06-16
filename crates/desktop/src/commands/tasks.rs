@@ -130,7 +130,7 @@ pub async fn cross_domain_check(
     title: String,
     created_at: Option<String>,
 ) -> () {
-    let core = Arc::clone(&*state);
+    let core = Arc::clone(state);
     tokio::spawn(async move {
         core.check_cross_domain_str(&domain, &id, &title, created_at.as_deref())
             .await;

@@ -383,10 +383,12 @@ fn normalize_task(t: storage::TaskRow, start: &str, end: &str) -> Vec<TimelineEn
 }
 
 /// Zero-decimal currencies where stored amount = major unit (no cents).
+#[allow(dead_code)]
 const ZERO_DECIMAL_CURRENCIES: &[&str] = &[
     "VND", "JPY", "KRW", "CLP", "HUF", "ISK", "UGX", "RWF", "PYG", "BIF",
 ];
 
+#[allow(dead_code)]
 fn format_timeline_amount(amount: i64, currency: &str, is_expense: bool) -> String {
     let sign = if is_expense { "-" } else { "+" };
     let is_zero_decimal = ZERO_DECIMAL_CURRENCIES
@@ -421,6 +423,7 @@ fn format_timeline_amount(amount: i64, currency: &str, is_expense: bool) -> Stri
     }
 }
 
+#[allow(dead_code)]
 fn format_with_separators(n: u64) -> String {
     let s = n.to_string();
     let mut result = String::with_capacity(s.len() + s.len() / 3);
@@ -540,7 +543,7 @@ fn compute_summary(entries: &[TimelineEntry]) -> TimelineSummary {
 
     // Top 5 apps by duration
     let mut app_list: Vec<_> = app_durations.into_iter().collect();
-    app_list.sort_by(|a, b| b.1.cmp(&a.1));
+    app_list.sort_by_key(|b| std::cmp::Reverse(b.1));
     let total_app_secs: i64 = app_list.iter().map(|(_, d)| d).sum();
     let top_apps: Vec<TopAppSummary> = app_list
         .into_iter()

@@ -102,7 +102,7 @@ impl AppCore {
             .collect();
 
         // Sort topics by fact_count desc for stable ordering.
-        topics.sort_by(|a, b| b.fact_count.cmp(&a.fact_count));
+        topics.sort_by_key(|b| std::cmp::Reverse(b.fact_count));
 
         // 4. Load co-activation pairs and map fact-level pairs to topic-level edges.
         let co_pairs = co_repo.list_all_pairs().await.map_err(map_cognitive_err)?;
@@ -294,7 +294,7 @@ fn auto_name_community(member_topic_ids: &[String]) -> String {
         }
     }
     let mut subjects: Vec<(&str, u32)> = subject_counts.into_iter().collect();
-    subjects.sort_by(|a, b| b.1.cmp(&a.1));
+    subjects.sort_by_key(|b| std::cmp::Reverse(b.1));
 
     match subjects.len() {
         0 => "Unknown".to_string(),

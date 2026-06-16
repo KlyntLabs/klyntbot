@@ -316,7 +316,7 @@ mod tests {
         assert!(hourlies[0]
             .summary
             .as_deref()
-            .map_or(false, |s| s.contains("5 items")));
+            .is_some_and(|s| s.contains("5 items")));
 
         // Raw episodics should be marked rolled_up_at.
         let raw = repo.list_by_tier("raw", 10).await.unwrap();

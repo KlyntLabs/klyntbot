@@ -46,6 +46,7 @@ pub struct CrossDomainSearcherImpl {
     embedding_engine: Arc<EmbeddingEngine>,
     task_repo: TaskRepo,
     note_repo: NoteRepo,
+    #[allow(dead_code)]
     tree_repo: SqliteBookTreeRepo,
 }
 
@@ -146,6 +147,7 @@ impl CrossDomainSearcherImpl {
     /// Finance nodes are stored in `book_tree_nodes` with source_type="finance".
     /// We prefer the `title` column; for leaf nodes (level 2) with no title we
     /// fall back to `content` (e.g. "$45.20 in food").
+    #[allow(dead_code)]
     async fn lookup_finance_node(&self, id: &str) -> Option<(String, Timestamp)> {
         match self.tree_repo.get_node(id).await {
             Ok(Some(node)) => {

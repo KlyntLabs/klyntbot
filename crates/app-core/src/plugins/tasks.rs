@@ -21,7 +21,7 @@ impl AppCorePlugin for TasksPlugin {
     }
 
     async fn init(&self, ctx: &mut PluginContext) -> common::Result<()> {
-        ctx.register_ai_feature(|reg| feature_tasks::TasksFeature::register(reg));
+        ctx.register_ai_feature(feature_tasks::TasksFeature::register);
         ctx.register_metrics(|reg| reg.register_all(feature_tasks::TaskEvent::FEATURE_METRICS));
         ctx.add_feature_translator(
             feature_tasks::events::try_from_domain_event,

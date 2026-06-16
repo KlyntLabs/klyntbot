@@ -4,6 +4,7 @@
 use proptest::prelude::*;
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 enum E {
     S,
     P(u32),

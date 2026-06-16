@@ -1,4 +1,3 @@
-use ai_core::AiEventMeta;
 use async_trait::async_trait;
 use std::sync::Arc;
 
@@ -47,7 +46,7 @@ impl AppCorePlugin for ProductivityPlugin {
     }
 
     async fn init(&self, ctx: &mut PluginContext) -> common::Result<()> {
-        ctx.register_ai_feature(|reg| feature_productivity::ProductivityFeature::register(reg));
+        ctx.register_ai_feature(feature_productivity::ProductivityFeature::register);
         ctx.register_metrics(|reg| {
             reg.register_all(feature_productivity::events::ProductivityEvent::FEATURE_METRICS)
         });

@@ -204,7 +204,6 @@ impl AppCore {
             tokio::sync::broadcast::channel::<::cognitive::PipelineEvent>(64);
 
         let shutdown_token = CancellationToken::new();
-        let config = config;
         let plugin_config = Arc::new(RwLock::new(config.clone()));
         let tracing_registry = Arc::new(crate::tracing::TracingRegistry::new());
 
@@ -316,7 +315,7 @@ impl AppCore {
 
         // ── Phase 5: Agent (consumes plugin-built tool registry) ──────────
         let agent::AgentResult {
-            cognitive_provider,
+            cognitive_provider: _,
             agent,
             inbound_rx,
         } = agent::init_agent(
@@ -363,7 +362,7 @@ impl AppCore {
         // ── Assemble AppCore ─────────────────────────────────────────────
         // Clone cron_repo before repos is moved into AppCore.
         let cron_repo = repos.cron.clone();
-        let mut core = AppCore {
+        let core = AppCore {
             mode,
             repos: repos.clone(),
             storage_pool: storage_pool.clone(),

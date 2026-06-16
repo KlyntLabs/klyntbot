@@ -388,8 +388,8 @@ impl Phase for CollectPhase {
         // Snapshot content hashes at collection time for conflict detection.
         run.collected_hashes = collected
             .skill_files
-            .iter()
-            .flat_map(|(_, files)| {
+            .values()
+            .flat_map(|files| {
                 files.iter().map(|f| {
                     (
                         (f.skill_name.clone(), f.file_path.clone()),

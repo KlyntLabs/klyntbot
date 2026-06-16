@@ -18,6 +18,7 @@ pub type Generation = u32;
 /// for cleanup.
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(tag = "event", rename_all = "snake_case")]
+#[allow(clippy::large_enum_variant)]
 pub enum ThreadEvent {
     // ── Streaming content ──────────────────────────────────────────────
     ContentChunk {

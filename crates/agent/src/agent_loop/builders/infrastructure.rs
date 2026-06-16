@@ -24,6 +24,7 @@ pub(crate) struct InfrastructureResult {
 }
 
 /// Build core infrastructure services.
+#[allow(clippy::too_many_arguments)]
 pub(crate) async fn build_infrastructure(
     config: &Config,
     provider: &DynProvider,
@@ -67,7 +68,7 @@ pub(crate) async fn build_infrastructure(
     let subagent_manager = Arc::new(subagent_builder.build());
 
     // ── Tool registry ─────────────────────────────────────────────────
-    let mut tool_registry = tool_registry.unwrap_or_else(ToolRegistry::new);
+    let mut tool_registry = tool_registry.unwrap_or_default();
 
     // Subagents tool
     tool_registry.register(SubagentsTool::with_handler(

@@ -10,6 +10,7 @@ use tracing::info;
 
 /// Results from the agent initialization phase.
 pub(super) struct AgentResult {
+    #[allow(dead_code)]
     pub cognitive_provider: Option<providers::DynProvider>,
     pub agent: Arc<AgentLoop>,
     pub inbound_rx: mpsc::Receiver<bus::InboundMessage>,

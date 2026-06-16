@@ -112,6 +112,12 @@ pub struct FeatureHostBuilder {
     pre_handles: Vec<(TypeId, Arc<dyn Any + Send + Sync>)>,
 }
 
+impl Default for FeatureHostBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl FeatureHostBuilder {
     pub fn new() -> Self {
         Self {

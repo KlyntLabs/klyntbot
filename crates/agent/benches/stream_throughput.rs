@@ -36,7 +36,7 @@ fn stream_throughput(c: &mut Criterion) {
                     });
                     let mut count = 0usize;
                     while let Some(ev) = rx.recv().await {
-                        criterion::black_box(&ev);
+                        std::hint::black_box(&ev);
                         count += 1;
                         if count >= n {
                             break;

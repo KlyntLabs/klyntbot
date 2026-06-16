@@ -8,7 +8,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use bus::{AlarmEvent, DomainEvent, DomainEventBus};
+use bus::{AlarmEvent, DomainEventBus};
 use common::{Result, ToolError};
 use jiff::{SignedDuration, Timestamp};
 use notifications::channel::names_to_mask;

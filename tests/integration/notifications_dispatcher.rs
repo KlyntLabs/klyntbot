@@ -7,7 +7,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use bus::{AlarmEvent, DomainEvent, DomainEventBus};
+use bus::{AlarmEvent, DomainEventBus};
 use notifications::{
     channel::{Channel, ChannelRegistry, NotificationPayload},
     held::HeldReleaseService,

@@ -369,7 +369,7 @@ impl AppCore {
                     let _ = sf_repo.upsert(&fact).await;
 
                     // Emit KnowledgeAtomCreated events
-                    if let Some(bus) = self.domain_event_bus().ok() {
+                    if let Ok(bus) = self.domain_event_bus() {
                         for atom in &created_atom {
                             bus.publish(bus::DomainEvent::Learning(
                                 bus::domain_events::LearningEvent::KnowledgeAtomCreated {
@@ -392,7 +392,7 @@ impl AppCore {
         } // end if is_weak
 
         // Emit PracticeUnitCompleted event
-        if let Some(bus) = self.domain_event_bus().ok() {
+        if let Ok(bus) = self.domain_event_bus() {
             bus.publish(
                 NoteEvent::PracticeUnitCompleted {
                     session_id: session.id.clone(),
@@ -515,7 +515,7 @@ impl AppCore {
             .map_err(map_cognitive_err)?;
 
         // Emit PracticeSessionCompleted event
-        if let Some(bus) = self.domain_event_bus().ok() {
+        if let Ok(bus) = self.domain_event_bus() {
             bus.publish(
                 NoteEvent::PracticeSessionCompleted {
                     session_id: session.id.clone(),

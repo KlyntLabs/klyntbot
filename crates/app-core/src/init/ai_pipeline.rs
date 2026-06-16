@@ -233,7 +233,6 @@ pub fn build_feature_registry() -> ai_core::AiFeatureRegistry {
 #[cfg(test)]
 mod bash_job_translate_tests {
     use super::*;
-    use jiff::Timestamp;
 
     #[test]
     fn translates_failed() {

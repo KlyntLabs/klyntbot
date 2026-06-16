@@ -4,8 +4,8 @@
 
 use std::sync::Arc;
 
+use bus::DomainEventBus;
 use bus::TaskEvent as BusTaskEvent;
-use bus::{DomainEvent, DomainEventBus};
 use storage::repos::task_repo::TaskRepo;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;

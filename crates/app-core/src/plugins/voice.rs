@@ -87,7 +87,6 @@ impl AppCorePlugin for VoicePlugin {
         drop(config_guard);
 
         // TTS: config-driven with engine manager wrapping primary + system fallback.
-        let mut qwen3_tts_ref: Option<Arc<voice_engine::Qwen3TtsEngine>> = None;
         let system_tts = Arc::new(voice_engine::AvSpeechTtsEngine::new(&data_dir));
         let tts: Option<Arc<dyn voice_engine::TtsEngine>> = {
             match voice_config.output.deployment {
@@ -120,7 +119,6 @@ impl AppCorePlugin for VoicePlugin {
                             Ok(engine) => {
                                 info!("Qwen3-TTS loaded — wrapping with system fallback");
                                 let engine = Arc::new(engine);
-                                qwen3_tts_ref = Some(Arc::clone(&engine));
                                 let manager = voice_engine::TtsEngineManager::new(
                                     engine,
                                     Some(

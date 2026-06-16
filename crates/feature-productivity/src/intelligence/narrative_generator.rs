@@ -113,7 +113,7 @@ fn compute_metrics(sessions: &[ProductivitySession]) -> NarrativeMetrics {
     }
 
     let mut cats: Vec<(String, i64)> = category_counts.into_iter().collect();
-    cats.sort_by(|a, b| b.1.cmp(&a.1));
+    cats.sort_by_key(|b| std::cmp::Reverse(b.1));
     let top_categories: Vec<String> = cats.into_iter().take(3).map(|(c, _)| c).collect();
 
     NarrativeMetrics {

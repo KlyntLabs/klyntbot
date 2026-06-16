@@ -476,7 +476,7 @@ impl AppCore {
                     .map_err(map_storage_err)?;
 
                 // Publish domain event so the cognitive pipeline picks up the new note
-                if let Some(bus) = self.domain_event_bus().ok() {
+                if let Ok(bus) = self.domain_event_bus() {
                     bus.publish(bus::DomainEvent::Note(bus::NoteEvent::NoteContentChanged {
                         note_id: note_id.clone(),
                     }));

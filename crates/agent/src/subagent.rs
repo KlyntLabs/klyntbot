@@ -858,6 +858,7 @@ async fn drive_subagent_with_progress(
     result
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn run_subagent_task(
     provider: &DynProvider,
     workspace: &std::path::Path,

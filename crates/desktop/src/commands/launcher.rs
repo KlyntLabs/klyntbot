@@ -157,37 +157,6 @@ pub async fn launcher_open_app(path: String) -> CommandResult<()> {
     Ok(())
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn parses_minutes() {
-        assert_eq!(
-            parse_human_duration("30m"),
-            Some(std::time::Duration::from_secs(1800))
-        );
-    }
-    #[test]
-    fn parses_hours() {
-        assert_eq!(
-            parse_human_duration("2h"),
-            Some(std::time::Duration::from_secs(7200))
-        );
-    }
-    #[test]
-    fn parses_days() {
-        assert_eq!(
-            parse_human_duration("1d"),
-            Some(std::time::Duration::from_secs(86400))
-        );
-    }
-    #[test]
-    fn rejects_garbage() {
-        assert_eq!(parse_human_duration("xyz"), None);
-    }
-}
-
 #[cfg(debug_assertions)]
 pub(crate) async fn dispatch_dev(
     cmd: &str,
@@ -258,4 +227,35 @@ pub(crate) async fn dispatch_dev(
         }
         _ => return None,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_minutes() {
+        assert_eq!(
+            parse_human_duration("30m"),
+            Some(std::time::Duration::from_secs(1800))
+        );
+    }
+    #[test]
+    fn parses_hours() {
+        assert_eq!(
+            parse_human_duration("2h"),
+            Some(std::time::Duration::from_secs(7200))
+        );
+    }
+    #[test]
+    fn parses_days() {
+        assert_eq!(
+            parse_human_duration("1d"),
+            Some(std::time::Duration::from_secs(86400))
+        );
+    }
+    #[test]
+    fn rejects_garbage() {
+        assert_eq!(parse_human_duration("xyz"), None);
+    }
 }

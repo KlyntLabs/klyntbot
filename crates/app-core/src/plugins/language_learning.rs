@@ -1,4 +1,3 @@
-use ai_core::AiEventMeta;
 use async_trait::async_trait;
 
 use crate::plugin::context::PluginContext;

@@ -71,8 +71,8 @@ pub async fn cluster_rules_for_skill_discovery(
     }
 
     Ok(by_root
-        .into_iter()
-        .filter_map(|(_, idxs)| {
+        .into_values()
+        .filter_map(|idxs| {
             if idxs.len() < 2 {
                 return None;
             }

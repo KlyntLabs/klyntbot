@@ -76,7 +76,7 @@ impl LiveContextRefresher {
         }
 
         // Sort by priority (High first)
-        updates.sort_by(|a, b| b.priority.cmp(&a.priority));
+        updates.sort_by_key(|b| std::cmp::Reverse(b.priority));
 
         let current_tokens: usize = messages
             .iter()

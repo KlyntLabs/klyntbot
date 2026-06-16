@@ -24,6 +24,7 @@ pub(crate) struct CognitiveBuildResult {
 
 /// Build the cognitive memory system: UnifiedMemoryService, InsightForge,
 /// tree builders, and entity backfills.
+#[allow(clippy::too_many_arguments)]
 pub(crate) async fn build_cognitive_system(
     config: &Config,
     context_engine: context_engine::ContextEngine,

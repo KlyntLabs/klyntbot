@@ -81,6 +81,7 @@ pub struct PluginContext<'a> {
 }
 
 impl<'a> PluginContext<'a> {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         deps: &'a PluginDeps,
         tools: &'a mut ToolRegistry,

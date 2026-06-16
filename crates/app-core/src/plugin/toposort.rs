@@ -1,5 +1,4 @@
 use std::collections::{HashMap, VecDeque};
-use std::sync::Arc;
 
 use super::AppCorePlugin;
 
@@ -95,6 +94,7 @@ mod tests {
     }
 
     impl MockPlugin {
+        #[allow(clippy::new_ret_no_self)]
         fn new(name: &'static str, deps: &[&'static str]) -> Box<dyn AppCorePlugin> {
             Box::new(MockPlugin {
                 name,

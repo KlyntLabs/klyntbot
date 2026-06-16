@@ -127,7 +127,7 @@ impl AppCore {
             }
         }
         let mut top_apps_vec: Vec<_> = app_map.into_iter().collect();
-        top_apps_vec.sort_by(|a, b| b.1.cmp(&a.1));
+        top_apps_vec.sort_by_key(|b| std::cmp::Reverse(b.1));
         top_apps_vec.truncate(10);
         let top_apps_json = serde_json::to_string(&top_apps_vec).ok();
 

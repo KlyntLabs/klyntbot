@@ -8,7 +8,6 @@ use std::sync::Mutex;
 use async_trait::async_trait;
 
 use super::*; // ReforgeContext, ReforgeRun, Phase impls (private), run_reforge, etc.
-use crate::types::*;
 
 // --- Scriptable fake handler (the 3 LLM seams) -----------------------------
 
@@ -340,9 +339,11 @@ async fn apply_stores_narrative_as_episodic_memory() {
 async fn collect_yields_none_on_empty_db() {
     let h = ReforgeTestHarness::new().await;
     let ctx = h.ctx();
-    let mut run = ReforgeRun::default();
     // Set a non-bootstrap last_run_at so the empty-db skip gate triggers.
-    run.last_run_at = Some(jiff::Timestamp::now().to_string());
+    let mut run = ReforgeRun {
+        last_run_at: Some(jiff::Timestamp::now().to_string()),
+        ..Default::default()
+    };
 
     CollectPhase.run(&ctx, &mut run).await;
 

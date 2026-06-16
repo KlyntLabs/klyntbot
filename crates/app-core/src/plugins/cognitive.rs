@@ -1,4 +1,3 @@
-use ai_core::AiEventMeta;
 use async_trait::async_trait;
 use std::sync::Arc;
 
@@ -92,7 +91,7 @@ impl AppCorePlugin for CognitivePlugin {
         {
             let mut config = app.config.write().await;
             self::init::init_cognitive(
-                &mut *config,
+                &mut config,
                 &app.storage_pool,
                 &app.activity_ingestion_service()
                     .expect("activity svc available"),

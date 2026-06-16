@@ -8,7 +8,6 @@ use tracing::warn;
 use super::super::TaskTool;
 use crate::events::TaskEvent;
 use crate::types::Task;
-use bus::DomainEvent;
 use bus::TaskEvent as BusTaskEvent;
 use storage::TaskPatch;
 

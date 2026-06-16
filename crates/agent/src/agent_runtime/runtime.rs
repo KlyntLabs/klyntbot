@@ -976,6 +976,7 @@ mod tests {
         )
     }
 
+    #[allow(dead_code)]
     fn text_response(text: &str) -> LlmResponse {
         LlmResponse {
             content: Some(text.to_string()),

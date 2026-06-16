@@ -176,7 +176,7 @@ impl AppCore {
         Ok(cfg
             .app_settings
             .clone()
-            .unwrap_or_else(|| default_app_settings()))
+            .unwrap_or_else(default_app_settings))
     }
 
     #[tracing::instrument(skip(self, settings), err)]

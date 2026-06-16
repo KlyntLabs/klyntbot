@@ -1,6 +1,5 @@
 use async_trait::async_trait;
 use std::sync::Arc;
-use tools_core::FeaturePackage;
 
 use crate::plugin::context::PluginContext;
 use crate::plugin::AppCorePlugin;

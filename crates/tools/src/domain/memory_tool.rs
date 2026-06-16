@@ -464,7 +464,7 @@ impl MemoryTool {
         let all_keyword_results: Vec<crate::search_utils::SearchResult> =
             conversation_search_results
                 .into_iter()
-                .chain(todo_search_results.into_iter())
+                .chain(todo_search_results)
                 .collect();
 
         let merged = crate::search_utils::rrf_merge(

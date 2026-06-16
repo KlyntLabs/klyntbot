@@ -2,7 +2,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use bus::{AlarmEvent, DomainEvent, DomainEventBus};
+use bus::{AlarmEvent, DomainEventBus};
 use config::schema::QuietHoursConfig;
 use notifications::{
     channel::{Channel, ChannelRegistry, NotificationPayload},

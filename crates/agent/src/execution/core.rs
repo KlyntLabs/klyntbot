@@ -600,6 +600,7 @@ impl ExecutionCore {
     /// 2. If tool calls returned: execute all in parallel with timeout → ToolsExecuted
     /// 3. If text response: FinalResponse
     /// 4. Otherwise: EmptyResponse
+    #[allow(clippy::too_many_arguments)]
     pub async fn run_cycle(
         &self,
         messages: &mut Vec<Message>,
@@ -620,10 +621,7 @@ impl ExecutionCore {
 
         // Build a never-cancelled token if no cancel_token was supplied so
         // call_provider_streaming always has a valid reference.
-        let cancel_ref = params
-            .cancel_token
-            .clone()
-            .unwrap_or_else(tokio_util::sync::CancellationToken::new);
+        let cancel_ref = params.cancel_token.clone().unwrap_or_default();
 
         let response = if let Some(tx) = event_tx {
             call_provider_streaming(
@@ -850,10 +848,8 @@ impl ExecutionCore {
                                     preview: None,
                                     suggested_grant: None,
                                 };
-                                let approval_cancel_ref = ctx
-                                    .cancel_token
-                                    .clone()
-                                    .unwrap_or_else(tokio_util::sync::CancellationToken::new);
+                                let approval_cancel_ref =
+                                    ctx.cancel_token.clone().unwrap_or_default();
                                 match gate.check(req, &approval_cancel_ref).await? {
                                     approval::GateOutcome::Allow => {}
                                     approval::GateOutcome::Deny { reason } => {

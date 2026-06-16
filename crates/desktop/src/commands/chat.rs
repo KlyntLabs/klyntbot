@@ -111,7 +111,7 @@ pub async fn chat_delete_stale_sessions(before_days: u32) -> u64 {
 
 #[klynt_command]
 pub async fn chat_cancel(session_key: String) -> () {
-    let runtime = Arc::clone(&state).assistant_runtime();
+    let runtime = Arc::clone(state).assistant_runtime();
     runtime.cancel_turn(&session_key).await
 }
 

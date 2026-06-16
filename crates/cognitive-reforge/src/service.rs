@@ -91,8 +91,8 @@ pub(crate) fn build_review_input(
 ) -> ReviewInput {
     let skill_contents: Vec<SkillContent> = collected
         .skill_files
-        .iter()
-        .flat_map(|(_, files)| {
+        .values()
+        .flat_map(|files| {
             files.iter().map(|f| SkillContent {
                 skill_name: f.skill_name.clone(),
                 file_path: f.file_path.clone(),

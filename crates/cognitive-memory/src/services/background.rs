@@ -1299,7 +1299,7 @@ mod tests {
     fn test_event_type_key() {
         assert_eq!(
             event_type_key(&DomainEvent::Productivity(
-                ProductivityEvent::ProductivityScoreComputed {
+                bus::ProductivityEvent::ProductivityScoreComputed {
                     date: "2026-03-06".into(),
                     score: 72.0,
                 }

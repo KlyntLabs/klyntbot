@@ -26,6 +26,7 @@ pub(crate) struct ContextSourcesResult {
 }
 
 /// Assemble all context sources and optional background services.
+#[allow(clippy::too_many_arguments)]
 pub(crate) async fn build_context_sources(
     config: &Config,
     pool: &Option<sqlx::SqlitePool>,
@@ -293,40 +294,37 @@ pub(crate) async fn build_context_sources(
 
     // Work context source (optional — requires real pool + enabled config).
     let mut inference_loop_token = None;
-    if config.work_context.enabled {
-        if pool.is_some() {
-            sources.push(Box::new(activity_log::WorkContextSource::new(
-                storage_pool.clone(),
-            )));
+    if config.work_context.enabled && pool.is_some() {
+        sources.push(Box::new(activity_log::WorkContextSource::new(
+            storage_pool.clone(),
+        )));
 
-            // Start inference engine + background loop
-            let text_embedder =
-                Arc::new(crate::adapters::cognitive_embedder::TextEmbedderImpl::new(
-                    Arc::clone(embedding_engine),
-                ));
-            let inference_config =
-                activity_log::inference::ContextInferenceConfig::from_work_context_config(
-                    &config.work_context,
-                );
-            let engine = Arc::new(activity_log::inference::ContextInferenceEngine::new(
-                storage_pool.clone(),
-                text_embedder,
-                vector_store.clone(),
-                inference_config,
-            ));
-
-            let token = CancellationToken::new();
-            let dormancy_days = config.work_context.max_dormancy_days as i64;
-            let _handle = activity_log::inference_loop::ContextInferenceLoop::start(
-                Arc::clone(&engine),
-                storage_pool.clone(),
-                config.work_context.inference_interval_mins,
-                dormancy_days,
-                token.clone(),
+        // Start inference engine + background loop
+        let text_embedder = Arc::new(crate::adapters::cognitive_embedder::TextEmbedderImpl::new(
+            Arc::clone(embedding_engine),
+        ));
+        let inference_config =
+            activity_log::inference::ContextInferenceConfig::from_work_context_config(
+                &config.work_context,
             );
-            info!("Work context inference loop started");
-            inference_loop_token = Some(token);
-        }
+        let engine = Arc::new(activity_log::inference::ContextInferenceEngine::new(
+            storage_pool.clone(),
+            text_embedder,
+            vector_store.clone(),
+            inference_config,
+        ));
+
+        let token = CancellationToken::new();
+        let dormancy_days = config.work_context.max_dormancy_days as i64;
+        let _handle = activity_log::inference_loop::ContextInferenceLoop::start(
+            Arc::clone(&engine),
+            storage_pool.clone(),
+            config.work_context.inference_interval_mins,
+            dormancy_days,
+            token.clone(),
+        );
+        info!("Work context inference loop started");
+        inference_loop_token = Some(token);
     }
 
     // Append plugin-registered sources

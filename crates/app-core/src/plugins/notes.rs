@@ -1,4 +1,3 @@
-use ai_core::AiEventMeta;
 use async_trait::async_trait;
 use std::sync::Arc;
 
@@ -26,7 +25,7 @@ impl AppCorePlugin for NotesPlugin {
     }
 
     async fn init(&self, ctx: &mut PluginContext) -> common::Result<()> {
-        ctx.register_ai_feature(|reg| feature_notes::NotesFeature::register(reg));
+        ctx.register_ai_feature(feature_notes::NotesFeature::register);
         ctx.add_feature_translator(
             feature_notes::events::try_from_domain_event,
             ai_core::RecallDomain::Notes,

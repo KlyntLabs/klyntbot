@@ -1,4 +1,3 @@
-use ai_core::AiEventMeta;
 use async_trait::async_trait;
 use tools_core::FeaturePackage;
 
@@ -19,7 +18,7 @@ impl AppCorePlugin for LearningPlugin {
     }
 
     async fn init(&self, ctx: &mut PluginContext) -> common::Result<()> {
-        ctx.register_ai_feature(|reg| feature_learning::LearningFeature::register(reg));
+        ctx.register_ai_feature(feature_learning::LearningFeature::register);
         ctx.register_metrics(|reg| {
             reg.register_all(feature_learning::LearningEvent::FEATURE_METRICS)
         });

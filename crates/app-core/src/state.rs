@@ -12,7 +12,7 @@ use desktop_shared::types::EntityKind;
 use feature_coaching::{FeedbackTracker, InterventionRouter, PatternDetector, SignalAccumulator};
 use feature_focus::DndManager;
 use feature_notes::repo::{NoteRepo, PracticeSessionRepo};
-use feature_productivity::{DailyAggregator, FocusManager, ProductivityEngine};
+use feature_productivity::{DailyAggregator, FocusManager};
 use scheduling::temporal::cron_bridge::CronBridge;
 use scheduling::temporal::cron_executor::CronExecutor;
 use storage::{repos::cron::CronRepo, Repos, StoragePool, VectorStore};
