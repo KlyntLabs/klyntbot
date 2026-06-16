@@ -1,7 +1,6 @@
 #![cfg(target_os = "linux")]
 
 use crate::policy::{FsConstraints, NetworkConstraints, SandboxPolicy};
-use std::path::Path;
 
 /// Builds the argv for `/usr/bin/bwrap`. Does NOT include the bwrap binary
 /// path itself — caller invokes Command::new("/usr/bin/bwrap").args(...).
