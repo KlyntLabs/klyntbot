@@ -72,8 +72,8 @@ export function useAgentResponseRequiredNotifications({
   const notifiedPlanItemsRef = useRef(new Set<string>());
   const pendingPlanNotificationsRef = useRef(new Map<string, PendingPlanNotification>());
   const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [_retrySignal, setRetrySignal] = useState(0);
-  const [_pendingPlansSignal, setPendingPlansSignal] = useState(0);
+  const [retrySignal, setRetrySignal] = useState(0);
+  const [pendingPlansSignal, setPendingPlansSignal] = useState(0);
 
   const canNotifyNow = useCallback(() => {
     if (!enabled) {
@@ -195,6 +195,7 @@ export function useAgentResponseRequiredNotifications({
     return null;
   })();
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: retrySignal intentionally triggers re-evaluation after scheduled retries
   useEffect(() => {
     if (!latestUnnotifiedApproval) {
       return;
@@ -224,7 +225,14 @@ export function useAgentResponseRequiredNotifications({
       requestId: latestUnnotifiedApproval.request_id,
     });
     scheduleRetry();
-  }, [canNotifyNow, getWorkspaceName, latestUnnotifiedApproval, notify, scheduleRetry]);
+  }, [
+    canNotifyNow,
+    getWorkspaceName,
+    latestUnnotifiedApproval,
+    notify,
+    retrySignal,
+    scheduleRetry,
+  ]);
 
   const latestUnnotifiedQuestion = (() => {
     for (let index = userInputRequests.length - 1; index >= 0; index -= 1) {
@@ -244,6 +252,7 @@ export function useAgentResponseRequiredNotifications({
     return null;
   })();
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: retrySignal intentionally triggers re-evaluation after scheduled retries
   useEffect(() => {
     if (!latestUnnotifiedQuestion) {
       return;
@@ -275,8 +284,16 @@ export function useAgentResponseRequiredNotifications({
       itemId: latestUnnotifiedQuestion.params.item_id,
     });
     scheduleRetry();
-  }, [canNotifyNow, getWorkspaceName, latestUnnotifiedQuestion, notify, scheduleRetry]);
+  }, [
+    canNotifyNow,
+    getWorkspaceName,
+    latestUnnotifiedQuestion,
+    notify,
+    retrySignal,
+    scheduleRetry,
+  ]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: retrySignal/pendingPlansSignal intentionally trigger re-evaluation of queued plan notifications
   useEffect(() => {
     if (!pendingPlanNotificationsRef.current.size) {
       return;
@@ -299,7 +316,7 @@ export function useAgentResponseRequiredNotifications({
     if (pendingPlanNotificationsRef.current.size) {
       scheduleRetry();
     }
-  }, [canNotifyNow, notify, scheduleRetry]);
+  }, [canNotifyNow, notify, retrySignal, pendingPlansSignal, scheduleRetry]);
 
   const onItemCompleted = useCallback(
     (workspaceId: string, threadId: string, item: Record<string, unknown>) => {
@@ -347,6 +364,7 @@ export function useAgentResponseRequiredNotifications({
     [canNotifyNow, getWorkspaceName, notify, scheduleRetry, shouldMuteSubagentThread],
   );
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: useMemo must list onItemCompleted to recreate the events object when it changes
   useAppServerEvents(
     useMemo(
       () => ({
