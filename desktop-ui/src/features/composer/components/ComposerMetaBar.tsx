@@ -67,7 +67,7 @@ export function ComposerMetaBar({
     <div className="composer-bar">
       <div className="composer-meta">
         {children}
-        {collaborationModes.length > 0 &&
+        {collaborationModes.length > 1 &&
           (canUsePlanToggle ? (
             <div className="composer-select-wrap composer-plan-toggle-wrap">
               <label className="composer-plan-toggle" aria-label="Plan mode">
