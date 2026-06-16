@@ -12,7 +12,7 @@ use desktop_shared::commands::{
 };
 use desktop_shared::{errors::ApiError, CommandResult};
 use serde::{Deserialize, Serialize};
-use tauri::State;
+use tauri::{Manager, State};
 
 use crate::app_core::AppCore;
 use crate::focus_timer::FocusTimer;
@@ -479,6 +479,27 @@ pub struct FocusDefaultsUpdate {
     pub auto_start_break: Option<bool>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct FocusSoundCue {
+    pub id: String,
+    pub label: String,
+    pub has_custom: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct FocusSoundCuesResponse {
+    pub cues: Vec<FocusSoundCue>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct FocusSetCustomSoundPayload {
+    pub cue: String,
+    pub source_path: String,
+}
+
 #[klynt_command]
 pub async fn focus_defaults_get() -> FocusDefaultsResponse {
     let pomodoro = &state.config.read().await.productivity.focus.pomodoro;
@@ -526,6 +547,109 @@ pub async fn focus_defaults_set(update: FocusDefaultsUpdate) -> FocusDefaultsRes
         auto_start_work: pomodoro.auto_start_work,
         auto_start_break: pomodoro.auto_start_break,
     })
+}
+
+fn has_custom_sound(app: &tauri::AppHandle, cue: crate::focus_audio::FocusCue) -> bool {
+    let dir = app
+        .path()
+        .app_data_dir()
+        .unwrap_or_else(|_| std::path::PathBuf::from("."))
+        .join("audio");
+    dir.join(cue.default_filename()).exists()
+}
+
+fn parse_focus_cue(cue: &str) -> CommandResult<crate::focus_audio::FocusCue> {
+    match cue {
+        "work_complete" => Ok(crate::focus_audio::FocusCue::WorkComplete),
+        "break_complete" => Ok(crate::focus_audio::FocusCue::BreakComplete),
+        _ => Err(ApiError::new("BAD_REQUEST", format!("invalid focus sound cue: {cue}"))),
+    }
+}
+
+#[klynt_raw_command]
+#[tauri::command(rename_all = "snake_case")]
+#[specta::specta]
+pub async fn focus_sound_cues(app: tauri::AppHandle) -> CommandResult<FocusSoundCuesResponse> {
+    Ok(FocusSoundCuesResponse {
+        cues: vec![
+            FocusSoundCue {
+                id: "work_complete".into(),
+                label: "Work Complete".into(),
+                has_custom: has_custom_sound(&app, crate::focus_audio::FocusCue::WorkComplete),
+            },
+            FocusSoundCue {
+                id: "break_complete".into(),
+                label: "Break Complete".into(),
+                has_custom: has_custom_sound(&app, crate::focus_audio::FocusCue::BreakComplete),
+            },
+        ],
+    })
+}
+
+#[klynt_raw_command]
+#[tauri::command(rename_all = "snake_case")]
+#[specta::specta]
+pub async fn focus_set_custom_sound(
+    app: tauri::AppHandle,
+    payload: FocusSetCustomSoundPayload,
+) -> CommandResult<()> {
+    let cue = parse_focus_cue(&payload.cue)?;
+
+    let ext = std::path::Path::new(&payload.source_path)
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.to_lowercase());
+    match ext.as_deref() {
+        Some("mp3") | Some("wav") | Some("ogg") => {}
+        _ => {
+            return Err(ApiError::new(
+                "BAD_REQUEST",
+                "custom sound must be mp3, wav, or ogg".to_string(),
+            ))
+        }
+    }
+
+    let data = std::fs::read(&payload.source_path)
+        .map_err(|e| ApiError::new("INTERNAL", format!("failed to read source sound: {e}")))?;
+
+    let _ = rodio::Decoder::new(std::io::Cursor::new(data.clone()))
+        .map_err(|e| ApiError::new("BAD_REQUEST", format!("file is not a valid audio file: {e}")))?;
+
+    let dir = app
+        .path()
+        .app_data_dir()
+        .unwrap_or_else(|_| std::path::PathBuf::from("."))
+        .join("audio");
+    std::fs::create_dir_all(&dir)
+        .map_err(|e| ApiError::new("INTERNAL", format!("failed to create audio directory: {e}")))?;
+
+    let dest = dir.join(cue.default_filename());
+    std::fs::write(&dest, data)
+        .map_err(|e| ApiError::new("INTERNAL", format!("failed to write custom sound: {e}")))?;
+
+    Ok(())
+}
+
+#[klynt_raw_command]
+#[tauri::command(rename_all = "snake_case")]
+#[specta::specta]
+pub async fn focus_reset_custom_sound(
+    app: tauri::AppHandle,
+    cue: String,
+) -> CommandResult<()> {
+    let cue = parse_focus_cue(&cue)?;
+    let dir = app
+        .path()
+        .app_data_dir()
+        .unwrap_or_else(|_| std::path::PathBuf::from("."))
+        .join("audio");
+    let path = dir.join(cue.default_filename());
+    if path.exists() {
+        std::fs::remove_file(&path).map_err(|e| {
+            ApiError::new("INTERNAL", format!("failed to remove custom sound: {e}"))
+        })?;
+    }
+    Ok(())
 }
 
 // ── Patterns & Hourly Breakdown ─────────────────────────────────────

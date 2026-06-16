@@ -2544,6 +2544,30 @@ async focusDefaultsSet(update: FocusDefaultsUpdate) : Promise<Result<FocusDefaul
     else return { status: "error", error: e  as any };
 }
 },
+async focusSoundCues() : Promise<Result<FocusSoundCuesResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("focus_sound_cues") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async focusSetCustomSound(payload: FocusSetCustomSoundPayload) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("focus_set_custom_sound", { payload }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async focusResetCustomSound(cue: string) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("focus_reset_custom_sound", { cue }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async focusSessionStart(params: FocusSessionStartParams) : Promise<Result<FocusSessionResponse, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("focus_session_start", { params }) };
@@ -3968,6 +3992,9 @@ export type FocusSession = { id: number; mode: FocusMode; startedAt: string; end
 export type FocusSessionResponse = { id: string; actionId: string | null; projectId: string | null; sessionType: string; targetMins: number | null; startedAt: string; endedAt: string | null; actualMins: number | null; interruptions: number; qualityScore: number | null; completed: boolean; notes: string | null }
 export type FocusSessionStartParams = { workSecs: number; shortBreakSecs: number; longBreakSecs: number; longBreakAfter: number; actionId: string | null; actionTitle: string | null; dndEnabled: boolean | null; soundEnabled: boolean | null; notificationEnabled: boolean | null }
 export type FocusSessionStatusResponse = { active: boolean; sync: FocusSyncPayload | null; session: FocusSessionResponse | null }
+export type FocusSetCustomSoundPayload = { cue: string; sourcePath: string }
+export type FocusSoundCue = { id: string; label: string; hasCustom: boolean }
+export type FocusSoundCuesResponse = { cues: FocusSoundCue[] }
 export type FocusStatePayload = { state: string; since: string }
 export type FocusSyncPayload = { phase: string; remainingSecs: number; totalSecs: number; cyclePosition: number; longBreakAfter: number; paused: boolean; actionTitle: string | null; dndActive: boolean }
 export type FocusWarningPayload = { phase: string; remainingSecs: number }
