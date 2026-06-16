@@ -118,8 +118,8 @@ cpal = "0.17"
 hound = "3.5"
 webrtc-vad = "0.4"
 nnnoiseless = "0.5"
-qwen3-asr = { version = "0.2", default-features = false, features = ["metal", "hub"] }
-qwen3-tts-rs = { version = "0.2", default-features = false, features = ["mlx"] }
+qwen3-asr = { version = "0.2", default-features = false, features = ["hub"] }
+qwen3-tts-rs = { version = "0.2", default-features = false }
 objc2 = "0.6"
 objc2-app-kit = { version = "0.3", features = ["NSWorkspace", "NSRunningApplication", "NSPasteboard", "NSImage", "NSImageRep", "NSBitmapImageRep", "NSScreen"] }
 objc2-foundation = { version = "0.3", features = ["NSString", "NSArray", "NSData"] }

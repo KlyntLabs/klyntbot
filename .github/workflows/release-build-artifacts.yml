@@ -13,6 +13,8 @@ on:
 jobs:
   build-macos-aarch64:
     runs-on: macos-latest
+    env:
+      CMAKEFLAGS: "-DCMAKE_SYSTEM_PROCESSOR=arm64"
     steps:
       - uses: actions/checkout@v4
 

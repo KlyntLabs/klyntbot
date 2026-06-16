@@ -23,8 +23,14 @@ tracing.workspace = true
 jiff.workspace = true
 webrtc-vad = { workspace = true, optional = true }
 nnnoiseless = { workspace = true, optional = true }
-qwen3-asr.workspace = true
-qwen3-tts-rs = { workspace = true, optional = true }
+qwen3-asr = { workspace = true, features = ["hub"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+qwen3-asr = { workspace = true, features = ["metal"] }
+qwen3-tts-rs = { workspace = true, optional = true, features = ["mlx"] }
+
+[target.'cfg(not(target_os = "macos"))'.dependencies]
+qwen3-tts-rs = { workspace = true, optional = true, features = ["tch-backend"] }
 
 [features]
 default = ["vad"]
