@@ -27,12 +27,11 @@ qwen3-asr = { workspace = true, features = ["hub"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 qwen3-asr = { workspace = true, features = ["metal"] }
-qwen3-tts-rs = { workspace = true, optional = true, features = ["mlx"] }
+qwen3-tts-rs = { workspace = true, features = ["mlx"] }
 
 [features]
 default = ["vad"]
 vad = ["dep:webrtc-vad", "dep:nnnoiseless"]
-qwen3 = ["dep:qwen3-tts-rs"]
 
 [dev-dependencies]
 tempfile = { workspace = true }

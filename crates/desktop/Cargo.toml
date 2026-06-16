@@ -29,9 +29,6 @@ session = { workspace = true }
 storage = { workspace = true }
 voice-engine = { workspace = true }
 
-[target.'cfg(target_os = "macos")'.dependencies]
-voice-engine = { workspace = true, features = ["qwen3"] }
-
 tools-core = { workspace = true }
 tauri.workspace = true
 tauri-plugin-global-shortcut.workspace = true

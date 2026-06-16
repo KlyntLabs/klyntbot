@@ -29,7 +29,7 @@ pub mod vad;
 
 pub use capture::{AudioCapture, CaptureConfig, CaptureSession, MonitorSession};
 pub use engine_manager::TtsEngineManager;
-#[cfg(feature = "qwen3")]
+#[cfg(target_os = "macos")]
 pub use engines::Qwen3TtsEngine;
 pub use engines::{AvSpeechTtsEngine, CloudAsrEngine, CloudTtsEngine, Qwen3AsrEngine};
 pub use events::{VoiceEvent, VOICE_EVENT};

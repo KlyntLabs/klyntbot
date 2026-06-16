@@ -65,9 +65,6 @@ walkdir = { workspace = true }
 platform-macos = { workspace = true }
 voice-engine = { workspace = true }
 
-[target.'cfg(target_os = "macos")'.dependencies]
-voice-engine = { workspace = true, features = ["qwen3"] }
-
 [features]
 default = []
 test-helpers = []
