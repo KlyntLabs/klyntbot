@@ -2528,6 +2528,22 @@ async productivityWeeklyAssessment(weekStart: string) : Promise<Result<WeeklyAss
     else return { status: "error", error: e  as any };
 }
 },
+async focusDefaultsGet() : Promise<Result<FocusDefaultsResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("focus_defaults_get") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async focusDefaultsSet(update: FocusDefaultsUpdate) : Promise<Result<FocusDefaultsResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("focus_defaults_set", { update }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async focusSessionStart(params: FocusSessionStartParams) : Promise<Result<FocusSessionResponse, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("focus_session_start", { params }) };
@@ -3944,6 +3960,8 @@ export type FlashcardReviewParams = { cardId: string; quality: string; recallSpe
 export type FlashcardSaveGeneratedParams = { noteId: string | null; deck: string; cards: GeneratedCardPreview[] }
 export type FlashcardSubmitAnswerParams = { cardId: string; userAnswer: string; mode: string }
 export type FlashcardUpdateParams = { id: string; front: string; back: string; deck: string; tags: string[] | null; clozeData: unknown | null; vocabData: unknown | null }
+export type FocusDefaultsResponse = { workMins: number; shortBreakMins: number; longBreakMins: number; longBreakAfter: number; autoStartWork: boolean; autoStartBreak: boolean }
+export type FocusDefaultsUpdate = { workMins: number | null; shortBreakMins: number | null; longBreakMins: number | null; longBreakAfter: number | null; autoStartWork: boolean | null; autoStartBreak: boolean | null }
 export type FocusDndUnavailablePayload = { message: string }
 export type FocusMode = "dnd"
 export type FocusSession = { id: number; mode: FocusMode; startedAt: string; endsAt: string; endedAt: string | null; alarmId: string | null; source: string }

@@ -11,6 +11,7 @@ use desktop_shared::commands::{
     ProductivitySummaryResponse, TimeEntryResponse, TrackedAppResponse, WeeklyAssessmentResponse,
 };
 use desktop_shared::{errors::ApiError, CommandResult};
+use serde::{Deserialize, Serialize};
 use tauri::State;
 
 use crate::app_core::AppCore;
@@ -452,6 +453,79 @@ pub async fn focus_session_skip_break(timer: State<'_, Arc<FocusTimer>>) -> Comm
 #[specta::specta]
 pub async fn focus_session_take_break(timer: State<'_, Arc<FocusTimer>>) -> CommandResult<bool> {
     Ok(timer.send_command(SessionCommand::TakeBreak).await)
+}
+
+// ── Focus defaults ──────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct FocusDefaultsResponse {
+    pub work_mins: u64,
+    pub short_break_mins: u64,
+    pub long_break_mins: u64,
+    pub long_break_after: u64,
+    pub auto_start_work: bool,
+    pub auto_start_break: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct FocusDefaultsUpdate {
+    pub work_mins: Option<u64>,
+    pub short_break_mins: Option<u64>,
+    pub long_break_mins: Option<u64>,
+    pub long_break_after: Option<u64>,
+    pub auto_start_work: Option<bool>,
+    pub auto_start_break: Option<bool>,
+}
+
+#[klynt_command]
+pub async fn focus_defaults_get() -> FocusDefaultsResponse {
+    let pomodoro = &state.config.read().await.productivity.focus.pomodoro;
+    Ok(FocusDefaultsResponse {
+        work_mins: pomodoro.work_mins,
+        short_break_mins: pomodoro.short_break_mins,
+        long_break_mins: pomodoro.long_break_mins,
+        long_break_after: pomodoro.long_break_after,
+        auto_start_work: pomodoro.auto_start_work,
+        auto_start_break: pomodoro.auto_start_break,
+    })
+}
+
+#[klynt_command]
+pub async fn focus_defaults_set(update: FocusDefaultsUpdate) -> FocusDefaultsResponse {
+    let mut pomodoro_patch = serde_json::Map::new();
+    if let Some(v) = update.work_mins {
+        pomodoro_patch.insert("workMins".to_string(), serde_json::json!(v));
+    }
+    if let Some(v) = update.short_break_mins {
+        pomodoro_patch.insert("shortBreakMins".to_string(), serde_json::json!(v));
+    }
+    if let Some(v) = update.long_break_mins {
+        pomodoro_patch.insert("longBreakMins".to_string(), serde_json::json!(v));
+    }
+    if let Some(v) = update.long_break_after {
+        pomodoro_patch.insert("longBreakAfter".to_string(), serde_json::json!(v));
+    }
+    if let Some(v) = update.auto_start_work {
+        pomodoro_patch.insert("autoStartWork".to_string(), serde_json::json!(v));
+    }
+    if let Some(v) = update.auto_start_break {
+        pomodoro_patch.insert("autoStartBreak".to_string(), serde_json::json!(v));
+    }
+
+    let patch = serde_json::json!({ "focus": { "pomodoro": pomodoro_patch } });
+    state.config_update_section("productivity".into(), patch).await?;
+
+    let pomodoro = &state.config.read().await.productivity.focus.pomodoro;
+    Ok(FocusDefaultsResponse {
+        work_mins: pomodoro.work_mins,
+        short_break_mins: pomodoro.short_break_mins,
+        long_break_mins: pomodoro.long_break_mins,
+        long_break_after: pomodoro.long_break_after,
+        auto_start_work: pomodoro.auto_start_work,
+        auto_start_break: pomodoro.auto_start_break,
+    })
 }
 
 // ── Patterns & Hourly Breakdown ─────────────────────────────────────
