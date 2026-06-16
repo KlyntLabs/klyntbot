@@ -230,8 +230,8 @@ impl PlatformCapture for MacCapture {
 use async_trait::async_trait;
 #[cfg(not(target_os = "macos"))]
 use platform_capture::{
-    AccessibilityNode, AxScope, CaptureError, DisplayInfo, Frame, PlatformCapture, Result, WindowId,
-    WindowInfo,
+    AccessibilityNode, AxScope, CaptureError, DisplayInfo, Frame, PlatformCapture, Result,
+    WindowId, WindowInfo,
 };
 #[cfg(not(target_os = "macos"))]
 use platform_input::Rect;

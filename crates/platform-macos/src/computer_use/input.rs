@@ -166,7 +166,9 @@ impl MacInput {
             );
             down.post(CGEventTapLocation::HID);
             let up = CGEvent::new_mouse_event(self.source.clone(), up_type, point, button)
-                .map_err(|()| PlatformError::PlatformCallFailed("CGEventCreate up failed".into()))?;
+                .map_err(|()| {
+                    PlatformError::PlatformCallFailed("CGEventCreate up failed".into())
+                })?;
             up.set_integer_value_field(
                 core_graphics::event::EventField::MOUSE_EVENT_CLICK_STATE,
                 i,
