@@ -1,5 +1,5 @@
-export function formatRemaining(endsAtISO: string): string {
-  const diffMs = new Date(endsAtISO).getTime() - Date.now();
+export function formatRemaining(endsAtISO: string, now = Date.now()): string {
+  const diffMs = new Date(endsAtISO).getTime() - now;
   if (diffMs <= 0) return "0s";
   const totalSecs = Math.floor(diffMs / 1000);
   const hrs = Math.floor(totalSecs / 3600);
