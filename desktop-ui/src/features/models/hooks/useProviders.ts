@@ -52,7 +52,11 @@ function brandsFromModels(models: ModelEntry[]): ProviderInfo[] {
 function hasConfiguredProvider(providersCfg: ProvidersConfig): boolean {
   return Object.entries(providersCfg).some(
     ([_, cfg]) =>
-      cfg && typeof cfg === "object" && "apiKey" in cfg && cfg.apiKey && cfg.apiKey.trim().length > 0,
+      cfg &&
+      typeof cfg === "object" &&
+      "apiKey" in cfg &&
+      cfg.apiKey &&
+      cfg.apiKey.trim().length > 0,
   );
 }
 

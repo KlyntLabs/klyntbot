@@ -1,6 +1,6 @@
+import X from "lucide-react/dist/esm/icons/x";
 import { ModalShell } from "@/features/design-system/components/modal/ModalShell";
 import { SettingsModelsSection } from "@/features/settings/components/sections/SettingsModelsSection";
-import X from "lucide-react/dist/esm/icons/x";
 
 export type ProviderSetupModalProps = {
   onClose: () => void;

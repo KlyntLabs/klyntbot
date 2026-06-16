@@ -8,7 +8,7 @@ import type {
   RequestUserInputResponse,
 } from "@/types";
 import { useFileLinkOpener } from "../hooks/useFileLinkOpener";
-import { groupBursts, type BurstGroup } from "../utils/groupBursts";
+import { type BurstGroup, groupBursts } from "../utils/groupBursts";
 import { parseReasoning } from "../utils/messageRenderUtils";
 import { BurstRow } from "./BurstRow";
 import {
@@ -189,9 +189,7 @@ export const Messages = memo(function Messages({
     }
     if (item.kind === "userInput") {
       const isExpanded = expandedItems.has(item.id);
-      return (
-        <UserInputRow item={item} isExpanded={isExpanded} onToggle={toggleExpanded} />
-      );
+      return <UserInputRow item={item} isExpanded={isExpanded} onToggle={toggleExpanded} />;
     }
     if (item.kind === "diff") {
       return <DiffRow item={item} />;
@@ -225,28 +223,19 @@ export const Messages = memo(function Messages({
   const renderGroupedEntry = useCallback(
     (entry: GroupedEntry) => {
       if ("kind" in entry && entry.kind === "burst") {
-        return (
-          <BurstRow
-            group={entry}
-            expandedItems={expandedItems}
-            onToggle={toggleExpanded}
-          />
-        );
+        return <BurstRow group={entry} expandedItems={expandedItems} onToggle={toggleExpanded} />;
       }
       return renderItem(entry);
     },
     [expandedItems, toggleExpanded],
   );
 
-  const getEntryKey = useCallback(
-    (entry: GroupedEntry, index: number) => {
-      if ("kind" in entry && entry.kind === "burst") {
-        return `burst-${entry.id}`;
-      }
-      return entry.id ?? `entry-${index}`;
-    },
-    [],
-  );
+  const getEntryKey = useCallback((entry: GroupedEntry, index: number) => {
+    if ("kind" in entry && entry.kind === "burst") {
+      return `burst-${entry.id}`;
+    }
+    return entry.id ?? `entry-${index}`;
+  }, []);
 
   return (
     <div className="messages messages-full" ref={containerRef} onScroll={updateAutoScroll}>

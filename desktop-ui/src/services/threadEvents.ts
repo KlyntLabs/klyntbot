@@ -104,8 +104,22 @@ export type MessagePart =
   | { kind: "reasoning"; text: string; redacted: boolean }
   | { kind: "tool_call"; id: string; tool: string; args: unknown }
   | { kind: "tool_result"; id: string; result: unknown }
-  | { kind: "command_execution"; command: string[]; cwd: string; exit_code: number | null; stdout: string; stderr: string }
-  | { kind: "file_change"; path: string; before: string | null; after: string; diff_unified: string; applied: boolean };
+  | {
+      kind: "command_execution";
+      command: string[];
+      cwd: string;
+      exit_code: number | null;
+      stdout: string;
+      stderr: string;
+    }
+  | {
+      kind: "file_change";
+      path: string;
+      before: string | null;
+      after: string;
+      diff_unified: string;
+      applied: boolean;
+    };
 
 export type TurnState =
   | { kind: "idle"; lastFinishReason?: unknown }

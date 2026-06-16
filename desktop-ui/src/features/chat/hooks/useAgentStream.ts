@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
-import { useChatStore } from "@/features/threads/store/useChatStore";
 import { DEFAULT_STREAM_SNAPSHOT } from "@/features/chat/types";
+import { useChatStore } from "@/features/threads/store/useChatStore";
 import type {
   ActiveInteraction,
   DebateRound,

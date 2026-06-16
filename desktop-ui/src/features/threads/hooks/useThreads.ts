@@ -21,6 +21,7 @@ import type {
   ThreadListSortKey,
   WorkspaceInfo,
 } from "@/types";
+import { selectThreadState, useChatStore } from "../store/useChatStore";
 import { useDetachedReviewTracking } from "./useDetachedReviewTracking";
 import { useThreadActions } from "./useThreadActions";
 import { useThreadApprovals } from "./useThreadApprovals";
@@ -30,7 +31,6 @@ import { useThreadMessaging } from "./useThreadMessaging";
 import { useThreadSelectors } from "./useThreadSelectors";
 import { useThreadStatus } from "./useThreadStatus";
 import { useThreadStorage } from "./useThreadStorage";
-import { useChatStore, selectThreadState } from "../store/useChatStore";
 import { useThreadTitleAutogeneration } from "./useThreadTitleAutogeneration";
 import { useThreadUserInput } from "./useThreadUserInput";
 
@@ -472,12 +472,7 @@ export function useThreads({
       onThreadArchived: handleThreadArchived,
       onThreadUnarchived: handleThreadUnarchived,
     }),
-    [
-      threadHandlers,
-      handleThreadStarted,
-      handleThreadArchived,
-      handleThreadUnarchived,
-    ],
+    [threadHandlers, handleThreadStarted, handleThreadArchived, handleThreadUnarchived],
   );
 
   useAppServerEvents(handlers);

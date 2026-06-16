@@ -2,10 +2,7 @@
 
 import { interruptTurn } from "@services/tauri";
 import { act, renderHook } from "@testing-library/react";
-import {
-  normalizePlanUpdate,
-  normalizeTokenUsage,
-} from "@threads/utils/threadNormalize";
+import { normalizePlanUpdate, normalizeTokenUsage } from "@threads/utils/threadNormalize";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TurnPlan } from "@/types";
 import { useThreadTurnEvents } from "./useThreadTurnEvents";
@@ -737,7 +734,6 @@ describe("useThreadTurnEvents", () => {
       tokenUsage: normalized,
     });
   });
-
 
   it("handles turn errors when retries are disabled", () => {
     const {

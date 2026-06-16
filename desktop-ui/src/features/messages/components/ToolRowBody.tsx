@@ -8,7 +8,9 @@ type ToolRowBodyProps = {
   item: Extract<ConversationItem, { kind: "tool" }>;
 };
 
-function tryParseSubagentOutput(output: string): { agentId?: string; sessionId?: string; description?: string } | null {
+function tryParseSubagentOutput(
+  output: string,
+): { agentId?: string; sessionId?: string; description?: string } | null {
   try {
     const parsed = JSON.parse(output);
     if (typeof parsed.agentId === "string" && typeof parsed.sessionId === "string") {

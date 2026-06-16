@@ -3,8 +3,8 @@ import type { ComponentProps } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Composer } from "@/features/composer/components/Composer";
 import type { Messages } from "@/features/messages/components/Messages";
-import type { ConversationItem, RequestUserInputRequest, RequestUserInputResponse } from "@/types";
 import { useChatStore } from "@/features/threads/store/useChatStore";
+import type { ConversationItem, RequestUserInputRequest, RequestUserInputResponse } from "@/types";
 import type {
   ActiveInteraction,
   Answer,

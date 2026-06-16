@@ -241,9 +241,11 @@ export const DiffCard = memo(function DiffCard({
             selectedLines={useInteractiveDiff ? selectedLines : null}
             renderGutterUtility={
               lineActionEnabled
-                ? (getHoveredLine: Parameters<
-                    NonNullable<ComponentProps<typeof FileDiff>["renderGutterUtility"]>
-                  >[0]) => (
+                ? (
+                    getHoveredLine: Parameters<
+                      NonNullable<ComponentProps<typeof FileDiff>["renderGutterUtility"]>
+                    >[0],
+                  ) => (
                     <button
                       type="button"
                       className="diff-viewer-line-action-button"

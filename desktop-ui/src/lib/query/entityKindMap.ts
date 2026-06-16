@@ -16,8 +16,7 @@ export type EntityKind =
   | "conversation"
   | "mirrorSnippet"
   | "brainVersion"
-  | "pendingMemory"
-;
+  | "pendingMemory";
 
 // Ordered longest-prefix-first so "notebook_" wins over "note_".
 const PREFIX_TABLE: ReadonlyArray<readonly [string, EntityKind]> = [

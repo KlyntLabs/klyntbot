@@ -224,7 +224,14 @@ export function useAgentResponseRequiredNotifications({
       requestId: latestUnnotifiedApproval.request_id,
     });
     scheduleRetry();
-  }, [canNotifyNow, getWorkspaceName, latestUnnotifiedApproval, notify, retrySignal, scheduleRetry]);
+  }, [
+    canNotifyNow,
+    getWorkspaceName,
+    latestUnnotifiedApproval,
+    notify,
+    retrySignal,
+    scheduleRetry,
+  ]);
 
   const latestUnnotifiedQuestion = (() => {
     for (let index = userInputRequests.length - 1; index >= 0; index -= 1) {
@@ -275,7 +282,14 @@ export function useAgentResponseRequiredNotifications({
       itemId: latestUnnotifiedQuestion.params.item_id,
     });
     scheduleRetry();
-  }, [canNotifyNow, getWorkspaceName, latestUnnotifiedQuestion, notify, retrySignal, scheduleRetry]);
+  }, [
+    canNotifyNow,
+    getWorkspaceName,
+    latestUnnotifiedQuestion,
+    notify,
+    retrySignal,
+    scheduleRetry,
+  ]);
 
   useEffect(() => {
     if (!pendingPlanNotificationsRef.current.size) {

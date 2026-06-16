@@ -19,9 +19,9 @@ import { STORAGE_KEY_DETACHED_REVIEW_LINKS } from "@threads/utils/threadStorage"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { WorkspaceInfo } from "@/types";
 import { useChatStore } from "../store/useChatStore";
-import { initialState as threadInitialState } from "./useThreadsReducer";
 import { useQueuedSend } from "./useQueuedSend";
 import { useThreads } from "./useThreads";
+import { initialState as threadInitialState } from "./useThreadsReducer";
 
 type AppServerHandlers = Parameters<typeof useAppServerEvents>[0];
 

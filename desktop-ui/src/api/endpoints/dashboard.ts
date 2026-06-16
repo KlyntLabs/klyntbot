@@ -176,4 +176,3 @@ export async function productivityGoalDelete(id: number): Promise<void> {
   if (r.status !== "ok") throw new Error(r.error.message ?? "productivity goal delete failed");
   return;
 }
-

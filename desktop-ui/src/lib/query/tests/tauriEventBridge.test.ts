@@ -193,4 +193,3 @@ it("focus:state_changed invalidates dndActive too", async () => {
   expect(spy).toHaveBeenCalledWith({ queryKey: qk.launcher.dndActive() });
   stop();
 });
-

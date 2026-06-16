@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { useCallback, useEffect, useState } from "react";
 
 export type ZombieSession = {
   key: string;
@@ -60,9 +60,7 @@ export function ChatErrorBanner() {
           <button
             type="button"
             className="chat-error-banner__dismiss"
-            onClick={() =>
-              setDismissed((prev) => new Set([...prev, zombie.key]))
-            }
+            onClick={() => setDismissed((prev) => new Set([...prev, zombie.key]))}
             aria-label="Dismiss"
           >
             ×

@@ -225,7 +225,6 @@ describe("useThreadMessaging telemetry", () => {
     );
   });
 
-
   it("uses turn/steer when steer mode is enabled and an active turn is present", async () => {
     const dispatch = vi.fn();
     const ensureWorkspaceRuntimeCodexArgs = vi.fn(async () => undefined);

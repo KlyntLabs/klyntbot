@@ -1,10 +1,5 @@
 import { clampThreadName } from "@threads/utils/threadNaming";
-import type {
-  AccessMode,
-  AppMention,
-  ComposerSendIntent,
-  ReviewTarget,
-} from "@/types";
+import type { AccessMode, AppMention, ComposerSendIntent, ReviewTarget } from "@/types";
 
 export type SendMessageOptions = {
   skipPromptExpansion?: boolean;

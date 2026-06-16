@@ -53,4 +53,3 @@ describe("normalizeRootPath", () => {
     expect(normalizeRootPath("\\\\?\\UNC\\SERVER\\Share\\Repo\\")).toBe("//server/share/repo");
   });
 });
-

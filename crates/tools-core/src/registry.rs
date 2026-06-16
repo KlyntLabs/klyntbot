@@ -212,7 +212,7 @@ impl ToolRegistry {
     pub fn top_used(&self, n: usize) -> Vec<(String, u64)> {
         let counts = self.usage_counts.lock().expect("usage lock poisoned");
         let mut entries: Vec<_> = counts.iter().map(|(k, v)| (k.clone(), *v)).collect();
-        entries.sort_by(|a, b| b.1.cmp(&a.1));
+        entries.sort_by_key(|b| std::cmp::Reverse(b.1));
         entries.truncate(n);
         entries
     }

@@ -30,8 +30,8 @@ export function CompactionCard({ event }: Props) {
       </div>
       <div className="cc-card__details">
         <span>
-          {(meta.preTokens ?? 0).toLocaleString()} →{" "}
-          {(meta.postTokens ?? 0).toLocaleString()} tokens
+          {(meta.preTokens ?? 0).toLocaleString()} → {(meta.postTokens ?? 0).toLocaleString()}{" "}
+          tokens
         </span>
       </div>
       {meta.preCompactDiscoveredTools && meta.preCompactDiscoveredTools.length > 0 && (

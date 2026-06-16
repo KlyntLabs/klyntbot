@@ -46,7 +46,9 @@ vi.mock("@pierre/diffs/react", () => ({
     ) => ReactNode;
   }) => (
     <div>
-      {renderGutterUtility ? renderGutterUtility(() => ({ lineNumber: 2, side: "additions" })) : null}
+      {renderGutterUtility
+        ? renderGutterUtility(() => ({ lineNumber: 2, side: "additions" }))
+        : null}
     </div>
   ),
   WorkerPoolContextProvider: ({ children }: { children: ReactNode }) => children,

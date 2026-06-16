@@ -1163,9 +1163,9 @@ describe("Messages", () => {
     await waitFor(() => {
       expect(container.querySelectorAll(".tool-row__explore-list").length).toBe(2);
     });
-    const exploreBlocks = Array.from(
-      container.querySelectorAll(".tool-row__explore-list"),
-    ).map((list) => list.closest(".tool-row--search"));
+    const exploreBlocks = Array.from(container.querySelectorAll(".tool-row__explore-list")).map(
+      (list) => list.closest(".tool-row--search"),
+    );
     const reasoningDetail = container.querySelector(".reasoning-inline-body");
     expect(exploreBlocks.length).toBe(2);
     expect(exploreBlocks[0]).toBeTruthy();
