@@ -33,7 +33,7 @@ fn main() {
     }
 
     match apply_landlock(&parsed.policy.sandbox) {
-        Ok(status) => {
+        Ok(Some(status)) => {
             if status.ruleset != RulesetStatus::FullyEnforced
                 && parsed.policy.mode == klynt_sandbox::helper_proto::HelperMode::LandlockOnly
             {
@@ -44,6 +44,9 @@ fn main() {
                 );
                 std::process::exit(EXIT_SANDBOX_UNAVAILABLE);
             }
+        }
+        Ok(None) => {
+            // No filesystem constraints requested; no Landlock ruleset to enforce.
         }
         Err(e) => {
             eprintln!("klynt-sandbox-helper: landlock setup: {e}");

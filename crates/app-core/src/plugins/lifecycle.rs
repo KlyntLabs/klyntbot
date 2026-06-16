@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use crate::plugin::context::PluginContext;
 use crate::plugin::AppCorePlugin;
+#[cfg(target_os = "macos")]
 use tracing::info;
 
 /// Result of lifecycle plugin initialization.

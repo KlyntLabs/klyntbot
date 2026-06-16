@@ -1,7 +1,7 @@
 use klynt_sandbox::policy::{FsConstraints, SandboxPolicy};
 use landlock::{
-    Access, AccessFs, CompatLevel, PathBeneath, PathFd, RestrictionStatus, Ruleset, RulesetAttr,
-    RulesetCreatedAttr, RulesetStatus, ABI,
+    AccessFs, CompatLevel, Compatible, PathBeneath, PathFd, RestrictionStatus, Ruleset, RulesetAttr,
+    RulesetCreatedAttr, ABI,
 };
 
 /// Reserved exit codes for the helper:
@@ -25,24 +25,21 @@ pub fn apply_no_new_privs() -> Result<(), String> {
 }
 
 /// Applies Landlock filesystem restrictions for the current process.
-/// Returns Ok(()) on FullyEnforced; Err with reserved exit code intent on degraded paths.
-pub fn apply_landlock(p: &SandboxPolicy) -> Result<RestrictionStatus, String> {
-    let abi = ABI::new_current();
-    if abi == ABI::Unsupported {
-        return Err("landlock unavailable: kernel < 5.13 or denied".into());
-    }
-
+/// Returns `Some(status)` when a ruleset was enforced, or `None` when the
+/// policy requests no filesystem constraints. Errors are returned when
+/// Landlock setup fails (caller should treat them as sandbox unavailable).
+pub fn apply_landlock(p: &SandboxPolicy) -> Result<Option<RestrictionStatus>, String> {
     let cwd = match &p.fs {
         FsConstraints::WriteCwdReadAll { cwd } => cwd,
         FsConstraints::ReadCwdOnly { cwd } => cwd,
-        FsConstraints::None => {
-            return Ok(RestrictionStatus {
-                ruleset: RulesetStatus::FullyEnforced,
-                no_new_privs: true,
-            })
-        } // nothing to enforce
+        FsConstraints::None => return Ok(None), // nothing to enforce
     };
 
+    // Use the highest ABI this crate supports; the best-effort compatibility
+    // layer will downgrade gracefully on older kernels. We intentionally avoid
+    // ABI::new_current() because it is no longer public in recent landlock
+    // versions and the compatibility layer handles runtime detection.
+    let abi = ABI::V6;
     let read_all = AccessFs::from_read(abi);
     let write_set = match &p.fs {
         FsConstraints::WriteCwdReadAll { .. } => AccessFs::from_all(abi),
@@ -55,7 +52,7 @@ pub fn apply_landlock(p: &SandboxPolicy) -> Result<RestrictionStatus, String> {
         PathFd::new(cwd.as_os_str()).map_err(|e| format!("PathFd {}: {e}", cwd.display()))?;
 
     let status = Ruleset::default()
-        .set_compatibility(CompatLevel::HardRequirement)
+        .set_compatibility(CompatLevel::BestEffort)
         .handle_access(AccessFs::from_all(abi))
         .map_err(|e| format!("handle_access: {e}"))?
         .create()
@@ -67,5 +64,5 @@ pub fn apply_landlock(p: &SandboxPolicy) -> Result<RestrictionStatus, String> {
         .restrict_self()
         .map_err(|e| format!("restrict_self: {e}"))?;
 
-    Ok(status)
+    Ok(Some(status))
 }
