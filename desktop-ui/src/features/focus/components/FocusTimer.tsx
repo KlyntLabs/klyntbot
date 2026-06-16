@@ -7,9 +7,9 @@ import Sparkles from "lucide-react/dist/esm/icons/sparkles";
 import Square from "lucide-react/dist/esm/icons/square";
 import X from "lucide-react/dist/esm/icons/x";
 import { useRef, useState } from "react";
-import { FOCUS_PRESETS, type useFocusTimer } from "../hooks/useFocusTimer";
-import { formatElapsed, formatHumanDuration } from "@/lib/dates";
 import { Checkbox } from "@/features/shared/components/Checkbox";
+import { formatElapsed, formatHumanDuration } from "@/lib/dates";
+import { FOCUS_PRESETS, type useFocusTimer } from "../hooks/useFocusTimer";
 import "../focus.css";
 
 const RING_SIZE = 170;
@@ -86,7 +86,13 @@ function TodayStats({
   );
 }
 
-export function FocusTimer({ timer, onOpenSettings }: { timer: Timer; onOpenSettings: () => void }) {
+export function FocusTimer({
+  timer,
+  onOpenSettings,
+}: {
+  timer: Timer;
+  onOpenSettings: () => void;
+}) {
   const {
     phase,
     paused,
