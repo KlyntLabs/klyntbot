@@ -5,7 +5,7 @@
 //! The backend owns cycle position and break-type decisions.
 
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use desktop_shared::events::{
     FocusDndUnavailablePayload, FocusSyncPayload, FocusWarningPayload, FOCUS_PHASE_CHANGED,
@@ -309,7 +309,6 @@ async fn session_loop(
     let mut paused = false;
     let mut warning_shown = false;
     let mut sync_counter: u64 = 0;
-    use std::time::Duration;
     let tick_duration = Duration::from_secs(1);
     let mut tick_count: u64 = 0;
     let mut segment_start = Instant::now();
@@ -537,7 +536,8 @@ async fn session_loop(
             }
         }
 
-        let next_tick = segment_start + tick_duration * ((tick_count + 1) as u32);
+        let ticks = u32::try_from(tick_count.saturating_add(1)).unwrap_or(u32::MAX);
+        let next_tick = segment_start + tick_duration * ticks;
         let sleep_for = next_tick.saturating_duration_since(Instant::now());
         tokio::time::sleep(sleep_for).await;
         tick_count += 1;
