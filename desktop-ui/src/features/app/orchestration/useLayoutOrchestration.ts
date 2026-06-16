@@ -1,5 +1,6 @@
 import { isWindowsPlatform } from "@utils/platformPaths";
 import { type CSSProperties, useMemo } from "react";
+import type { AppView } from "@app/constants/appViews";
 import type { AppSettings } from "@/types";
 
 type UseAppShellOrchestrationOptions = {
@@ -8,7 +9,7 @@ type UseAppShellOrchestrationOptions = {
   shouldReduceTransparency: boolean;
   isWorkspaceDropActive: boolean;
   centerMode: "chat" | "diff" | "plugins" | "calendar";
-  appView: "home" | "chat" | "plugins" | "calendar";
+  appView: AppView;
   selectedDiffPath: string | null;
   showComposer: boolean;
   activeThreadId: string | null;

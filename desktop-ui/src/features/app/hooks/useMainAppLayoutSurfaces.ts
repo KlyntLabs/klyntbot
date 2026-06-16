@@ -11,6 +11,7 @@ import type { RefObject } from "react";
 import type { LayoutNodesOptions } from "@/features/layout/hooks/layoutNodes/types";
 import { useLoadedContextFiles } from "@/features/prompts/hooks/useLoadedContextFiles";
 import type { ThreadState } from "@/features/threads/hooks/useThreadsReducer";
+import type { AppView } from "@app/constants/appViews";
 import type { AppSettings, ComposerEditorSettings, WorkspaceInfo } from "@/types";
 
 type ComposerProps = NonNullable<LayoutNodesOptions["primary"]["composerProps"]>;
@@ -229,7 +230,7 @@ type UseMainAppLayoutSurfacesArgs = {
   showDebugButton: boolean;
   handleDebugClick: () => void;
   chatView: {
-    appView: "home" | "chat" | "plugins" | "calendar";
+    appView: AppView;
     selectedSessionKey: string | null;
     onNewChat: () => void;
     onSelectThread: (sessionKey: string) => void;
