@@ -1,4 +1,5 @@
 import type { SidebarProps } from "@app/components/Sidebar";
+import type { AppView } from "@app/constants/appViews";
 import type { useMainAppComposerWorkspaceState } from "@app/hooks/useMainAppComposerWorkspaceState";
 import type { useMainAppDisplayNodes } from "@app/hooks/useMainAppDisplayNodes";
 import type { useMainAppGitState } from "@app/hooks/useMainAppGitState";
@@ -220,11 +221,12 @@ type UseMainAppLayoutSurfacesArgs = {
   showDebugButton: boolean;
   handleDebugClick: () => void;
   chatView: {
-    appView: "home" | "chat" | "calendar";
+    appView: AppView;
     selectedSessionKey: string | null;
     onNewChat: () => void;
     onSelectThread: (sessionKey: string) => void;
     onSelectCalendar: () => void;
+    onSelectFocus: () => void;
     activeNavId: string | null;
     chatThreads: import("@/features/chat/types").ChatThread[];
     refetchChatThreads: () => Promise<void>;
@@ -351,6 +353,7 @@ function buildPrimarySurface({
       onOpenSettings: sidebarHandlers.onOpenSettings,
       onNewChat: chatView.onNewChat,
       onSelectCalendar: chatView.onSelectCalendar,
+      onSelectFocus: chatView.onSelectFocus,
       activeNavId: chatView.activeNavId,
       threads: chatView.chatThreads,
       selectedSessionKey: chatView.selectedSessionKey,

@@ -4,6 +4,7 @@ pub mod claude_code_integration;
 pub mod commands;
 #[cfg(debug_assertions)]
 pub mod dev_server;
+pub mod focus_audio;
 pub mod focus_timer;
 pub mod lazy_window;
 pub mod notify;

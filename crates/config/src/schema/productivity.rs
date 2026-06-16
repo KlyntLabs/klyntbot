@@ -62,6 +62,25 @@ pub struct FocusConfig {
     pub learned_rule_threshold: u64,
     #[serde(default = "default_cooldown_grace_secs")]
     pub cooldown_grace_secs: u64,
+    #[serde(default)]
+    pub pomodoro: PomodoroConfig,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PomodoroConfig {
+    #[serde(default = "default_pomodoro_work_mins")]
+    pub work_mins: u64,
+    #[serde(default = "default_pomodoro_short_break_mins")]
+    pub short_break_mins: u64,
+    #[serde(default = "default_pomodoro_long_break_mins")]
+    pub long_break_mins: u64,
+    #[serde(default = "default_pomodoro_long_break_after")]
+    pub long_break_after: u64,
+    #[serde(default)]
+    pub auto_start_work: bool,
+    #[serde(default)]
+    pub auto_start_break: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -164,6 +183,18 @@ fn default_learned_rule_threshold() -> u64 {
 fn default_cooldown_grace_secs() -> u64 {
     30
 }
+fn default_pomodoro_work_mins() -> u64 {
+    25
+}
+fn default_pomodoro_short_break_mins() -> u64 {
+    5
+}
+fn default_pomodoro_long_break_mins() -> u64 {
+    15
+}
+fn default_pomodoro_long_break_after() -> u64 {
+    4
+}
 
 impl Default for ProductivityConfig {
     fn default() -> Self {
@@ -204,6 +235,7 @@ impl Default for FocusConfig {
             soft_block_llm_timeout_ms: default_llm_timeout(),
             learned_rule_threshold: default_learned_rule_threshold(),
             cooldown_grace_secs: default_cooldown_grace_secs(),
+            pomodoro: PomodoroConfig::default(),
         }
     }
 }
@@ -219,5 +251,47 @@ impl Default for NudgeConfig {
             quiet_hours_start: None,
             quiet_hours_end: None,
         }
+    }
+}
+
+impl Default for PomodoroConfig {
+    fn default() -> Self {
+        Self {
+            work_mins: default_pomodoro_work_mins(),
+            short_break_mins: default_pomodoro_short_break_mins(),
+            long_break_mins: default_pomodoro_long_break_mins(),
+            long_break_after: default_pomodoro_long_break_after(),
+            auto_start_work: false,
+            auto_start_break: false,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn pomodoro_config_round_trip() {
+        let cfg = PomodoroConfig::default();
+        let json = serde_json::to_string(&cfg).expect("serialize");
+        let parsed: PomodoroConfig = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(parsed.work_mins, cfg.work_mins);
+        assert_eq!(parsed.short_break_mins, cfg.short_break_mins);
+        assert_eq!(parsed.long_break_mins, cfg.long_break_mins);
+        assert_eq!(parsed.long_break_after, cfg.long_break_after);
+        assert_eq!(parsed.auto_start_work, cfg.auto_start_work);
+        assert_eq!(parsed.auto_start_break, cfg.auto_start_break);
+    }
+
+    #[test]
+    fn pomodoro_config_defaults() {
+        let cfg = PomodoroConfig::default();
+        assert_eq!(cfg.work_mins, 25);
+        assert_eq!(cfg.short_break_mins, 5);
+        assert_eq!(cfg.long_break_mins, 15);
+        assert_eq!(cfg.long_break_after, 4);
+        assert!(!cfg.auto_start_work);
+        assert!(!cfg.auto_start_break);
     }
 }

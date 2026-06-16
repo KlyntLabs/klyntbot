@@ -39,7 +39,7 @@ fn configure_mimalloc() {
 #[cfg(debug_assertions)]
 use desktop::dev_server;
 use desktop::{
-    app_core, claude_code_integration, commands, focus_timer, lazy_window, shortcuts,
+    app_core, claude_code_integration, commands, focus_audio, focus_timer, lazy_window, shortcuts,
     specta_builder, tray_countdown,
 };
 
@@ -405,6 +405,7 @@ fn run_desktop_app() {
             app.manage(core);
             app.manage(approval_channel);
             app.manage(Arc::new(focus_timer::FocusTimer::new()));
+            app.manage(Arc::new(focus_audio::FocusAudioManager::new(app.handle())));
 
             // No periodic mi_collect timer needed — common::memory::purge_freed_memory()
             // is called at the source (after LanceDB compaction, prune, index creation)

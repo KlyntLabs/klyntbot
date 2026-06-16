@@ -15,6 +15,7 @@ export const qk = {
     all: () => ["focus"] as const,
     status: () => ["focus", "status"] as const,
     todaySessions: () => ["focus", "todaySessions"] as const,
+    defaults: () => ["focus", "defaults"] as const,
   },
   flashcards: {
     all: () => ["flashcards"] as const,

@@ -6,6 +6,7 @@ import Settings from "lucide-react/dist/esm/icons/settings";
 import X from "lucide-react/dist/esm/icons/x";
 import XCircle from "lucide-react/dist/esm/icons/x-circle";
 import { useCallback, useMemo, useRef } from "react";
+import { Checkbox } from "@/features/shared/components/Checkbox";
 import { useTransparentBackground } from "@/hooks/window/useTransparentBackground";
 import { useWindowAutoResize } from "@/hooks/window/useWindowAutoResize";
 import { qk, useTauriMutation, useTauriQuery } from "@/lib/query";
@@ -14,7 +15,6 @@ import { useFocusTimer } from "../hooks/useFocusTimer";
 import { todayISO } from "../lib/dates";
 import type { CalendarEvent, TodayTask } from "../types";
 import { Badge } from "./Badge";
-import { Checkbox } from "./Checkbox";
 import { FocusControl } from "./FocusControl";
 import { useCoachingNudge } from "./stubs";
 

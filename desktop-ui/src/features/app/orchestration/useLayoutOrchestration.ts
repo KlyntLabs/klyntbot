@@ -1,3 +1,4 @@
+import type { AppView } from "@app/constants/appViews";
 import { isWindowsPlatform } from "@utils/platformPaths";
 import { type CSSProperties, useMemo } from "react";
 import type { AppSettings } from "@/types";
@@ -7,8 +8,8 @@ type UseAppShellOrchestrationOptions = {
   rightPanelCollapsed: boolean;
   shouldReduceTransparency: boolean;
   isWorkspaceDropActive: boolean;
-  centerMode: "chat" | "diff" | "calendar";
-  appView: "home" | "chat" | "calendar";
+  centerMode: "chat" | "diff" | "calendar" | "focus";
+  appView: AppView;
   selectedDiffPath: string | null;
   showComposer: boolean;
   activeThreadId: string | null;
@@ -47,7 +48,7 @@ export function useAppShellOrchestration({
     shouldReduceTransparency ? " reduced-transparency" : ""
   }${sidebarCollapsed ? " sidebar-collapsed" : ""}${
     rightPanelCollapsed ? " right-panel-collapsed" : ""
-  }${appView === "calendar" ? " is-calendar" : ""}${isWindows ? " is-windows" : ""}`;
+  }${appView === "calendar" ? " is-calendar" : ""}${appView === "focus" ? " is-focus" : ""}${isWindows ? " is-windows" : ""}`;
 
   const appStyle = useMemo<CSSProperties>(
     () =>
