@@ -30,7 +30,9 @@ jobs:
           tool: cargo-nextest
 
       - name: Install protoc
-        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+        uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: cargo fmt
         run: cargo fmt --all --check
@@ -84,10 +86,14 @@ jobs:
           bun-version: latest
 
       - name: Install protoc
-        run: brew install protobuf
+        uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install cargo-tauri
-        run: cargo install tauri-cli --locked
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-tauri
 
       - name: Install dependencies
         working-directory: desktop-ui
