@@ -507,7 +507,6 @@ mod tests {
         assert_eq!(config.ui.chat_history_scrollback_items, Some(100));
         assert!(config.ui.show_message_file_path);
         assert!(!config.ui.split_chat_diff_view);
-        assert!(!config.ui.usage_show_remaining);
     }
 
     #[test]

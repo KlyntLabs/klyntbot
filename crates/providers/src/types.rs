@@ -29,6 +29,10 @@ pub(crate) fn map_http_error(status_code: u16, body: String, provider_name: &str
             provider: provider_name.to_string(),
             config_key: format!("providers.{}.apiKey", provider_name),
         }),
+        402 => KlyntbotError::Provider(ProviderError::InvalidResponse(format!(
+            "HTTP 402: Provider request failed. Check the configuration for {}.",
+            provider_name
+        ))),
         _ => KlyntbotError::Provider(ProviderError::InvalidResponse(format!(
             "HTTP {}: {}",
             status_code, body

@@ -59,10 +59,6 @@ pub struct UiConfig {
     /// Split diff view in chat (side-by-side vs inline).
     #[serde(default)]
     pub split_chat_diff_view: bool,
-
-    /// Show remaining token / credit estimates in usage bar.
-    #[serde(default)]
-    pub usage_show_remaining: bool,
 }
 
 impl Default for UiConfig {
@@ -81,7 +77,6 @@ impl Default for UiConfig {
             chat_history_scrollback_items: default_chat_history_scrollback_items(),
             show_message_file_path: true,
             split_chat_diff_view: false,
-            usage_show_remaining: false,
         }
     }
 }
@@ -130,7 +125,6 @@ mod tests {
         assert_eq!(ui.chat_history_scrollback_items, Some(100));
         assert!(ui.show_message_file_path);
         assert!(!ui.split_chat_diff_view);
-        assert!(!ui.usage_show_remaining);
     }
 
     #[test]
@@ -149,7 +143,6 @@ mod tests {
             chat_history_scrollback_items: None,
             show_message_file_path: false,
             split_chat_diff_view: true,
-            usage_show_remaining: true,
         };
         let json = serde_json::to_string(&ui).unwrap();
         let loaded: UiConfig = serde_json::from_str(&json).unwrap();
@@ -166,7 +159,6 @@ mod tests {
         assert_eq!(loaded.chat_history_scrollback_items, None);
         assert!(!loaded.show_message_file_path);
         assert!(loaded.split_chat_diff_view);
-        assert!(loaded.usage_show_remaining);
     }
 
     #[test]

@@ -18,7 +18,7 @@ fn user_facing_error(err: &common::KlyntbotError) -> String {
         }
         common::KlyntbotError::Channel(ChannelError::SendFailed(detail)) => {
             if detail.contains("rate limit") || detail.contains("429") {
-                "Rate limited — please wait a moment and try again.".to_string()
+                "Provider is busy — please wait a moment and try again.".to_string()
             } else {
                 "Message delivery failed — please try again.".to_string()
             }

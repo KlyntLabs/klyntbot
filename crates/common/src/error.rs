@@ -98,7 +98,7 @@ pub enum ProviderError {
     #[error("Invalid response: {0}")]
     InvalidResponse(String),
 
-    #[error("Rate limited by {provider}{}", retry_after.map(|s| format!(" (retry after {}s)", s)).unwrap_or_default())]
+    #[error("Provider {provider} is busy; please try again{}", retry_after.map(|s| format!(" in {}s", s)).unwrap_or_default())]
     RateLimited {
         provider: String,
         retry_after: Option<u64>,
@@ -200,7 +200,7 @@ mod tests {
                 retry_after: Some(30)
             }
             .to_string(),
-            "Rate limited by openai (retry after 30s)"
+            "Provider openai is busy; please try again in 30s"
         );
         assert_eq!(
             ProviderError::RateLimited {
@@ -208,7 +208,7 @@ mod tests {
                 retry_after: None
             }
             .to_string(),
-            "Rate limited by anthropic"
+            "Provider anthropic is busy; please try again"
         );
         assert_eq!(
             ProviderError::AuthFailed {

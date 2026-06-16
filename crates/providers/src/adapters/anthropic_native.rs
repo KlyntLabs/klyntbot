@@ -1047,7 +1047,7 @@ impl LlmProvider for AnthropicNativeProvider {
                         status
                     )))
                 } else if status.as_u16() == 429 {
-                    Ok(ProviderHealth::Degraded("Rate limited".to_string()))
+                    Ok(ProviderHealth::Degraded("Provider busy".to_string()))
                 } else if status.as_u16() == 529 {
                     Ok(ProviderHealth::Unhealthy("API overloaded".to_string()))
                 } else {

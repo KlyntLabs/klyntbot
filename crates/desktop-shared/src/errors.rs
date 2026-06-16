@@ -73,11 +73,11 @@ impl From<KlyntbotError> for ApiError {
                 retry_after,
             }) => {
                 let message = if let Some(secs) = retry_after {
-                    format!("Rate limited by {} (retry after {}s)", provider, secs)
+                    format!("Provider {} is busy; please try again in {}s", provider, secs)
                 } else {
-                    format!("Rate limited by {}", provider)
+                    format!("Provider {} is busy; please try again", provider)
                 };
-                ApiError::new("RATE_LIMITED", message)
+                ApiError::new("PROVIDER_BUSY", message)
             }
             KlyntbotError::Provider(ProviderError::AuthFailed {
                 provider,
@@ -192,7 +192,7 @@ mod tests {
             retry_after: Some(60),
         })
         .into();
-        assert_eq!(err.code, "RATE_LIMITED");
+        assert_eq!(err.code, "PROVIDER_BUSY");
         assert!(err.message.contains("anthropic"));
         assert!(err.message.contains("60s"));
     }
