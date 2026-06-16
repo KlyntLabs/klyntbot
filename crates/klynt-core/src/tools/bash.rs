@@ -1,16 +1,21 @@
 use crate::privacy::PrivacyGuard;
-use crate::tools::shared::file_edit_event::fan_out_tool_event;
 use crate::tools::shared::fs_resolve::resolve_path;
 use crate::tools::shared::hook_emit::{fire_post_tool_use, fire_pre_tool_use};
 use async_trait::async_trait;
 use bus::DomainEventBus;
 use klynt_execpolicy::Policy;
-use klynt_sandbox::SandboxRunner;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::time::Duration;
-use tools_core::events::ToolEvent;
 use tools_core::{FullCtx, RoutingContext, ToolExecute, ToolParams};
+
+#[cfg(target_os = "macos")]
+use crate::tools::shared::file_edit_event::fan_out_tool_event;
+#[cfg(target_os = "macos")]
+use klynt_sandbox::SandboxRunner;
+#[cfg(target_os = "macos")]
+use std::time::Duration;
+#[cfg(target_os = "macos")]
+use tools_core::events::ToolEvent;
 
 #[derive(Debug, Clone, serde::Serialize, ToolParams)]
 pub struct BashArgs {
@@ -269,18 +274,20 @@ impl BashTool {
 
     async fn execute_foreground(
         &self,
-        args: BashArgs,
-        ctx: &RoutingContext,
+        _args: BashArgs,
+        _ctx: &RoutingContext,
     ) -> common::Result<String> {
         #[cfg(not(target_os = "macos"))]
         {
-            return Err(common::KlyntbotError::NotImplemented(
+            Err(common::KlyntbotError::NotImplemented(
                 "bash on non-macOS lands in Plan 3".into(),
-            ));
+            ))
         }
 
         #[cfg(target_os = "macos")]
         {
+            let args = _args;
+            let ctx = _ctx;
             let cwd = args
                 .cwd
                 .as_deref()
