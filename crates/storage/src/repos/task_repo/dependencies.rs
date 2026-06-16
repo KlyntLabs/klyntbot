@@ -15,7 +15,7 @@ impl TaskRepo {
         let mut tx = self.pool.begin().await?;
 
         let would_cycle = self
-            .would_create_cycle(&mut *tx, task_id, blocker_id)
+            .would_create_cycle(&mut tx, task_id, blocker_id)
             .await?;
         if would_cycle {
             tx.rollback().await?;

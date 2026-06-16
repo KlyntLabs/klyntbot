@@ -15,7 +15,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
-use bus::{AlarmEvent, DomainEvent, DomainEventBus};
+use bus::{AlarmEvent, DomainEventBus};
 use jiff::Timestamp;
 use storage::rows::scheduled_fire::ScheduledFireRow;
 use tokio::sync::Notify;

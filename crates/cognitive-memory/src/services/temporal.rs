@@ -276,7 +276,7 @@ impl TemporalService {
             })
             .collect();
 
-        points.sort_by(|a, b| b.version_count.cmp(&a.version_count));
+        points.sort_by_key(|b| std::cmp::Reverse(b.version_count));
         points.truncate(limit);
         Ok(points)
     }

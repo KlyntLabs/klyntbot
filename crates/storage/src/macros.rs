@@ -20,6 +20,7 @@
 /// // For a repo with a custom delete:
 /// crud_repo!(@no_delete FinanceTransactionRepo, "finance_transactions", FinanceTransactionRow, "finance_transaction");
 /// ```
+#[allow(unused_macros)]
 macro_rules! crud_repo {
     // Default: struct + new + get + get_or_err + delete(bool)
     ($repo:ident, $table:expr, $row:ty, $label:expr) => {

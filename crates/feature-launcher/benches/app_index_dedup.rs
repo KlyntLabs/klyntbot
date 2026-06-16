@@ -1,11 +1,12 @@
 use std::path::PathBuf;
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use feature_launcher::{
     new_attention_signals, new_running_signals, AppEntry, AppIndex, AttentionStat, RunningSignal,
     RunningSignals,
 };
 use smol_str::SmolStr;
+use std::hint::black_box;
 
 const QUERIES: &[&str] = &["s", "saf", "safari", "vsc", "fin"];
 

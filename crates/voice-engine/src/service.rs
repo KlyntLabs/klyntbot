@@ -97,9 +97,13 @@ impl AudioPlayer {
                             .as_deref()
                             .and_then(|name| {
                                 host.output_devices().ok().and_then(|devices| {
-                                    devices
-                                        .into_iter()
-                                        .find(|d| d.name().ok().as_deref() == Some(name))
+                                    devices.into_iter().find(|d| {
+                                        d.description()
+                                            .ok()
+                                            .map(|desc| desc.name().to_string())
+                                            .as_deref()
+                                            == Some(name)
+                                    })
                                 })
                             })
                             .or_else(|| host.default_output_device());

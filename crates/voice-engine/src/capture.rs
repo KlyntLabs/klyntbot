@@ -91,14 +91,26 @@ impl AudioCapture {
         let host = cpal::default_host();
         let input = host
             .input_devices()
-            .map(|devices| devices.filter_map(|d| d.name().ok()).collect())
+            .map(|devices| {
+                devices
+                    .filter_map(|d| d.description().ok().map(|desc| desc.name().to_string()))
+                    .collect()
+            })
             .unwrap_or_default();
         let output = host
             .output_devices()
-            .map(|devices| devices.filter_map(|d| d.name().ok()).collect())
+            .map(|devices| {
+                devices
+                    .filter_map(|d| d.description().ok().map(|desc| desc.name().to_string()))
+                    .collect()
+            })
             .unwrap_or_default();
-        let default_in = host.default_input_device().and_then(|d| d.name().ok());
-        let default_out = host.default_output_device().and_then(|d| d.name().ok());
+        let default_in = host
+            .default_input_device()
+            .and_then(|d| d.description().ok().map(|desc| desc.name().to_string()));
+        let default_out = host
+            .default_output_device()
+            .and_then(|d| d.description().ok().map(|desc| desc.name().to_string()));
         (input, output, default_in, default_out)
     }
 
@@ -108,7 +120,12 @@ impl AudioCapture {
         if let Some(name) = name {
             if let Ok(devices) = host.input_devices() {
                 for d in devices {
-                    if d.name().ok().as_deref() == Some(name) {
+                    if d.description()
+                        .ok()
+                        .map(|desc| desc.name().to_string())
+                        .as_deref()
+                        == Some(name)
+                    {
                         return Ok(d);
                     }
                 }
@@ -144,7 +161,10 @@ impl AudioCapture {
 
         let device = Self::resolve_input_device(cfg.selected_device.as_deref())?;
 
-        let device_name = device.name().unwrap_or_else(|_| "unknown".to_string());
+        let device_name = device
+            .description()
+            .map(|desc| desc.name().to_string())
+            .unwrap_or_else(|_| "unknown".to_string());
         info!("Opening audio input: {}", device_name);
 
         // Use the device's default config — most macOS mics don't support 16kHz directly.
@@ -377,7 +397,10 @@ impl AudioCapture {
             ))
         })?;
 
-        let device_name = device.name().unwrap_or_else(|_| "unknown".to_string());
+        let device_name = device
+            .description()
+            .map(|desc| desc.name().to_string())
+            .unwrap_or_else(|_| "unknown".to_string());
         info!("Opening audio monitor: {}", device_name);
 
         let default_config = device.default_input_config().map_err(|e| {

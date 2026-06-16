@@ -103,7 +103,7 @@ impl RoutingSignalSource {
                 .iter()
                 .map(|(k, v)| (k.clone(), *v))
                 .collect();
-            sorted_triggers.sort_by(|a, b| b.1.cmp(&a.1));
+            sorted_triggers.sort_by_key(|b| std::cmp::Reverse(b.1));
             let top_triggers: Vec<String> = sorted_triggers
                 .into_iter()
                 .take(5)

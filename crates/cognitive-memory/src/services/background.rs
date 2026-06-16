@@ -15,7 +15,7 @@ use tracing::{debug, info, warn};
 
 use bus::domain_events::LearningEvent as BusLearningEvent;
 use bus::DomainEvent;
-use bus::ProductivityEvent;
+
 use bus::TaskEvent;
 
 use crate::consolidation::ConsolidationHandler;
@@ -347,11 +347,8 @@ impl BackgroundConsolidationService {
                 {
                     let entity_repo = crate::repos::EntityRepo::new(repo.pool().clone());
                     for event in &batch {
-                        match event {
-                            DomainEvent::Task(TaskEvent::TaskCreated { task_id, .. }) => {
-                                upsert_domain_entity(&entity_repo, task_id, "task", task_id).await;
-                            }
-                            _ => {}
+                        if let DomainEvent::Task(TaskEvent::TaskCreated { task_id, .. }) = event {
+                            upsert_domain_entity(&entity_repo, task_id, "task", task_id).await;
                         }
                     }
                 }

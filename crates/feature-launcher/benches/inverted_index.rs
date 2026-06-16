@@ -1,8 +1,9 @@
 use std::fs;
 use std::path::PathBuf;
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use feature_launcher::search::inverted_index::{InvertedFileIndex, SkipSet};
+use std::hint::black_box;
 use tempfile::TempDir;
 
 fn seed_tree(root: &std::path::Path, files: usize) {

@@ -7,7 +7,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use bus::{AlarmEvent, DomainEventBus};
+use bus::DomainEventBus;
 use storage::repos::cron::CronRepo;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
@@ -306,7 +306,7 @@ mod tests {
     }
 
     fn alarm_fired(kind: &str, ref_id: Option<&str>) -> DomainEvent {
-        DomainEvent::Alarm(AlarmEvent::AlarmFired {
+        DomainEvent::Alarm(bus::AlarmEvent::AlarmFired {
             fire_id: "fire-test".into(),
             kind: kind.into(),
             ref_id: ref_id.map(|s| s.to_owned()),

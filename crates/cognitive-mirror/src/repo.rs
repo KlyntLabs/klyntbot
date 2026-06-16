@@ -3,7 +3,6 @@
 use common::Result;
 use jiff::Timestamp;
 use sqlx::Row;
-use std::collections::HashMap;
 use uuid::Uuid;
 
 use crate::{

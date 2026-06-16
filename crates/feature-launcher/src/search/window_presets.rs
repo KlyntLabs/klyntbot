@@ -45,7 +45,7 @@ impl SearchSource for WindowPresetsSource {
             })
             .collect();
 
-        scored.sort_by(|a, b| b.0.cmp(&a.0));
+        scored.sort_by_key(|b| std::cmp::Reverse(b.0));
         scored.truncate(limit);
         scored.into_iter().map(|(_, p)| make_item(p)).collect()
     }

@@ -230,7 +230,7 @@ pub fn fuzzy_match<'a, T>(
         })
         .collect();
 
-    scored.sort_by(|a, b| b.0.cmp(&a.0));
+    scored.sort_by_key(|b| std::cmp::Reverse(b.0));
     scored.truncate(limit);
     scored
 }
@@ -268,7 +268,7 @@ pub fn fuzzy_match2<'a, T>(
         })
         .collect();
 
-    scored.sort_by(|a, b| b.0.cmp(&a.0));
+    scored.sort_by_key(|b| std::cmp::Reverse(b.0));
     scored.truncate(limit);
     scored
 }

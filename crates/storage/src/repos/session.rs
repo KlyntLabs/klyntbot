@@ -422,10 +422,11 @@ impl SessionRepo {
     /// Replace a message's `parts` (and the legacy `content` mirror) by id.
     ///
     /// Used by the coding turn-handler bridge to coalesce streaming-snapshot
-    /// + final-flush duplicates: when a later flush's text is a superset of
+    /// and final-flush duplicates: when a later flush's text is a superset of
     /// the earlier persisted row, we update that row in place rather than
-    /// inserting a duplicate. Returns `true` when a row was actually
-    /// updated.
+    /// inserting a duplicate.
+    ///
+    /// Returns `true` when a row was actually updated.
     pub async fn update_message_parts(
         &self,
         message_id: uuid::Uuid,

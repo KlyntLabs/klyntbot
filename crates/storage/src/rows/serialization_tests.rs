@@ -69,7 +69,7 @@ mod tests {
     #[test]
     fn all_row_types_serialize_to_camel_case() {
         let now: SqlTs = Timestamp::now().into();
-        let today: SqlDate = Date::new(2026, 1, 1).unwrap().into();
+        let _today: SqlDate = Date::new(2026, 1, 1).unwrap().into();
 
         let rows: Vec<(&str, serde_json::Value)> = vec![
             (

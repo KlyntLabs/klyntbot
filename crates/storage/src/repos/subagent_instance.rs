@@ -115,6 +115,7 @@ impl SubagentInstanceRepo {
     /// - From terminal states (failed/killed/completed): forbidden.
     /// - From `running`: any non-running state.
     /// - From `idle` or `stopped_turn`: to `running` (on resume) or any terminal.
+    ///
     /// Returns `Err(KlyntbotError::Storage)` if the transition is rejected.
     pub async fn update_status(&self, agent_id: &str, next: SubagentStatus) -> Result<()> {
         let current = self
