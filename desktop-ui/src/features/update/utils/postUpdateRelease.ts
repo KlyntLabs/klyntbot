@@ -1,6 +1,6 @@
 export const STORAGE_KEY_PENDING_POST_UPDATE_VERSION = "klynt.pendingPostUpdateVersion";
-const GITHUB_RELEASES_API_BASE = "https://api.github.com/repos/Dimillian/Klynt/releases";
-const GITHUB_RELEASES_WEB_BASE = "https://github.com/Dimillian/Klynt/releases";
+const GITHUB_RELEASES_API_BASE = "https://api.github.com/repos/KlyntLabs/klyntbot/releases";
+const GITHUB_RELEASES_WEB_BASE = "https://github.com/KlyntLabs/klyntbot/releases";
 
 type GitHubReleaseResponse = {
   tag_name?: string;
