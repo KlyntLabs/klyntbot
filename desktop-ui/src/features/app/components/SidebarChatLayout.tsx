@@ -5,6 +5,7 @@ import LayoutGrid from "lucide-react/dist/esm/icons/layout-grid";
 import Search from "lucide-react/dist/esm/icons/search";
 import Settings from "lucide-react/dist/esm/icons/settings";
 import SquarePen from "lucide-react/dist/esm/icons/square-pen";
+import Timer from "lucide-react/dist/esm/icons/timer";
 import { memo } from "react";
 import type { ChatThread } from "@/features/chat/types";
 type SidebarChatLayoutProps = {
@@ -12,6 +13,7 @@ type SidebarChatLayoutProps = {
   onNewChat: () => void;
   onSelectPlugins: () => void;
   onSelectCalendar?: () => void;
+  onSelectFocus?: () => void;
   threads: ChatThread[];
   selectedSessionKey: string | null;
   onSelectThread: (sessionKey: string) => void;
@@ -30,12 +32,14 @@ export const SidebarChatLayout = memo(function SidebarChatLayout({
   onNewChat,
   onSelectPlugins,
   onSelectCalendar,
+  onSelectFocus,
   threads,
   selectedSessionKey,
   onSelectThread,
   activeNavId,
 }: SidebarChatLayoutProps) {
   const handleSelectCalendar = onSelectCalendar ?? (() => {});
+  const handleSelectFocus = onSelectFocus ?? (() => {});
   const allNavItems: NavItem[] = [
     {
       id: "new-chat",
@@ -55,6 +59,12 @@ export const SidebarChatLayout = memo(function SidebarChatLayout({
       label: "Plugins",
       icon: <LayoutGrid aria-hidden />,
       onClick: onSelectPlugins,
+    },
+    {
+      id: "focus",
+      label: "Focus",
+      icon: <Timer aria-hidden />,
+      onClick: handleSelectFocus,
     },
     { id: "automations", label: "Automations", icon: <Clock aria-hidden /> },
     {

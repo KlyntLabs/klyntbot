@@ -77,6 +77,7 @@ import { useModels } from "@/features/models/hooks/useModels";
 import { useProviders } from "@/features/models/hooks/useProviders";
 import { useErrorToasts } from "@/features/notifications/hooks/useErrorToasts";
 import { PluginsView } from "@/features/plugins/components/PluginsView";
+import { FocusPage } from "@/features/focus/components/FocusPage";
 import { useCustomPrompts } from "@/features/prompts/hooks/useCustomPrompts";
 import { useSkills } from "@/features/skills/hooks/useSkills";
 import { useTerminalController } from "@/features/terminal/hooks/useTerminalController";
@@ -430,6 +431,10 @@ export default function MainApp() {
 
   const onSelectCalendar = useCallback(() => {
     setAppView("calendar");
+  }, []);
+
+  const onSelectFocus = useCallback(() => {
+    setAppView("focus");
   }, []);
 
   const onSelectThread = useCallback((sessionKey: string) => {
@@ -1909,7 +1914,15 @@ export default function MainApp() {
       onSelectThread,
       onSelectPlugins,
       onSelectCalendar,
-      activeNavId: appView === "calendar" ? "calendar" : appView === "plugins" ? "plugins" : null,
+      onSelectFocus,
+      activeNavId:
+        appView === "calendar"
+          ? "calendar"
+          : appView === "plugins"
+            ? "plugins"
+            : appView === "focus"
+              ? "focus"
+              : null,
       chatThreads,
       refetchChatThreads,
     },
@@ -2012,7 +2025,12 @@ export default function MainApp() {
       selectedPullRequestNumber: selectedPullRequest?.number ?? null,
     },
     appLayout: {
-      showHome: showHome && appView !== "chat" && appView !== "plugins" && appView !== "calendar",
+      showHome:
+        showHome &&
+        appView !== "chat" &&
+        appView !== "plugins" &&
+        appView !== "calendar" &&
+        appView !== "focus",
       centerMode: (() => {
         switch (appView) {
           case "chat":
@@ -2021,6 +2039,8 @@ export default function MainApp() {
             return "plugins";
           case "calendar":
             return "calendar";
+          case "focus":
+            return "focus";
           default:
             return centerMode;
         }
@@ -2031,7 +2051,8 @@ export default function MainApp() {
       activeWorkspace:
         (Boolean(activeWorkspace) || appView === "chat") &&
         appView !== "plugins" &&
-        appView !== "calendar",
+        appView !== "calendar" &&
+        appView !== "focus",
       sidebarNode,
       messagesNode: mainMessagesNode,
       composerNode,
@@ -2041,6 +2062,7 @@ export default function MainApp() {
       homeNode,
       pluginsNode: appView === "plugins" ? <PluginsView /> : null,
       dashboardNode: appView === "calendar" ? <Dashboard /> : null,
+      focusNode: appView === "focus" ? <FocusPage /> : null,
       gitDiffPanelNode,
       gitDiffViewerNode,
       planPanelNode,

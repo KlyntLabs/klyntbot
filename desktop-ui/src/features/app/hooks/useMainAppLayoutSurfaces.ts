@@ -236,6 +236,7 @@ type UseMainAppLayoutSurfacesArgs = {
     onSelectThread: (sessionKey: string) => void;
     onSelectPlugins: () => void;
     onSelectCalendar: () => void;
+    onSelectFocus: () => void;
     activeNavId: string | null;
     chatThreads: import("@/features/chat/types").ChatThread[];
     refetchChatThreads: () => Promise<void>;
@@ -366,6 +367,7 @@ function buildPrimarySurface({
       onNewChat: chatView.onNewChat,
       onSelectPlugins: chatView.onSelectPlugins,
       onSelectCalendar: chatView.onSelectCalendar,
+      onSelectFocus: chatView.onSelectFocus,
       activeNavId: chatView.activeNavId,
       threads: chatView.chatThreads,
       selectedSessionKey: chatView.selectedSessionKey,

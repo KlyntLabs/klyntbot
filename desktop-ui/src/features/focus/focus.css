@@ -543,3 +543,19 @@
   color: var(--text-dim);
   font-weight: 300;
 }
+
+/* ── Full-window page wrapper ──────────────────────────────────── */
+.tc-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+}
+
+.app.is-focus .main {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+}
