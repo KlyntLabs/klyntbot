@@ -566,6 +566,39 @@ fn parse_focus_cue(cue: &str) -> CommandResult<crate::focus_audio::FocusCue> {
     }
 }
 
+const MAX_CUSTOM_SOUND_BYTES: u64 = 10 * 1024 * 1024;
+
+fn validate_source_sound(path: &std::path::Path) -> CommandResult<()> {
+    if !path.is_absolute() {
+        return Err(ApiError::new(
+            "BAD_REQUEST",
+            "source path must be absolute".to_string(),
+        ));
+    }
+
+    let meta = std::fs::symlink_metadata(path)
+        .map_err(|e| ApiError::new("BAD_REQUEST", format!("cannot access source sound: {e}")))?;
+    if meta.file_type().is_symlink() {
+        return Err(ApiError::new(
+            "BAD_REQUEST",
+            "source sound cannot be a symlink".to_string(),
+        ));
+    }
+    if !meta.file_type().is_file() {
+        return Err(ApiError::new(
+            "BAD_REQUEST",
+            "source sound must be a regular file".to_string(),
+        ));
+    }
+    if meta.len() > MAX_CUSTOM_SOUND_BYTES {
+        return Err(ApiError::new(
+            "BAD_REQUEST",
+            format!("source sound exceeds {MAX_CUSTOM_SOUND_BYTES} byte limit"),
+        ));
+    }
+    Ok(())
+}
+
 #[klynt_raw_command]
 #[tauri::command(rename_all = "snake_case")]
 #[specta::specta]
@@ -595,24 +628,27 @@ pub async fn focus_set_custom_sound(
 ) -> CommandResult<()> {
     let cue = parse_focus_cue(&payload.cue)?;
 
-    let ext = std::path::Path::new(&payload.source_path)
+    let source_path = std::path::Path::new(&payload.source_path);
+    validate_source_sound(source_path)?;
+
+    let ext = source_path
         .extension()
         .and_then(|e| e.to_str())
         .map(|e| e.to_lowercase());
     match ext.as_deref() {
-        Some("mp3") | Some("wav") | Some("ogg") => {}
+        Some("mp3") | Some("wav") => {}
         _ => {
             return Err(ApiError::new(
                 "BAD_REQUEST",
-                "custom sound must be mp3, wav, or ogg".to_string(),
+                "custom sound must be mp3 or wav".to_string(),
             ))
         }
     }
 
-    let data = std::fs::read(&payload.source_path)
+    let data = std::fs::read(source_path)
         .map_err(|e| ApiError::new("INTERNAL", format!("failed to read source sound: {e}")))?;
 
-    let _ = rodio::Decoder::new(std::io::Cursor::new(data.clone()))
+    rodio::Decoder::new(std::io::Cursor::new(data.clone()))
         .map_err(|e| ApiError::new("BAD_REQUEST", format!("file is not a valid audio file: {e}")))?;
 
     let dir = app
