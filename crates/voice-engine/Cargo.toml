@@ -29,9 +29,6 @@ qwen3-asr = { workspace = true, features = ["hub"] }
 qwen3-asr = { workspace = true, features = ["metal"] }
 qwen3-tts-rs = { workspace = true, optional = true, features = ["mlx"] }
 
-[target.'cfg(not(target_os = "macos"))'.dependencies]
-qwen3-tts-rs = { workspace = true, optional = true, features = ["tch-backend"] }
-
 [features]
 default = ["vad"]
 vad = ["dep:webrtc-vad", "dep:nnnoiseless"]

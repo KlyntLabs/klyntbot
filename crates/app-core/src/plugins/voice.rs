@@ -114,25 +114,34 @@ impl AppCorePlugin for VoicePlugin {
                         }
                         config::schema::TtsEngineKind::System => None,
                     };
-                    if let Some(dir) = model_dir {
-                        match voice_engine::Qwen3TtsEngine::new(&dir).await {
-                            Ok(engine) => {
-                                info!("Qwen3-TTS loaded — wrapping with system fallback");
-                                let engine = Arc::new(engine);
-                                let manager = voice_engine::TtsEngineManager::new(
-                                    engine,
-                                    Some(
-                                        Arc::clone(&system_tts) as Arc<dyn voice_engine::TtsEngine>
-                                    ),
-                                );
-                                Some(Arc::new(manager) as Arc<dyn voice_engine::TtsEngine>)
+                    #[cfg(target_os = "macos")]
+                    {
+                        if let Some(dir) = model_dir {
+                            match voice_engine::Qwen3TtsEngine::new(&dir).await {
+                                Ok(engine) => {
+                                    info!("Qwen3-TTS loaded — wrapping with system fallback");
+                                    let engine = Arc::new(engine);
+                                    let manager = voice_engine::TtsEngineManager::new(
+                                        engine,
+                                        Some(Arc::clone(&system_tts)
+                                            as Arc<dyn voice_engine::TtsEngine>),
+                                    );
+                                    Some(Arc::new(manager) as Arc<dyn voice_engine::TtsEngine>)
+                                }
+                                Err(e) => {
+                                    warn!("Qwen3-TTS failed, using system TTS: {e}");
+                                    Some(Arc::clone(&system_tts) as Arc<dyn voice_engine::TtsEngine>)
+                                }
                             }
-                            Err(e) => {
-                                warn!("Qwen3-TTS failed, using system TTS: {e}");
-                                Some(Arc::clone(&system_tts) as Arc<dyn voice_engine::TtsEngine>)
-                            }
+                        } else {
+                            Some(Arc::clone(&system_tts) as Arc<dyn voice_engine::TtsEngine>)
                         }
-                    } else {
+                    }
+                    #[cfg(not(target_os = "macos"))]
+                    {
+                        if model_dir.is_some() {
+                            warn!("Qwen3-TTS is not available on this platform");
+                        }
                         Some(Arc::clone(&system_tts) as Arc<dyn voice_engine::TtsEngine>)
                     }
                 }
@@ -287,6 +296,7 @@ impl AppCorePlugin for VoicePlugin {
                     }
 
                     // Hot-swap TTS engine after successful download
+                    #[cfg(target_os = "macos")]
                     if let Ok(ref dir) = tts {
                         match voice_engine::Qwen3TtsEngine::new(dir).await {
                             Ok(engine) => {
@@ -301,6 +311,11 @@ impl AppCorePlugin for VoicePlugin {
                             }
                             Err(e) => warn!("Qwen3-TTS engine creation after download failed: {e}"),
                         }
+                    }
+                    #[cfg(not(target_os = "macos"))]
+                    {
+                        let _ = tts;
+                        let _ = system_tts_for_swap;
                     }
 
                     // Download 1.7B instruct model when custom personas are configured

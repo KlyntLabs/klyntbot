@@ -229,20 +229,32 @@ impl AppCore {
                 let system_fallback =
                     std::sync::Arc::new(voice_engine::AvSpeechTtsEngine::new(&data_dir))
                         as std::sync::Arc<dyn voice_engine::TtsEngine>;
-                match voice_engine::Qwen3TtsEngine::new(model_dir).await {
-                    Ok(engine) => {
-                        let manager = voice_engine::TtsEngineManager::new(
-                            std::sync::Arc::new(engine),
-                            Some(system_fallback),
-                        );
-                        svc.set_tts_engine(std::sync::Arc::new(manager)
-                            as std::sync::Arc<dyn voice_engine::TtsEngine>);
-                        tracing::info!(
-                            "Hot-swapped {} into live VoiceService",
-                            model.display_name()
-                        );
+                #[cfg(target_os = "macos")]
+                {
+                    match voice_engine::Qwen3TtsEngine::new(model_dir).await {
+                        Ok(engine) => {
+                            let manager = voice_engine::TtsEngineManager::new(
+                                std::sync::Arc::new(engine),
+                                Some(system_fallback),
+                            );
+                            svc.set_tts_engine(std::sync::Arc::new(manager)
+                                as std::sync::Arc<dyn voice_engine::TtsEngine>);
+                            tracing::info!(
+                                "Hot-swapped {} into live VoiceService",
+                                model.display_name()
+                            );
+                        }
+                        Err(e) => {
+                            tracing::warn!("Failed to create TTS engine after download: {e}");
+                            svc.set_tts_engine(system_fallback);
+                        }
                     }
-                    Err(e) => tracing::warn!("Failed to create TTS engine after download: {e}"),
+                }
+                #[cfg(not(target_os = "macos"))]
+                {
+                    let _ = model_dir;
+                    tracing::warn!("Qwen3-TTS is not available on this platform");
+                    svc.set_tts_engine(system_fallback);
                 }
             }
         }

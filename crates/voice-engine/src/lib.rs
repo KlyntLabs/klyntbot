@@ -29,9 +29,9 @@ pub mod vad;
 
 pub use capture::{AudioCapture, CaptureConfig, CaptureSession, MonitorSession};
 pub use engine_manager::TtsEngineManager;
-pub use engines::{
-    AvSpeechTtsEngine, CloudAsrEngine, CloudTtsEngine, Qwen3AsrEngine, Qwen3TtsEngine,
-};
+#[cfg(feature = "qwen3")]
+pub use engines::Qwen3TtsEngine;
+pub use engines::{AvSpeechTtsEngine, CloudAsrEngine, CloudTtsEngine, Qwen3AsrEngine};
 pub use events::{VoiceEvent, VOICE_EVENT};
 pub use model_manager::ModelManager;
 pub use pronunciation::compute_pronunciation_report;
