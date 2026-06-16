@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -67,6 +69,7 @@ describe("SettingsAppSection", () => {
 
     const slider = screen.getByRole("slider", { name: /ui scale/i });
     fireEvent.change(slider, { target: { value: "1.25" } });
+    await waitFor(() => expect(slider).toHaveValue(1.25));
     fireEvent.blur(slider);
 
     await waitFor(() => {
