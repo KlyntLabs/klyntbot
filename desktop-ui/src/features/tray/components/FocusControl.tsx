@@ -10,7 +10,7 @@ import X from "lucide-react/dist/esm/icons/x";
 import { useEffect, useRef, useState } from "react";
 import { qk, useTauriQuery } from "@/lib/query";
 import { emit, getCurrentWindow, getWindowByLabel, isTauri } from "@/utils/tauri-bridge";
-import { FOCUS_PRESETS, type useFocusTimer } from "../hooks/useFocusTimer";
+import { FOCUS_PRESETS, type useFocusTimer } from "../../focus/hooks/useFocusTimer";
 import { formatElapsed, formatHumanDuration } from "../lib/dates";
 import type { FocusSettings } from "../types";
 import { Checkbox } from "./Checkbox";
