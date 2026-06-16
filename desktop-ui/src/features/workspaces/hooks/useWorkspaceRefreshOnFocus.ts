@@ -120,5 +120,5 @@ export function useWorkspaceRefreshOnFocus({
         clearInterval(pollTimer);
       }
     };
-  }, []);
+  }, [backendMode, pollIntervalMs]);
 }

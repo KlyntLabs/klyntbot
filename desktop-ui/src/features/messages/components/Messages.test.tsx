@@ -810,7 +810,7 @@ describe("Messages", () => {
     );
 
     expect(container.querySelector(".reasoning-inline")).toBeTruthy();
-    const reasoningDetail = container.querySelector(".reasoning-inline-detail");
+    const reasoningDetail = container.querySelector(".reasoning-inline-body");
     expect(reasoningDetail?.textContent ?? "").toContain("Looking for entry points");
     const workingText = container.querySelector(".working-text");
     expect(workingText?.textContent ?? "").toContain("Scanning repository");
@@ -840,7 +840,7 @@ describe("Messages", () => {
 
     const workingText = container.querySelector(".working-text");
     expect(workingText?.textContent ?? "").toContain("Plan from content");
-    const reasoningDetail = container.querySelector(".reasoning-inline-detail");
+    const reasoningDetail = container.querySelector(".reasoning-inline-body");
     expect(reasoningDetail?.textContent ?? "").toContain("More detail here");
     expect(reasoningDetail?.textContent ?? "").not.toContain("Plan from content");
   });
@@ -1119,7 +1119,7 @@ describe("Messages", () => {
     );
 
     await waitFor(() => {
-      const exploreBlocks = container.querySelectorAll(".tool-row--search");
+      const exploreBlocks = container.querySelectorAll(".tool-row__explore-list");
       expect(exploreBlocks.length).toBe(2);
     });
     const exploreItems = container.querySelectorAll(".tool-row__explore-item");
@@ -1161,13 +1161,17 @@ describe("Messages", () => {
     );
 
     await waitFor(() => {
-      expect(container.querySelectorAll(".tool-row--search").length).toBe(2);
+      expect(container.querySelectorAll(".tool-row__explore-list").length).toBe(2);
     });
-    const exploreBlocks = Array.from(container.querySelectorAll(".tool-row--search"));
-    const reasoningDetail = container.querySelector(".reasoning-inline-detail");
+    const exploreBlocks = Array.from(
+      container.querySelectorAll(".tool-row__explore-list"),
+    ).map((list) => list.closest(".tool-row--search"));
+    const reasoningDetail = container.querySelector(".reasoning-inline-body");
     expect(exploreBlocks.length).toBe(2);
+    expect(exploreBlocks[0]).toBeTruthy();
+    expect(exploreBlocks[1]).toBeTruthy();
     expect(reasoningDetail).toBeTruthy();
-    const [firstExploreBlock, secondExploreBlock] = exploreBlocks;
+    const [firstExploreBlock, secondExploreBlock] = exploreBlocks as Element[];
     const firstBeforeReasoning =
       firstExploreBlock.compareDocumentPosition(reasoningDetail as Node) &
       Node.DOCUMENT_POSITION_FOLLOWING;

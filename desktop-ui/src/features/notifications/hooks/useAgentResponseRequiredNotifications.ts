@@ -72,8 +72,8 @@ export function useAgentResponseRequiredNotifications({
   const notifiedPlanItemsRef = useRef(new Set<string>());
   const pendingPlanNotificationsRef = useRef(new Map<string, PendingPlanNotification>());
   const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [_retrySignal, setRetrySignal] = useState(0);
-  const [_pendingPlansSignal, setPendingPlansSignal] = useState(0);
+  const [retrySignal, setRetrySignal] = useState(0);
+  const [pendingPlansSignal, setPendingPlansSignal] = useState(0);
 
   const canNotifyNow = useCallback(() => {
     if (!enabled) {
@@ -224,7 +224,7 @@ export function useAgentResponseRequiredNotifications({
       requestId: latestUnnotifiedApproval.request_id,
     });
     scheduleRetry();
-  }, [canNotifyNow, getWorkspaceName, latestUnnotifiedApproval, notify, scheduleRetry]);
+  }, [canNotifyNow, getWorkspaceName, latestUnnotifiedApproval, notify, retrySignal, scheduleRetry]);
 
   const latestUnnotifiedQuestion = (() => {
     for (let index = userInputRequests.length - 1; index >= 0; index -= 1) {
@@ -275,7 +275,7 @@ export function useAgentResponseRequiredNotifications({
       itemId: latestUnnotifiedQuestion.params.item_id,
     });
     scheduleRetry();
-  }, [canNotifyNow, getWorkspaceName, latestUnnotifiedQuestion, notify, scheduleRetry]);
+  }, [canNotifyNow, getWorkspaceName, latestUnnotifiedQuestion, notify, retrySignal, scheduleRetry]);
 
   useEffect(() => {
     if (!pendingPlanNotificationsRef.current.size) {
@@ -299,7 +299,7 @@ export function useAgentResponseRequiredNotifications({
     if (pendingPlanNotificationsRef.current.size) {
       scheduleRetry();
     }
-  }, [canNotifyNow, notify, scheduleRetry]);
+  }, [canNotifyNow, notify, retrySignal, pendingPlansSignal, scheduleRetry]);
 
   const onItemCompleted = useCallback(
     (workspaceId: string, threadId: string, item: Record<string, unknown>) => {

@@ -18,6 +18,8 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { STORAGE_KEY_DETACHED_REVIEW_LINKS } from "@threads/utils/threadStorage";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { WorkspaceInfo } from "@/types";
+import { useChatStore } from "../store/useChatStore";
+import { initialState as threadInitialState } from "./useThreadsReducer";
 import { useQueuedSend } from "./useQueuedSend";
 import { useThreads } from "./useThreads";
 
@@ -63,6 +65,15 @@ describe("useThreads UX integration", () => {
     handlers = null;
     localStorage.clear();
     vi.clearAllMocks();
+    const store = useChatStore.getState();
+    useChatStore.setState({
+      ...threadInitialState,
+      maxItemsPerThread: store.maxItemsPerThread,
+      dispatchThreadAction: store.dispatchThreadAction,
+      streamSnapshots: {},
+      streamApprovals: {},
+      streamFileEdits: {},
+    });
     now = 1000;
     nowSpy = vi.spyOn(Date, "now").mockImplementation(() => now++);
   });

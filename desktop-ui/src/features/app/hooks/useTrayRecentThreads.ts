@@ -94,13 +94,14 @@ export function useTrayRecentThreads({
   const serializedEntries = useMemo(() => JSON.stringify(entries), [entries]);
   const syncEntries = useMemo(() => entries, [entries]);
   const lastSyncedEntriesRef = useRef<string | null>(null);
+  const isSyncingRef = useRef(false);
 
   useEffect(() => {
     if (!isTauri()) {
       return;
     }
 
-    if (lastSyncedEntriesRef.current === serializedEntries) {
+    if (lastSyncedEntriesRef.current === serializedEntries || isSyncingRef.current) {
       return;
     }
 
@@ -109,8 +110,15 @@ export function useTrayRecentThreads({
     let retries = 0;
     const MAX_RETRIES = 3;
 
+    const finishSync = () => {
+      if (!cancelled) {
+        isSyncingRef.current = false;
+      }
+    };
+
     const attemptSync = () => {
       timeoutId = null;
+      isSyncingRef.current = true;
       void setTrayRecentThreads(syncEntries)
         .then(() => {
           if (cancelled) return;
@@ -122,11 +130,12 @@ export function useTrayRecentThreads({
           if (retries < MAX_RETRIES) {
             retries++;
             timeoutId = window.setTimeout(attemptSync, SYNC_DEBOUNCE_MS);
-          } else {
-            // Exhausted retries — mark as attempted so we don't loop forever.
-            lastSyncedEntriesRef.current = serializedEntries;
+            return;
           }
-        });
+          // Exhausted retries — mark as attempted so we don't loop forever.
+          lastSyncedEntriesRef.current = serializedEntries;
+        })
+        .finally(finishSync);
     };
 
     timeoutId = window.setTimeout(attemptSync, SYNC_DEBOUNCE_MS);

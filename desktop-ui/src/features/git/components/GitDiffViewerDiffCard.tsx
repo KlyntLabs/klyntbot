@@ -8,7 +8,7 @@ import { FileDiff } from "@pierre/diffs/react";
 import { type ParsedDiffLine, parseDiff } from "@utils/diff";
 import { highlightLine, languageFromPath } from "@utils/syntax";
 import RotateCcw from "lucide-react/dist/esm/icons/rotate-ccw";
-import { memo, useMemo } from "react";
+import { type ComponentProps, memo, useMemo } from "react";
 import { DIFF_VIEWER_SCROLL_CSS } from "@/features/design-system/diff/diffViewerTheme";
 import type { PullRequestReviewAction, PullRequestReviewIntent } from "@/types";
 import { splitPath } from "./GitDiffPanel.utils";
@@ -239,9 +239,11 @@ export const DiffCard = memo(function DiffCard({
             fileDiff={fileDiff}
             options={diffOptions}
             selectedLines={useInteractiveDiff ? selectedLines : null}
-            renderHoverUtility={
+            renderGutterUtility={
               lineActionEnabled
-                ? (getHoveredLine) => (
+                ? (getHoveredLine: Parameters<
+                    NonNullable<ComponentProps<typeof FileDiff>["renderGutterUtility"]>
+                  >[0]) => (
                     <button
                       type="button"
                       className="diff-viewer-line-action-button"

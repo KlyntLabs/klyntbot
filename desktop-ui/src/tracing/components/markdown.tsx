@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // Derived from upstream Apache-2.0 source. See THIRD_PARTY_NOTICES.md.
 
-import type { Element } from "hast";
 import { CheckIcon, CopyIcon } from "lucide-react";
 import {
   type ComponentProps,
@@ -135,7 +134,18 @@ function SimpleCodeBlock({
   );
 }
 
-type StreamdownCodeProps = ComponentProps<"code"> & { node?: Element };
+type HastElement = {
+  type: "element";
+  tagName: string;
+  properties?: Record<string, unknown>;
+  position?: {
+    start: { line: number };
+    end: { line: number };
+  };
+  children?: unknown[];
+};
+
+type StreamdownCodeProps = ComponentProps<"code"> & { node?: HastElement };
 
 const MarkdownCode = ({ className, children, node, ...props }: StreamdownCodeProps) => {
   const isInline = node?.position?.start?.line === node?.position?.end?.line;

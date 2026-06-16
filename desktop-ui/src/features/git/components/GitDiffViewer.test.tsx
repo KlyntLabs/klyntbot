@@ -39,14 +39,14 @@ vi.mock("@pierre/diffs", () => ({
 
 vi.mock("@pierre/diffs/react", () => ({
   FileDiff: ({
-    renderHoverUtility,
+    renderGutterUtility,
   }: {
-    renderHoverUtility?: (
+    renderGutterUtility?: (
       getHoveredLine: () => { lineNumber: number; side?: "additions" | "deletions" } | undefined,
     ) => ReactNode;
   }) => (
     <div>
-      {renderHoverUtility ? renderHoverUtility(() => ({ lineNumber: 2, side: "additions" })) : null}
+      {renderGutterUtility ? renderGutterUtility(() => ({ lineNumber: 2, side: "additions" })) : null}
     </div>
   ),
   WorkerPoolContextProvider: ({ children }: { children: ReactNode }) => children,

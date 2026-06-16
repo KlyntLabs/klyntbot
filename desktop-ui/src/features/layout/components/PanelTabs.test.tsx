@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { type PanelTabId, PanelTabs } from "./PanelTabs";
 
 function PanelTabsHarness() {
-  const [active, setActive] = useState<PanelTabId>("git");
+  const [active, setActive] = useState<PanelTabId>("activity");
   return <PanelTabs active={active} onSelect={setActive} />;
 }
 

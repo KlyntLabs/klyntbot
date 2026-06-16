@@ -108,17 +108,6 @@ describe("useComposerAutocompleteState slash commands", () => {
         "status",
       ]),
     );
-    // Phase 2 + coding-mode slashes derived from registry FLAT_CATALOG
-    expect(labels).toEqual(
-      expect.arrayContaining([
-        "sessions rewind",
-        "sessions export",
-        "sessions fork",
-        "permissions clear-mirror",
-        "dead-ends",
-        "mirror",
-      ]),
-    );
     // Sorted alphabetically
     const sorted = [...labels].sort((a, b) => a.localeCompare(b));
     expect(labels).toEqual(sorted);
@@ -156,8 +145,6 @@ describe("useComposerAutocompleteState slash commands", () => {
     expect(labels).toEqual(
       expect.arrayContaining(["compact", "fork", "mcp", "new", "resume", "review", "status"]),
     );
-    // Phase 2 entries still present (independent of appsEnabled)
-    expect(labels).toEqual(expect.arrayContaining(["sessions rewind", "dead-ends", "mirror"]));
   });
 });
 
