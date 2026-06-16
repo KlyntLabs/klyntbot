@@ -1015,11 +1015,9 @@ mod tests {
         use std::time::{Duration, Instant};
         let start = Instant::now();
         let tick_duration = Duration::from_millis(100);
-        let mut tick_count = 0;
-        for _ in 0..10 {
-            let next = start + tick_duration * (tick_count + 1);
+        for (tick_count, _) in (0..10).enumerate() {
+            let next = start + tick_duration * ((tick_count as u32) + 1);
             tokio::time::sleep(next.saturating_duration_since(Instant::now())).await;
-            tick_count += 1;
         }
         let elapsed = start.elapsed();
         assert!(elapsed >= Duration::from_millis(950), "elapsed: {elapsed:?}");
