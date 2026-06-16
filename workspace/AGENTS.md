@@ -49,3 +49,11 @@ Task format examples:
 ```
 
 When the user asks you to add a recurring/periodic task, update `HEARTBEAT.md` instead of creating a one-time reminder. Keep the file small to minimize token usage.
+
+## Release / versioning conventions
+
+- Repo versions remain at `0.1.0`; CI injects the real release version at build time.
+- Use calendar-semver: stable `YYYY.M.D`, alpha `YYYY.M.D-alpha.N`.
+- Alpha releases run automatically on `main`; stable releases trigger from `stable-vYYYY.M.D` tags.
+- Release notes live in `release-notes/<tag>.md`.
+- Run `python3 scripts/compute-release-version.py alpha` locally to preview the next alpha version.
