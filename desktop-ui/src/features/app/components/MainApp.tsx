@@ -56,6 +56,8 @@ import errorSoundUrl from "@/assets/error-notification.mp3";
 import successSoundUrl from "@/assets/success-notification.mp3";
 import { useApps } from "@/features/apps/hooks/useApps";
 import { ChatErrorBanner } from "@/features/chat/components/ChatErrorBanner";
+import { ProviderSetupModal } from "@/features/chat/components/ProviderSetupModal";
+import { ProviderSetupPrompt } from "@/features/chat/components/ProviderSetupPrompt";
 import { useChatThreads } from "@/features/chat/hooks/useChatThreads";
 import { useKlyntbotSurfaceProps } from "@/features/chat/hooks/useKlyntbotSurfaceProps";
 import { useCollaborationModeSelection } from "@/features/collaboration/hooks/useCollaborationModeSelection";
@@ -315,6 +317,7 @@ export default function MainApp() {
     reasoningOptions,
     selectedEffort,
     setSelectedEffort,
+    refreshModels,
   } = useModels({
     activeWorkspace,
     onDebug: addDebugEntry,
@@ -323,7 +326,7 @@ export default function MainApp() {
     selectionKey: threadCodexSelectionKey,
   });
 
-  const { providers, defaultProviderId } = useProviders();
+  const { providers, defaultProviderId, hasApiKeyConfigured, loading: providersLoading, refresh: refreshProviders } = useProviders();
   // User-driven provider override. Cleared when the user picks a model
   // directly (the pill should follow the model). The effective
   // `selectedProviderId` is derived below from this override + the
@@ -405,6 +408,7 @@ export default function MainApp() {
 
   const [appView, setAppView] = useState<AppView>(AppView.Home);
   const [selectedSessionKey, setSelectedSessionKey] = useState<string | null>(null);
+  const [providerSetupOpen, setProviderSetupOpen] = useState(false);
   const { threads: chatThreads, refetch: refetchChatThreads } = useChatThreads();
 
   const onNewChat = useCallback(() => {
@@ -1921,6 +1925,10 @@ export default function MainApp() {
   // bubbles, markdown, code blocks, copy buttons as assistant mode — only
   const mainMessagesNode =
     showWorkspaceHome && appView !== "chat" ? workspaceHomeNode : chatMessagesNode;
+
+  const showProviderSetup =
+    !providersLoading && !hasApiKeyConfigured && appView === AppView.Chat;
+
   const compactThreadConnectionState: "live" | "polling" | "disconnected" =
     !activeWorkspace?.connected ? "disconnected" : remoteThreadConnectionState;
   const mainAppShellProps = useMainAppShellProps({
@@ -1959,8 +1967,12 @@ export default function MainApp() {
       hasActivePlan: hasActivePlan,
       activeWorkspace: (Boolean(activeWorkspace) || appView === "chat") && appView !== "calendar",
       sidebarNode,
-      messagesNode: mainMessagesNode,
-      composerNode,
+      messagesNode: showProviderSetup ? (
+        <ProviderSetupPrompt onOpenSettings={() => setProviderSetupOpen(true)} />
+      ) : (
+        mainMessagesNode
+      ),
+      composerNode: showProviderSetup ? null : composerNode,
       approvalToastsNode,
       updateToastNode,
       errorToastsNode,
@@ -1985,5 +1997,18 @@ export default function MainApp() {
     },
   });
 
-  return <MainAppShell {...mainAppShellProps} />;
+  return (
+    <>
+      <MainAppShell {...mainAppShellProps} />
+      {providerSetupOpen && (
+        <ProviderSetupModal
+          onClose={() => {
+            setProviderSetupOpen(false);
+            void refreshProviders();
+            void refreshModels();
+          }}
+        />
+      )}
+    </>
+  );
 }

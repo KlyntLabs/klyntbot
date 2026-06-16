@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { invoke } from "@/api/client";
 import { PROVIDER_DISPLAY_NAMES } from "@/features/models/utils/deriveProvider";
 
@@ -49,69 +49,73 @@ function brandsFromModels(models: ModelEntry[]): ProviderInfo[] {
   return [...seen.values()].sort((a, b) => a.displayName.localeCompare(b.displayName));
 }
 
+function hasConfiguredProvider(providersCfg: ProvidersConfig): boolean {
+  return Object.entries(providersCfg).some(
+    ([_, cfg]) =>
+      cfg && typeof cfg === "object" && "apiKey" in cfg && cfg.apiKey && cfg.apiKey.trim().length > 0,
+  );
+}
+
 export function useProviders() {
   const [providers, setProviders] = useState<ProviderInfo[]>([]);
   const [defaultProviderId, setDefaultProviderId] = useState<string | null>(null);
+  const [hasApiKeyConfigured, setHasApiKeyConfigured] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        // Pull the workspace id so model_list can be scoped (today the
-        // backend ignores it, but the IPC accepts it for forward
-        // compat with per-workspace overrides).
-        const workspaces = (await invoke("workspaces_list").catch(() => [])) as Array<{
-          id: string;
-        }>;
-        const workspaceId = workspaces[0]?.id ?? "";
-        const [models, providersCfg, agentsCfg] = await Promise.all([
-          invoke("model_list", { workspaceId }).catch(() => []) as Promise<ModelEntry[]>,
-          invoke("config_get_section", { section: "providers" }) as Promise<ProvidersConfig>,
-          invoke("config_get_section", { section: "agents" }) as Promise<AgentsConfig>,
-        ]);
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      // Pull the workspace id so model_list can be scoped (today the
+      // backend ignores it, but the IPC accepts it for forward
+      // compat with per-workspace overrides).
+      const workspaces = (await invoke("workspaces_list").catch(() => [])) as Array<{ id: string }>;
+      const workspaceId = workspaces[0]?.id ?? "";
+      const [models, providersCfg, agentsCfg] = await Promise.all([
+        invoke("model_list", { workspaceId }).catch(() => []) as Promise<ModelEntry[]>,
+        invoke("config_get_section", { section: "providers" }) as Promise<ProvidersConfig>,
+        invoke("config_get_section", { section: "agents" }) as Promise<AgentsConfig>,
+      ]);
 
-        if (cancelled) return;
-
-        // Primary path: derive providers from brands present in the
-        // aggregated model list. Falls back to the legacy config-key
-        // list when model_list is empty (e.g. no API keys configured).
-        let list: ProviderInfo[] = brandsFromModels(models);
-        if (list.length === 0) {
-          list = Object.entries(providersCfg)
-            .filter(([_, cfg]) => cfg.apiKey && cfg.apiKey.trim().length > 0)
-            .map(([id]) => ({
-              id,
-              displayName: PROVIDER_DISPLAY_NAMES[id] ?? id,
-              hasApiKey: true,
-            }));
-        }
-
-        // Default provider = brand of the configured default model,
-        // when discoverable. Fall back to agents.defaults.provider if
-        // the model isn't in the catalogue, then to the first entry.
-        const defaultModel = agentsCfg?.defaults?.model ?? null;
-        const defaultBrand =
-          (defaultModel && models.find((m) => m.id === defaultModel)?.brand) || null;
-        const cfgDefault = agentsCfg?.defaults?.provider ?? null;
-        const resolvedDefault =
-          (defaultBrand && list.some((p) => p.id === defaultBrand) ? defaultBrand : null) ??
-          (cfgDefault && list.some((p) => p.id === cfgDefault) ? cfgDefault : null) ??
-          list[0]?.id ??
-          null;
-
-        setProviders(list);
-        setDefaultProviderId(resolvedDefault);
-      } catch (e) {
-        console.warn("useProviders: failed to fetch providers config", e);
-      } finally {
-        if (!cancelled) setLoading(false);
+      // Primary path: derive providers from brands present in the
+      // aggregated model list. Falls back to the legacy config-key
+      // list when model_list is empty (e.g. no API keys configured).
+      let list: ProviderInfo[] = brandsFromModels(models);
+      if (list.length === 0) {
+        list = Object.entries(providersCfg)
+          .filter(([_, cfg]) => cfg.apiKey && cfg.apiKey.trim().length > 0)
+          .map(([id]) => ({
+            id,
+            displayName: PROVIDER_DISPLAY_NAMES[id] ?? id,
+            hasApiKey: true,
+          }));
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
+
+      // Default provider = brand of the configured default model,
+      // when discoverable. Fall back to agents.defaults.provider if
+      // the model isn't in the catalogue, then to the first entry.
+      const defaultModel = agentsCfg?.defaults?.model ?? null;
+      const defaultBrand =
+        (defaultModel && models.find((m) => m.id === defaultModel)?.brand) || null;
+      const cfgDefault = agentsCfg?.defaults?.provider ?? null;
+      const resolvedDefault =
+        (defaultBrand && list.some((p) => p.id === defaultBrand) ? defaultBrand : null) ??
+        (cfgDefault && list.some((p) => p.id === cfgDefault) ? cfgDefault : null) ??
+        list[0]?.id ??
+        null;
+
+      setProviders(list);
+      setDefaultProviderId(resolvedDefault);
+      setHasApiKeyConfigured(hasConfiguredProvider(providersCfg));
+    } catch (e) {
+      console.warn("useProviders: failed to fetch providers config", e);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  return { providers, defaultProviderId, loading };
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  return { providers, defaultProviderId, hasApiKeyConfigured, loading, refresh: load };
 }
