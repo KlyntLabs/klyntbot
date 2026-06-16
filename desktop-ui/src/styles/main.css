@@ -45,6 +45,11 @@
   grid-template-rows: minmax(0, 1fr);
 }
 
+.app.is-focus .main {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+}
+
 .app.reduced-transparency .main {
   background: var(--surface-messages);
 }

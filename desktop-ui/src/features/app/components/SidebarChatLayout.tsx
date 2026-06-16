@@ -8,6 +8,7 @@ import SquarePen from "lucide-react/dist/esm/icons/square-pen";
 import Timer from "lucide-react/dist/esm/icons/timer";
 import { memo } from "react";
 import type { ChatThread } from "@/features/chat/types";
+
 type SidebarChatLayoutProps = {
   onOpenSettings: () => void;
   onNewChat: () => void;

@@ -554,8 +554,3 @@
   height: 100%;
   overflow: auto;
 }
-
-.app.is-focus .main {
-  grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: minmax(0, 1fr);
-}

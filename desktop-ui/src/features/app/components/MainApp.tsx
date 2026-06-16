@@ -67,6 +67,7 @@ import { useComposerEditorState } from "@/features/composer/hooks/useComposerEdi
 import { useComposerMenuActions } from "@/features/composer/hooks/useComposerMenuActions";
 import { useComposerShortcuts } from "@/features/composer/hooks/useComposerShortcuts";
 import { Dashboard } from "@/features/dashboard";
+import { FocusPage } from "@/features/focus/components/FocusPage";
 import { useAutoExitEmptyDiff } from "@/features/git/hooks/useAutoExitEmptyDiff";
 import { useBranchSwitcherShortcut } from "@/features/git/hooks/useBranchSwitcherShortcut";
 import { usePullRequestComposer } from "@/features/git/hooks/usePullRequestComposer";
@@ -77,7 +78,6 @@ import { useModels } from "@/features/models/hooks/useModels";
 import { useProviders } from "@/features/models/hooks/useProviders";
 import { useErrorToasts } from "@/features/notifications/hooks/useErrorToasts";
 import { PluginsView } from "@/features/plugins/components/PluginsView";
-import { FocusPage } from "@/features/focus/components/FocusPage";
 import { useCustomPrompts } from "@/features/prompts/hooks/useCustomPrompts";
 import { useSkills } from "@/features/skills/hooks/useSkills";
 import { useTerminalController } from "@/features/terminal/hooks/useTerminalController";
