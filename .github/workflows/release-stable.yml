@@ -1,0 +1,102 @@
+name: Release Stable
+
+on:
+  push:
+    tags:
+      - 'stable-v*'
+      - 'v20*'
+
+permissions:
+  contents: write
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.compute.outputs.version }}
+      tag: ${{ steps.compute.outputs.tag }}
+      display: ${{ steps.compute.outputs.display }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Compute version
+        id: compute
+        run: |
+          TAG=${GITHUB_REF#refs/tags/}
+          python3 scripts/compute-release-version.py stable --tag "$TAG" >> "$GITHUB_OUTPUT"
+
+  create-release:
+    needs: version
+    runs-on: ubuntu-latest
+    outputs:
+      id: ${{ steps.create_release.outputs.id }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve release notes
+        id: notes
+        run: |
+          TAG="${{ needs.version.outputs.tag }}"
+          FILE="release-notes/${TAG}.md"
+          if [[ -f "$FILE" ]]; then
+            echo "body_path=$FILE" >> "$GITHUB_OUTPUT"
+          else
+            {
+              echo 'NOTES<<EOF'
+              git log --pretty=format:'- %s' $(git describe --tags --abbrev=0 --match 'stable-v*' 2>/dev/null || echo HEAD~50)..HEAD
+              echo ''
+              echo 'EOF'
+            } >> "$GITHUB_ENV"
+            echo "body=${{ env.NOTES }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.version.outputs.tag }}
+          name: ${{ needs.version.outputs.display }}
+          body_path: ${{ steps.notes.outputs.body_path }}
+          body: ${{ steps.notes.outputs.body }}
+          prerelease: false
+
+  build-artifacts:
+    needs: [version, create-release]
+    uses: ./.github/workflows/release-build-artifacts.yml
+    with:
+      version: ${{ needs.version.outputs.version }}
+      channel: stable
+    secrets: inherit
+
+  publish-manifest:
+    needs: [version, build-artifacts]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download release assets
+        uses: actions/download-artifact@v4
+        with:
+          pattern: release-assets-*
+          path: ./release-assets
+          merge-multiple: true
+
+      - name: Generate latest.json
+        run: |
+          python3 scripts/generate-updater-manifest.py \
+            --version ${{ needs.version.outputs.version }} \
+            --channel stable \
+            --assets ./release-assets \
+            --repo ${{ github.repository }} \
+            --tag ${{ needs.version.outputs.tag }} \
+            --output latest.json
+
+      - name: Upload manifest to release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload ${{ needs.version.outputs.tag }} latest.json --clobber
