@@ -38,7 +38,10 @@ pub struct FocusAudioManager {
 
 impl FocusAudioManager {
     pub fn new(app: &AppHandle) -> Self {
-        let app_data_dir = app.path().app_data_dir().unwrap_or_else(|_| PathBuf::from("."));
+        let app_data_dir = app
+            .path()
+            .app_data_dir()
+            .unwrap_or_else(|_| PathBuf::from("."));
         Self { app_data_dir }
     }
 

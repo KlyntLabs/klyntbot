@@ -73,7 +73,10 @@ impl From<KlyntbotError> for ApiError {
                 retry_after,
             }) => {
                 let message = if let Some(secs) = retry_after {
-                    format!("Provider {} is busy; please try again in {}s", provider, secs)
+                    format!(
+                        "Provider {} is busy; please try again in {}s",
+                        provider, secs
+                    )
                 } else {
                     format!("Provider {} is busy; please try again", provider)
                 };

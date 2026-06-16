@@ -536,7 +536,9 @@ pub async fn focus_defaults_set(update: FocusDefaultsUpdate) -> FocusDefaultsRes
     }
 
     let patch = serde_json::json!({ "focus": { "pomodoro": pomodoro_patch } });
-    state.config_update_section("productivity".into(), patch).await?;
+    state
+        .config_update_section("productivity".into(), patch)
+        .await?;
 
     let pomodoro = &state.config.read().await.productivity.focus.pomodoro;
     Ok(FocusDefaultsResponse {
@@ -562,7 +564,10 @@ fn parse_focus_cue(cue: &str) -> CommandResult<crate::focus_audio::FocusCue> {
     match cue {
         "work_complete" => Ok(crate::focus_audio::FocusCue::WorkComplete),
         "break_complete" => Ok(crate::focus_audio::FocusCue::BreakComplete),
-        _ => Err(ApiError::new("BAD_REQUEST", format!("invalid focus sound cue: {cue}"))),
+        _ => Err(ApiError::new(
+            "BAD_REQUEST",
+            format!("invalid focus sound cue: {cue}"),
+        )),
     }
 }
 
@@ -648,8 +653,12 @@ pub async fn focus_set_custom_sound(
     let data = std::fs::read(source_path)
         .map_err(|e| ApiError::new("INTERNAL", format!("failed to read source sound: {e}")))?;
 
-    rodio::Decoder::new(std::io::Cursor::new(data.clone()))
-        .map_err(|e| ApiError::new("BAD_REQUEST", format!("file is not a valid audio file: {e}")))?;
+    rodio::Decoder::new(std::io::Cursor::new(data.clone())).map_err(|e| {
+        ApiError::new(
+            "BAD_REQUEST",
+            format!("file is not a valid audio file: {e}"),
+        )
+    })?;
 
     let dir = app
         .path()
@@ -669,10 +678,7 @@ pub async fn focus_set_custom_sound(
 #[klynt_raw_command]
 #[tauri::command(rename_all = "snake_case")]
 #[specta::specta]
-pub async fn focus_reset_custom_sound(
-    app: tauri::AppHandle,
-    cue: String,
-) -> CommandResult<()> {
+pub async fn focus_reset_custom_sound(app: tauri::AppHandle, cue: String) -> CommandResult<()> {
     let cue = parse_focus_cue(&cue)?;
     let dir = app
         .path()

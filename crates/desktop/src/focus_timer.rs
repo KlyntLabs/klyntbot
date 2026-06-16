@@ -1020,7 +1020,13 @@ mod tests {
             tokio::time::sleep(next.saturating_duration_since(Instant::now())).await;
         }
         let elapsed = start.elapsed();
-        assert!(elapsed >= Duration::from_millis(950), "elapsed: {elapsed:?}");
-        assert!(elapsed < Duration::from_millis(1150), "elapsed: {elapsed:?}");
+        assert!(
+            elapsed >= Duration::from_millis(950),
+            "elapsed: {elapsed:?}"
+        );
+        assert!(
+            elapsed < Duration::from_millis(1150),
+            "elapsed: {elapsed:?}"
+        );
     }
 }
