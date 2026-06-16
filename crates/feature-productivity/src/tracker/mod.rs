@@ -305,6 +305,7 @@ impl ActivityTracker {
 }
 
 /// macOS system processes that should never be tracked as user activity.
+#[cfg(target_os = "macos")]
 const SYSTEM_EXCLUDED_APPS: &[&str] = &[
     "loginwindow",
     "ScreenSaverEngine",
@@ -313,6 +314,7 @@ const SYSTEM_EXCLUDED_APPS: &[&str] = &[
     "universalAccessAuthWarn",
 ];
 
+#[cfg(target_os = "macos")]
 fn is_excluded(info: &macos::WindowInfo, privacy: &PrivacyConfig) -> bool {
     SYSTEM_EXCLUDED_APPS
         .iter()
