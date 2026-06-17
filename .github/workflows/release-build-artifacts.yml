@@ -18,10 +18,10 @@ jobs:
       fail-fast: true
       matrix:
         include:
+          # MLX (via qwen3-tts-rs) does not support x86_64 macOS, so only arm64
+          # is built for alpha releases.
           - arch: aarch64
             target: aarch64-apple-darwin
-          - arch: x86_64
-            target: x86_64-apple-darwin
     steps:
       - uses: actions/checkout@v4
 
