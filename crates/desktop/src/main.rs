@@ -649,7 +649,7 @@ fn run_desktop_app() {
 
                 // Hide on close instead of quitting — keeps the tray alive
                 let mw = main_window.clone();
-                let app_handle = app.handle().clone();
+                let _app_handle = app.handle().clone();
                 main_window.on_window_event(move |event| {
                     if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                         api.prevent_close();
@@ -657,7 +657,7 @@ fn run_desktop_app() {
                         // Remove from Dock — pure tray app when main window is hidden
                         #[cfg(target_os = "macos")]
                         let _ =
-                            app_handle.set_activation_policy(tauri::ActivationPolicy::Accessory);
+                            _app_handle.set_activation_policy(tauri::ActivationPolicy::Accessory);
                     }
                 });
             }
