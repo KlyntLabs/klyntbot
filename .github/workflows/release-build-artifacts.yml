@@ -92,11 +92,34 @@ jobs:
       - name: Inject release version
         run: python3 scripts/inject-release-version.py ${{ inputs.version }}
 
+      - name: Prepare Tauri signing secrets
+        env:
+          KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          PASS: ${{ secrets.TAURI_KEY_PASSWORD }}
+        run: |
+          trim() {
+            printf '%s' "$1" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'
+          }
+          if [ -n "$KEY" ]; then
+            {
+              echo "TAURI_SIGNING_PRIVATE_KEY<<EOF"
+              trim "$KEY"
+              echo ""
+              echo "EOF"
+            } >> "$GITHUB_ENV"
+          fi
+          if [ -n "$PASS" ]; then
+            {
+              echo "TAURI_KEY_PASSWORD<<EOF"
+              trim "$PASS"
+              echo ""
+              echo "EOF"
+            } >> "$GITHUB_ENV"
+          fi
+
       - name: Build Tauri app
         working-directory: crates/desktop
         env:
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
@@ -162,11 +185,33 @@ jobs:
       - name: Inject release version
         run: python3 scripts/inject-release-version.py ${{ inputs.version }}
 
+      - name: Prepare Tauri signing secrets
+        env:
+          KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          PASS: ${{ secrets.TAURI_KEY_PASSWORD }}
+        run: |
+          trim() {
+            printf '%s' "$1" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'
+          }
+          if [ -n "$KEY" ]; then
+            {
+              echo "TAURI_SIGNING_PRIVATE_KEY<<EOF"
+              trim "$KEY"
+              echo ""
+              echo "EOF"
+            } >> "$GITHUB_ENV"
+          fi
+          if [ -n "$PASS" ]; then
+            {
+              echo "TAURI_KEY_PASSWORD<<EOF"
+              trim "$PASS"
+              echo ""
+              echo "EOF"
+            } >> "$GITHUB_ENV"
+          fi
+
       - name: Build Tauri app
         working-directory: crates/desktop
-        env:
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
         run: cargo tauri build --target x86_64-unknown-linux-gnu --bundles appimage
 
       - name: Upload artifacts
@@ -216,11 +261,34 @@ jobs:
       - name: Inject release version
         run: python3 scripts/inject-release-version.py ${{ inputs.version }}
 
+      - name: Prepare Tauri signing secrets
+        shell: bash
+        env:
+          KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          PASS: ${{ secrets.TAURI_KEY_PASSWORD }}
+        run: |
+          trim() {
+            printf '%s' "$1" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'
+          }
+          if [ -n "$KEY" ]; then
+            {
+              echo "TAURI_SIGNING_PRIVATE_KEY<<EOF"
+              trim "$KEY"
+              echo ""
+              echo "EOF"
+            } >> "$GITHUB_ENV"
+          fi
+          if [ -n "$PASS" ]; then
+            {
+              echo "TAURI_KEY_PASSWORD<<EOF"
+              trim "$PASS"
+              echo ""
+              echo "EOF"
+            } >> "$GITHUB_ENV"
+          fi
+
       - name: Build Tauri app
         working-directory: crates/desktop
-        env:
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
         run: cargo tauri build --target x86_64-pc-windows-msvc --bundles nsis
 
       - name: Upload artifacts
