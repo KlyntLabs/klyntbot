@@ -44,7 +44,6 @@ members = [
     "crates/klynt-protocol",
     "crates/klynt-pty",
     "crates/klynt-sandbox",
-    "crates/klynt-sandbox-helper",
     "crates/klynt-skill-loader",
     "crates/klyntbot-server",
     "crates/feature-learning",
@@ -128,8 +127,6 @@ core-foundation = "0.10"
 screencapturekit = "0.3.6"
 core-media-rs = "0.3"
 core-video-rs = "0.3"
-landlock = "0.4"
-nix = { version = "0.31", features = ["process"] }
 tauri = { version = "2.11", features = ["macos-private-api", "tray-icon", "image-png", "devtools"] }
 tauri-build = { version = "2.6", features = [] }
 tauri-plugin-global-shortcut = "2"
@@ -180,7 +177,6 @@ klynt-protocol = { path = "crates/klynt-protocol" }
 klynt-pty = { path = "crates/klynt-pty" }
 klynt-sandbox = { path = "crates/klynt-sandbox" }
 klynt-hooks = { path = "crates/klynt-hooks" }
-klynt-sandbox-helper = { path = "crates/klynt-sandbox-helper" }
 klynt-skill-loader = { path = "crates/klynt-skill-loader" }
 platform-macos = { path = "crates/platform-macos" }
 autotuner = { path = "crates/autotuner" }
