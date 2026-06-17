@@ -1,6 +1,6 @@
 use klynt_sandbox::policy::{FsConstraints, SandboxPolicy};
 use landlock::{
-    AccessFs, CompatLevel, Compatible, PathBeneath, PathFd, RestrictionStatus, Ruleset,
+    Access, AccessFs, CompatLevel, Compatible, PathBeneath, PathFd, RestrictionStatus, Ruleset,
     RulesetAttr, RulesetCreatedAttr, ABI,
 };
 

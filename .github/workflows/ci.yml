@@ -77,7 +77,8 @@ jobs:
   desktop-build-check:
     runs-on: macos-latest
     env:
-      CMAKEFLAGS: "-DCMAKE_SYSTEM_PROCESSOR=arm64"
+      CMAKEFLAGS: "-DCMAKE_SYSTEM_PROCESSOR=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0"
+      MACOSX_DEPLOYMENT_TARGET: "14.0"
     steps:
       - uses: actions/checkout@v4
 
