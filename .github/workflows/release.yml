@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   version:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     outputs:
       version: ${{ steps.compute.outputs.version }}
       tag: ${{ steps.compute.outputs.tag }}
@@ -32,7 +32,7 @@ jobs:
 
   create-release:
     needs: version
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     outputs:
       id: ${{ steps.create_release.outputs.id }}
     steps:
@@ -69,7 +69,7 @@ jobs:
 
   publish-manifest:
     needs: [version, build-artifacts]
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
 
