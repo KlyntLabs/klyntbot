@@ -2864,6 +2864,38 @@ async mcpUpdateServer(params: McpUpdateServerParams) : Promise<Result<McpConfigR
     else return { status: "error", error: e  as any };
 }
 },
+async getAppSettings() : Promise<Result<JsonValue, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_app_settings") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async updateAppSettings(settings: JsonValue) : Promise<Result<JsonValue, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("update_app_settings", { settings }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async appBuildType() : Promise<Result<string, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("app_build_type") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async isMobileRuntime() : Promise<Result<boolean, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("is_mobile_runtime") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async shortcutsGet() : Promise<Result<ShortcutsConfig, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("shortcuts_get") };
