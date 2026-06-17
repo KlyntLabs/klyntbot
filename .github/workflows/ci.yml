@@ -82,20 +82,34 @@ jobs:
       - name: Install macOS build tools
         run: brew install autoconf automake libtool
 
-      - name: Inject CMake deployment target for MLX
+      - name: Inject CMake deployment target and arm64 system processor for MLX
         run: |
-          REAL_CMAKE=$(which cmake)
           mkdir -p /tmp/cmake-wrapper
-          printf '%s\n' '#!/bin/bash' \
-            'for arg in "$@"; do' \
-            '  case "$arg" in' \
-            '    --build|--install|-E|--version|--help|--system-information)' \
-            '      exec "'"$REAL_CMAKE"'" "$@"' \
-            '      ;;' \
-            '  esac' \
-            'done' \
-            'exec "'"$REAL_CMAKE"'" "$@" -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0' \
-            > /tmp/cmake-wrapper/cmake
+          cat > /tmp/cmake-wrapper/cmake <<'EOF'
+          #!/bin/bash
+          REAL_CMAKE=$(PATH="${PATH//\/tmp\/cmake-wrapper:/}" which cmake)
+          for arg in "$@"; do
+            case "$arg" in
+              --build|--install|-E|--version|--help|--system-information)
+                exec "$REAL_CMAKE" "$@"
+                ;;
+            esac
+          done
+          EXTRA=("-DCMAKE_OSX_DEPLOYMENT_TARGET=14.0")
+          FORCE_ARM64=false
+          if [ "$(uname -s)" = "Darwin" ]; then
+            if [ -n "$TARGET" ] && [[ "$TARGET" == aarch64* ]]; then
+              FORCE_ARM64=true
+            elif [ -z "$TARGET" ] && [ "$(uname -m)" = "arm64" ]; then
+              FORCE_ARM64=true
+            fi
+          fi
+          if [ "$FORCE_ARM64" = true ]; then
+            EXTRA+=("-DCMAKE_SYSTEM_NAME=Darwin")
+            EXTRA+=("-DCMAKE_SYSTEM_PROCESSOR=arm64")
+          fi
+          exec "$REAL_CMAKE" "$@" "${EXTRA[@]}"
+          EOF
           chmod +x /tmp/cmake-wrapper/cmake
           echo "/tmp/cmake-wrapper" >> "$GITHUB_PATH"
 
