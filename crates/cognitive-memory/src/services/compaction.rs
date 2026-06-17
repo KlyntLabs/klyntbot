@@ -258,6 +258,12 @@ mod tests {
         }
     }
 
+    fn date_days_ago(days: i64) -> String {
+        (jiff::Timestamp::now() - jiff::SignedDuration::from_secs(days * 86400))
+            .strftime("%Y-%m-%d")
+            .to_string()
+    }
+
     fn test_episodic(id: &str, occurred_at: &str, access_count: i64) -> EpisodicMemory {
         EpisodicMemory {
             id: id.into(),
@@ -312,11 +318,11 @@ mod tests {
         let episodic_repo = EpisodicMemoryRepo::new(pool);
 
         // Old memory with low access
-        let old = test_episodic("e1", "2025-01-01", 0);
+        let old = test_episodic("e1", &date_days_ago(180), 0);
         episodic_repo.insert(&old).await.unwrap();
 
         // Recent memory
-        let recent = test_episodic("e2", "2026-03-05", 0);
+        let recent = test_episodic("e2", &date_days_ago(30), 0);
         episodic_repo.insert(&recent).await.unwrap();
 
         let result = run_compaction_with_params(&fact_repo, &episodic_repo, None, 90, 90, 2)
