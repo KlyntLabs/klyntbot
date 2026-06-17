@@ -39,6 +39,11 @@ jobs:
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Build klynt-sandbox-helper for tests
+        run: |
+          cargo build -p klynt-sandbox-helper
+          echo "$PWD/target/debug" >> "$GITHUB_PATH"
+
       - name: cargo fmt
         run: cargo fmt --all --check
 
