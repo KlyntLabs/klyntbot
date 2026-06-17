@@ -1,7 +1,6 @@
 // crates/klynt-sandbox/tests/linux_smoke.rs
 #![cfg(target_os = "linux")]
 use klynt_sandbox::{LinuxSandboxRunner, SandboxPolicy, SandboxRunner};
-use std::path::PathBuf;
 use std::time::Duration;
 
 #[tokio::test]

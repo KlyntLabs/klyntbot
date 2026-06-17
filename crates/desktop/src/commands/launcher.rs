@@ -145,16 +145,16 @@ pub async fn launcher_open_app(path: String) -> CommandResult<()> {
             .arg(&path)
             .spawn()
             .map_err(|e| ApiError::new("OPEN_APP_ERROR", e.to_string()))?;
+        Ok(())
     }
     #[cfg(not(target_os = "macos"))]
     {
         let _ = path;
-        return Err(ApiError::new(
+        Err(ApiError::new(
             "UNSUPPORTED",
             "App launching only supported on macOS",
-        ));
+        ))
     }
-    Ok(())
 }
 
 #[cfg(debug_assertions)]
