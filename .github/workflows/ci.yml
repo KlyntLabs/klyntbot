@@ -76,9 +76,6 @@ jobs:
 
   desktop-build-check:
     runs-on: macos-latest
-    env:
-      CMAKEFLAGS: "-DCMAKE_SYSTEM_PROCESSOR=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0"
-      MACOSX_DEPLOYMENT_TARGET: "14.0"
     steps:
       - uses: actions/checkout@v4
 
@@ -118,3 +115,7 @@ jobs:
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+          MACOSX_DEPLOYMENT_TARGET: "14.0"
+          CMAKE_OSX_DEPLOYMENT_TARGET: "14.0"
+          CFLAGS: "-mmacosx-version-min=14.0"
+          CXXFLAGS: "-mmacosx-version-min=14.0"

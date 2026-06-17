@@ -228,6 +228,7 @@ pub fn read_bundle_id(_app_path: &Path) -> Option<String> {
 }
 
 #[cfg(test)]
+#[cfg(target_os = "macos")]
 mod bundle_id_tests {
     use super::*;
     use std::fs;
