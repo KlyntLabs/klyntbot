@@ -9,8 +9,6 @@ from pathlib import Path
 PLATFORM_MAP = {
     "_aarch64.app.tar.gz": "darwin-aarch64",
     "_x86_64.app.tar.gz": "darwin-x86_64",
-    "_amd64.AppImage": "linux-x86_64",
-    "_x64-setup.exe": "windows-x86_64",
 }
 
 
