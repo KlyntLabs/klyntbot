@@ -2,7 +2,7 @@ name: Release Alpha
 
 on:
   push:
-    branches: [main]
+    branches: [dev]
 
 permissions:
   contents: write

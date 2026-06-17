@@ -11,20 +11,44 @@ on:
         type: string
 
 jobs:
-  build-macos-aarch64:
+  build-macos:
+    name: Build (${{ matrix.arch }} macOS)
     runs-on: macos-latest
-    env:
-      CMAKEFLAGS: "-DCMAKE_SYSTEM_PROCESSOR=arm64"
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - arch: aarch64
+            target: aarch64-apple-darwin
+          - arch: x86_64
+            target: x86_64-apple-darwin
     steps:
       - uses: actions/checkout@v4
 
       - name: Install macOS build tools
         run: brew install autoconf automake libtool
 
+      - name: Inject CMake deployment target for MLX
+        run: |
+          REAL_CMAKE=$(which cmake)
+          mkdir -p /tmp/cmake-wrapper
+          printf '%s\n' '#!/bin/bash' \
+            'for arg in "$@"; do' \
+            '  case "$arg" in' \
+            '    --build|--install|-E|--version|--help|--system-information)' \
+            '      exec "'"$REAL_CMAKE"'" "$@"' \
+            '      ;;' \
+            '  esac' \
+            'done' \
+            'exec "'"$REAL_CMAKE"'" "$@" -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0' \
+            > /tmp/cmake-wrapper/cmake
+          chmod +x /tmp/cmake-wrapper/cmake
+          echo "/tmp/cmake-wrapper" >> "$GITHUB_PATH"
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-apple-darwin
+          targets: ${{ matrix.target }}
 
       - name: Rust cache
         uses: Swatinem/rust-cache@v2
@@ -55,6 +79,7 @@ jobs:
         run: python3 scripts/inject-release-version.py ${{ inputs.version }}
 
       - name: Build Tauri app
+        working-directory: crates/desktop
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
@@ -64,17 +89,20 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: cargo tauri build --target aarch64-apple-darwin
+          MACOSX_DEPLOYMENT_TARGET: "14.0"
+          CFLAGS: "-mmacosx-version-min=14.0"
+          CXXFLAGS: "-mmacosx-version-min=14.0"
+        run: cargo tauri build --target ${{ matrix.target }}
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: release-assets-macos-aarch64
+          name: release-assets-macos-${{ matrix.arch }}
           path: |
-            target/aarch64-apple-darwin/release/bundle/macos/*.dmg
-            target/aarch64-apple-darwin/release/bundle/macos/*.dmg.sig
-            target/aarch64-apple-darwin/release/bundle/macos/*.tar.gz
-            target/aarch64-apple-darwin/release/bundle/macos/*.tar.gz.sig
+            target/${{ matrix.target }}/release/bundle/macos/*.dmg
+            target/${{ matrix.target }}/release/bundle/macos/*.dmg.sig
+            target/${{ matrix.target }}/release/bundle/macos/*.tar.gz
+            target/${{ matrix.target }}/release/bundle/macos/*.tar.gz.sig
           if-no-files-found: error
 
   build-linux-x86_64:
@@ -85,7 +113,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libasound2-dev
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev libglib2.0-dev patchelf libasound2-dev
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -121,10 +149,11 @@ jobs:
         run: python3 scripts/inject-release-version.py ${{ inputs.version }}
 
       - name: Build Tauri app
+        working-directory: crates/desktop
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
-        run: cargo tauri build --target x86_64-unknown-linux-gnu
+        run: cargo tauri build --target x86_64-unknown-linux-gnu --bundles appimage
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -174,10 +203,11 @@ jobs:
         run: python3 scripts/inject-release-version.py ${{ inputs.version }}
 
       - name: Build Tauri app
+        working-directory: crates/desktop
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
-        run: cargo tauri build --target x86_64-pc-windows-msvc
+        run: cargo tauri build --target x86_64-pc-windows-msvc --bundles nsis
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4

@@ -7,8 +7,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 PLATFORM_MAP = {
-    "_aarch64.dmg": "darwin-aarch64",
-    "_x86_64.dmg": "darwin-x86_64",
+    "_aarch64.app.tar.gz": "darwin-aarch64",
+    "_x86_64.app.tar.gz": "darwin-x86_64",
     "_amd64.AppImage": "linux-x86_64",
     "_x64-setup.exe": "windows-x86_64",
 }
@@ -50,8 +50,10 @@ def main() -> int:
             "signature": signature_for(asset),
             "url": url,
         }
-        if suffix == "_aarch64.dmg":
-            entry["dmg_url"] = url
+        dmg_suffix = suffix.replace(".app.tar.gz", ".dmg")
+        dmg_asset = find_asset(args.assets, dmg_suffix)
+        if dmg_asset is not None:
+            entry["dmg_url"] = f"{base_url}/{dmg_asset.name}"
         platforms[platform] = entry
 
     manifest = {
