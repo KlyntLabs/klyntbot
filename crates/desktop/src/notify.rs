@@ -2,8 +2,8 @@
 //!
 //! Routes OS notifications through `tauri-plugin-notification` so that
 //! macOS attributes them to the Klynt app and displays the correct app icon.
-//! When the Tauri notification channel fails, we fall back to platform-specific
-//! helpers (e.g. `notify-send` on Linux).
+//! When the Tauri notification channel fails, there is no fallback on this
+//! platform.
 
 use common::NotificationSender;
 use common::Result;
@@ -109,9 +109,8 @@ mod tests {
 
     #[test]
     fn fallback_args_match_content() {
-        // The Linux fallback simply passes the title and body as positional
-        // arguments to `notify-send`. This test guards the contract used by
-        // the platform fallback so that future i18n changes do not drop content.
+        // This test guards the contract used by the platform fallback so that
+        // future i18n changes do not drop content.
         let title = FOCUS_WORK_COMPLETE_TITLE;
         let body = focus_work_complete_body(25);
         assert!(title.contains("Focus"));

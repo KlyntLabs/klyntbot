@@ -51,8 +51,8 @@ pub struct BackgroundCommandHandle {
 ///   - Set Stdio::null() for stdin (unless interactive — not in 2.3a)
 ///   - Added env vars (GIT_EDITOR=true, PAGER=cat, TERM=dumb)
 ///
-/// This function adds the Unix-specific pre_exec (setpgid + PR_SET_PDEATHSIG)
-/// and captures pgid after spawn.
+/// This function adds the Unix-specific pre_exec (setpgid) and captures pgid
+/// after spawn.
 pub fn spawn_with_pgrp(
     mut cmd: tokio::process::Command,
 ) -> Result<BackgroundCommandHandle, PtyError> {
