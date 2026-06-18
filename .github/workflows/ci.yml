@@ -134,7 +134,7 @@ jobs:
           tool: cargo-binstall
 
       - name: Install cargo-tauri
-        run: cargo binstall tauri-cli -y
+        run: cargo binstall tauri-cli -y --force
 
       - name: Install dependencies
         working-directory: desktop-ui
