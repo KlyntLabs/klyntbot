@@ -154,7 +154,7 @@ env:
 
 jobs:
   rust-quality:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -176,7 +176,7 @@ jobs:
         run: cargo test --workspace --all-features
 
   desktop-ui-quality:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -561,7 +561,7 @@ permissions:
 
 jobs:
   version:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     outputs:
       version: ${{ steps.compute.outputs.version }}
       tag: ${{ steps.compute.outputs.tag }}
@@ -584,7 +584,7 @@ jobs:
 
   create-release:
     needs: version
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     outputs:
       upload_url: ${{ steps.create_release.outputs.upload_url }}
     steps:
@@ -620,7 +620,7 @@ jobs:
 
   publish-manifest:
     needs: [version, build-artifacts]
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -689,7 +689,7 @@ permissions:
 
 jobs:
   version:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     outputs:
       version: ${{ steps.compute.outputs.version }}
       tag: ${{ steps.compute.outputs.tag }}
@@ -707,7 +707,7 @@ jobs:
 
   create-release:
     needs: version
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     outputs:
       upload_url: ${{ steps.create_release.outputs.upload_url }}
     steps:
@@ -751,7 +751,7 @@ jobs:
 
   publish-manifest:
     needs: [version, build-artifacts]
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -1138,7 +1138,6 @@ Add a file at `release-notes/<tag>.md` before pushing the stable tag. If the fil
 
 - `TAURI_SIGNING_PRIVATE_KEY` / `TAURI_KEY_PASSWORD`
 - `APPLE_CERTIFICATE` / `APPLE_CERTIFICATE_PASSWORD` / `APPLE_SIGNING_IDENTITY` / `APPLE_ID` / `APPLE_PASSWORD` / `APPLE_TEAM_ID`
-- `WINDOWS_CODE_SIGNING_CERTIFICATE` / `WINDOWS_CODE_SIGNING_CERTIFICATE_PASSWORD` (optional)
 - `GITHUB_TOKEN` (provided automatically)
 ```
 
