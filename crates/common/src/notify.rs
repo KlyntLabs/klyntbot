@@ -118,9 +118,7 @@ mod tests {
     fn injection_do_shell_script() {
         let input = r#"" & do shell script "whoami" & ""#;
         let sanitized = sanitize_for_applescript(input);
-        assert!(
-            !sanitized.contains('\n') || sanitized.replace("\\\"", "").find('"').is_none()
-        );
+        assert!(!sanitized.contains('\n') || sanitized.replace("\\\"", "").find('"').is_none());
         assert!(sanitized.contains("\\\""));
     }
 
@@ -141,7 +139,10 @@ mod tests {
     #[test]
     fn critical_applescript_includes_sound_and_urgent_prefix() {
         let script = build_critical_script("My Title", "My Body");
-        assert!(script.contains("sound name"), "script must contain sound name clause: {script}");
+        assert!(
+            script.contains("sound name"),
+            "script must contain sound name clause: {script}"
+        );
         assert!(
             script.contains("URGENT · "),
             "script must contain URGENT · prefix: {script}"
@@ -155,7 +156,10 @@ mod tests {
             script.contains("title\\\"injection"),
             "double-quote in title must be escaped: {script}"
         );
-        assert!(!script.contains('\n'), "raw newline must be stripped: {script}");
+        assert!(
+            !script.contains('\n'),
+            "raw newline must be stripped: {script}"
+        );
     }
 
     #[test]
@@ -164,6 +168,9 @@ mod tests {
         let sanitized = sanitize_for_applescript(input);
         assert!(!sanitized.contains('\n'));
         let clean = sanitized.replace("\\\"", "");
-        assert!(!clean.contains('"'), "unescaped double-quote found: {sanitized}");
+        assert!(
+            !clean.contains('"'),
+            "unescaped double-quote found: {sanitized}"
+        );
     }
 }
