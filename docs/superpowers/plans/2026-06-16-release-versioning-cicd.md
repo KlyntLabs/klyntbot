@@ -517,92 +517,6 @@ jobs:
           asset_name: Klynt_${{ inputs.version }}_aarch64.dmg
           asset_content_type: application/octet-stream
 
-  build-linux-x86_64:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: x86_64-unknown-linux-gnu
-
-      - name: Rust cache
-        uses: Swatinem/rust-cache@v2
-
-      - name: Install Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-
-      - name: Install dependencies
-        working-directory: desktop-ui
-        run: bun install --frozen-lockfile
-
-      - name: Inject release version
-        run: python3 scripts/inject-release-version.py ${{ inputs.version }}
-
-      - name: Build Tauri app
-        env:
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
-        run: cargo tauri build --target x86_64-unknown-linux-gnu
-
-      - name: Upload AppImage
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ inputs.upload_url }}
-          asset_path: ./target/x86_64-unknown-linux-gnu/release/bundle/appimage/*.AppImage
-          asset_name: Klynt_${{ inputs.version }}_amd64.AppImage
-          asset_content_type: application/octet-stream
-
-  build-windows-x86_64:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: x86_64-pc-windows-msvc
-
-      - name: Rust cache
-        uses: Swatinem/rust-cache@v2
-
-      - name: Install Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-
-      - name: Install dependencies
-        working-directory: desktop-ui
-        run: bun install --frozen-lockfile
-
-      - name: Inject release version
-        run: python3 scripts/inject-release-version.py ${{ inputs.version }}
-
-      - name: Build Tauri app
-        env:
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
-        run: cargo tauri build --target x86_64-pc-windows-msvc
-
-      - name: Upload NSIS installer
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ inputs.upload_url }}
-          asset_path: ./target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
-          asset_name: Klynt_${{ inputs.version }}_x64-setup.exe
-          asset_content_type: application/octet-stream
 ```
 
 > **Note:** `actions/upload-release-asset` is deprecated. Replace with `gh release upload` or `softprops/action-gh-release` before production use.
@@ -905,8 +819,6 @@ from pathlib import Path
 PLATFORM_MAP = {
     "aarch64.dmg": "darwin-aarch64",
     "x86_64.dmg": "darwin-x86_64",
-    "amd64.AppImage": "linux-x86_64",
-    "x64-setup.exe": "windows-x86_64",
 }
 
 
