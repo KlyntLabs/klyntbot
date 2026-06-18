@@ -1,4 +1,4 @@
-type PlatformKind = "mac" | "windows" | "linux" | "unknown";
+type PlatformKind = "mac" | "unknown";
 
 function platformKind(): PlatformKind {
   if (typeof navigator === "undefined") {
@@ -8,25 +8,11 @@ function platformKind(): PlatformKind {
     (navigator as Navigator & { userAgentData?: { platform?: string } }).userAgentData?.platform ??
     navigator.platform ??
     "";
-  const normalized = platform.toLowerCase();
-  if (normalized.includes("mac")) {
-    return "mac";
-  }
-  if (normalized.includes("win")) {
-    return "windows";
-  }
-  if (normalized.includes("linux")) {
-    return "linux";
-  }
-  return "unknown";
+  return platform.toLowerCase().includes("mac") ? "mac" : "unknown";
 }
 
 export function isMacPlatform(): boolean {
   return platformKind() === "mac";
-}
-
-export function isWindowsPlatform(): boolean {
-  return platformKind() === "windows";
 }
 
 export function isMobilePlatform(): boolean {
@@ -64,66 +50,28 @@ export function isMobilePlatform(): boolean {
 }
 
 export function fileManagerName(): string {
-  const platform = platformKind();
-  if (platform === "mac") {
-    return "Finder";
-  }
-  if (platform === "windows") {
-    return "Explorer";
-  }
-  return "File Manager";
+  return "Finder";
 }
 
 export function revealInFileManagerLabel(): string {
-  const platform = platformKind();
-  if (platform === "mac") {
-    return "Reveal in Finder";
-  }
-  if (platform === "windows") {
-    return "Show in Explorer";
-  }
-  return "Reveal in File Manager";
+  return "Reveal in Finder";
 }
 
 export function openInFileManagerLabel(): string {
-  return `Open in ${fileManagerName()}`;
-}
-
-function looksLikeWindowsAbsolutePath(value: string): boolean {
-  if (/^[A-Za-z]:[\\/]/.test(value)) {
-    return true;
-  }
-  if (value.startsWith("\\\\") || value.startsWith("//")) {
-    return true;
-  }
-  if (value.startsWith("\\\\?\\")) {
-    return true;
-  }
-  return false;
+  return "Open in Finder";
 }
 
 export function isAbsolutePath(value: string): boolean {
   const trimmed = value.trim();
-  if (!trimmed) {
-    return false;
-  }
-  if (trimmed.startsWith("/") || trimmed.startsWith("~/") || trimmed.startsWith("~\\")) {
-    return true;
-  }
-  return looksLikeWindowsAbsolutePath(trimmed);
+  return Boolean(trimmed) && (trimmed.startsWith("/") || trimmed.startsWith("~/"));
 }
 
 function stripTrailingSeparators(value: string) {
-  return value.replace(/[\\/]+$/, "");
+  return value.replace(/[/]+$/, "");
 }
 
 function stripLeadingSeparators(value: string) {
-  return value.replace(/^[\\/]+/, "");
-}
-
-function looksLikeWindowsPathPrefix(value: string): boolean {
-  const trimmed = value.trim();
-  return looksLikeWindowsAbsolutePath(trimmed) || trimmed.includes("\\");
+  return value.replace(/^[/]+/, "");
 }
 
 export function joinWorkspacePath(base: string, path: string): string {
@@ -136,13 +84,7 @@ export function joinWorkspacePath(base: string, path: string): string {
     return trimmedPath;
   }
 
-  const isWindows = looksLikeWindowsPathPrefix(trimmedBase);
   const baseWithoutTrailing = stripTrailingSeparators(trimmedBase);
   const pathWithoutLeading = stripLeadingSeparators(trimmedPath);
-  if (isWindows) {
-    const normalizedRelative = pathWithoutLeading.replace(/\//g, "\\");
-    return `${baseWithoutTrailing}\\${normalizedRelative}`;
-  }
-  const normalizedRelative = pathWithoutLeading.replace(/\\/g, "/");
-  return `${baseWithoutTrailing}/${normalizedRelative}`;
+  return `${baseWithoutTrailing}/${pathWithoutLeading}`;
 }

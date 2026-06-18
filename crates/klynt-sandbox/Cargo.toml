@@ -3,7 +3,7 @@ name = "klynt-sandbox"
 version = "0.0.1"
 edition = "2021"
 license = "Apache-2.0"
-description = "Klynt sandbox — Seatbelt (.sbpl) for macOS, Landlock+bwrap for Linux. Adapted from codex-rs/sandboxing/."
+description = "Klynt sandbox — Seatbelt (.sbpl) for macOS."
 
 [dependencies]
 common = { path = "../common" }
@@ -12,14 +12,6 @@ thiserror = { workspace = true }
 sha2 = { workspace = true }
 hex.workspace = true
 async-trait = { workspace = true }
-
-[target.'cfg(target_os = "macos")'.dependencies]
-tokio = { workspace = true, features = ["process", "rt", "macros", "time"] }
-
-[target.'cfg(target_os = "linux")'.dependencies]
-base64 = { workspace = true }
-serde_json = { workspace = true }
-which = { workspace = true }
 tokio = { workspace = true, features = ["process", "rt", "macros", "time"] }
 
 [dev-dependencies]

@@ -2,8 +2,8 @@
 //!
 //! Routes OS notifications through `tauri-plugin-notification` so that
 //! macOS attributes them to the Klynt app and displays the correct app icon.
-//! When the Tauri notification channel fails, we fall back to platform-specific
-//! helpers (e.g. `notify-send` on Linux).
+//! When the Tauri notification channel fails, there is no fallback on this
+//! platform.
 
 use common::NotificationSender;
 use common::Result;
@@ -51,9 +51,8 @@ impl TauriNotificationSender {
 
     /// Send a notification, falling back to a platform helper if Tauri fails.
     ///
-    /// The fallback is best-effort: on Linux it spawns `notify-send` with the
-    /// supplied title and body. Other platforms currently have no explicit
-    /// fallback because the Tauri plugin covers macOS/Windows natively.
+    /// The fallback is best-effort: currently no explicit fallback is
+    /// implemented because the Tauri plugin covers macOS natively.
     pub fn send_sync_with_fallback(&self, title: &str, body: &str) -> Result<()> {
         match self.send_sync(title, body) {
             Ok(()) => Ok(()),
@@ -83,16 +82,6 @@ impl TauriNotificationSender {
     }
 }
 
-#[cfg(target_os = "linux")]
-fn platform_fallback_notify(title: &str, body: &str) -> Result<()> {
-    std::process::Command::new("notify-send")
-        .arg(title)
-        .arg(body)
-        .status()?;
-    Ok(())
-}
-
-#[cfg(not(target_os = "linux"))]
 fn platform_fallback_notify(_title: &str, _body: &str) -> Result<()> {
     Err(common::KlyntbotError::Io(std::io::Error::other(
         "no platform notification fallback available",
@@ -120,9 +109,8 @@ mod tests {
 
     #[test]
     fn fallback_args_match_content() {
-        // The Linux fallback simply passes the title and body as positional
-        // arguments to `notify-send`. This test guards the contract used by
-        // the platform fallback so that future i18n changes do not drop content.
+        // This test guards the contract used by the platform fallback so that
+        // future i18n changes do not drop content.
         let title = FOCUS_WORK_COMPLETE_TITLE;
         let body = focus_work_complete_body(25);
         assert!(title.contains("Focus"));

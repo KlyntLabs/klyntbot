@@ -12,14 +12,9 @@ env:
 
 jobs:
   rust-quality:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev libglib2.0-dev libasound2-dev
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -39,11 +34,6 @@ jobs:
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build klynt-sandbox-helper for tests
-        run: |
-          cargo build -p klynt-sandbox-helper
-          echo "$PWD/target/debug" >> "$GITHUB_PATH"
-
       - name: cargo fmt
         run: cargo fmt --all --check
 
@@ -54,7 +44,7 @@ jobs:
         run: cargo nextest run --workspace --all-features
 
   desktop-ui-quality:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
 

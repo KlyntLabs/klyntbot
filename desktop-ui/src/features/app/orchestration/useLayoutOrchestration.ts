@@ -1,5 +1,4 @@
 import type { AppView } from "@app/constants/appViews";
-import { isWindowsPlatform } from "@utils/platformPaths";
 import { type CSSProperties, useMemo } from "react";
 import type { AppSettings } from "@/types";
 
@@ -40,7 +39,6 @@ export function useAppShellOrchestration({
   debugPanelHeight,
   appSettings,
 }: UseAppShellOrchestrationOptions) {
-  const isWindows = isWindowsPlatform();
   const showGitDetail = Boolean(selectedDiffPath) && centerMode === "diff";
   const isThreadOpen = Boolean(activeThreadId && showComposer);
 
@@ -48,7 +46,7 @@ export function useAppShellOrchestration({
     shouldReduceTransparency ? " reduced-transparency" : ""
   }${sidebarCollapsed ? " sidebar-collapsed" : ""}${
     rightPanelCollapsed ? " right-panel-collapsed" : ""
-  }${appView === "calendar" ? " is-calendar" : ""}${isWindows ? " is-windows" : ""}`;
+  }${appView === "calendar" ? " is-calendar" : ""}`;
 
   const appStyle = useMemo<CSSProperties>(
     () =>
@@ -62,28 +60,11 @@ export function useAppShellOrchestration({
         "--ui-font-family": appSettings.uiFontFamily,
         "--code-font-family": appSettings.codeFontFamily,
         "--code-font-size": `${appSettings.codeFontSize}px`,
-        "--sidebar-top-padding": isWindows ? "10px" : "36px",
-        "--right-panel-top-padding": isWindows
-          ? "calc(var(--main-topbar-height, 44px) + 6px)"
-          : "12px",
-        "--home-scroll-offset": isWindows ? "var(--main-topbar-height, 44px)" : "0px",
-        "--window-caption-width": isWindows ? "138px" : "0px",
-        "--window-caption-gap": isWindows ? "10px" : "0px",
-        ...(isWindows
-          ? {
-              "--titlebar-height": "8px",
-              "--titlebar-drag-strip-z-index": "5",
-              "--side-panel-drag-strip-height": "56px",
-              "--window-drag-hit-height": "44px",
-              "--window-drag-strip-pointer-events": "none",
-              "--titlebar-inset-left": "0px",
-              "--titlebar-collapsed-left-extra": "0px",
-              "--titlebar-toggle-size": "32px",
-              "--titlebar-toggle-side-gap": "14px",
-              "--titlebar-toggle-title-offset": "0px",
-              "--titlebar-toggle-offset": "0px",
-            }
-          : {}),
+        "--sidebar-top-padding": "36px",
+        "--right-panel-top-padding": "12px",
+        "--home-scroll-offset": "0px",
+        "--window-caption-width": "0px",
+        "--window-caption-gap": "0px",
       }) as CSSProperties,
     [
       appSettings.codeFontFamily,
@@ -91,7 +72,6 @@ export function useAppShellOrchestration({
       appSettings.uiFontFamily,
       chatDiffSplitPositionPercent,
       debugPanelHeight,
-      isWindows,
       planPanelHeight,
       rightPanelCollapsed,
       rightPanelWidth,

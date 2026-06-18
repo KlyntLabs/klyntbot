@@ -1,0 +1,13 @@
+# Default nextest profile used by CI and local verification.
+# Excludes long-running soak property tests; those should be run explicitly
+# with `cargo nextest run --profile soak`.
+[profile.default]
+default-filter = 'not test(/soaked/)'
+retries = { count = 1, backoff = "fixed", delay = "1s" }
+slow-timeout = { period = "120s", terminate-after = 2 }
+
+[profile.soak]
+# Runs the soak property tests. Override slow-timeout because these are
+# intentionally long.
+default-filter = 'test(/soaked/)'
+slow-timeout = { period = "600s", terminate-after = 3 }

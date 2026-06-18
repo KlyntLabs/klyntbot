@@ -3,7 +3,6 @@ import {
   COMPOSER_PRESET_LABELS,
   DICTATION_MODELS,
 } from "@settings/components/settingsViewConstants";
-import { isMacPlatform, isWindowsPlatform } from "@utils/platformPaths";
 import { useMemo } from "react";
 import type {
   AppSettings,
@@ -102,9 +101,9 @@ export function useSettingsViewOrchestration({
     [projects],
   );
 
-  const optionKeyLabel = isMacPlatform() ? "Option" : "Alt";
-  const metaKeyLabel = isMacPlatform() ? "Command" : isWindowsPlatform() ? "Windows" : "Meta";
-  const followUpShortcutLabel = isMacPlatform() ? "Shift+Cmd+Enter" : "Shift+Ctrl+Enter";
+  const optionKeyLabel = "Option";
+  const metaKeyLabel = "Command";
+  const followUpShortcutLabel = "Shift+Cmd+Enter";
 
   const selectedDictationModel = useMemo(() => {
     return (

@@ -1,65 +1,18 @@
-#[cfg(unix)]
 use std::ffi::OsString;
-
-#[cfg(unix)]
 use std::os::unix::ffi::OsStrExt;
 
-/// Pre-main hardening: disables core dumps, blocks ptrace attach (Linux/macOS),
-/// and removes dangerous env vars (LD_*, DYLD_*, MallocStackLogging*).
+/// Pre-main hardening: disables core dumps, blocks ptrace attach on macOS,
+/// and removes dangerous env vars (DYLD_*, MallocStackLogging*).
 ///
 /// Call from a `#[ctor::ctor]` or as the very first line of `fn main()`.
 pub fn pre_main_hardening() {
-    #[cfg(any(target_os = "linux", target_os = "android"))]
-    pre_main_hardening_linux();
-
-    #[cfg(target_os = "macos")]
     pre_main_hardening_macos();
-
-    #[cfg(any(target_os = "freebsd", target_os = "openbsd"))]
-    pre_main_hardening_bsd();
-
-    #[cfg(windows)]
-    pre_main_hardening_windows();
 }
 
-#[cfg(any(target_os = "linux", target_os = "android"))]
-const PRCTL_FAILED_EXIT_CODE: i32 = 5;
-
-#[cfg(target_os = "macos")]
 const PTRACE_DENY_ATTACH_FAILED_EXIT_CODE: i32 = 6;
-
-#[cfg(any(
-    target_os = "linux",
-    target_os = "android",
-    target_os = "macos",
-    target_os = "freebsd",
-    target_os = "netbsd",
-    target_os = "openbsd"
-))]
 const SET_RLIMIT_CORE_FAILED_EXIT_CODE: i32 = 7;
 
-#[cfg(any(target_os = "linux", target_os = "android"))]
-pub(crate) fn pre_main_hardening_linux() {
-    let ret_code = unsafe { libc::prctl(libc::PR_SET_DUMPABLE, 0, 0, 0, 0) };
-    if ret_code != 0 {
-        eprintln!(
-            "ERROR: prctl(PR_SET_DUMPABLE, 0) failed: {}",
-            std::io::Error::last_os_error()
-        );
-        std::process::exit(PRCTL_FAILED_EXIT_CODE);
-    }
-    set_core_file_size_limit_to_zero();
-    remove_env_vars_with_prefix(b"LD_");
-}
-
-#[cfg(any(target_os = "freebsd", target_os = "openbsd"))]
-pub(crate) fn pre_main_hardening_bsd() {
-    set_core_file_size_limit_to_zero();
-    remove_env_vars_with_prefix(b"LD_");
-}
-
-#[cfg(target_os = "macos")]
-pub(crate) fn pre_main_hardening_macos() {
+fn pre_main_hardening_macos() {
     let ret_code = unsafe { libc::ptrace(libc::PT_DENY_ATTACH, 0, std::ptr::null_mut(), 0) };
     if ret_code == -1 {
         eprintln!(
@@ -74,7 +27,6 @@ pub(crate) fn pre_main_hardening_macos() {
     remove_env_vars_with_prefix(b"MallocLogFile");
 }
 
-#[cfg(unix)]
 fn set_core_file_size_limit_to_zero() {
     let rlim = libc::rlimit {
         rlim_cur: 0,
@@ -90,12 +42,6 @@ fn set_core_file_size_limit_to_zero() {
     }
 }
 
-#[cfg(windows)]
-pub(crate) fn pre_main_hardening_windows() {
-    // TODO: Windows hardening (Job Object, mitigations) is out of scope for Phase 3.
-}
-
-#[cfg(unix)]
 fn remove_env_vars_with_prefix(prefix: &[u8]) {
     for key in env_keys_with_prefix(std::env::vars_os(), prefix) {
         unsafe {
@@ -104,7 +50,6 @@ fn remove_env_vars_with_prefix(prefix: &[u8]) {
     }
 }
 
-#[cfg(unix)]
 fn env_keys_with_prefix<I>(vars: I, prefix: &[u8]) -> Vec<OsString>
 where
     I: IntoIterator<Item = (OsString, OsString)>,
@@ -119,10 +64,9 @@ where
         .collect()
 }
 
-#[cfg(all(test, unix))]
+#[cfg(test)]
 mod tests {
     use super::*;
-    use pretty_assertions::assert_eq;
     use std::ffi::OsStr;
     use std::os::unix::ffi::OsStrExt;
     use std::os::unix::ffi::OsStringExt;

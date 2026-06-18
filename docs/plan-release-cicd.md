@@ -21,7 +21,7 @@ Adopt Tolaria's calendar-semver, two-channel model:
 - Version is computed in GitHub Actions, then written into:
   - `crates/desktop/tauri.conf.json` (`version`)
   - `crates/desktop/Cargo.toml` (`version`)
-- A reusable workflow `.github/workflows/release-build-artifacts.yml` builds cross-platform Tauri bundles.
+- A reusable workflow `.github/workflows/release-build-artifacts.yml` builds macOS Tauri bundles.
 - Release workflows publish GitHub releases and attach a `latest.json` Tauri updater manifest.
 
 ## Phases
@@ -44,21 +44,15 @@ Adopt Tolaria's calendar-semver, two-channel model:
    - Calls `release-build-artifacts.yml` with `.dmg` uploads enabled
    - Publishes a GitHub release and `latest.json`
 
-### Phase 3: Cross-Platform Builds
-5. Add a Linux job to `release-build-artifacts.yml` building `deb`, `rpm`, and `AppImage` for `x86_64-unknown-linux-gnu`.
-6. Add a Windows job to `release-build-artifacts.yml` building NSIS for `x86_64-pc-windows-msvc`.
-7. Update alpha and stable release workflows to build a multi-platform `latest.json` (darwin-aarch64, darwin-x86_64, linux-x86_64, windows-x86_64).
-
-### Phase 4: GitHub Pages & Release Pages (optional)
+### Phase 3: GitHub Pages & Release Pages (optional)
 8. Add a workflow or job to deploy `latest.json` and release download/history pages to GitHub Pages.
 9. Optionally port/adapt Tolaria's `scripts/build-release-download-page.ts` and `scripts/build-release-history-page.ts`.
 
 ## Risks & Decisions
 - **Signing/notarization**: Apple certificate secrets may not be configured yet. The first implementation can build unsigned bundles but still produce Tauri updater signatures with the existing private key.
-- **Runner cost/time**: Cross-platform release builds are slow. Start with macOS only and gate Linux/Windows behind future work.
+- **Runner cost/time**: macOS release builds are the primary target; keeping the matrix small keeps runner cost/time manageable.
 - **MLX on macOS release runners**: Already fixed in CI via a CMake wrapper; the same wrapper must be used in release builds.
 - **Alpha branch**: Tolaria uses `main`; this plan assumes Klyntbot's active branch `dev` is the alpha channel. Switch to `main` later if the branching model changes.
-- **Windows NSIS tooling**: Requires prefetching NSIS 3.11 and `nsis_tauri_utils.dll`; can reuse Tolaria's PowerShell script.
 
 ## Acceptance Criteria for Phase 1
 - [ ] Pushing to `dev` triggers a successful alpha release workflow.
