@@ -14,9 +14,9 @@ use common::{build_http_client, ProviderError, Result};
 
 use crate::registry::ProviderRegistry;
 use crate::types::{
-    CacheAnchor, CacheBreakpoint, ChatParams, LlmProvider, LlmResponse, LlmStream, LlmStreamChunk,
-    Message, ProviderCapabilities, ProviderHealth, ResponseFormat, ToolCall, ToolCallDelta,
-    ToolCallMessage, Usage, DEFAULT_CONTEXT_WINDOW,
+    CacheBreakpoint, ChatParams, LlmProvider, LlmResponse, LlmStream, LlmStreamChunk, Message,
+    ProviderCapabilities, ProviderHealth, ResponseFormat, ToolCall, ToolCallDelta, ToolCallMessage,
+    Usage, DEFAULT_CONTEXT_WINDOW,
 };
 
 /// OpenAI-compatible provider using direct HTTP
@@ -68,6 +68,7 @@ impl OpenAiCompatProvider {
         breakpoints: &[CacheBreakpoint],
         params: &ChatParams,
     ) {
+        use crate::types::CacheAnchor;
         use std::collections::hash_map::DefaultHasher;
         use std::hash::{Hash, Hasher};
 
@@ -410,10 +411,10 @@ impl LlmProvider for OpenAiCompatProvider {
         messages: &[Message],
         tools: Option<&[Value]>,
         params: &ChatParams,
-        cache_breakpoints: &[CacheBreakpoint],
+        _cache_breakpoints: &[CacheBreakpoint],
     ) -> Result<LlmResponse> {
         #[cfg(debug_assertions)]
-        self.assert_prefix_stable(messages, cache_breakpoints, params);
+        self.assert_prefix_stable(messages, _cache_breakpoints, params);
         let url = format!("{}/chat/completions", self.api_base);
         let body = self.build_request_body(messages, tools, params, false);
 
@@ -470,10 +471,10 @@ impl LlmProvider for OpenAiCompatProvider {
         messages: &[Message],
         tools: Option<&[Value]>,
         params: &ChatParams,
-        cache_breakpoints: &[CacheBreakpoint],
+        _cache_breakpoints: &[CacheBreakpoint],
     ) -> Result<LlmStream> {
         #[cfg(debug_assertions)]
-        self.assert_prefix_stable(messages, cache_breakpoints, params);
+        self.assert_prefix_stable(messages, _cache_breakpoints, params);
         let url = format!("{}/chat/completions", self.api_base);
         let body = self.build_request_body(messages, tools, params, true);
 
