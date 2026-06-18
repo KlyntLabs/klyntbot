@@ -10,7 +10,6 @@ import {
   Suspense,
 } from "react";
 import { TitlebarExpandControls } from "@/features/layout/components/SidebarToggleControls";
-import { WindowCaptionControls } from "@/features/layout/components/WindowCaptionControls";
 import { MobileServerSetupWizard } from "@/features/mobile/components/MobileServerSetupWizard";
 
 const GitHubPanelData = lazy(() =>
@@ -60,7 +59,6 @@ export const MainAppShell = memo(function MainAppShell({
     >
       <div className="drag-strip" id="titlebar" />
       <TitlebarExpandControls {...sidebarToggleProps} />
-      <WindowCaptionControls />
       {shouldLoadGitHubPanelData ? (
         <Suspense fallback={null}>
           <GitHubPanelData {...gitHubPanelDataProps} />
