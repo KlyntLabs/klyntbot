@@ -117,15 +117,65 @@ jobs:
             } >> "$GITHUB_ENV"
           fi
 
-      - name: Build Tauri app
-        working-directory: crates/desktop
+      - name: Configure code signing
         env:
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          CERT: ${{ secrets.APPLE_CERTIFICATE }}
+          CERT_PASS: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -e
+          if [ -n "$CERT" ]; then
+            {
+              echo "APPLE_CERTIFICATE<<EOF"
+              printf '%s\n' "$CERT"
+              echo "EOF"
+            } >> "$GITHUB_ENV"
+            if [ -n "$CERT_PASS" ]; then
+              {
+                echo "APPLE_CERTIFICATE_PASSWORD<<EOF"
+                printf '%s\n' "$CERT_PASS"
+                echo "EOF"
+              } >> "$GITHUB_ENV"
+            fi
+            if [ -n "$IDENTITY" ]; then
+              {
+                echo "APPLE_SIGNING_IDENTITY<<EOF"
+                printf '%s\n' "$IDENTITY"
+                echo "EOF"
+              } >> "$GITHUB_ENV"
+              echo "Using Apple Developer identity from secrets." >&2
+            else
+              echo "APPLE_CERTIFICATE provided without APPLE_SIGNING_IDENTITY; falling back to ad-hoc signing." >&2
+              echo "APPLE_SIGNING_IDENTITY=-" >> "$GITHUB_ENV"
+            fi
+            if [ -n "$APPLE_ID" ] && [ -n "$APPLE_PASSWORD" ] && [ -n "$APPLE_TEAM_ID" ]; then
+              {
+                echo "APPLE_ID<<EOF"
+                printf '%s\n' "$APPLE_ID"
+                echo "EOF"
+              } >> "$GITHUB_ENV"
+              {
+                echo "APPLE_PASSWORD<<EOF"
+                printf '%s\n' "$APPLE_PASSWORD"
+                echo "EOF"
+              } >> "$GITHUB_ENV"
+              {
+                echo "APPLE_TEAM_ID<<EOF"
+                printf '%s\n' "$APPLE_TEAM_ID"
+                echo "EOF"
+              } >> "$GITHUB_ENV"
+            fi
+          else
+            echo "No APPLE_CERTIFICATE secret found; using ad-hoc signing." >&2
+            echo "APPLE_SIGNING_IDENTITY=-" >> "$GITHUB_ENV"
+          fi
+
+      - name: Build Tauri app
+        working-directory: crates/desktop
+        env:
           MACOSX_DEPLOYMENT_TARGET: "14.0"
           CFLAGS: "-mmacosx-version-min=14.0"
           CXXFLAGS: "-mmacosx-version-min=14.0"

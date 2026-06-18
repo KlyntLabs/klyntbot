@@ -1,12 +1,10 @@
 //! Mini status-badge window for no-view launcher executions.
 
-use std::sync::Arc;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 
-use crate::app_core::AppCore;
 use desktop_macros::klynt_command;
-use desktop_shared::{errors::ApiError, CommandResult};
+use desktop_shared::errors::ApiError;
 use feature_launcher::BadgeKind;
 
 const WIN_LABEL: &str = "status_badge";
@@ -71,9 +69,9 @@ pub async fn show_status_badge(
 #[cfg(debug_assertions)]
 pub(crate) async fn dispatch_dev(
     cmd: &str,
-    _core: &Arc<AppCore>,
+    _core: &std::sync::Arc<crate::app_core::AppCore>,
     body: &serde_json::Value,
-) -> Option<CommandResult<serde_json::Value>> {
+) -> Option<desktop_shared::CommandResult<serde_json::Value>> {
     use super::dev_helpers as dev;
     if cmd != "show_status_badge" {
         return None;

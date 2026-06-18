@@ -677,7 +677,7 @@ struct ResponseMessage {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::CacheTtl;
+    use crate::types::{CacheAnchor, CacheTtl};
 
     fn test_provider(model: &str) -> OpenAiCompatProvider {
         OpenAiCompatProvider::new("https://api.openai.com/v1", "test-key", model).unwrap()

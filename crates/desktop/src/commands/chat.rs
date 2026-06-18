@@ -7,12 +7,10 @@ use tauri::Manager;
 use desktop_shared::commands::{
     ChatMessageResponse, ChatSessionResponse, ChatThreadResponse, SessionContextInput,
 };
-use desktop_shared::{errors::ApiError, CommandResult};
+use desktop_shared::errors::ApiError;
 use tauri::Emitter;
 
 use desktop_macros::klynt_command;
-
-use crate::app_core::AppCore;
 
 /// Bridges `AppEventEmitter` to Tauri's `Emitter` trait.
 struct TauriEmitter(tauri::AppHandle);
@@ -145,9 +143,9 @@ pub async fn chat_save_starlark_rule(
 #[cfg(debug_assertions)]
 pub(crate) async fn dispatch_dev(
     cmd: &str,
-    core: &AppCore,
+    core: &crate::app_core::AppCore,
     body: &serde_json::Value,
-) -> Option<CommandResult<serde_json::Value>> {
+) -> Option<desktop_shared::CommandResult<serde_json::Value>> {
     use super::dev_helpers::{self as dev, try_field};
     Some(match cmd {
         "chat_threads" => dev::val(core.chat_threads().await),

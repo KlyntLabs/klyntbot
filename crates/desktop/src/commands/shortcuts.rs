@@ -1,6 +1,5 @@
-use app_core::AppCore;
 use config::ShortcutsConfig;
-use desktop_shared::{errors::ApiError, CommandResult};
+use desktop_shared::errors::ApiError;
 use tauri::AppHandle;
 
 use crate::shortcuts::register_shortcuts;
@@ -41,9 +40,9 @@ pub async fn shortcuts_update(app: AppHandle, launcher: String, tray: String) ->
 #[cfg(debug_assertions)]
 pub(crate) async fn dispatch_dev(
     cmd: &str,
-    core: &AppCore,
+    core: &crate::app_core::AppCore,
     body: &serde_json::Value,
-) -> Option<CommandResult<serde_json::Value>> {
+) -> Option<desktop_shared::CommandResult<serde_json::Value>> {
     use super::dev_helpers::{self as dev, try_field};
 
     Some(match cmd {

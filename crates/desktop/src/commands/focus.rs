@@ -1,11 +1,9 @@
 //! Focus / DND Tauri commands — thin adapters to `DndManager` + the macOS bridge helpers.
 
 use desktop_macros::{klynt_command, klynt_raw_command};
-use desktop_shared::{errors::ApiError, CommandResult};
+use desktop_shared::errors::ApiError;
 use feature_focus::repo::FocusSession;
 use feature_focus::FocusMode;
-
-use crate::app_core::AppCore;
 
 // ── Shortcut install helpers ──────────────────────────────────────────────────
 
@@ -16,7 +14,7 @@ use crate::app_core::AppCore;
 #[klynt_raw_command]
 #[tauri::command]
 #[specta::specta]
-pub async fn focus_install_shortcuts() -> CommandResult<()> {
+pub async fn focus_install_shortcuts() -> desktop_shared::CommandResult<()> {
     #[cfg(target_os = "macos")]
     {
         use feature_focus::bridge::macos::install_bundled_shortcut;
@@ -41,7 +39,7 @@ pub async fn focus_install_shortcuts() -> CommandResult<()> {
 #[klynt_raw_command]
 #[tauri::command]
 #[specta::specta]
-pub async fn focus_shortcuts_installed() -> CommandResult<bool> {
+pub async fn focus_shortcuts_installed() -> desktop_shared::CommandResult<bool> {
     #[cfg(target_os = "macos")]
     {
         use feature_focus::bridge::macos::is_shortcut_installed;
@@ -106,9 +104,9 @@ pub async fn focus_active(mode: FocusMode) -> Option<FocusSession> {
 #[cfg(debug_assertions)]
 pub(crate) async fn dispatch_dev(
     cmd: &str,
-    core: &AppCore,
+    core: &crate::app_core::AppCore,
     body: &serde_json::Value,
-) -> Option<CommandResult<serde_json::Value>> {
+) -> Option<desktop_shared::CommandResult<serde_json::Value>> {
     use super::dev_helpers as dev;
 
     Some(match cmd {
