@@ -298,6 +298,10 @@ fn run_desktop_app() {
                     dev_server::start(dev_core, global_event_tx).await;
                 });
             }
+            #[cfg(not(debug_assertions))]
+            {
+                let _global_event_tx = global_event_tx;
+            }
 
             // Start embedded MCP HTTP server if enabled in config.
             // Must clone before app.manage(core) moves the Arc.
