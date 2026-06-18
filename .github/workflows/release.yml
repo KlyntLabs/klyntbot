@@ -95,3 +95,12 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release upload ${{ needs.version.outputs.tag }} alpha-latest.json --clobber
+
+      - name: Upload app bundles to release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mapfile -t ASSETS < <(find ./release-assets -maxdepth 1 -type f \( -name '*.dmg' -o -name '*.dmg.sig' -o -name '*.tar.gz' -o -name '*.tar.gz.sig' \))
+          if [ ${#ASSETS[@]} -gt 0 ]; then
+            gh release upload ${{ needs.version.outputs.tag }} "${ASSETS[@]}" --clobber
+          fi

@@ -186,9 +186,10 @@ jobs:
         with:
           name: release-assets-macos-${{ matrix.arch }}
           path: |
-            target/${{ matrix.target }}/release/bundle/macos/*.dmg
-            target/${{ matrix.target }}/release/bundle/macos/*.dmg.sig
-            target/${{ matrix.target }}/release/bundle/macos/*.tar.gz
-            target/${{ matrix.target }}/release/bundle/macos/*.tar.gz.sig
+            target/${{ matrix.target }}/release/bundle/macos/*.app
+            target/${{ matrix.target }}/release/bundle/macos/*.app.tar.gz
+            target/${{ matrix.target }}/release/bundle/macos/*.app.tar.gz.sig
+            target/${{ matrix.target }}/release/bundle/dmg/*.dmg
+            target/${{ matrix.target }}/release/bundle/dmg/*.dmg.sig
           if-no-files-found: error
 
