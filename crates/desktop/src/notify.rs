@@ -51,9 +51,8 @@ impl TauriNotificationSender {
 
     /// Send a notification, falling back to a platform helper if Tauri fails.
     ///
-    /// The fallback is best-effort: on Linux it spawns `notify-send` with the
-    /// supplied title and body. Other platforms currently have no explicit
-    /// fallback because the Tauri plugin covers macOS/Windows natively.
+    /// The fallback is best-effort: currently no explicit fallback is
+    /// implemented because the Tauri plugin covers macOS natively.
     pub fn send_sync_with_fallback(&self, title: &str, body: &str) -> Result<()> {
         match self.send_sync(title, body) {
             Ok(()) => Ok(()),
@@ -83,16 +82,6 @@ impl TauriNotificationSender {
     }
 }
 
-#[cfg(target_os = "linux")]
-fn platform_fallback_notify(title: &str, body: &str) -> Result<()> {
-    std::process::Command::new("notify-send")
-        .arg(title)
-        .arg(body)
-        .status()?;
-    Ok(())
-}
-
-#[cfg(not(target_os = "linux"))]
 fn platform_fallback_notify(_title: &str, _body: &str) -> Result<()> {
     Err(common::KlyntbotError::Io(std::io::Error::other(
         "no platform notification fallback available",

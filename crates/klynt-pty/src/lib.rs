@@ -63,13 +63,6 @@ pub fn spawn_with_pgrp(
             if libc::setpgid(0, 0) != 0 {
                 return Err(std::io::Error::last_os_error());
             }
-            // Linux: when the parent dies, kernel sends SIGTERM to children.
-            #[cfg(target_os = "linux")]
-            {
-                if libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGTERM) != 0 {
-                    return Err(std::io::Error::last_os_error());
-                }
-            }
             Ok(())
         });
     }
