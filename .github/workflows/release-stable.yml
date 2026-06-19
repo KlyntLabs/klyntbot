@@ -105,7 +105,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          mapfile -t ASSETS < <(find ./release-assets -maxdepth 1 -type f \( -name '*.dmg' -o -name '*.dmg.sig' -o -name '*.tar.gz' -o -name '*.tar.gz.sig' \))
+          ASSETS=()
+          while IFS= read -r -d '' f; do
+            ASSETS+=("$f")
+          done < <(find ./release-assets -maxdepth 1 -type f \( -name '*.dmg' -o -name '*.dmg.sig' -o -name '*.tar.gz' -o -name '*.tar.gz.sig' \) -print0)
           if [ ${#ASSETS[@]} -gt 0 ]; then
             gh release upload ${{ needs.version.outputs.tag }} "${ASSETS[@]}" --clobber
           fi
