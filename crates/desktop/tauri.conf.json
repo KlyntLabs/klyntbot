@@ -4,7 +4,7 @@
   "identifier": "com.klynt.app",
   "build": {
     "beforeDevCommand": {
-      "script": "bun run dev:vite",
+      "script": "bun run dev",
       "cwd": "../../desktop-ui"
     },
     "beforeBuildCommand": {

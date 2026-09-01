@@ -1,15 +1,17 @@
-export { Dashboard } from "./components/Dashboard";
+// Components
+
+export { ActivityTrack } from "./components/ActivityTrack";
+export { CalendarSync } from "./components/CalendarSync";
+export { CalendarTrack } from "./components/CalendarTrack";
+export { DashboardLayout } from "./components/DashboardLayout";
+export { DayCalendarView } from "./components/DayCalendarView";
+export { DayColumnsView } from "./components/DayColumnsView";
+export { MonthCalendarView } from "./components/MonthCalendarView";
 export { ProductivityStrip } from "./components/ProductivityStrip";
-export { AddGoalDialog } from "./components/productivity/AddGoalDialog";
-export { FocusStateIndicator } from "./components/productivity/FocusStateIndicator";
-export { FocusTrayIndicator } from "./components/productivity/FocusTrayIndicator";
-export { GoalsProgress } from "./components/productivity/GoalsProgress";
-export { HourlyHeatmap } from "./components/productivity/HourlyHeatmap";
-export { PatternsCard } from "./components/productivity/PatternsCard";
-export { ProductivityScoreRing, ScoreBar } from "./components/productivity/ProductivityScoreRing";
 export { SummaryPanel } from "./components/SummaryPanel";
-export type { SessionBlock } from "./components/views/ActivityTrack";
-export { ActivityTrack } from "./components/views/ActivityTrack";
-export type { MergeableEvent, MergedSession } from "./lib/activity-sessions";
-export { mergeActivitySessions } from "./lib/activity-sessions";
-export { AppIcon, getAppColor, qualityToColor, scoreColor } from "./lib/productivity";
+export { WeekCalendarView } from "./components/WeekCalendarView";
+export { YearHeatmapView } from "./components/YearHeatmapView";
+
+// Utilities
+export { buildContainers } from "./lib/buildContainers";
+export * from "./lib/layers";

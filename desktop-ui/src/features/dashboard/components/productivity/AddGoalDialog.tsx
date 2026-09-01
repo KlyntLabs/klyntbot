@@ -1,10 +1,10 @@
-import X from "lucide-react/dist/esm/icons/x";
+import { X } from "lucide-react";
 import { useState } from "react";
 
 interface AddGoalDialogProps {
   open: boolean;
   onClose: () => void;
-  onAdd: (params: { goalType: string; metric: string; targetValue: number }) => void;
+  onAdd: (params: { goal_type: string; metric: string; target_value: number }) => void;
 }
 
 const METRICS = [
@@ -27,107 +27,104 @@ export function AddGoalDialog({ open, onClose, onAdd }: AddGoalDialogProps) {
   if (!open) return null;
 
   const selectedMetric = METRICS.find((m) => m.value === metric) ?? METRICS[0];
-  const numericValue = Number(targetValue);
-  const isEmpty = targetValue.trim() === "";
-  const isInvalid = !isEmpty && (Number.isNaN(numericValue) || numericValue <= 0);
-  const canSubmit = !isEmpty && !isInvalid;
+  const canSubmit = targetValue.trim() !== "" && Number(targetValue) > 0;
 
   const handleSubmit = () => {
-    onAdd({ goalType, metric, targetValue: Number(targetValue) });
+    onAdd({ goal_type: goalType, metric, target_value: Number(targetValue) });
     setTargetValue("");
     onClose();
   };
 
   return (
-    <div className="dashboard__goal-dialog-backdrop">
-      <div className="dashboard__goal-dialog">
-        <div className="dashboard__goal-dialog-header">
-          <h2>Add Goal</h2>
-          <button type="button" onClick={onClose} aria-label="Close dialog">
-            <X aria-hidden />
-          </button>
-        </div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay-heavy">
+      <div className="glass-panel w-[400px]">
+        <div className="bg-card rounded-[var(--glass-radius-inner)]">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+            <h3 className="text-sm font-medium text-foreground">Add Goal</h3>
+            <button
+              type="button"
+              onClick={onClose}
+              className="size-7 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
 
-        <div className="dashboard__goal-dialog-body">
-          <div className="dashboard__goal-dialog-section">
-            <span>Period</span>
-            <div className="dashboard__goal-dialog-period-toggle">
-              {(["daily", "weekly"] as const).map((t) => (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => setGoalType(t)}
-                  className={
-                    goalType === t
-                      ? "dashboard__goal-dialog-period-btn dashboard__goal-dialog-period-btn--active"
-                      : "dashboard__goal-dialog-period-btn"
-                  }
-                >
-                  {t}
-                </button>
-              ))}
+          <div className="px-5 py-4 space-y-4">
+            <div>
+              <span className="block text-xs text-muted-foreground mb-1.5">Period</span>
+              <div className="flex gap-2">
+                {(["daily", "weekly"] as const).map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setGoalType(t)}
+                    className={`flex-1 py-1.5 text-xs rounded-md border transition-colors capitalize ${
+                      goalType === t
+                        ? "border-brand/50 text-brand bg-brand/5"
+                        : "border-border text-muted-foreground bg-accent hover:bg-muted"
+                    }`}
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <span className="block text-xs text-muted-foreground mb-1.5">Metric</span>
+              <div className="flex flex-col gap-1.5">
+                {METRICS.map((m) => (
+                  <button
+                    key={m.value}
+                    type="button"
+                    onClick={() => setMetric(m.value)}
+                    className={`px-3 py-2 text-xs text-left rounded-md border transition-colors ${
+                      metric === m.value
+                        ? "border-brand/50 text-brand bg-brand/5"
+                        : "border-border text-muted-foreground bg-accent hover:bg-muted"
+                    }`}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label htmlFor="goal-target" className="block text-xs text-muted-foreground mb-1.5">
+                Target <span className="text-dim">({selectedMetric.unit})</span>
+              </label>
+              <input
+                id="goal-target"
+                type="number"
+                value={targetValue}
+                onChange={(e) => setTargetValue(e.target.value)}
+                placeholder={selectedMetric.placeholder}
+                min={0}
+                step={metric === "productive_hours" ? 0.5 : 1}
+                className="w-full px-3 py-1.5 text-[13px] bg-accent border border-border rounded-md text-foreground placeholder:text-dim"
+              />
             </div>
           </div>
 
-          <div className="dashboard__goal-dialog-section">
-            <span>Metric</span>
-            <div className="dashboard__goal-dialog-metric-list">
-              {METRICS.map((m) => (
-                <button
-                  key={m.value}
-                  type="button"
-                  onClick={() => setMetric(m.value)}
-                  className={
-                    metric === m.value
-                      ? "dashboard__goal-dialog-metric-btn dashboard__goal-dialog-metric-btn--active"
-                      : "dashboard__goal-dialog-metric-btn"
-                  }
-                >
-                  {m.label}
-                </button>
-              ))}
-            </div>
+          <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-border">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground rounded-md hover:bg-accent transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={!canSubmit}
+              className="px-4 py-1.5 text-xs rounded-md bg-brand text-white hover:bg-brand-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Add goal
+            </button>
           </div>
-
-          <div className="dashboard__goal-dialog-section">
-            <label htmlFor="goal-target">
-              Target <span>({selectedMetric.unit})</span>
-            </label>
-            <input
-              id="goal-target"
-              type="number"
-              value={targetValue}
-              onChange={(e) => setTargetValue(e.target.value)}
-              placeholder={selectedMetric.placeholder}
-              min={0}
-              step={metric === "productive_hours" ? 0.5 : 1}
-              className="dashboard__goal-dialog-input"
-              aria-invalid={isInvalid}
-              aria-describedby={isInvalid ? "goal-target-error" : undefined}
-            />
-            {isInvalid && (
-              <span
-                id="goal-target-error"
-                style={{
-                  fontSize: "var(--fs-2xs)",
-                  color: "var(--destructive)",
-                  marginTop: 4,
-                }}
-                role="alert"
-              >
-                Please enter a positive number
-              </span>
-            )}
-          </div>
-        </div>
-
-        <div className="dashboard__goal-dialog-footer">
-          <button type="button" onClick={onClose}>
-            Cancel
-          </button>
-          <button type="button" onClick={handleSubmit} disabled={!canSubmit}>
-            Add goal
-          </button>
         </div>
       </div>
     </div>

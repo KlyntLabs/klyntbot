@@ -1,67 +1,56 @@
-import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
-import { qk, useTauriQuery } from "@/lib/query";
-import { isTauri } from "@/utils/tauri-bridge";
-import { useLauncherApi, useLauncherState } from "../store";
+import { ipc } from "@shared/hooks/useIpc";
+import { useEffect, useRef } from "react";
+import { useLauncherStore } from "../stores/launcherStore";
 import type { LauncherItem } from "../types";
 
-const DEBOUNCE_MS = 16; // one frame for responsive typing
-
 export function useLauncherSearch() {
-  const query = useLauncherState((s) => s.query);
-  const { setResults, setIsSearching } = useLauncherApi();
-  const queryClient = useQueryClient();
+  const query = useLauncherStore((s) => s.query);
+  const setResults = useLauncherStore((s) => s.setResults);
+  const setIsSearching = useLauncherStore((s) => s.setIsSearching);
+  const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const versionRef = useRef(0);
 
-  const debounced = useDebounced(query, DEBOUNCE_MS);
-
-  const search = useTauriQuery<LauncherItem[]>({
-    queryKey: qk.launcher.search(debounced),
-    command: "launcher_search",
-    args: { query: debounced },
-    fallback: [],
-    staleTime: 5_000,
-  });
+  // Fetch default view on mount (empty query = top frecency items)
+  useEffect(() => {
+    ipc<LauncherItem[]>("launcher_search", { query: "" })
+      .then(setResults)
+      .catch(() => {});
+  }, [setResults]);
 
   useEffect(() => {
-    setIsSearching(search.isFetching);
-  }, [search.isFetching, setIsSearching]);
+    if (!query.trim()) {
+      // Refetch defaults when query is cleared
+      const v = ++versionRef.current;
+      ipc<LauncherItem[]>("launcher_search", { query: "" })
+        .then((results) => {
+          if (versionRef.current === v) setResults(results);
+        })
+        .catch(() => {});
+      return;
+    }
 
-  useEffect(() => {
-    if (search.data) setResults(search.data);
-  }, [search.data, setResults]);
+    setIsSearching(true);
+    clearTimeout(timerRef.current);
 
-  // Refetch frequents on every launcher show — first-open may race against
-  // backend index population (AppIndex, attention table), and stale empty
-  // results would otherwise stick until the cache TTL expires.
-  useEffect(() => {
-    if (!isTauri()) return;
-    let unlisten: (() => void) | undefined;
-    let cancelled = false;
-    (async () => {
-      const { getCurrentWindow } = await import("@tauri-apps/api/window");
-      const win = getCurrentWindow();
-      const off = await win.listen("window-shown", () => {
-        // The store's results are cleared on hide via reset(); restore from the
-        // React Query cache synchronously so frequents reappear immediately.
-        const cached = queryClient.getQueryData<LauncherItem[]>(qk.launcher.search(""));
-        if (cached && cached.length > 0) setResults(cached);
-        queryClient.invalidateQueries({ queryKey: qk.launcher.search("") });
-      });
-      if (cancelled) off();
-      else unlisten = off;
-    })();
-    return () => {
-      cancelled = true;
-      unlisten?.();
-    };
-  }, [queryClient, setResults]);
-}
+    // Cancel-on-keystroke: increment version so stale responses are discarded
+    const version = ++versionRef.current;
 
-function useDebounced<T>(value: T, ms: number): T {
-  const [v, setV] = useState(value);
-  useEffect(() => {
-    const t = setTimeout(() => setV(value), ms);
-    return () => clearTimeout(t);
-  }, [value, ms]);
-  return v;
+    timerRef.current = setTimeout(async () => {
+      try {
+        const results = await ipc<LauncherItem[]>("launcher_search", { query });
+        if (versionRef.current === version) {
+          setResults(results);
+          setIsSearching(false);
+        }
+      } catch (e) {
+        if (versionRef.current === version) {
+          console.error("Launcher search failed:", e);
+          setResults([]);
+          setIsSearching(false);
+        }
+      }
+    }, 30);
+
+    return () => clearTimeout(timerRef.current);
+  }, [query, setResults, setIsSearching]);
 }

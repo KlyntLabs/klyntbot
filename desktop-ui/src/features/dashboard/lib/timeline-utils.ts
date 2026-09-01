@@ -1,5 +1,5 @@
-import type { TimelineEntry } from "@/bindings";
-import { minutesSinceMidnight } from "@/utils/dashboardDates";
+import { minutesSinceMidnight } from "@shared/lib/dates";
+import type { TimelineEntry } from "@shared/types";
 
 export interface OverlapLayout {
   colIndex: number;
@@ -54,8 +54,7 @@ export function computeOverlapLayout<
 
     const totalCols = columnEnds.length;
     for (const iv of cluster) {
-      const entry = result.get(iv.id);
-      if (entry) entry.totalCols = totalCols;
+      result.get(iv.id)!.totalCols = totalCols;
     }
 
     clusterStart = clusterEnd + 1;

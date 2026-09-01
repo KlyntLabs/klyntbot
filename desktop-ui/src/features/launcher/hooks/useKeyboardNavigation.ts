@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useLauncherApi, useLauncherState } from "../store";
+import { useLauncherStore } from "../stores/launcherStore";
 import { executeItem } from "./useExecuteItem";
 
 interface KeyboardNavOptions {
@@ -9,68 +9,87 @@ interface KeyboardNavOptions {
 }
 
 export function useKeyboardNavigation({ onEnterChat, onExpandToMain, onHide }: KeyboardNavOptions) {
-  const mode = useLauncherState((s) => s.mode);
-  const store = useLauncherApi();
+  const mode = useLauncherStore((s) => s.mode);
 
   useEffect(() => {
     if (mode === "chat") return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      const s = store.getState();
-      if (s.actionMenuOpen) return;
+      const store = useLauncherStore.getState();
+
+      // When action menu is open, let the ActionMenu component handle keys
+      if (store.actionMenuOpen) return;
 
       switch (e.key) {
         case "ArrowDown": {
           e.preventDefault();
-          if (e.altKey && mode === "search") store.navigateHistory("down");
-          else store.moveSelection(1);
+          if (e.altKey && mode === "search") {
+            // Alt+Down: navigate query history forward
+            store.navigateHistory("down");
+          } else {
+            store.moveSelection(1);
+          }
           break;
         }
+
         case "ArrowUp": {
           e.preventDefault();
-          if (e.altKey && mode === "search") store.navigateHistory("up");
-          else store.moveSelection(-1);
+          if (e.altKey && mode === "search") {
+            // Alt+Up: navigate query history backward
+            store.navigateHistory("up");
+          } else {
+            store.moveSelection(-1);
+          }
           break;
         }
+
         case "Enter": {
           e.preventDefault();
-          const item = s.results[s.selectedIndex];
+          const item = store.results[store.selectedIndex];
           if (!item) {
-            if (s.query.trim()) onEnterChat(s.query);
+            if (store.query.trim()) {
+              onEnterChat(store.query);
+            }
             return;
           }
+
           if (item.arguments && item.arguments.length > 0) {
             store.setArgModeItem(item);
             return;
           }
-          executeItem(item, { store, onEnterChat, onExpandToMain, onHide });
+
+          executeItem(item, { onEnterChat, onExpandToMain, onHide });
           break;
         }
+
         case "Escape": {
           e.preventDefault();
-          if (s.argModeItem) store.setArgModeItem(null);
-          else if (s.mode === "detail") {
+          if (store.argModeItem) {
+            store.setArgModeItem(null);
+          } else if (store.mode === "detail") {
             store.setDetailItem(null);
             store.setMode("search");
-          } else if (s.query) {
+          } else if (store.query) {
             store.setQuery("");
           } else {
             onHide();
           }
           break;
         }
+
         case "Tab": {
           e.preventDefault();
-          const item = s.results[s.selectedIndex];
-          if (item && s.mode === "search") {
+          const item = store.results[store.selectedIndex];
+          if (item && store.mode === "search") {
             store.setDetailItem(item);
             store.setMode("detail");
-          } else if (s.mode === "detail") {
+          } else if (store.mode === "detail") {
             store.setDetailItem(null);
             store.setMode("search");
           }
           break;
         }
+
         case "j": {
           if (e.ctrlKey) {
             e.preventDefault();
@@ -78,15 +97,18 @@ export function useKeyboardNavigation({ onEnterChat, onExpandToMain, onHide }: K
           }
           break;
         }
+
         case "k": {
           if (e.ctrlKey) {
             e.preventDefault();
             store.moveSelection(-1);
           } else if (e.metaKey) {
             e.preventDefault();
-            if (s.mode === "search" || s.mode === "detail") {
-              const item = s.results[s.selectedIndex];
-              if (item) store.setActionMenuOpen(true);
+            if (store.mode === "search" || store.mode === "detail") {
+              const item = store.results[store.selectedIndex];
+              if (item) {
+                store.setActionMenuOpen(true);
+              }
             } else {
               onExpandToMain();
             }
@@ -98,5 +120,5 @@ export function useKeyboardNavigation({ onEnterChat, onExpandToMain, onHide }: K
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [mode, store, onEnterChat, onExpandToMain, onHide]);
+  }, [mode, onEnterChat, onExpandToMain, onHide]);
 }

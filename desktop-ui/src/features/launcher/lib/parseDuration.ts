@@ -1,10 +1,19 @@
+/**
+ * Client-side duration parser for simple `Nm` / `Nh` / `Nd` strings.
+ *
+ * Full grammar (`until 5pm`, `until next meeting`) is handled server-side
+ * and will be wired in a future iteration.
+ */
 const RE = /^(\d+)(s|m|h|d)$/i;
 
+/** Returns an ISO 8601 string = now + the parsed duration, or null if unparseable. */
 export function parseDurationToEndsAt(input: string): string | null {
-  const m = input.trim().match(RE);
+  const m = RE.exec(input.trim());
   if (!m) return null;
+
   const value = parseInt(m[1], 10);
   const unit = m[2].toLowerCase();
+
   let ms: number;
   switch (unit) {
     case "s":
@@ -22,5 +31,6 @@ export function parseDurationToEndsAt(input: string): string | null {
     default:
       return null;
   }
+
   return new Date(Date.now() + ms).toISOString();
 }

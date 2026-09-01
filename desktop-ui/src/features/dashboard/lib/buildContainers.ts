@@ -1,5 +1,5 @@
-import type { TimelineEntry } from "@/bindings";
-import { minutesSinceMidnight } from "@/utils/dashboardDates";
+import { minutesSinceMidnight } from "@shared/lib/dates";
+import type { TimelineEntry } from "@shared/types";
 
 /** Maps focus quality score (0-10) to a CSS background color with 25% opacity via color-mix. */
 export function focusColor(qualityScore: number): string {
@@ -70,8 +70,8 @@ export function buildContainers(entries: TimelineEntry[]): ActivityContainer[] {
   // Build focused containers
   const focused: ActivityContainer[] = focusSessions.map((s) => {
     const { start, end } = entryRange(s);
-    const meta = s.metadata as Record<string, unknown> | null;
-    const quality = typeof meta?.qualityScore === "number" ? (meta.qualityScore as number) : 5;
+    const quality =
+      typeof s.metadata?.qualityScore === "number" ? (s.metadata.qualityScore as number) : 5;
     return {
       id: `focus-${s.id}`,
       type: "focused" as const,

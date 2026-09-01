@@ -1,6 +1,5 @@
-import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useQuery } from "@shared/hooks/useQuery";
+import { parseApiError } from "@shared/lib/utils";
 import type {
   ActiveInteraction,
   ChatMessage,
@@ -9,16 +8,10 @@ import type {
   MessageSegment,
   PersonaSegment,
   TransparencyData,
-} from "../types";
+} from "@shared/types";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAgentStream } from "./useAgentStream";
-
-function parseApiError(e: unknown): { message: string } {
-  if (e instanceof Error) return { message: e.message };
-  if (typeof e === "object" && e !== null && "message" in e) {
-    return { message: String((e as { message: unknown }).message) };
-  }
-  return { message: String(e) };
-}
+import { ipc } from "./useIpc";
 
 interface ChatSession {
   messages: ChatMessage[];
@@ -61,40 +54,16 @@ export function useChatSession(
   onDone?: () => void,
   options?: UseChatSessionOptions,
 ): ChatSession {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const refetch = useCallback(async () => {
-    if (!sessionKey) return;
-    try {
-      const result = await invoke<ChatMessage[]>("chat_messages", { sessionKey });
-      setMessages(result);
-    } catch {
-      // Errors surface via the streaming store's error field; messages just stay
-      // at the previous value rather than wiping the conversation.
-    }
-  }, [sessionKey]);
-
-  useEffect(() => {
-    refetch();
-  }, [refetch]);
-
-  useEffect(() => {
-    if (!sessionKey) return;
-    let active = true;
-    let unsub: (() => void) | undefined;
-    listen<{ sessionKey?: string }>("chat:message_added", (event) => {
-      if (event.payload?.sessionKey === sessionKey) {
-        refetch();
-      }
-    }).then((fn) => {
-      if (active) unsub = fn;
-      else fn();
-    });
-    return () => {
-      active = false;
-      unsub?.();
-    };
-  }, [sessionKey, refetch]);
-
+  const { data: messages, refetch } = useQuery<ChatMessage[]>(
+    "chat_messages",
+    sessionKey ? { sessionKey } : null,
+    [],
+    {
+      invalidateOn: ["chat:message_added"],
+      invalidateFilter: (payload) =>
+        (payload as { sessionKey?: string })?.sessionKey === sessionKey,
+    },
+  );
   const [input, setInput] = useState("");
   const [pendingUserMsg, setPendingUserMsg] = useState<string | null>(null);
 
@@ -107,15 +76,7 @@ export function useChatSession(
   // Clear streaming segments only when a NEW assistant message arrives from refetch.
   // Tracks assistant count to avoid clearing before the refetch completes — the old
   // approach fired on isStreaming→false before the new message existed, causing a flash.
-  const {
-    isStreaming,
-    clearSegments,
-    clearTransparency,
-    clearPersonaMessages,
-    segments,
-    startStreaming,
-    failStreaming,
-  } = stream;
+  const { isStreaming, clearSegments, clearTransparency, clearPersonaMessages, segments } = stream;
   const hasSegmentsRef = useRef(false);
   hasSegmentsRef.current = segments.length > 0;
   const assistantCountRef = useRef(0);
@@ -138,12 +99,12 @@ export function useChatSession(
   const squadId = options?.squadId;
   const send = useCallback(
     async (extraPayload?: Record<string, unknown>) => {
-      if (!input.trim() || isStreaming) return;
+      if (!input.trim() || stream.isStreaming) return;
       const text = input;
       setInput("");
 
       setPendingUserMsg(text);
-      startStreaming();
+      stream.startStreaming();
 
       try {
         const payload: Record<string, unknown> = {
@@ -158,12 +119,12 @@ export function useChatSession(
             squadMode: options?.squadMode,
           };
         }
-        await invoke<ChatMessage>("chat_send", payload);
+        await ipc<ChatMessage>("chat_send", payload);
       } catch (e: unknown) {
-        failStreaming(parseApiError(e).message);
+        stream.failStreaming(parseApiError(e).message);
       }
     },
-    [input, sessionKey, isStreaming, startStreaming, failStreaming, squadId, options?.squadMode],
+    [input, sessionKey, stream, squadId, options?.squadMode],
   );
 
   return {

@@ -6,7 +6,7 @@
     "dev": "cd crates/desktop && cargo tauri dev",
     "dev:2420": "cd crates/desktop && VITE_DEV_PORT=2420 cargo tauri dev --config '{\"build\":{\"devUrl\":\"http://localhost:2420\"}}'",
     "dev:custom": "cd crates/desktop && VITE_DEV_PORT=${VITE_DEV_PORT:-2420} cargo tauri dev --config '{\"build\":{\"devUrl\":\"http://localhost:'${VITE_DEV_PORT}'\"}}'",
-    "dev:vite": "cd desktop-ui && bun run dev:vite",
+    "dev:vite": "cd desktop-ui && bun run dev",
     "build": "cd desktop-ui && bun run build",
     "test": "cd desktop-ui && bun run test",
     "typecheck": "cd desktop-ui && bun run typecheck",

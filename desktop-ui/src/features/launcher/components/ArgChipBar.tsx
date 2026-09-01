@@ -1,6 +1,8 @@
 import { useRef, useState } from "react";
 import type { ArgSpec } from "../types";
 
+export type { ArgSpec };
+
 interface Props {
   specs: ArgSpec[];
   onSubmit: (args: Record<string, string>) => void;
@@ -12,10 +14,11 @@ export function ArgChipBar({ specs, onSubmit, onCancel }: Props) {
     Object.fromEntries(specs.map((s) => [s.name, ""])),
   );
   const refs = useRef<(HTMLInputElement | null)[]>([]);
+
   const focusAt = (i: number) => refs.current[i]?.focus();
 
   return (
-    <div className="lc-arg-bar">
+    <div className="flex items-center gap-2 p-2">
       {specs.map((spec, i) => (
         <input
           key={spec.name}
@@ -40,7 +43,7 @@ export function ArgChipBar({ specs, onSubmit, onCancel }: Props) {
               else focusAt(i - 1);
             }
           }}
-          className="lc-arg-input"
+          className="bg-surface-base text-fg px-2 py-1 rounded border border-border min-w-[100px]"
         />
       ))}
     </div>

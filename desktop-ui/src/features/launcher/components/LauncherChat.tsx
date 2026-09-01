@@ -1,76 +1,172 @@
-import { useEffect, useRef } from "react";
-import { useChatSession } from "@/features/chat/hooks/useChatSession";
+import { MessageList } from "@features/chat/components/MessageList";
+import { useAutoResizeTextarea } from "@shared/hooks/useAutoResizeTextarea";
+import { useChatSession } from "@shared/hooks/useChatSession";
+import { isTauri } from "@shared/lib/utils";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { ArrowLeft, ArrowUpRight, Send, Sparkles } from "lucide-react";
+import { useCallback, useEffect, useRef } from "react";
 
-interface Props {
-  initialQuery: string;
+interface LauncherChatProps {
   sessionKey: string;
+  initialQuery: string | null;
   onBack: () => void;
-  onExpandToMain: (sessionKey: string) => void;
+  onExpand: () => void;
 }
 
-export function LauncherChat({ initialQuery, sessionKey, onBack, onExpandToMain }: Props) {
-  const { messages, isStreaming, input, setInput, send } = useChatSession(sessionKey);
-  const sentInitialRef = useRef(false);
+export function LauncherChat({ sessionKey, initialQuery, onBack, onExpand }: LauncherChatProps) {
+  const chat = useChatSession(sessionKey);
+  const { ref: inputRef, handleInput } = useAutoResizeTextarea(chat.input);
+  const sentInitial = useRef(false);
+  const needsInitialSend = useRef(false);
 
+  // Set initial query input once
   useEffect(() => {
-    if (!sentInitialRef.current && initialQuery) {
-      sentInitialRef.current = true;
-      setInput(initialQuery);
-      // Defer send to next tick so setInput is applied
-      const id = setTimeout(() => send(), 0);
-      return () => clearTimeout(id);
+    if (initialQuery && !sentInitial.current) {
+      sentInitial.current = true;
+      needsInitialSend.current = true;
+      chat.setInput(initialQuery);
     }
-  }, [initialQuery, send, setInput]);
+  }, [initialQuery, chat.setInput]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Fire send once when input state has committed with the initial query
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onBack();
-      if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) onExpandToMain(sessionKey);
+    if (needsInitialSend.current && chat.input) {
+      needsInitialSend.current = false;
+      chat.send();
+    }
+  }, [chat.input, chat.send]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Focus input after streaming completes
+  // biome-ignore lint/correctness/useExhaustiveDependencies: inputRef is a stable ref object
+  useEffect(() => {
+    if (!chat.isStreaming && !chat.activeInteraction) {
+      inputRef.current?.focus();
+    }
+  }, [chat.isStreaming, chat.activeInteraction]);
+
+  // Re-focus input when launcher window regains focus (after hide/show)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: inputRef is a stable ref object
+  useEffect(() => {
+    if (!isTauri) return;
+    let unlisten: (() => void) | undefined;
+    let cancelled = false;
+    getCurrentWindow()
+      .onFocusChanged(({ payload: focused }) => {
+        if (focused) inputRef.current?.focus();
+      })
+      .then((fn) => {
+        if (cancelled) fn();
+        else unlisten = fn;
+      });
+    return () => {
+      cancelled = true;
+      unlisten?.();
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onBack, onExpandToMain, sessionKey]);
+  }, []);
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        chat.send();
+      }
+    },
+    [chat.send],
+  );
+
+  // Handle Escape to go back and Cmd+/ to expand
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onBack();
+      } else if ((e.metaKey || e.ctrlKey) && e.key === "/") {
+        e.preventDefault();
+        onExpand();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onBack, onExpand]);
 
   return (
-    <div className="lc-chat">
-      <header className="lc-chat-header">
-        <button type="button" className="lc-icon-btn" onClick={onBack} aria-label="Back">
-          ←
-        </button>
-        <span className="lc-chat-title">Ask</span>
+    <div className="flex flex-col" style={{ height: 568 }}>
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border-subtle">
         <button
           type="button"
-          className="lc-icon-btn"
-          onClick={() => onExpandToMain(sessionKey)}
-          aria-label="Expand"
+          onClick={onBack}
+          className="flex items-center gap-1.5 text-xs font-light text-muted-foreground hover:text-foreground transition-colors"
         >
-          ↗
+          <ArrowLeft className="size-3.5" strokeWidth={1.5} />
+          Back
         </button>
-      </header>
-      <div className="lc-chat-thread" role="log" aria-live="polite">
-        {messages.map((m) => (
-          <div key={m.id} className={`lc-chat-msg lc-chat-msg--${m.role}`}>
-            {m.content}
-          </div>
-        ))}
-        {isStreaming && <div className="lc-chat-streaming">…</div>}
+        <span className="text-[13px] font-light text-foreground">Klynt AI</span>
+        <button
+          type="button"
+          onClick={onExpand}
+          className="flex items-center gap-1.5 text-[11px] font-light text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <ArrowUpRight className="size-3.5" strokeWidth={1.5} />
+          Expand
+        </button>
       </div>
-      <form
-        className="lc-chat-composer"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (input.trim()) {
-            void send();
-          }
-        }}
-      >
-        <input
-          className="lc-chat-input"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Reply… (⌘↵ to expand)"
+
+      <div className="flex-1 overflow-y-auto px-4 py-3">
+        <MessageList
+          messages={chat.messages}
+          segments={chat.segments}
+          isStreaming={chat.isStreaming}
+          activeTools={chat.activeTools}
+          error={chat.error}
+          activeInteraction={chat.activeInteraction}
+          sessionKey={sessionKey}
+          onInteractionSubmitted={chat.clearInteraction}
+          liveTransparency={null}
+          activeDelegateAgent={chat.activeDelegateAgent}
+          statusPhase={chat.statusPhase}
         />
-      </form>
+      </div>
+
+      {/* Input */}
+      <div className="px-4 pb-3">
+        <div className="flex items-center gap-3 glass-input px-4 py-2.5">
+          <Sparkles className="w-[16px] h-[16px] text-brand shrink-0" strokeWidth={1.5} />
+          <textarea
+            ref={inputRef}
+            value={chat.input}
+            onChange={(e) => chat.setInput(e.target.value)}
+            onInput={handleInput}
+            onKeyDown={handleKeyDown}
+            placeholder="Follow up\u2026"
+            aria-label="Message Klynt"
+            rows={1}
+            className="flex-1 bg-transparent text-foreground text-[13px] placeholder:text-muted-foreground outline-none font-light resize-none max-h-[80px]"
+          />
+          <button
+            type="button"
+            onClick={() => chat.send()}
+            disabled={!chat.input.trim() || chat.isStreaming}
+            className="text-brand hover:text-brand/80 disabled:text-muted-foreground transition-colors shrink-0"
+          >
+            <Send className="size-4" strokeWidth={1.5} />
+          </button>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="px-5 py-2.5 border-t border-border-subtle">
+        <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+          <span className="flex items-center gap-1.5 font-light">
+            <kbd className="px-1.5 py-0.5 glass-badge">Esc</kbd>
+            Back to commands
+          </span>
+          <span className="flex items-center gap-1.5 font-light">
+            <kbd className="px-1.5 py-0.5 glass-badge">{"\u2318/"}</kbd>
+            Open full chat
+          </span>
+        </div>
+      </div>
     </div>
   );
 }

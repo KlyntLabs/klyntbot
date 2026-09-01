@@ -1,6 +1,6 @@
-import { useTauriMutation } from "@/lib/query";
+import { ipc } from "@shared/hooks/useIpc";
+import { invalidateQueries } from "@shared/hooks/useQuery";
 import { formatRemaining } from "../lib/formatRemaining";
-import { showError } from "../lib/showError";
 
 interface Props {
   endsAt: string;
@@ -8,39 +8,50 @@ interface Props {
 }
 
 export function FocusActiveChip({ endsAt, onDone }: Props) {
-  const focusExtend = useTauriMutation<void, { mode: "dnd"; newEndsAt: string }>({
-    command: "focus_extend",
-  });
-  const focusDeactivate = useTauriMutation<void, { mode: "dnd" }>({
-    command: "focus_deactivate",
-  });
-
   const handleExtend = (extraMs: number) => {
     const base = Math.max(new Date(endsAt).getTime(), Date.now());
     const newEndsAt = new Date(base + extraMs).toISOString();
-    focusExtend
-      .mutate({ mode: "dnd", newEndsAt })
-      .then(() => onDone())
-      .catch((err) => showError("Couldn't extend focus:", err));
+    ipc("focus_extend", { mode: "dnd", newEndsAt })
+      .then(() => {
+        invalidateQueries("focus_active");
+        onDone();
+      })
+      .catch((err) => console.error("focus_extend failed:", err));
   };
 
   const handleTurnOff = () => {
-    focusDeactivate
-      .mutate({ mode: "dnd" })
-      .then(() => onDone())
-      .catch((err) => showError("Couldn't end focus:", err));
+    ipc("focus_deactivate", { mode: "dnd" })
+      .then(() => {
+        invalidateQueries("focus_active");
+        onDone();
+      })
+      .catch((err) => console.error("focus_deactivate failed:", err));
   };
 
   return (
-    <div className="lc-arg-bar">
-      <span className="lc-muted-sm">DND on — {formatRemaining(endsAt)} left</span>
-      <button type="button" className="lc-chip-btn" onClick={() => handleExtend(30 * 60_000)}>
+    <div className="flex items-center gap-2 p-2">
+      <span className="text-xs text-muted-foreground shrink-0">
+        DND on — {formatRemaining(endsAt)} left
+      </span>
+      <button
+        type="button"
+        className="px-2 py-1 rounded bg-surface-base border border-border text-xs text-fg hover:bg-muted transition-colors"
+        onClick={() => handleExtend(30 * 60_000)}
+      >
         +30m
       </button>
-      <button type="button" className="lc-chip-btn" onClick={() => handleExtend(2 * 3_600_000)}>
+      <button
+        type="button"
+        className="px-2 py-1 rounded bg-surface-base border border-border text-xs text-fg hover:bg-muted transition-colors"
+        onClick={() => handleExtend(2 * 3_600_000)}
+      >
         +2h
       </button>
-      <button type="button" className="lc-chip-btn is-danger" onClick={handleTurnOff}>
+      <button
+        type="button"
+        className="px-2 py-1 rounded bg-surface-base border border-border text-xs text-destructive hover:bg-muted transition-colors"
+        onClick={handleTurnOff}
+      >
         Turn off
       </button>
     </div>

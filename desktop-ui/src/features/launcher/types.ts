@@ -22,7 +22,6 @@ export interface LauncherItem {
   icon?: string;
   kind: LauncherItemKind;
   score: number;
-  pinned?: boolean;
   noView?: boolean;
   arguments?: ArgSpec[];
 }
@@ -31,11 +30,7 @@ export type LauncherItemKind =
   | { type: "application"; path: string; running: boolean }
   | { type: "task"; taskId: string; status: string }
   | { type: "note"; noteId: string; preview: string }
-  | {
-      type: "clipboardEntry";
-      entryId: number;
-      contentType: "text" | "image" | "file";
-    }
+  | { type: "clipboardEntry"; entryId: number; contentType: "text" | "image" | "file" }
   | { type: "systemCommand"; action: string }
   | { type: "script"; path: string; name: string }
   | { type: "calculator"; expression: string; result: number }
@@ -79,17 +74,25 @@ export type WindowAction =
 export interface FocusSession {
   id: number;
   mode: "dnd";
-  startedAt: string;
-  endsAt: string;
-  endedAt: string | null;
+  startedAt: string; // RFC 3339
+  endsAt: string; // RFC 3339
+  endedAt: string | null; // RFC 3339 or null while active
   alarmId: string | null;
   source: string;
 }
 
 export interface DashboardData {
+  focus: FocusDashboard | null;
   calendar: CalendarDashboard[];
   tasks: TaskDashboard[];
   productivity: ProductivityDashboard;
+}
+
+export interface FocusDashboard {
+  taskName: string | null;
+  elapsedSecs: number;
+  targetSecs: number | null;
+  sessionId: string;
 }
 
 export interface CalendarDashboard {

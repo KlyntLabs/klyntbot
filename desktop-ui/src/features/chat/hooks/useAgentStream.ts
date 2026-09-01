@@ -1,6 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
-import { DEFAULT_STREAM_SNAPSHOT } from "@/features/chat/types";
-import { useChatStore } from "@/features/threads/store/useChatStore";
+import { chatStreamStore } from "@shared/stores/chatStreamStore";
 import type {
   ActiveInteraction,
   DebateRound,
@@ -8,7 +6,8 @@ import type {
   MessageSegment,
   PersonaSegment,
   TransparencyData,
-} from "../types";
+} from "@shared/types";
+import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
 
 export type { PersonaSegment };
 
@@ -47,16 +46,17 @@ interface AgentStream {
 /**
  * Listens to agent streaming events for a specific session.
  *
- * State is managed by `useChatStore` so streams survive React component
- * unmount/remount (e.g. during route navigation).
+ * State and EventSource connections are managed by a global store so they
+ * survive React component unmount/remount (e.g. during route navigation).
  *
  * @param sessionKey  Session to filter events for (empty = inert).
  * @param onDone      Called when the agent finishes — use for refetching messages.
  */
 export function useAgentStream(sessionKey: string, onDone?: () => void): AgentStream {
-  const state = useChatStore(
-    (store) => store.streamSnapshots[sessionKey] ?? DEFAULT_STREAM_SNAPSHOT,
-  );
+  // Subscribe to the global store for this session's state
+  const getSnapshot = useCallback(() => chatStreamStore.getSnapshot(sessionKey), [sessionKey]);
+
+  const state = useSyncExternalStore(chatStreamStore.subscribe, getSnapshot);
 
   // Register onDone callback with the store
   const onDoneRef = useRef(onDone);
@@ -64,55 +64,46 @@ export function useAgentStream(sessionKey: string, onDone?: () => void): AgentSt
 
   useEffect(() => {
     if (!sessionKey) return;
-    return useChatStore.subscribe((store, prevStore) => {
-      const snap = store.streamSnapshots[sessionKey];
-      const prevSnap = prevStore.streamSnapshots[sessionKey];
-      if (!snap || snap === prevSnap) return;
-      // Fire onDone when a stream transitions from active to inactive
-      if (prevSnap?.isStreaming && !snap.isStreaming) {
-        onDoneRef.current?.();
-      }
-    });
+    return chatStreamStore.registerOnDone(sessionKey, () => onDoneRef.current?.());
   }, [sessionKey]);
 
+  // Handle deferred refetch: if a stream finished while this component was
+  // unmounted, the store sets needsRefetch=true. On mount, consume it and
+  // fire onDone to trigger message refetch.
+  useEffect(() => {
+    if (state.needsRefetch && sessionKey) {
+      chatStreamStore.consumeRefetch(sessionKey);
+      onDoneRef.current?.();
+    }
+  }, [state.needsRefetch, sessionKey]);
+
   const startStreaming = useCallback(() => {
-    useChatStore.getState()._setStreamSnapshot(sessionKey, {
-      ...DEFAULT_STREAM_SNAPSHOT,
-      isStreaming: true,
-      statusPhase: "Thinking",
-      needsRefetch: false,
-    });
+    chatStreamStore.startStream(sessionKey);
   }, [sessionKey]);
 
   const failStreaming = useCallback(
     (message: string) => {
-      useChatStore.getState()._setStreamSnapshot(sessionKey, {
-        ...DEFAULT_STREAM_SNAPSHOT,
-        error: message,
-      });
+      chatStreamStore.failStream(sessionKey, message);
     },
     [sessionKey],
   );
 
-  const clearInteraction = useCallback(() => {
-    const snap = useChatStore.getState().streamSnapshots[sessionKey] ?? DEFAULT_STREAM_SNAPSHOT;
-    useChatStore.getState()._setStreamSnapshot(sessionKey, { ...snap, activeInteraction: null });
-  }, [sessionKey]);
+  const clearInteraction = useCallback(
+    () => chatStreamStore.clearInteraction(sessionKey),
+    [sessionKey],
+  );
 
-  const clearSegments = useCallback(() => {
-    const snap = useChatStore.getState().streamSnapshots[sessionKey] ?? DEFAULT_STREAM_SNAPSHOT;
-    useChatStore.getState()._setStreamSnapshot(sessionKey, { ...snap, segments: [] });
-  }, [sessionKey]);
+  const clearSegments = useCallback(() => chatStreamStore.clearSegments(sessionKey), [sessionKey]);
 
-  const clearTransparency = useCallback(() => {
-    const snap = useChatStore.getState().streamSnapshots[sessionKey] ?? DEFAULT_STREAM_SNAPSHOT;
-    useChatStore.getState()._setStreamSnapshot(sessionKey, { ...snap, transparency: null });
-  }, [sessionKey]);
+  const clearTransparency = useCallback(
+    () => chatStreamStore.clearTransparency(sessionKey),
+    [sessionKey],
+  );
 
-  const clearPersonaMessages = useCallback(() => {
-    const snap = useChatStore.getState().streamSnapshots[sessionKey] ?? DEFAULT_STREAM_SNAPSHOT;
-    useChatStore.getState()._setStreamSnapshot(sessionKey, { ...snap, personaMessages: [] });
-  }, [sessionKey]);
+  const clearPersonaMessages = useCallback(
+    () => chatStreamStore.clearPersonaMessages(sessionKey),
+    [sessionKey],
+  );
 
   return {
     segments: state.segments,

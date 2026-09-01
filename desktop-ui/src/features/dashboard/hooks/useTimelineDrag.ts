@@ -1,19 +1,21 @@
-import { type QueryKey, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@shared/hooks/useMutation";
+import { invalidateQueries } from "@shared/hooks/useQuery";
+import { minutesToIso } from "@shared/lib/dates";
+import type { TaskUpdateParams } from "@shared/types";
 import { useCallback, useRef, useState } from "react";
-import { taskUpdate } from "@/api/endpoints/dashboard";
-import type { TaskResponse, TaskUpdateParams, TimelineResponse } from "@/bindings";
-import { useTauriMutation } from "@/lib/query";
-import { qk } from "@/lib/query/queryKeys";
-import { minutesToIso } from "@/utils/dashboardDates";
 
 const SNAP_MINUTES = 15;
 
 interface DragState {
   taskId: string;
   mode: "move" | "resize" | "tray";
+  /** Pre-drag top in minutes (for rollback) */
   originTopMin: number;
+  /** Pre-drag end in minutes (for rollback) */
   originEndMin: number;
+  /** Mouse Y at drag start relative to timeline container */
   startMouseY: number;
+  /** Offset from top of block to mouse position (for move mode) */
   offsetMin: number;
 }
 
@@ -30,29 +32,7 @@ function clampMinutes(min: number): number {
   return Math.max(0, Math.min(1440, min));
 }
 
-function optimisticUpdateTimeline(vars: TaskUpdateParams, prev: unknown): TimelineResponse {
-  const timeline = prev as TimelineResponse;
-  if (!timeline?.entries) return timeline;
-  const newStart = vars.scheduledStart;
-  const newEnd = vars.scheduledEnd;
-  if (!newStart || !newEnd) return timeline;
-  const newDuration = Math.round(
-    (new Date(newEnd).getTime() - new Date(newStart).getTime()) / 1000,
-  );
-  return {
-    ...timeline,
-    entries: timeline.entries.map((entry) => {
-      if (entry.entityId !== vars.id) return entry;
-      return {
-        ...entry,
-        startedAt: newStart,
-        durationSecs: newDuration,
-      };
-    }),
-  };
-}
-
-export function useTimelineDrag(date: string, pxPerMin: number, timelineQueryKey: QueryKey) {
+export function useTimelineDrag(date: string, pxPerMin: number) {
   const [drag, setDrag] = useState<DragState | null>(null);
   const [ghost, setGhost] = useState<GhostPosition | null>(null);
   const dragRef = useRef<DragState | null>(null);
@@ -60,15 +40,7 @@ export function useTimelineDrag(date: string, pxPerMin: number, timelineQueryKey
   const pxPerMinRef = useRef(pxPerMin);
   pxPerMinRef.current = pxPerMin;
 
-  const queryClient = useQueryClient();
-  const { mutate: updateTask } = useTauriMutation<TaskResponse, TaskUpdateParams>({
-    mutationFn: taskUpdate,
-    invalidates: [qk.dashboard.all()],
-    optimistic: {
-      queryKey: timelineQueryKey,
-      update: optimisticUpdateTimeline,
-    },
-  });
+  const { mutate: updateTask } = useMutation<void, TaskUpdateParams>("task_update", "params");
 
   const isDragging = drag !== null;
 
@@ -129,6 +101,7 @@ export function useTimelineDrag(date: string, pxPerMin: number, timelineQueryKey
   const dateRef = useRef(date);
   dateRef.current = date;
 
+  // Stable identity — reads only from refs, no state closures
   const onMouseMove = useCallback((e: MouseEvent) => {
     const d = dragRef.current;
     if (!d) return;
@@ -137,10 +110,14 @@ export function useTimelineDrag(date: string, pxPerMin: number, timelineQueryKey
     const deltaMins = deltaY / pxPerMinRef.current;
 
     let newGhost: GhostPosition;
+
     if (d.mode === "move") {
       const newTop = snapToGrid(d.originTopMin + deltaMins);
       const duration = d.originEndMin - d.originTopMin;
-      newGhost = { topMin: clampMinutes(newTop), endMin: clampMinutes(newTop + duration) };
+      newGhost = {
+        topMin: clampMinutes(newTop),
+        endMin: clampMinutes(newTop + duration),
+      };
     } else if (d.mode === "resize") {
       const newEnd = snapToGrid(d.originEndMin + deltaMins);
       newGhost = {
@@ -148,9 +125,13 @@ export function useTimelineDrag(date: string, pxPerMin: number, timelineQueryKey
         endMin: clampMinutes(Math.max(d.originTopMin + SNAP_MINUTES, newEnd)),
       };
     } else {
+      // tray mode: position ghost based on mouse position
       const duration = ghostRef.current ? ghostRef.current.endMin - ghostRef.current.topMin : 30;
       const rawTop = snapToGrid(d.originTopMin + deltaMins);
-      newGhost = { topMin: clampMinutes(rawTop), endMin: clampMinutes(rawTop + duration) };
+      newGhost = {
+        topMin: clampMinutes(rawTop),
+        endMin: clampMinutes(rawTop + duration),
+      };
     }
 
     ghostRef.current = newGhost;
@@ -167,37 +148,41 @@ export function useTimelineDrag(date: string, pxPerMin: number, timelineQueryKey
       setGhost(null);
       return;
     }
+
+    // Clear drag state immediately for responsive UI
     dragRef.current = null;
     ghostRef.current = null;
     setDrag(null);
     setGhost(null);
 
-    if (d.mode !== "tray" && g.topMin === d.originTopMin && g.endMin === d.originEndMin) return;
-    if (d.mode === "tray" && d.originTopMin === -1) return;
+    // Skip if nothing changed (move/resize back to original position)
+    if (d.mode !== "tray" && g.topMin === d.originTopMin && g.endMin === d.originEndMin) {
+      return;
+    }
+
+    // Skip tray drags that never moved
+    if (d.mode === "tray" && d.originTopMin === -1) {
+      return;
+    }
 
     await updateTask({
       id: d.taskId,
-      title: null,
-      description: null,
-      priority: null,
-      status: null,
-      dueDate: null,
-      projectId: null,
-      areaId: null,
-      tags: null,
-      keyResultId: null,
-      statusLabelId: null,
-      position: null,
-      groupId: null,
-      taskType: null,
-      energyLevel: null,
-      estimatedMinutes: null,
       scheduledStart: minutesToIso(dateRef.current, g.topMin),
       scheduledEnd: minutesToIso(dateRef.current, g.endMin),
     });
 
-    void queryClient.invalidateQueries({ queryKey: qk.dashboard.all() });
-  }, [updateTask, queryClient]);
+    invalidateQueries("timeline_");
+    invalidateQueries("task");
+  }, [updateTask]);
 
-  return { drag, ghost, isDragging, startMove, startResize, startTrayDrag, onMouseMove, onMouseUp };
+  return {
+    drag,
+    ghost,
+    isDragging,
+    startMove,
+    startResize,
+    startTrayDrag,
+    onMouseMove,
+    onMouseUp,
+  };
 }

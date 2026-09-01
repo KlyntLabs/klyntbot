@@ -1,5 +1,5 @@
+import type { TimelineSource } from "@shared/types";
 import { createContext, useCallback, useContext, useMemo, useState } from "react";
-import type { TimelineSource } from "@/bindings";
 
 export type LayerKey = "activity" | "calendar" | "timeEntries" | "tasks" | "transactions" | "notes";
 
@@ -77,7 +77,7 @@ function loadEnabled(): Set<LayerKey> {
 export function useLayerToggle() {
   const [enabled, setEnabled] = useState<Set<LayerKey>>(loadEnabled);
 
-  const toggle = useCallback((key: LayerKey) => {
+  const toggle = (key: LayerKey) => {
     setEnabled((prev) => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key);
@@ -85,13 +85,13 @@ export function useLayerToggle() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify([...next]));
       return next;
     });
-  }, []);
+  };
 
-  const reset = useCallback(() => {
+  const reset = () => {
     const defaults = defaultEnabled();
     setEnabled(defaults);
     localStorage.setItem(STORAGE_KEY, JSON.stringify([...defaults]));
-  }, []);
+  };
 
   /** Flat list of TimelineSource values for enabled layers, to pass to timeline_query */
   const enabledSources = useMemo(
@@ -102,57 +102,16 @@ export function useLayerToggle() {
   return { enabled, toggle, reset, enabledSources };
 }
 
-export interface LayerContextValue {
+export const LayerContext = createContext<{
   enabled: Set<LayerKey>;
   enabledSources: TimelineSource[];
-  toggle: (key: LayerKey) => void;
-  reset: () => void;
-}
-
-export const LayerContext = createContext<LayerContextValue>({
-  enabled: new Set(),
-  enabledSources: [],
-  toggle: () => {},
-  reset: () => {},
-});
+}>({ enabled: new Set(), enabledSources: [] });
 
 export function useEnabledLayers() {
   return useContext(LayerContext);
 }
 
-export interface SidebarContextValue {
-  sidebarOpen: boolean;
-  toggleSidebar: () => void;
-}
-
-export const SidebarContext = createContext<SidebarContextValue>({
-  sidebarOpen: true,
-  toggleSidebar: () => {},
-});
-
-export function useSidebarOpen() {
-  return useContext(SidebarContext);
-}
-
-export function useSidebarToggle() {
-  const [open, setOpen] = useState(() => {
-    try {
-      return localStorage.getItem("dashboard-sidebar") !== "closed";
-    } catch {
-      return true;
-    }
-  });
-
-  const toggle = () => {
-    setOpen((prev) => {
-      const next = !prev;
-      localStorage.setItem("dashboard-sidebar", next ? "open" : "closed");
-      return next;
-    });
-  };
-
-  return { sidebarOpen: open, toggleSidebar: toggle };
-}
+export const SidebarContext = createContext<boolean>(true);
 
 // ── Data Mode ────────────────────────────────────────────────
 export type DataMode = "productivity" | "contexts";
@@ -176,16 +135,32 @@ export function useDataMode() {
   return { dataMode: mode, setDataMode };
 }
 
-export interface DataModeContextValue {
-  dataMode: DataMode;
-  setDataMode: (next: DataMode) => void;
-}
-
-export const DataModeContext = createContext<DataModeContextValue>({
-  dataMode: "productivity",
-  setDataMode: () => {},
-});
+export const DataModeContext = createContext<DataMode>("productivity");
 
 export function useDataModeValue() {
   return useContext(DataModeContext);
+}
+
+export function useSidebarOpen() {
+  return useContext(SidebarContext);
+}
+
+export function useSidebarToggle() {
+  const [open, setOpen] = useState(() => {
+    try {
+      return localStorage.getItem("dashboard-sidebar") !== "closed";
+    } catch {
+      return true;
+    }
+  });
+
+  const toggle = () => {
+    setOpen((prev) => {
+      const next = !prev;
+      localStorage.setItem("dashboard-sidebar", next ? "open" : "closed");
+      return next;
+    });
+  };
+
+  return { sidebarOpen: open, toggleSidebar: toggle };
 }

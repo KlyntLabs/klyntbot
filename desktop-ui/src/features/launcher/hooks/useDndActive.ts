@@ -1,22 +1,23 @@
-import { qk, useTauriQuery } from "@/lib/query";
+import { useQuery } from "@shared/hooks/useQuery";
+import { useEffect } from "react";
 import type { FocusSession } from "../types";
 
-export interface DndActiveResult {
-  data: FocusSession | null;
-  refetch: () => void;
-}
+/**
+ * Polls focus_active for the DND session. Uses a short 2s stale time and a
+ * 2s background refetch so the UI reflects natural expiration and external
+ * activations without needing bus-event wiring.
+ */
+export function useDndActive() {
+  const query = useQuery<FocusSession | null>(
+    "focus_active",
+    { mode: "dnd" },
+    { staleTime: 2_000 },
+  );
 
-export function useDndActive(): DndActiveResult {
-  const query = useTauriQuery<FocusSession | null>({
-    queryKey: qk.launcher.dndActive(),
-    command: "focus_active",
-    args: { mode: "dnd" },
-    fallback: null,
-  });
-  return {
-    data: query.data,
-    refetch: () => {
-      query.refetch();
-    },
-  };
+  useEffect(() => {
+    const id = setInterval(() => query.refetch(), 2_000);
+    return () => clearInterval(id);
+  }, [query.refetch]);
+
+  return query;
 }

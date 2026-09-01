@@ -1,0 +1,15 @@
+export { Dashboard } from "./components/Dashboard";
+export { ProductivityStrip } from "./components/ProductivityStrip";
+export { AddGoalDialog } from "./components/productivity/AddGoalDialog";
+export { FocusStateIndicator } from "./components/productivity/FocusStateIndicator";
+export { FocusTrayIndicator } from "./components/productivity/FocusTrayIndicator";
+export { GoalsProgress } from "./components/productivity/GoalsProgress";
+export { HourlyHeatmap } from "./components/productivity/HourlyHeatmap";
+export { PatternsCard } from "./components/productivity/PatternsCard";
+export { ProductivityScoreRing, ScoreBar } from "./components/productivity/ProductivityScoreRing";
+export { SummaryPanel } from "./components/SummaryPanel";
+export type { SessionBlock } from "./components/views/ActivityTrack";
+export { ActivityTrack } from "./components/views/ActivityTrack";
+export type { MergeableEvent, MergedSession } from "./lib/activity-sessions";
+export { mergeActivitySessions } from "./lib/activity-sessions";
+export { AppIcon, getAppColor, qualityToColor, scoreColor } from "./lib/productivity";

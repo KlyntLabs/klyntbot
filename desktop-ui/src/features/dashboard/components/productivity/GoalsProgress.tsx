@@ -1,15 +1,8 @@
-import Plus from "lucide-react/dist/esm/icons/plus";
-import Trash2 from "lucide-react/dist/esm/icons/trash-2";
+import { useMutation } from "@shared/hooks/useMutation";
+import { useQuery } from "@shared/hooks/useQuery";
+import type { GoalProgress } from "@shared/types";
+import { Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
-import {
-  type GoalCreateParams,
-  productivityGoalCreate,
-  productivityGoalDelete,
-  productivityGoalsQuery,
-} from "@/api/endpoints/dashboard";
-import type { GoalProgressResponse } from "@/bindings";
-import { useTauriMutation, useTauriQuery } from "@/lib/query";
-import { qk } from "@/lib/query/queryKeys";
 import { AddGoalDialog } from "./AddGoalDialog";
 
 function metricLabel(metric: string): string {
@@ -36,95 +29,82 @@ function formatValue(metric: string, value: number): string {
 }
 
 export function GoalsProgress() {
+  const { data: goals, refetch } = useQuery<GoalProgress[]>("productivity_goals", undefined, [], {
+    invalidateOn: ["entity:updated"],
+    invalidateFilter: (p) => (p as { entityKind?: string })?.entityKind === "productivity",
+  });
   const [showAdd, setShowAdd] = useState(false);
+  const { mutate: createGoal } = useMutation<
+    void,
+    { goal_type: string; metric: string; target_value: number }
+  >("productivity_goal_create");
+  const { mutate: deleteGoal } = useMutation<void, { id: number }>("productivity_goal_delete");
 
-  const { data: goals } = useTauriQuery<GoalProgressResponse[]>({
-    queryKey: qk.productivity.goals(),
-    queryFn: () => productivityGoalsQuery(),
-    fallback: [],
-  });
-
-  const { mutate: createGoal } = useTauriMutation<GoalProgressResponse, GoalCreateParams>({
-    mutationFn: productivityGoalCreate,
-    invalidates: [qk.productivity.goals()],
-  });
-
-  const { mutate: deleteGoal } = useTauriMutation<void, number>({
-    mutationFn: productivityGoalDelete,
-    invalidates: [qk.productivity.goals()],
-  });
-
-  const handleAdd = (params: GoalCreateParams) => {
-    void createGoal(params);
+  const handleAdd = async (params: { goal_type: string; metric: string; target_value: number }) => {
+    await createGoal(params);
+    refetch();
   };
 
-  const handleDelete = (id: number) => {
-    if (window.confirm("Are you sure you want to delete this goal?")) {
-      void deleteGoal(id);
-    }
+  const handleDelete = async (id: number) => {
+    await deleteGoal({ id });
+    refetch();
   };
 
   return (
     <>
-      <div className="dashboard__goals">
-        <div className="dashboard__goals-header">
-          <h2>Goals</h2>
+      <div className="glass-card p-4 flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-[13px] font-medium text-muted-foreground">Goals</h2>
           <button
             type="button"
             onClick={() => setShowAdd(true)}
-            className="dashboard__goals-add-btn"
-            aria-label="Add goal"
+            className="size-6 rounded-md flex items-center justify-center text-muted-foreground hover:text-brand hover:bg-muted transition-colors"
           >
-            <Plus aria-hidden />
+            <Plus className="size-3.5" />
           </button>
         </div>
 
         {goals.length === 0 ? (
-          <p className="dashboard__goals-empty">No goals set</p>
+          <p className="text-xs font-light text-dim">No goals set</p>
         ) : (
-          <div>
+          <div className="flex flex-col gap-2">
             {goals.map((g) => {
               const pct =
                 g.targetValue > 0 ? Math.min((g.currentValue / g.targetValue) * 100, 100) : 0;
               return (
-                <div key={g.id} className="dashboard__goal-row">
-                  <div className="dashboard__goal-meta">
-                    <span
-                      className={
-                        g.met
-                          ? "dashboard__goal-status dashboard__goal-status--met"
-                          : "dashboard__goal-status dashboard__goal-status--in-progress"
-                      }
-                    >
-                      {g.met ? "MET" : "IN PROGRESS"}
-                    </span>
-                    <span>
-                      {formatValue(g.metric, g.targetValue)} {metricLabel(g.metric)}
-                    </span>
-                    {g.projectId && (
-                      <span className="dashboard__goal-project-tag">{g.projectId}</span>
-                    )}
-                    <span>({g.goalType})</span>
-                    <span>
-                      {formatValue(g.metric, g.currentValue)} /{" "}
-                      {formatValue(g.metric, g.targetValue)}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(g.id)}
-                      className="dashboard__goal-delete-btn"
-                      aria-label="Delete goal"
-                    >
-                      <Trash2 aria-hidden />
-                    </button>
+                <div key={g.id} className="group flex flex-col gap-1">
+                  <div className="flex items-center justify-between text-[11px] font-light">
+                    <div className="flex items-center gap-2">
+                      <span className={g.met ? "text-success" : "text-brand"}>
+                        {g.met ? "MET" : "IN PROGRESS"}
+                      </span>
+                      <span className="text-foreground">
+                        {formatValue(g.metric, g.targetValue)} {metricLabel(g.metric)}
+                      </span>
+                      {g.projectId && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                          {g.projectId}
+                        </span>
+                      )}
+                      <span className="text-dim">({g.goalType})</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-muted-foreground tabular-nums">
+                        {formatValue(g.metric, g.currentValue)} /{" "}
+                        {formatValue(g.metric, g.targetValue)}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(g.id)}
+                        className="size-5 rounded flex items-center justify-center text-transparent group-hover:text-muted-foreground hover:!text-destructive transition-colors"
+                      >
+                        <Trash2 className="size-3" />
+                      </button>
+                    </div>
                   </div>
-                  <div className="dashboard__goal-bar-track">
+                  <div className="h-1.5 rounded-full bg-muted overflow-hidden">
                     <div
-                      className={
-                        g.met
-                          ? "dashboard__goal-bar-fill dashboard__goal-bar-fill--met"
-                          : "dashboard__goal-bar-fill"
-                      }
+                      className={`h-full rounded-full transition-[width] ${g.met ? "bg-success" : "bg-brand"}`}
                       style={{ width: `${pct}%` }}
                     />
                   </div>

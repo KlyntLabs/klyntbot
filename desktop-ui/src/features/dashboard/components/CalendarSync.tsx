@@ -1,45 +1,52 @@
-import Calendar from "lucide-react/dist/esm/icons/calendar";
-import Loader2 from "lucide-react/dist/esm/icons/loader-2";
-import RefreshCw from "lucide-react/dist/esm/icons/refresh-cw";
+/**
+ * CalendarSync — toolbar button for syncing calendar events from Google Calendar MCP.
+ * Shows sync status and triggers sync on click.
+ */
+
+import { useMutation } from "@shared/hooks/useMutation";
+import { formatTime } from "@shared/lib/dates";
+import { cn } from "@shared/lib/utils";
+import { Calendar, Loader2, RefreshCw } from "lucide-react";
 import { useState } from "react";
-import { calendarSyncEvents } from "@/api/endpoints/dashboard";
-import { useTauriMutation } from "@/lib/query";
-import { qk } from "@/lib/query/queryKeys";
-import { formatTime } from "@/utils/dashboardDates";
 
 export function CalendarSync() {
+  const { mutate, loading } = useMutation("calendar_sync_events");
   const [lastSynced, setLastSynced] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const { mutate, isLoading } = useTauriMutation<unknown, void>({
-    mutationFn: () => calendarSyncEvents(),
-    invalidates: [qk.dashboard.all(), qk.calendarSync.all()],
-    onSuccess: () => {
-      setError(null);
+  const handleSync = async () => {
+    setError(null);
+    try {
+      // The frontend sends an empty array to trigger a "pull" sync
+      // In production, this would be populated by MCP Google Calendar data
+      await mutate({ events: [] });
       setLastSynced(formatTime(new Date().toISOString()));
-    },
-    onError: (e) => {
+    } catch (e) {
       setError(e instanceof Error ? e.message : "Sync failed");
-    },
-  });
-
-  const title = lastSynced
-    ? `Last synced: ${lastSynced}`
-    : error
-      ? `Error: ${error}`
-      : "Sync calendar events";
+    }
+  };
 
   return (
     <button
       type="button"
-      onClick={() => void mutate()}
-      disabled={isLoading}
-      className="dashboard__calendar-sync"
-      title={title}
+      onClick={handleSync}
+      disabled={loading}
+      className={cn(
+        "flex items-center gap-1.5 px-2 py-1 rounded-md text-xs",
+        "text-muted-foreground hover:text-foreground hover:bg-accent transition-colors",
+        loading && "opacity-50 cursor-not-allowed",
+      )}
+      title={
+        lastSynced
+          ? `Last synced: ${lastSynced}`
+          : error
+            ? `Error: ${error}`
+            : "Sync calendar events"
+      }
     >
-      {isLoading ? <Loader2 className="lc-spin" /> : <Calendar />}
-      <span>Sync</span>
-      {lastSynced && !isLoading && <RefreshCw />}
+      {loading ? <Loader2 className="size-3.5 animate-spin" /> : <Calendar className="size-3.5" />}
+      <span className="hidden sm:inline">Sync</span>
+      {lastSynced && !loading && <RefreshCw className="size-3 text-success" />}
     </button>
   );
 }
