@@ -2832,6 +2832,14 @@ async mcpGetConfig() : Promise<Result<McpConfigResponse, ApiError>> {
     else return { status: "error", error: e  as any };
 }
 },
+async mcpGetEmbeddedStatus() : Promise<Result<EmbeddedMcpStatusResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("mcp_get_embedded_status") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async mcpAddServer(params: McpAddServerParams) : Promise<Result<McpConfigResponse, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("mcp_add_server", { params }) };
@@ -3955,6 +3963,23 @@ export type DomainEventRow = { id: string; event_type: string; domain: string; s
 export type DomainHealthEntry = { domain: string; score: number; totalFacts: number; activeFacts: number; fastFailures: number }
 export type DomainHistory = { domain: string; points: RetentionPoint[] }
 export type DonePayload = { sessionKey: string; content: string }
+export type EmbeddedMcpRejection = { name: string; 
+/**
+ * `unknown` | `forbidden`
+ */
+reason: string }
+/**
+ * Persistent embedded MCP server status (distinct from client server list).
+ */
+export type EmbeddedMcpStatusResponse = { 
+/**
+ * `ready` | `disabled` | `invalid`
+ */
+state: string; requested: string[]; 
+/**
+ * Effective builtins + registry tools advertised when Ready.
+ */
+effective: string[]; rejected: EmbeddedMcpRejection[] }
 export type EnhancementStagePayload = { name: string; status: string; statusDetail?: string | null; latencyMs: number; llmCalls: number; outputSummary: string }
 export type EnrichAnnotationParams = { annotationId: string; quotedText: string; sourceLang: string; targetLang: string }
 export type EntityCreatedPayload = { sessionKey: string; 

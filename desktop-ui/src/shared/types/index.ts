@@ -169,6 +169,9 @@ export type { CalendarEvent } from "./dashboard";
 // ── Config Types ──────────────────────────────────────────
 
 export type {
+  EmbeddedMcpRejection,
+  EmbeddedMcpState,
+  EmbeddedMcpStatusResponse,
   McpAddServerParams,
   McpConfigResponse,
   McpServerConfig,
@@ -229,4 +232,3 @@ export type {
   FabricNote,
   FabricTreeNode,
 } from "./fabric";
-

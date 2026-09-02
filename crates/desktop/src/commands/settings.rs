@@ -1,12 +1,17 @@
 use desktop_macros::klynt_command;
 use desktop_shared::commands::{
-    AppInfoResponse, McpAddServerParams, McpConfigResponse, McpRemoveParams, McpToggleParams,
-    McpUpdateServerParams,
+    AppInfoResponse, EmbeddedMcpStatusResponse, McpAddServerParams, McpConfigResponse,
+    McpRemoveParams, McpToggleParams, McpUpdateServerParams,
 };
 use desktop_shared::specta_helpers::JsonValueWrapper;
 #[klynt_command]
 pub async fn mcp_get_config() -> McpConfigResponse {
     state.mcp_get_config().await
+}
+
+#[klynt_command]
+pub async fn mcp_get_embedded_status() -> EmbeddedMcpStatusResponse {
+    state.mcp_get_embedded_status().await
 }
 
 #[klynt_command]

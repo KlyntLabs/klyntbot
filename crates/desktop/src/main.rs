@@ -305,16 +305,20 @@ fn run_desktop_app() {
                 let _global_event_tx = global_event_tx;
             }
 
-            // Start embedded MCP HTTP server if enabled in config.
-            // Must clone before app.manage(core) moves the Arc.
-            // Task 6 owns Invalid/Disabled bind gating; here we only pass the
-            // stored ExposureValidation into the handler (builtins + effective set).
+            // Start embedded MCP HTTP server only when AppCore status is Ready
+            // (EXPO-3.8 / EXPO-5.* / EXPO-8.10). Invalid/Disabled must not bind.
             {
                 let mcp_core = Arc::clone(&core);
-                let enabled = tauri::async_runtime::block_on(async {
-                    mcp_core.config.read().await.mcp.server.enabled
-                });
-                if enabled {
+                if !mcp_core.embedded_mcp_bind_allowed() {
+                    let state = mcp_core
+                        .mcp_exposure()
+                        .map(|v| v.runtime_state.as_str())
+                        .unwrap_or("missing");
+                    tracing::info!(
+                        runtime_state = state,
+                        "embedded MCP HTTP server not started (Ready required)"
+                    );
+                } else {
                     tauri::async_runtime::spawn(async move {
                         let config = mcp_core.config.read().await;
                         let host = config.mcp.server.host.clone();

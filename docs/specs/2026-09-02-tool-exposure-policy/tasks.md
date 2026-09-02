@@ -166,9 +166,9 @@ _Requirements: EXPO-3.2, EXPO-3.3, EXPO-3.7, EXPO-3.9, EXPO-4.1, EXPO-4.2, EXPO-
 **Depends-on:** Task 3, Task 5
 
 **Steps:**
-- [ ] Failing UI/command test: Invalid shows reasons; Ready/Disabled chips; client list still works
-- [ ] Gate embedded HTTP start on status; map DTO; add settings section
-- [ ] Pass; commit `feat(desktop-ui): show embedded MCP exposure status`
+- [x] Failing UI/command test: Invalid shows reasons; Ready/Disabled chips; client list still works
+- [x] Gate embedded HTTP start on status; map DTO; add settings section
+- [x] Pass; commit `feat(desktop-ui): show embedded MCP exposure status`
 
 _Requirements: EXPO-5.1, EXPO-5.2, EXPO-5.3, EXPO-5.4, EXPO-5.5, EXPO-5.6, EXPO-7.3, EXPO-8.10, EXPO-8.11, EXPO-8.13_
 

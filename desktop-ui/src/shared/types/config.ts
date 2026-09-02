@@ -18,6 +18,20 @@ export interface McpConfigResponse {
   servers: McpServerConfig[];
 }
 
+export type EmbeddedMcpState = "ready" | "disabled" | "invalid";
+
+export interface EmbeddedMcpRejection {
+  name: string;
+  reason: string;
+}
+
+export interface EmbeddedMcpStatusResponse {
+  state: EmbeddedMcpState | string;
+  requested: string[];
+  effective: string[];
+  rejected: EmbeddedMcpRejection[];
+}
+
 export interface McpAddServerParams {
   name: string;
   transport: "stdio" | "http";

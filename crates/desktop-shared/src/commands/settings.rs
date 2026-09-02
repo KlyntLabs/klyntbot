@@ -81,6 +81,26 @@ pub struct McpUpdateServerParams {
     pub headers: Option<std::collections::HashMap<String, String>>,
 }
 
+/// Persistent embedded MCP server status (distinct from client server list).
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct EmbeddedMcpStatusResponse {
+    /// `ready` | `disabled` | `invalid`
+    pub state: String,
+    pub requested: Vec<String>,
+    /// Effective builtins + registry tools advertised when Ready.
+    pub effective: Vec<String>,
+    pub rejected: Vec<EmbeddedMcpRejection>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct EmbeddedMcpRejection {
+    pub name: String,
+    /// `unknown` | `forbidden`
+    pub reason: String,
+}
+
 // ── App Info ──────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
