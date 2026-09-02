@@ -52,3 +52,7 @@ benchmark-out/
 # Local agent / browser artifacts
 .skills/
 .playwright-mcp/
+desktop-ui/test-results/
+desktop-ui/playwright-report/
+desktop-ui/blob-report/
+desktop-ui/playwright/.cache/

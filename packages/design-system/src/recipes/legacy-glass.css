@@ -147,14 +147,17 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
+    .glass,
+    .glass-strong,
+    .liquid-glass,
     .glass-panel,
-    .glass-toolbar,
-    .glass-input,
     .glass-floating,
     .glass-dropdown,
+    .glass-input,
+    .glass-toolbar,
     .context-menu {
-      -webkit-backdrop-filter: none;
       backdrop-filter: none;
+      -webkit-backdrop-filter: none;
     }
   }
 

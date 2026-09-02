@@ -14,20 +14,22 @@ the north star. Prefer local timing, bundle analysis, and React profiler traces.
 **Structured observability dashboards (OpenTelemetry / Prometheus) are a product
 non-goal** — do not add them for FE perf.
 
-**Enforcement:** a check script lands in **P2**. Until then, budgets below are
-**targets to calibrate**, not CI gates. Loosening a calibrated budget later needs
-explicit owner approval in the PR.
+**Enforcement:** `desktop-ui/scripts/check-performance-budget.sh` is the
+executable source of truth for budget numbers. Run via
+`bun run check:performance` from `desktop-ui/` (or the repo root). Budgets may
+be **tightened** in a normal PR; **loosening one requires explicit owner
+approval** in the PR description.
 
-## Budgets (initial targets — need calibration)
+## Budgets (current values, mirrored from the script)
 
-| Budget | Soft target (gzip) | Notes |
+| Budget | Limit (gzipped) | Notes |
 |---|---|---|
-| Initial JS (main entry scripts) | ~400 kB | Shell + router + DS; calibrate after a release build |
-| Initial CSS | ~50 kB | Token + chrome CSS |
-| Largest public raster | 500 kB | Prefer SVG/WebP; rare in this app |
+| Entry JS (`<script>` tags in `dist/index.html`, fallback `main-*.js`) | 800 kB | Soft Tauri-local budget; calibrated 2026-09-02 (~44 kB today) |
+| Main CSS (`main-*.css` or largest CSS) | 80 kB | Token + chrome CSS; calibrated 2026-09-02 (~23 kB today) |
 
-Tighten only after measuring a real `vite build` artifact sizes. Do not raise a
-target as the first response to a regression — split or drop weight first.
+The script also prints the top 10 JS chunks by gzip size for visibility — those
+are not individually gated. Do not raise a budget as the first response to a
+regression — split or drop weight first.
 
 ## Startup and bundle
 
@@ -62,4 +64,4 @@ target as the first response to a regression — split or drop weight first.
   a profiler trace, or a reproducible timing. Speculative micro-optimization is
   rejected in review.
 - Changes that touch shell hot paths or add a runtime dependency should run
-  `bun run build` locally and note chunk impact until the P2 budget script exists.
+  `bun run check:performance` locally and note chunk impact before push.

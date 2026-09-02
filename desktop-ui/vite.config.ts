@@ -14,6 +14,7 @@ export default defineConfig({
   ],
   clearScreen: false,
   resolve: {
+    dedupe: ["react", "react-dom"],
     alias: {
       "@": path.resolve(__dirname, "./src"),
       "@shared": path.resolve(__dirname, "./src/shared"),

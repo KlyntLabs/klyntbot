@@ -89,5 +89,6 @@ substitute or a generated API catalog.
 
 - [`design-tokens.md`](./design-tokens.md) — token contract
 - [`frontend-performance.md`](./frontend-performance.md) — budgets / splitting
+- [`desktop-ui.md`](./desktop-ui.md) — platform scripts / aliases / IPC / glass
 - [`jdbot-fe-upgrade-gaps.md`](./jdbot-fe-upgrade-gaps.md) — P0–P2 wave plan
 - [`desktop-ui/AGENTS.md`](../../desktop-ui/AGENTS.md) — pointer for agents
