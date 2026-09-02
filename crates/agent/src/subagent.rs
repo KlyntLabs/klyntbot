@@ -57,8 +57,9 @@ pub struct SubagentManager {
     agent_task_repo: AgentTaskRepo,
     tool_kit: std::sync::Mutex<Option<Arc<klynt_core::ToolKitBuilder>>>,
     hook_engine: std::sync::Mutex<Option<Arc<klynt_hooks::HookEngine>>>,
-    /// Parent agent's tool registry; source of `subagent_visible` domain tools
-    /// projected into each spawned subagent (cwd-independent tools only).
+    /// Parent agent's tool registry; source of domain tools with
+    /// `exposure_policy().subagent` projected into each spawned subagent
+    /// (cwd-independent tools only — kit primitives are rebuilt per cwd).
     parent_registry: std::sync::Mutex<Option<Arc<RwLock<ToolRegistry>>>>,
     /// Cache of base ToolRegistry builds keyed by cwd.
     /// The cache stores the registry *before* AgentTaskTool is added,
@@ -199,8 +200,8 @@ impl SubagentManager {
         SubagentManagerBuilder::new(provider, workspace)
     }
 
-    /// Inject the parent agent's tool registry. Subagents project the
-    /// `subagent_visible` tools from it (called inside `AgentLoopBuilder::build`
+    /// Inject the parent agent's tool registry. Subagents project tools whose
+    /// `exposure_policy().subagent` is true (called inside `AgentLoopBuilder::build`
     /// once the registry is `Arc`-wrapped). Clears the cwd-keyed registry cache
     /// so it's rebuilt with them.
     pub fn set_parent_registry(&self, registry: Arc<RwLock<ToolRegistry>>) {
@@ -320,19 +321,15 @@ impl SubagentManager {
             agent_id: short_id.clone(),
         };
 
-        // Project subagent-visible domain tools from the parent registry.
+        // Project subagent-opted domain tools from the parent registry.
         // These are cwd-independent (e.g. memory/recall), so they live in the
         // cwd-keyed cache alongside the workspace-scoped primitives.
         let domain_tools: Vec<tools_core::DynTool> = {
             let parent = self.parent_registry.lock().unwrap().clone();
             match parent {
-                Some(reg) => reg
-                    .read()
-                    .await
-                    .dyn_tools()
-                    .into_iter()
-                    .filter(|t| t.subagent_visible())
-                    .collect(),
+                Some(reg) => {
+                    project_subagent_domain_tools(reg.read().await.dyn_tools())
+                }
                 None => Vec::new(),
             }
         };
@@ -1039,6 +1036,18 @@ Summarize this naturally for the user. Keep it brief (1-2 sentences). Do not men
     debug!("Subagent [{}] announced result to {}", task_id, origin_key);
 }
 
+/// Parent-registry projection for subagent toolkits — reads
+/// [`tools_core::Tool::exposure_policy`]. Cwd-scoped kit primitives are not
+/// projected here; they are rebuilt per subagent via `ToolKitBuilder`.
+fn project_subagent_domain_tools(
+    parent_tools: impl IntoIterator<Item = tools_core::DynTool>,
+) -> Vec<tools_core::DynTool> {
+    parent_tools
+        .into_iter()
+        .filter(|t| t.exposure_policy().subagent)
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1255,5 +1264,73 @@ mod tests {
             }
             other => panic!("expected a Progress lifecycle event, got {other:?}"),
         }
+    }
+
+    /// Default tools (and cwd-scoped kit primitives, if present on the parent)
+    /// stay out of parent-registry projection; only `exposure_policy().subagent`
+    /// opt-ins (production: `memory`) are included.
+    #[test]
+    fn projects_only_exposure_policy_subagent_tools() {
+        use serde_json::{json, Value};
+        use tools::MemoryTool;
+        use tools_core::{ExposurePolicy, RoutingContext, Tool};
+
+        struct DefaultHiddenTool;
+        #[async_trait]
+        impl Tool for DefaultHiddenTool {
+            fn name(&self) -> &str {
+                "bash"
+            }
+            fn description(&self) -> &str {
+                "cwd-scoped kit primitive stand-in"
+            }
+            fn parameters(&self) -> Value {
+                json!({"type": "object"})
+            }
+            async fn execute(&self, _args: Value, _ctx: &RoutingContext) -> Result<String> {
+                Ok("ok".into())
+            }
+        }
+
+        struct OptInTool;
+        #[async_trait]
+        impl Tool for OptInTool {
+            fn name(&self) -> &str {
+                "opt_in"
+            }
+            fn description(&self) -> &str {
+                "explicit subagent opt-in"
+            }
+            fn parameters(&self) -> Value {
+                json!({"type": "object"})
+            }
+            async fn execute(&self, _args: Value, _ctx: &RoutingContext) -> Result<String> {
+                Ok("ok".into())
+            }
+            fn exposure_policy(&self) -> ExposurePolicy {
+                ExposurePolicy {
+                    subagent: true,
+                    ..Default::default()
+                }
+            }
+        }
+
+        let mut reg = ToolRegistry::new();
+        reg.register(DefaultHiddenTool);
+        reg.register(OptInTool);
+        reg.register(MemoryTool::new());
+
+        assert!(!DefaultHiddenTool.exposure_policy().subagent);
+        assert!(OptInTool.exposure_policy().subagent);
+        assert!(MemoryTool::new().exposure_policy().subagent);
+
+        let mut projected: Vec<String> = project_subagent_domain_tools(reg.dyn_tools())
+            .into_iter()
+            .map(|t| t.name().to_string())
+            .collect();
+        projected.sort();
+
+        assert_eq!(projected, vec!["memory".to_string(), "opt_in".to_string()]);
+        assert!(!projected.iter().any(|n| n == "bash"));
     }
 }
