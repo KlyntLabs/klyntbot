@@ -11,7 +11,7 @@ Today MCP default membership is invented outside the live tool catalog: `AiPipel
 
 The binding constraint is **declaration/policy locality**: one cohesive exposure policy on each `Tool`, projections from the final agent `ToolRegistry`, and a Forbidden wall for unreviewed MCP exposure — without a parallel exposure catalog and without `app-core → klyntbot-server`. That rules out keeping AiFeature∪allowlist as runtime authority, and rules out registering domain tools as “builtins.”
 
-Fresh retrieval: `docs/specs/catalog/agent-runtime.md` contains only **EXPO** — no neighbor CODEs to reuse (`owns_coverage`: 1/1 for this shard). Scan digest: `.skills/EXPO/scan.md`. No `docs/architecture/` spine.
+Fresh retrieval: `docs/specs/catalog/agent-runtime.md` holds **EXPO** (and later **EUPI**). Scan digest: `.skills/EXPO/scan.md`. Architecture spine exists under `docs/architecture/`; this design does not cite `Respects: ARCH-N` (no binding invariant chosen at design time).
 
 ## Decisions
 
@@ -54,7 +54,7 @@ Does not execute tools or own HTTP/stdio servers.
 
 ### Cutover in AppCore (`AiPipelinePlugin::post_init`)
 
-Satisfies: EXPO-2.1, EXPO-2.2, EXPO-2.6, EXPO-3.8, EXPO-8.4, EXPO-7.2
+Satisfies: EXPO-2.1, EXPO-2.2, EXPO-2.5, EXPO-2.6, EXPO-2.7, EXPO-3.8, EXPO-8.4, EXPO-7.2
 Reuse: rung 2 — extend `AiPipelinePlugin::post_init` and AppCore-held status handle
 Surface:
 - `config.mcp.server.exposed_tools` auto-fill path — **replace** (policy-derived defaults; delete AiFeature∪allowlist write)
@@ -134,8 +134,8 @@ A11y: section heading; chip text includes state word; rejection list keyboard re
 | ID | Satisfies section |
 |---|---|
 | EXPO-1.1–1.7 | ExposurePolicy on Tool |
-| EXPO-2.1–2.2, 2.6 | Cutover in AppCore |
-| EXPO-2.3–2.5, 2.7 | ExposurePolicy + migration seam |
+| EXPO-2.1–2.2, 2.5–2.7 | Cutover in AppCore (+ migration fixture seam) |
+| EXPO-2.3–2.4 | ExposurePolicy on Tool |
 | EXPO-3.1–3.7, 3.10–3.11 | mcp::server::exposure |
 | EXPO-3.8 | Cutover in AppCore |
 | EXPO-3.9 | klyntbot-server |

@@ -16,6 +16,9 @@ _Avoid_: channel (overloaded with ChannelMask / messaging), layer, boundary
 A derived or validated view of the tool set for one surface, produced from the exposure policy (plus explicit overrides). Not a second place to invent membership.
 _Avoid_: copy of the registry, re-registration
 
+**Entity-update intent**:
+Pure classification of a successful tool call (tool name + action only) into zero or more kind-level UI invalidation intents. Lived in an `app-core` pure module; missing projection entry ⇒ no intent; id is always the broadcast sentinel `"*"` (kind-level, not a concrete entity). Does **not** emit events, own session auto-context, decide tool exposure/membership, or replace handler `EntityUpdate` (known mutation + concrete id).
+_Avoid_: projection (alone — that is exposure-policy surface projection), EntityUpdate (for this), AiFeatureRegistry-as-emit-catalog, params/result parsing for refresh
 
 **Mcp exposure**:
 Per-tool MCP membership: `Default` (auto-fill when no user override), `OptIn` (user may list explicitly after per-tool review), or `Forbidden` (never exposable). Unreviewed tools default to `Forbidden` — `OptIn` is never a migration catch-all. Overrides: registered+Default/OptIn valid; Forbidden or absent invalid → refuse MCP subsystem start (embedded) or non-zero exit (stdio-only); do not kill the whole desktop app.
@@ -37,7 +40,8 @@ _Avoid_: registry tool, allowlist entry, exposure-policy Default
 - The live **ToolRegistry** is the authoritative in-process catalog for **registry-backed** tools; MCP/agent/subagent projections read policy from registered tools.
 - **MCP-server builtins** (`get_status` mandatory; `agent` configurable) are a closed server-owned capability set — not Tool exposure policy and not a place to register domain tools.
 - Tool **construction** stays where dependencies/lifecycle need it; construction sites must not invent a second policy home.
-- **AiFeatureRegistry** is recall-domain metadata only — not a proxy for general tool exposure.
+- **AiFeatureRegistry** is recall-domain metadata only — not a proxy for general tool exposure or entity-update emission.
+- Chat successful `ToolEnd` and MCP successful bridge-executed tools derive refresh from **entity-update intent**; session auto-context uses a separate session-only tool→domain map.
 
 ## Flagged ambiguities
 

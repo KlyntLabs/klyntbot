@@ -59,9 +59,9 @@ Execution-mode: continuous
 **Depends-on:** none
 
 **Steps:**
-- [ ] Failing tests: defaults ALL / subagent false / mcp Forbidden; derive overrides; accessors match policy
-- [ ] Implement types + trait + derive/`tool_actions` support; annotate historical Defaults (channel literals remain `all`|`desktop_only` only)
-- [ ] Tests pass; commit `feat(tools-core): add ExposurePolicy on Tool`
+- [x] Failing tests: defaults ALL / subagent false / mcp Forbidden; derive overrides; accessors match policy
+- [x] Implement types + trait + derive/`tool_actions` support; annotate historical Defaults (channel literals remain `all`|`desktop_only` only)
+- [x] Tests pass; commit `feat(tools-core): add ExposurePolicy on Tool`
 
 _Requirements: EXPO-1.1, EXPO-1.2, EXPO-1.3, EXPO-1.4, EXPO-1.5, EXPO-1.6, EXPO-1.7, EXPO-2.3, EXPO-2.4, EXPO-8.1, EXPO-8.2_
 
@@ -81,9 +81,9 @@ _Requirements: EXPO-1.1, EXPO-1.2, EXPO-1.3, EXPO-1.4, EXPO-1.5, EXPO-1.6, EXPO-
 **Depends-on:** Task 1
 
 **Steps:**
-- [ ] Failing tests: empty override → Defaults only; Forbidden/unknown reject; `get_status` always; `agent` default-on / overrideable; Disabled when server off
-- [ ] Implement pure validator + typed builtins
-- [ ] Pass; commit `feat(mcp): add server exposure validator`
+- [x] Failing tests: empty override → Defaults only; Forbidden/unknown reject; `get_status` always; `agent` default-on / overrideable; Disabled when server off
+- [x] Implement pure validator + typed builtins
+- [x] Pass; commit `feat(mcp): add server exposure validator`
 
 _Requirements: EXPO-3.1, EXPO-3.2, EXPO-3.3, EXPO-3.4, EXPO-3.5, EXPO-3.6, EXPO-3.7, EXPO-3.10, EXPO-3.11, EXPO-4.2, EXPO-7.1_
 
@@ -124,9 +124,9 @@ _Requirements: EXPO-2.1, EXPO-2.2, EXPO-2.5, EXPO-2.6, EXPO-2.7, EXPO-3.8, EXPO-
 **Depends-on:** Task 1
 
 **Steps:**
-- [ ] Failing tests if needed: channel allow + memory subagent true; default false
-- [ ] Switch filters to policy accessors
-- [ ] Pass; commit `refactor(agent): read exposure policy for projections`
+- [x] Failing tests if needed: channel allow + memory subagent true; default false
+- [x] Switch filters to policy accessors
+- [x] Pass; commit `refactor(agent): read exposure policy for projections`
 
 _Requirements: EXPO-6.1, EXPO-6.2, EXPO-6.3, EXPO-6.4, EXPO-8.6, EXPO-8.7_
 
