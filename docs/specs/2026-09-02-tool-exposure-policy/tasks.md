@@ -1,7 +1,7 @@
 # Tasks: Tool exposure policy
 
 Feature code: EXPO
-Status: In-progress
+Status: Implemented
 Date: 2026-09-02
 Execution-mode: continuous
 
