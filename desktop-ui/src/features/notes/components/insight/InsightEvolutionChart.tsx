@@ -53,8 +53,8 @@ export function InsightEvolutionChart({ versions }: Props) {
           />
           <Tooltip
             contentStyle={{
-              backgroundColor: "var(--card)",
-              border: "1px solid var(--border)",
+              backgroundColor: "var(--ds-bg-elevated)",
+              border: "1px solid var(--ds-separator)",
               borderRadius: 8,
               fontSize: 11,
             }}
@@ -85,7 +85,7 @@ export function InsightEvolutionChart({ versions }: Props) {
           <Area
             type="monotone"
             dataKey="gaps"
-            stroke="var(--chart-2)"
+            stroke="var(--ds-chart-2)"
             fill="none"
             strokeWidth={1}
             strokeDasharray="4 2"
@@ -94,7 +94,7 @@ export function InsightEvolutionChart({ versions }: Props) {
           <Area
             type="monotone"
             dataKey="stability"
-            stroke="var(--purple)"
+            stroke="var(--ds-purple)"
             fill="none"
             strokeWidth={1}
             strokeDasharray="4 2"
@@ -114,8 +114,8 @@ export function InsightEvolutionChart({ versions }: Props) {
 const LEGEND = [
   { label: "Overall", color: "var(--ds-accent)" },
   { label: "Flashcards", color: "var(--ds-status-success)" },
-  { label: "Gap Closure", color: "var(--chart-2)" },
-  { label: "Stability", color: "var(--purple)" },
+  { label: "Gap Closure", color: "var(--ds-chart-2)" },
+  { label: "Stability", color: "var(--ds-purple)" },
 ];
 
 const LABEL_MAP: Record<string, string> = {

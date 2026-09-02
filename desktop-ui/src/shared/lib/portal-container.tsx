@@ -6,7 +6,13 @@ export function usePortalContainer() {
   return useContext(PortalContainerContext);
 }
 
-export function PortalContainerProvider({ children }: { children: React.ReactNode }) {
+export function PortalContainerProvider({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
   const [container, setContainer] = useState<HTMLDivElement | null>(null);
   const ref = useCallback((node: HTMLDivElement | null) => {
     if (node) setContainer(node);
@@ -14,7 +20,7 @@ export function PortalContainerProvider({ children }: { children: React.ReactNod
   return (
     <PortalContainerContext.Provider value={container}>
       {children}
-      <div ref={ref} className="tasks-scope" />
+      <div ref={ref} className={className} />
     </PortalContainerContext.Provider>
   );
 }

@@ -13,7 +13,7 @@ export function retentionBarColor(pct: number): string {
 /** CSS variable value for inline styles (not Tailwind classes). */
 export function retentionCssColor(pct: number): string {
   if (pct >= 0.8) return "var(--ds-status-success)";
-  if (pct >= 0.5) return "var(--warning)";
+  if (pct >= 0.5) return "var(--ds-status-warning)";
   return "var(--ds-accent)";
 }
 

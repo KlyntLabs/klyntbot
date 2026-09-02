@@ -35,7 +35,7 @@ export function PromotionToast({ impact, onDismiss }: PromotionToastProps) {
           <button
             type="button"
             onClick={onDismiss}
-            className="text-ui-xs font-medium px-3 py-1.5 rounded-lg bg-[var(--surface-glass-subtle)] text-fg-secondary hover:bg-[var(--surface-glass-subtle-hover)] transition-colors"
+            className="text-ui-xs font-medium px-3 py-1.5 rounded-lg bg-[var(--ds-glass-bg-subtle)] text-fg-secondary hover:bg-[var(--ds-control-hover)] transition-colors"
           >
             Dismiss
           </button>

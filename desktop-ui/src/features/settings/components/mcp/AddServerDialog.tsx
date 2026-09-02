@@ -64,7 +64,7 @@ export function AddServerDialog({ open, onClose, onAdd, prefill }: AddServerDial
       aria-labelledby="add-server-dialog-title"
     >
       <div className="glass-panel w-[480px] max-h-[80vh] overflow-y-auto">
-        <div className="island rounded-[var(--glass-radius-inner)]">
+        <div className="island rounded-[calc(var(--ds-radius-card) - var(--ds-space-1-5))]">
           {/* Header */}
           <div className="flex items-center justify-between px-5 py-4 border-b border-separator">
             <h3 id="add-server-dialog-title" className="text-sm font-medium text-fg">

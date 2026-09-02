@@ -66,46 +66,19 @@
   --color-code-foreground: var(--ds-code-foreground);
   --color-code-number: var(--ds-code-number);
 
-  /* Temporary migration aliases (Wave 1–4). Prefer DS names above. */
+  /* Remaining shadcn-compat @theme aliases still referenced by product utilities.
+     Prefer DS names above (bg-bg / text-fg / bg-separator / bg-brand / …). */
   --color-background: var(--ds-bg);
   --color-foreground: var(--ds-text);
-  --color-card: var(--ds-bg-elevated);
-  --color-card-foreground: var(--ds-text);
-  --color-popover: var(--ds-glass-bg-strong);
-  --color-popover-foreground: var(--ds-text);
   --color-primary: var(--ds-accent);
-  --color-primary-foreground: var(--ds-accent-foreground);
-  --color-secondary: var(--ds-control-hover);
-  --color-secondary-foreground: var(--ds-text);
   --color-muted: var(--ds-control-hover);
-  --color-muted-foreground: var(--ds-text-secondary);
-  --color-destructive: var(--ds-status-danger);
-  --color-destructive-foreground: var(--ds-accent-foreground);
   --color-border: var(--ds-separator);
   --color-border-subtle: var(--ds-separator);
   --color-input: var(--ds-glass-bg-subtle);
   /* Neutral focus ring — brand reserved for CTAs, not form controls */
   --color-ring: var(--ds-separator);
-  --color-success: var(--ds-status-success);
-  --color-info: var(--ds-status-info);
-  --color-warning: var(--ds-status-warning);
   --color-dim: var(--ds-text-dim);
-  --color-sidebar: var(--ds-bg);
-  --color-sidebar-foreground: var(--ds-text);
-  --color-sidebar-primary: var(--ds-accent);
-  --color-sidebar-primary-foreground: var(--ds-accent-foreground);
-  --color-sidebar-accent: var(--ds-control-hover);
-  --color-sidebar-accent-foreground: var(--ds-text);
-  --color-sidebar-border: var(--ds-separator);
-  --color-sidebar-ring: var(--ds-accent);
   --color-surface-lowest: var(--ds-bg);
-  --color-surface-low: var(--ds-bg);
-  --color-surface-base: var(--ds-bg-elevated);
-  --color-surface-raised: var(--ds-glass-bg-subtle);
-  --color-surface-highest: var(--ds-glass-bg-strong);
-  --color-text-primary: var(--ds-text);
-  --color-text-secondary: var(--ds-text-secondary);
-  --color-text-muted: var(--ds-text-secondary);
 
   /* Typography */
   --font-sans: var(--ds-font-sans);

@@ -50,7 +50,7 @@ export function ProgressRing({
             cy={center}
             r={radius}
             fill="none"
-            stroke="var(--surface-raised)"
+            stroke="var(--ds-glass-bg-subtle)"
             strokeWidth={strokeWidth}
           />
           <circle

@@ -26,10 +26,16 @@ _Avoid_: allowlist membership, exposed_tools as source of truth, OptIn-as-defaul
 Persistent desktop indication of the in-process KlyntBot MCP server (ready / disabled / invalid), distinct from external MCP servers KlyntBot connects to as a client. Invalid config blocks only this subsystem; rejection summary must be reachable from the status, not only via toast or logs.
 _Avoid_: conflating with external MCP server connection status
 
+
+**MCP-server builtin**:
+A closed, server-owned MCP capability outside Tool exposure policy (`get_status` mandatory; `agent` configurable with default-on). Must not be used to register domain tools or duplicate registry-tool policy. New builtins need a separate architecture decision.
+_Avoid_: registry tool, allowlist entry, exposure-policy Default
+
 ## Relationships
 
 - An **exposure policy** lives on each `Tool` and drives **projections** onto **surfaces**.
-- The live **ToolRegistry** is the in-process catalog; MCP/agent/subagent projections read policy from registered tools.
+- The live **ToolRegistry** is the authoritative in-process catalog for **registry-backed** tools; MCP/agent/subagent projections read policy from registered tools.
+- **MCP-server builtins** (`get_status` mandatory; `agent` configurable) are a closed server-owned capability set — not Tool exposure policy and not a place to register domain tools.
 - Tool **construction** stays where dependencies/lifecycle need it; construction sites must not invent a second policy home.
 - **AiFeatureRegistry** is recall-domain metadata only — not a proxy for general tool exposure.
 

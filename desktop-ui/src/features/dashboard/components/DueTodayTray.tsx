@@ -30,8 +30,8 @@ export function DueTodayTray({
             type="button"
             className={cn(
               "px-1.5 py-0.5 rounded text-ui-xs truncate max-w-[120px] cursor-grab",
-              "bg-[var(--timeline-todo)]/15 text-[var(--timeline-todo)]",
-              "hover:bg-[var(--timeline-todo)]/25 transition-colors",
+              "bg-[var(--ds-timeline-todo)]/15 text-[var(--ds-timeline-todo)]",
+              "hover:bg-[var(--ds-timeline-todo)]/25 transition-colors",
               isSelected && "ring-1 ring-brand",
             )}
             title={entry.title}

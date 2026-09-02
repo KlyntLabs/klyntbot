@@ -196,7 +196,7 @@ export function Launcher() {
             onExpand={expandToMain}
           />
         ) : (
-          <div className="relative rounded-[var(--glass-radius-inner)] overflow-hidden">
+          <div className="relative rounded-[calc(var(--ds-radius-card) - var(--ds-space-1-5))] overflow-hidden">
             <LauncherInput />
             {argModeItem &&
             argModeItem.kind.type === "systemCommand" &&

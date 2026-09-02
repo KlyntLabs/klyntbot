@@ -86,7 +86,7 @@ export function ProductivityScoreRing({ score, size = 110, summary }: Productivi
             cy={center}
             r={radius}
             fill="none"
-            stroke="var(--surface-raised)"
+            stroke="var(--ds-glass-bg-subtle)"
             strokeWidth={strokeWidth}
           />
           {/* Progress arc */}

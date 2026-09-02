@@ -45,8 +45,8 @@ export function QuickTranslatePopup({
       style={{
         top: position.top,
         left: position.left,
-        background: "var(--surface-floating)",
-        border: "1px solid var(--glass-border)",
+        background: "var(--ds-glass-bg-strong)",
+        border: "1px solid var(--ds-glass-border)",
       }}
     >
       {/* Loading state */}

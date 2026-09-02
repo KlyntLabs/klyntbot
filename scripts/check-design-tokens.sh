@@ -26,8 +26,8 @@ else
 fi
 
 echo
-echo "==> Legacy runtime CSS vars"
-VARS_PAT='var\(--brand\)|var\(--destructive\)|var\(--success\)|var\(--text-muted-foreground\)|var\(--surface-highest\)'
+echo "==> Legacy runtime CSS vars (bare names; prefer --ds-* / mapped utilities)"
+VARS_PAT='var\(--background\)|var\(--foreground\)|var\(--muted\)|var\(--primary\)|var\(--card\)|var\(--popover\)|var\(--sidebar|var\(--accent\)|var\(--border\)|var\(--destructive\)|var\(--brand\)|var\(--success\)|var\(--warning\)|var\(--info\)|var\(--surface|var\(--glass-|var\(--text-primary\)|var\(--text-secondary\)|var\(--text-muted\)|var\(--text-dim\)|var\(--text-muted-foreground\)|var\(--radius\)|var\(--font-size\)|var\(--font-weight|var\(--timeline-|var\(--chart-[0-9]\)|var\(--purple\)'
 vars="$(rg -n --pcre2 "$VARS_PAT" "$UI_SRC" --glob '*.{tsx,ts,css}' || true)"
 vcount="$(printf '%s\n' "$vars" | rg -c '.' || true)"
 vcount="${vcount:-0}"
@@ -36,7 +36,7 @@ if [[ "$vcount" -gt 0 ]]; then
   printf '%s\n' "$vars" | head -40
   FAIL=1
 else
-  echo "OK: no legacy var(--brand/--destructive/...) refs."
+  echo "OK: no bare legacy CSS var() refs."
 fi
 
 echo

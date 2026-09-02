@@ -15,8 +15,10 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-} from "./ui/command";
-import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@shared/ui";
 
 interface StatusSelectorProps {
   issueId: string;

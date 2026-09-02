@@ -63,7 +63,7 @@
     "diff": "^8.0.3",
     "katex": "^0.16.35",
     "lowlight": "^3.3.0",
-    "lucide-react": "^0.487.0",
+    "lucide-react": "^1.39.0",
     "mermaid": "^11.13.0",
     "motion": "^12.35.2",
     "react": "^19.0.0",

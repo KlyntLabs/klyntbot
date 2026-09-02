@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from "react";
 import { IssueBoard } from "../../../tasks/components/IssueBoard";
-import { PortalContainerProvider } from "../../../tasks/components/portal-context";
+import { PortalContainerProvider } from "@shared/lib/portal-container";
 import { StatusWorkflowProvider } from "../../../tasks/contexts/StatusWorkflowContext";
 import { useTasks } from "../../../tasks/hooks/useTasks";
 import { TasksProvider } from "../../../tasks/hooks/useTasksContext";
@@ -41,7 +41,7 @@ function ProjectTasksInner({ projectId }: { projectId: string }) {
 
   return (
     <TasksProvider value={ctxValue}>
-      <PortalContainerProvider>
+      <PortalContainerProvider className="tasks-scope">
         <div className="h-full">
           {projectIssues.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">

@@ -14,8 +14,10 @@ import {
   CommandItem,
   CommandList,
   CommandSeparator,
-} from "./ui/command";
-import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@shared/ui";
 
 type FilterCategory = "status" | "priority" | "labels" | "project";
 

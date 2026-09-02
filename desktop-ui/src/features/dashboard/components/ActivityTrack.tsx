@@ -216,7 +216,7 @@ export function ActivityTrack({
             style={{
               top,
               height,
-              backgroundColor: session.duringFocus ? "var(--timeline-focus)" : session.color,
+              backgroundColor: session.duringFocus ? "var(--ds-timeline-focus)" : session.color,
               opacity,
             }}
             onClick={() => onSelectSession(session)}

@@ -2,7 +2,7 @@ import type { Area, Project } from "@shared/types/tasks";
 import { Plus } from "lucide-react";
 import { useState } from "react";
 import { useTabStore } from "../store/tab-store";
-import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@shared/ui";
 
 const menuItemCls =
   "w-full text-left px-2 py-1.5 text-ui rounded-sm hover:bg-control-hover text-fg transition-colors";

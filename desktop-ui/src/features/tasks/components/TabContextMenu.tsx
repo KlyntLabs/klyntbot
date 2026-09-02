@@ -6,7 +6,7 @@ import {
   ContextMenuItem,
   ContextMenuSeparator,
   ContextMenuTrigger,
-} from "./ui/context-menu";
+} from "@shared/ui/RadixContextMenu";
 
 interface TabContextMenuProps {
   tabId: string;

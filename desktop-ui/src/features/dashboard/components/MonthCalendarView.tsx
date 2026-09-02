@@ -85,10 +85,10 @@ function activeRatio(activeSecs: number, maxActiveSecs: number): number {
 function focusIntensityBg(secs: number, maxSecs: number): string {
   if (secs === 0 || maxSecs === 0) return "transparent";
   const ratio = secs / maxSecs;
-  if (ratio > 0.75) return "color-mix(in oklch, var(--timeline-focus) 25%, transparent)";
-  if (ratio > 0.5) return "color-mix(in oklch, var(--timeline-focus) 18%, transparent)";
-  if (ratio > 0.25) return "color-mix(in oklch, var(--timeline-focus) 10%, transparent)";
-  return "color-mix(in oklch, var(--timeline-focus) 5%, transparent)";
+  if (ratio > 0.75) return "color-mix(in oklch, var(--ds-timeline-focus) 25%, transparent)";
+  if (ratio > 0.5) return "color-mix(in oklch, var(--ds-timeline-focus) 18%, transparent)";
+  if (ratio > 0.25) return "color-mix(in oklch, var(--ds-timeline-focus) 10%, transparent)";
+  return "color-mix(in oklch, var(--ds-timeline-focus) 5%, transparent)";
 }
 
 export function MonthCalendarView() {

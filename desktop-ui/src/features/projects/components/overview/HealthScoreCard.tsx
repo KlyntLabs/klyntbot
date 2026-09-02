@@ -34,7 +34,7 @@ export function HealthScoreCard() {
                 health.color === "green"
                   ? "var(--ds-status-success)"
                   : health.color === "yellow"
-                    ? "var(--warning)"
+                    ? "var(--ds-status-warning)"
                     : "var(--ds-status-danger)",
             }}
           >

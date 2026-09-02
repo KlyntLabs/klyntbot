@@ -1,5 +1,5 @@
 import { CircleUserRound } from "lucide-react";
-import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@shared/ui";
 
 interface User {
   id: string;

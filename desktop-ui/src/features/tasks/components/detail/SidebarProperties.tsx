@@ -13,8 +13,10 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-} from "../ui/command";
-import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@shared/ui";
 
 type EnergyLevel = "low" | "medium" | "high" | "deep";
 type TaskType = "manual" | "agentic" | "hybrid";

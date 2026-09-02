@@ -22,12 +22,11 @@ Date: 2026-09-02
 
 ## Remaining nits (acceptable)
 
-- `compat.css` still dual-publishes shadcn/Tahoe aliases — keep until a hard `rg` gate proves unused, then delete
-- `glass.css` legacy class names (`glass-panel`, …) still used; recipes preferred for new code
+- `compat.css` **deleted**; callers use `--ds-*`
+- Legacy `glass-*` class names remain for some HUD/controls; owned by DS `legacy-glass.css` — prefer recipes for new code
 - ThemeSwitcher preview swatches still use literal hex (carve-out)
-- Some `text-white` on brand CTAs remain alongside `text-brand-foreground` (equivalent)
 - Setup checkbox selected state uses `border-brand` intentionally
-- `HARD=1` token check not flipped yet — soft gate via `bun run check:tokens`
+- Token gate is hard by default (`bun run check:tokens`)
 
 ## Verification performed
 

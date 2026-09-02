@@ -60,8 +60,8 @@ export function DraggableTaskBlock({
       <div
         className={cn(
           "absolute rounded-md px-1.5 py-0.5 text-ui-xs leading-tight overflow-hidden",
-          "border-l-2 border-l-[var(--timeline-todo)] bg-[var(--timeline-todo)]/15",
-          "hover:bg-[var(--timeline-todo)]/25 transition-colors",
+          "border-l-2 border-l-[var(--ds-timeline-todo)] bg-[var(--ds-timeline-todo)]/15",
+          "hover:bg-[var(--ds-timeline-todo)]/25 transition-colors",
           isDragging && "opacity-50",
           selected && "ring-1 ring-brand",
           !isDragging && "cursor-grab",

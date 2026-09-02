@@ -38,7 +38,7 @@ export function AddGoalDialog({ open, onClose, onAdd }: AddGoalDialogProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay-heavy">
       <div className="glass-panel w-[400px]">
-        <div className="bg-bg-elevated rounded-[var(--glass-radius-inner)]">
+        <div className="bg-bg-elevated rounded-[calc(var(--ds-radius-card) - var(--ds-space-1-5))]">
           <div className="flex items-center justify-between px-5 py-4 border-b border-separator">
             <h3 className="text-sm font-medium text-fg">Add Goal</h3>
             <button

@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from "react";
 import "../tasks.css";
 import { CreateIssueModal } from "../components/CreateIssueModal";
-import { PortalContainerProvider } from "../components/portal-context";
+import { PortalContainerProvider } from "@shared/lib/portal-container";
 import { TabBar } from "../components/TabBar";
 import { TabContent } from "../components/TabContent";
 import { TasksLayout } from "../components/TasksLayout";
@@ -32,7 +32,7 @@ function TasksPageInner() {
 
   return (
     <TasksProvider value={ctxValue}>
-      <PortalContainerProvider>
+      <PortalContainerProvider className="tasks-scope">
         <div className="tasks-scope flex-1 h-full min-w-0">
           <TasksLayout>
             <TabBar areas={tasksData.areas} projects={tasksData.projects} />

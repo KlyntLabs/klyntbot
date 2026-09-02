@@ -8,7 +8,7 @@ function getCssVar(name: string): string {
 
 /** Detect whether the current theme is light-on-white (e.g. retro/nexora). */
 function isLightTheme(): boolean {
-  const bg = getCssVar("--background");
+  const bg = getCssVar("--ds-bg");
   // Dark theme uses #000000 or similar; light themes use #ffffff / #fafafa
   return bg.startsWith("#f") || bg.startsWith("#e") || bg === "#ffffff";
 }
@@ -21,12 +21,12 @@ function initMermaid() {
     theme: light ? "default" : "dark",
     themeVariables: light
       ? {
-          primaryColor: getCssVar("--brand") || "#ca8a04",
-          primaryTextColor: getCssVar("--text-primary") || "#000000",
-          primaryBorderColor: getCssVar("--border") || "#e5e5e5",
-          lineColor: getCssVar("--border") || "#d4d4d4",
-          secondaryColor: getCssVar("--surface-base") || "#fafafa",
-          tertiaryColor: getCssVar("--surface-low") || "#f5f5f5",
+          primaryColor: getCssVar("--ds-accent") || "#ca8a04",
+          primaryTextColor: getCssVar("--ds-text") || "#000000",
+          primaryBorderColor: getCssVar("--ds-separator") || "#e5e5e5",
+          lineColor: getCssVar("--ds-separator") || "#d4d4d4",
+          secondaryColor: getCssVar("--ds-bg-elevated") || "#fafafa",
+          tertiaryColor: getCssVar("--ds-bg") || "#f5f5f5",
         }
       : {
           primaryColor: "rgba(249, 115, 22, 0.3)",

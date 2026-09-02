@@ -346,7 +346,7 @@ export function WeekCalendarView() {
                           style={{
                             top,
                             height,
-                            backgroundColor: "var(--timeline-focus)",
+                            backgroundColor: "var(--ds-timeline-focus)",
                             opacity: 0.9,
                           }}
                         />

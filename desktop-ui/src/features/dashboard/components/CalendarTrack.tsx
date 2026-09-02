@@ -54,7 +54,7 @@ export function CalendarTrack({
         const top = startMin * pxPerMin;
         const height = Math.max((endMin - startMin) * pxPerMin, 14);
         const isSelected = selectedEventId === event.id;
-        const color = event.color ?? "var(--timeline-focus)";
+        const color = event.color ?? "var(--ds-timeline-focus)";
         const layout = layouts.get(event.id);
         const hasOverlap = layout && layout.totalCols > 1;
 

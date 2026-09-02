@@ -8,7 +8,6 @@
 @import "../tokens/index.css";
 @import "./theme.css";
 @import "./variants.css";
-@import "./compat.css";
 @import "../recipes/recipes.css";
 @import "../recipes/legacy-glass.css";
 @import "./base.css";

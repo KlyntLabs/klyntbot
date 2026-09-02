@@ -94,7 +94,7 @@ export function DistractionOverlay() {
       style={{ animation: intervention ? "glass-appear 0.25s ease-out" : undefined }}
     >
       {intervention && (
-        <div className="rounded-[var(--glass-radius-inner)] overflow-hidden">
+        <div className="rounded-[calc(var(--ds-radius-card) - var(--ds-space-1-5))] overflow-hidden">
           <div className="px-4 py-3.5 flex flex-col gap-3">
             {/* Header */}
             <div className="flex items-center justify-between">

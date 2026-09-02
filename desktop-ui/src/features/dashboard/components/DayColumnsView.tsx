@@ -43,7 +43,7 @@ const COLUMNS: ColumnDef[] = [
     key: "activity",
     label: "Activity",
     icon: "⬡",
-    color: "var(--timeline-app-productive)",
+    color: "var(--ds-timeline-app-productive)",
     flex: 1.2,
     filter: (e) => e.entryType === "appUsage",
   },
@@ -51,7 +51,7 @@ const COLUMNS: ColumnDef[] = [
     key: "calendar",
     label: "Calendar",
     icon: "📅",
-    color: "var(--timeline-focus)",
+    color: "var(--ds-timeline-focus)",
     flex: 1.4,
     filter: () => false, // Calendar uses its own data source
   },
@@ -59,7 +59,7 @@ const COLUMNS: ColumnDef[] = [
     key: "timeEntries",
     label: "Time Entries",
     icon: "☰",
-    color: "var(--timeline-task)",
+    color: "var(--ds-timeline-task)",
     flex: 1.8,
     filter: (e) => e.entryType === "taskTimeEntry",
   },
@@ -67,7 +67,7 @@ const COLUMNS: ColumnDef[] = [
     key: "tasks",
     label: "Tasks",
     icon: "☑",
-    color: "var(--timeline-todo)",
+    color: "var(--ds-timeline-todo)",
     flex: 1.8,
     filter: (e) => e.entryType === "taskDue",
   },
@@ -75,7 +75,7 @@ const COLUMNS: ColumnDef[] = [
     key: "transactions",
     label: "Transactions",
     icon: "$",
-    color: "var(--timeline-finance)",
+    color: "var(--ds-timeline-finance)",
     flex: 1.2,
     filter: (e) =>
       e.entryType === "expenseRecorded" ||
@@ -86,7 +86,7 @@ const COLUMNS: ColumnDef[] = [
     key: "notes",
     label: "Notes",
     icon: "✎",
-    color: "var(--timeline-note)",
+    color: "var(--ds-timeline-note)",
     flex: 1.2,
     filter: (e) => e.entryType === "noteCreated" || e.entryType === "noteUpdated",
   },
@@ -438,7 +438,7 @@ export function DayColumnsView({
                             ),
                             source: "calendar",
                             entryType: "calendarEvent",
-                            color: event.color ?? "var(--timeline-focus)",
+                            color: event.color ?? "var(--ds-timeline-focus)",
                           } as TimelineEntry)
                         }
                       />
@@ -632,8 +632,8 @@ function ColumnEntry({
         className={cn(
           "absolute rounded-md px-1.5 py-0.5 text-ui-xs leading-tight overflow-hidden cursor-pointer transition-colors",
           isDue
-            ? "border-l-2 border-l-[var(--timeline-todo)] bg-[var(--timeline-todo)]/15 hover:bg-[var(--timeline-todo)]/25"
-            : "border-l-2 border-l-[var(--timeline-todo)]/50 bg-[var(--timeline-todo)]/8 hover:bg-[var(--timeline-todo)]/15",
+            ? "border-l-2 border-l-[var(--ds-timeline-todo)] bg-[var(--ds-timeline-todo)]/15 hover:bg-[var(--ds-timeline-todo)]/25"
+            : "border-l-2 border-l-[var(--ds-timeline-todo)]/50 bg-[var(--ds-timeline-todo)]/8 hover:bg-[var(--ds-timeline-todo)]/15",
           isCompleted && "opacity-60 line-through",
           selected && "ring-1 ring-brand",
         )}
@@ -658,8 +658,8 @@ function ColumnEntry({
         className={cn(
           "absolute rounded-md px-1.5 py-0.5 text-ui-xs leading-tight overflow-hidden cursor-pointer transition-colors",
           isExpense
-            ? "border-l-2 border-l-[var(--timeline-finance-expense)] bg-[var(--timeline-finance-expense)]/15 hover:bg-[var(--timeline-finance-expense)]/25"
-            : "border-l-2 border-l-[var(--timeline-finance-income)] bg-[var(--timeline-finance-income)]/15 hover:bg-[var(--timeline-finance-income)]/25",
+            ? "border-l-2 border-l-[var(--ds-timeline-finance-expense)] bg-[var(--ds-timeline-finance-expense)]/15 hover:bg-[var(--ds-timeline-finance-expense)]/25"
+            : "border-l-2 border-l-[var(--ds-timeline-finance-income)] bg-[var(--ds-timeline-finance-income)]/15 hover:bg-[var(--ds-timeline-finance-income)]/25",
           selected && "ring-1 ring-brand",
         )}
         style={{ ...posStyle, height: Math.max(height, 18) }}
@@ -669,8 +669,8 @@ function ColumnEntry({
           className={cn(
             "truncate block font-medium",
             isExpense
-              ? "text-[var(--timeline-finance-expense)]"
-              : "text-[var(--timeline-finance-income)]",
+              ? "text-[var(--ds-timeline-finance-expense)]"
+              : "text-[var(--ds-timeline-finance-income)]",
           )}
         >
           {entry.title}
@@ -687,7 +687,7 @@ function ColumnEntry({
         onClick={onClick}
         className={cn(
           "absolute rounded-md px-1.5 py-0.5 text-ui-xs leading-tight overflow-hidden cursor-pointer transition-colors",
-          "border-l-2 border-l-[var(--timeline-note)]/60 bg-[var(--timeline-note)]/8 hover:bg-[var(--timeline-note)]/15",
+          "border-l-2 border-l-[var(--ds-timeline-note)]/60 bg-[var(--ds-timeline-note)]/8 hover:bg-[var(--ds-timeline-note)]/15",
           selected && "ring-1 ring-brand",
         )}
         style={{ ...posStyle, height: Math.max(height, 18) }}

@@ -761,7 +761,7 @@ export function GraphView({
       <div
         className="flex-1 relative min-h-0 bg-bg"
         style={{
-          backgroundImage: "radial-gradient(circle, var(--border) 0.5px, transparent 0.5px)",
+          backgroundImage: "radial-gradient(circle, var(--ds-separator) 0.5px, transparent 0.5px)",
           backgroundSize: "20px 20px",
         }}
       >

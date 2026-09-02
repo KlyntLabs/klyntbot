@@ -19,7 +19,7 @@ export function CoachingNudge({ isStreaming }: { isStreaming: boolean }) {
     <div className="px-6">
       <div className="max-w-3xl mx-auto">
         <div
-          className="flex items-start gap-3 px-4 py-3 rounded-xl bg-[var(--glass-tint-info)] border border-[var(--glass-border)] backdrop-blur-sm"
+          className="flex items-start gap-3 px-4 py-3 rounded-xl bg-[color-mix(in_srgb,var(--ds-status-info)_6%,transparent)] border border-glass-border backdrop-blur-sm"
           style={{ animation: "nudge-slide-in 0.25s ease-out" }}
         >
           <Lightbulb className="size-4 text-status-info shrink-0 mt-0.5" strokeWidth={1.5} />

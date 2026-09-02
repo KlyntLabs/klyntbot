@@ -69,4 +69,4 @@ Use `@utility` recipes for glass — include blur **and** saturate:
 
 ## Migration aliases
 
-`styles/compat.css` temporarily aliases legacy shadcn/Tahoe var names onto `--ds-*`. New code must not add to it; Wave 4 deletes it once consumers are migrated.
+Legacy `styles/compat.css` was removed after callers moved to `--ds-*` / mapped utilities. Do not reintroduce bare shadcn/Tahoe var aliases — extend `--ds-*` + `@theme` instead.

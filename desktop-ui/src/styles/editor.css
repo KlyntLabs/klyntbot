@@ -196,7 +196,7 @@
   border-radius: 5px;
   padding: 0.1rem 0.4rem;
   font-size: 0.84em;
-  font-family: var(--font-mono, ui-monospace, monospace);
+  font-family: var(--ds-font-mono, ui-monospace, monospace);
   color: var(--ds-accent-hover);
 }
 
@@ -263,7 +263,7 @@
   border: none;
   outline: none;
   font-size: 0.75rem;
-  font-family: var(--font-mono, ui-monospace, monospace);
+  font-family: var(--ds-font-mono, ui-monospace, monospace);
   color: var(--ds-text-secondary);
   cursor: pointer;
   padding: 0.125rem 0.25rem;
@@ -309,7 +309,7 @@
     background 0.15s ease;
   background: none;
   border: none;
-  font-family: var(--font-mono, ui-monospace, monospace);
+  font-family: var(--ds-font-mono, ui-monospace, monospace);
 }
 
 .code-block-btn:hover {

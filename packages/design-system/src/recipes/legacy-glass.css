@@ -10,7 +10,7 @@
     border: 1px solid var(--ds-glass-border);
     border-radius: var(--ds-radius-card);
     box-shadow: var(--ds-elevation-glass);
-    padding: var(--glass-padding);
+    padding: var(--ds-space-1-5);
   }
 
   .glass-sidebar {
@@ -69,7 +69,7 @@
     -webkit-backdrop-filter: var(--ds-blur);
     border: 1px solid var(--ds-glass-border);
     border-radius: var(--ds-radius-card);
-    padding: var(--glass-padding);
+    padding: var(--ds-space-1-5);
   }
 
   :root[data-vibrancy] .glass-floating {
@@ -85,7 +85,7 @@
     border: 1px solid var(--ds-glass-border);
     border-radius: var(--ds-radius-card);
     box-shadow: var(--ds-elevation-window);
-    padding: var(--glass-padding);
+    padding: var(--ds-space-1-5);
   }
 
   .glass-card {

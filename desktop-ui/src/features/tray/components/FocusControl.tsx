@@ -204,7 +204,7 @@ function TimerView({ timer, onOpenSettings }: { timer: Timer; onOpenSettings: ()
         : formatElapsed(settings.focusDuration * 60);
 
   // Ring color: brand for focus, info-blue for break, warning pulse at 30s
-  const ringColor = showWarning ? "var(--warning)" : isBreak ? "var(--info)" : "var(--ds-accent)";
+  const ringColor = showWarning ? "var(--ds-status-warning)" : isBreak ? "var(--ds-status-info)" : "var(--ds-accent)";
 
   // Cycle state (from backend)
   const dotsCount = longBreakAfter;

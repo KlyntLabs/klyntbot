@@ -57,7 +57,7 @@ export function SlidePanel({
         } ${className ?? ""}`}
         style={{ width }}
       >
-        <div className="bg-bg-elevated flex-1 flex flex-col rounded-[var(--glass-radius-inner)]">
+        <div className="bg-bg-elevated flex-1 flex flex-col rounded-[calc(var(--ds-radius-card) - var(--ds-space-1-5))]">
           <div className="flex items-center justify-between px-5 py-4 border-b border-separator shrink-0">
             <h3 className="text-body font-medium text-fg">{title}</h3>
             <button

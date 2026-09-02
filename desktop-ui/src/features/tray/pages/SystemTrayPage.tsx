@@ -122,7 +122,7 @@ export function SystemTray() {
         style={{ animation: "glass-appear 0.2s ease-out" }}
       >
         <div
-          className="rounded-[var(--glass-radius-inner)] overflow-y-auto"
+          className="rounded-[calc(var(--ds-radius-card) - var(--ds-space-1-5))] overflow-y-auto"
           style={{ maxHeight: MAX_TRAY_HEIGHT }}
         >
           {/* Coaching Nudge (Channel 2: tray) */}

@@ -148,7 +148,7 @@
   border-radius: 5px;
   padding: 0.1rem 0.4rem;
   font-size: 0.84em;
-  font-family: var(--font-mono, ui-monospace, monospace);
+  font-family: var(--ds-font-mono, ui-monospace, monospace);
   color: var(--ds-accent-hover);
 }
 

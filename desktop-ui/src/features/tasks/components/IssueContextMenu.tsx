@@ -18,7 +18,7 @@ import {
   ContextMenuSubContent,
   ContextMenuSubTrigger,
   ContextMenuTrigger,
-} from "./ui/context-menu";
+} from "@shared/ui/RadixContextMenu";
 
 interface IssueContextMenuProps {
   issue: Issue;

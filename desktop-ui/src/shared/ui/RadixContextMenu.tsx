@@ -1,9 +1,13 @@
 import * as ContextMenuPrimitive from "@radix-ui/react-context-menu";
+import { usePortalContainer } from "@shared/lib/portal-container";
 import { cn } from "@shared/lib/utils";
 import { Check, ChevronRight, Circle } from "lucide-react";
 import * as React from "react";
-import { usePortalContainer } from "../portal-context";
 
+/**
+ * Radix compound context-menu primitives (shadcn-style).
+ * Distinct from the coordinate-based `@shared/ui/ContextMenu`.
+ */
 const ContextMenu = ContextMenuPrimitive.Root;
 const ContextMenuTrigger = ContextMenuPrimitive.Trigger;
 const ContextMenuGroup = ContextMenuPrimitive.Group;

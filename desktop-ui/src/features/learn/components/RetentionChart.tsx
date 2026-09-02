@@ -26,12 +26,12 @@ export function RetentionChart({ data, height = 200 }: RetentionChartProps) {
   return (
     <ResponsiveContainer width="100%" height={height}>
       <AreaChart data={formatted}>
-        <XAxis dataKey="label" tick={{ fontSize: 10 }} stroke="var(--muted)" />
-        <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} stroke="var(--muted)" />
+        <XAxis dataKey="label" tick={{ fontSize: 10 }} stroke="var(--ds-text-dim)" />
+        <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} stroke="var(--ds-text-dim)" />
         <Tooltip
           contentStyle={{
-            background: "var(--surface-raised)",
-            border: "1px solid var(--border)",
+            background: "var(--ds-glass-bg-subtle)",
+            border: "1px solid var(--ds-separator)",
             borderRadius: 8,
             fontSize: 11,
           }}

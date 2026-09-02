@@ -73,7 +73,7 @@ export function PracticePreview({
       <div
         className="relative max-w-[520px] w-full mx-4 rounded-xl overflow-hidden animate-[glass-appear_0.2s_ease-out]"
         style={{
-          background: "var(--surface-floating)",
+          background: "var(--ds-glass-bg-strong)",
           border: "1px solid rgba(255,255,255,0.08)",
           boxShadow:
             "0 24px 80px rgba(0,0,0,0.5), 0 0 1px rgba(255,255,255,0.1) inset, 0 0 40px rgba(167,139,250,0.06)",
