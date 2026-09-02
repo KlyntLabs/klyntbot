@@ -81,6 +81,10 @@ pub struct AppCore {
 
     /// Feature host — holds plugin handles and provides typed lookup.
     pub host: crate::plugin::host::FeatureHost,
+
+    /// Embedded MCP exposure validation from `AiPipelinePlugin::post_init`.
+    /// Source of truth for desktop/UI embedded-server status (Ready/Disabled/Invalid).
+    pub mcp_exposure: std::sync::OnceLock<mcp::server::exposure::ExposureValidation>,
 }
 
 impl AppCore {
@@ -361,6 +365,11 @@ impl AppCore {
         self.host
             .get::<ai_core::AiFeatureRegistry>()
             .expect("feature registry built by host")
+    }
+
+    /// Embedded MCP exposure validation (set once during AI pipeline post_init).
+    pub fn mcp_exposure(&self) -> Option<&mcp::server::exposure::ExposureValidation> {
+        self.mcp_exposure.get()
     }
 
     /// Approve a pending memory: deserialize fact, upsert to semantic_facts, remove from pending.

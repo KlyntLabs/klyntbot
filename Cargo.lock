@@ -425,6 +425,7 @@ dependencies = [
  "klynt-hooks",
  "klynt-sandbox",
  "klynt-skill-loader",
+ "mcp",
  "notifications",
  "notify",
  "notify-debouncer-mini",

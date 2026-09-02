@@ -16,6 +16,7 @@ agent = { workspace = true }
 autotuner = { workspace = true }
 bus = { workspace = true }
 channels = { workspace = true }
+mcp = { workspace = true }
 klynt-git-utils = { path = "../klynt-git-utils" }
 cognitive = { workspace = true }
 common = { workspace = true }

@@ -102,10 +102,10 @@ _Requirements: EXPO-3.1, EXPO-3.2, EXPO-3.3, EXPO-3.4, EXPO-3.5, EXPO-3.6, EXPO-
 **Depends-on:** Task 2
 
 **Steps:**
-- [ ] Failing migration test: fixture historical set → registry Defaults = union − agent − eight stubs; advertised = builtins + Defaults; no silent add of Forbidden tools
-- [ ] Wire post_init; delete AiFeature∪allowlist runtime fill; store status on AppCore
-- [ ] Confirm client MCP config serde and AiFeature recall registration still work; recall stub shadow test still passes
-- [ ] Pass; commit `feat(app-core): cut over MCP defaults to ToolRegistry policy`
+- [x] Failing migration test: fixture historical set → registry Defaults = union − agent − eight stubs; advertised = builtins + Defaults; no silent add of Forbidden tools
+- [x] Wire post_init; delete AiFeature∪allowlist runtime fill; store status on AppCore
+- [x] Confirm client MCP config serde and AiFeature recall registration still work; recall stub shadow test still passes
+- [x] Pass; commit `feat(app-core): cut over MCP defaults to ToolRegistry policy`
 
 _Requirements: EXPO-2.1, EXPO-2.2, EXPO-2.5, EXPO-2.6, EXPO-2.7, EXPO-3.8, EXPO-7.2, EXPO-8.3, EXPO-8.4, EXPO-8.5, EXPO-8.12_
 
