@@ -60,6 +60,16 @@ pub enum RejectionReason {
     Forbidden,
 }
 
+impl RejectionReason {
+    /// Wire / diagnostic reason token (`unknown` | `forbidden`).
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Unknown => "unknown",
+            Self::Forbidden => "forbidden",
+        }
+    }
+}
+
 /// One rejected override entry.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RejectedEntry {
@@ -76,6 +86,17 @@ pub enum RuntimeState {
     Disabled,
     /// Server enabled but override contains rejected names.
     Invalid,
+}
+
+impl RuntimeState {
+    /// Diagnostic / UI token (`ready` | `disabled` | `invalid`).
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Ready => "ready",
+            Self::Disabled => "disabled",
+            Self::Invalid => "invalid",
+        }
+    }
 }
 
 /// Inputs to [`validate_mcp_exposure`].
@@ -249,6 +270,11 @@ mod tests {
         assert_eq!(BuiltinId::parse("get_status"), Some(BuiltinId::GetStatus));
         assert_eq!(BuiltinId::parse("agent"), Some(BuiltinId::Agent));
         assert_eq!(BuiltinId::parse("tasks"), None);
+        assert_eq!(RejectionReason::Unknown.as_str(), "unknown");
+        assert_eq!(RejectionReason::Forbidden.as_str(), "forbidden");
+        assert_eq!(RuntimeState::Ready.as_str(), "ready");
+        assert_eq!(RuntimeState::Disabled.as_str(), "disabled");
+        assert_eq!(RuntimeState::Invalid.as_str(), "invalid");
     }
 
     #[test]

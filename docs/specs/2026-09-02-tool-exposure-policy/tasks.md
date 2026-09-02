@@ -145,9 +145,9 @@ _Requirements: EXPO-6.1, EXPO-6.2, EXPO-6.3, EXPO-6.4, EXPO-8.6, EXPO-8.7_
 **Depends-on:** Task 2, Task 3
 
 **Steps:**
-- [ ] Failing test/diagnostic expectation: no AiFeature∪allowlist reconstruction; Invalid → non-zero
-- [ ] Wire handler + diagnostic to validator; keep schemas with handlers
-- [ ] Pass; commit `feat(klyntbot-server): serve validated MCP exposure`
+- [x] Failing test/diagnostic expectation: no AiFeature∪allowlist reconstruction; Invalid → non-zero
+- [x] Wire handler + diagnostic to validator; keep schemas with handlers
+- [x] Pass; commit `feat(klyntbot-server): serve validated MCP exposure`
 
 _Requirements: EXPO-3.2, EXPO-3.3, EXPO-3.7, EXPO-3.9, EXPO-4.1, EXPO-4.2, EXPO-4.3, EXPO-4.4, EXPO-8.8, EXPO-8.9_
 

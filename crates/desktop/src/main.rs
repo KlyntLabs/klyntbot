@@ -157,8 +157,9 @@ fn run_mcp_stdio() {
         .build()
         .expect("Failed to create tokio runtime");
     rt.block_on(async {
-        // Read whitelist from AppCore's finalised config (auto-filled from
-        // AiFeatureRegistry when the user leaves exposed_tools empty).
+        // Boot AppCore; MCP exposure is validated in AI pipeline post_init and
+        // stored on AppCore. Handler advertises effective registry tools +
+        // BuiltinId set (get_status always; agent when selected).
         let config = config::load_with_env_overrides()
             .await
             .expect("config load failed");
@@ -202,9 +203,10 @@ fn run_mcp_stdio() {
             }
         });
 
-        let whitelist = app.config.read().await.mcp.server.exposed_tools.clone();
-        if let Err(e) = klyntbot_server::serve_stdio(app, whitelist).await {
+        // Invalid exposure → unsuccessful exit (EXPO-3.9); MCP is this process's sole purpose.
+        if let Err(e) = klyntbot_server::serve_stdio(app).await {
             tracing::error!("MCP serve failed: {e}");
+            std::process::exit(1);
         }
     });
 }
@@ -305,6 +307,8 @@ fn run_desktop_app() {
 
             // Start embedded MCP HTTP server if enabled in config.
             // Must clone before app.manage(core) moves the Arc.
+            // Task 6 owns Invalid/Disabled bind gating; here we only pass the
+            // stored ExposureValidation into the handler (builtins + effective set).
             {
                 let mcp_core = Arc::clone(&core);
                 let enabled = tauri::async_runtime::block_on(async {
@@ -315,9 +319,18 @@ fn run_desktop_app() {
                         let config = mcp_core.config.read().await;
                         let host = config.mcp.server.host.clone();
                         let port = config.mcp.server.port;
-                        let whitelist = config.mcp.server.exposed_tools.clone();
                         let auth_config = config.mcp.server.auth.clone();
                         drop(config);
+
+                        let exposure = match mcp_core.mcp_exposure().cloned() {
+                            Some(v) => Arc::new(v),
+                            None => {
+                                tracing::error!(
+                                    "embedded MCP: exposure status missing after init; not starting"
+                                );
+                                return;
+                            }
+                        };
 
                         tracing::info!("Starting embedded MCP HTTP server on {host}:{port}");
 
@@ -341,7 +354,7 @@ fn run_desktop_app() {
                             move || {
                                 Ok(klyntbot_server::KlyntbotServerHandler::new(
                                     factory_app.clone(),
-                                    whitelist.clone(),
+                                    exposure.as_ref(),
                                 ))
                             },
                             std::sync::Arc::new(LocalSessionManager::default()),
