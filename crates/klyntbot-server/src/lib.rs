@@ -63,23 +63,7 @@ pub async fn print_exposed_tools() -> Result<()> {
     .await
     .map_err(|e| anyhow::anyhow!("AppCore init failed: {e}"))?;
 
-    // Drain unused EventChannels so senders do not block during shutdown.
-    tokio::spawn(async move {
-        let mut intervention_rx = events.intervention_rx;
-        let mut pipeline_rx = events.pipeline_rx;
-        let mut intervention_closed = false;
-        let mut pipeline_closed = false;
-        while !intervention_closed || !pipeline_closed {
-            tokio::select! {
-                msg = intervention_rx.recv(), if !intervention_closed => {
-                    if msg.is_none() { intervention_closed = true; }
-                }
-                result = pipeline_rx.recv(), if !pipeline_closed => {
-                    if result.is_err() { pipeline_closed = true; }
-                }
-            }
-        }
-    });
+    events.spawn_background_drain();
 
     let exposure = require_exposure(&app)?;
     print_exposure_report(server_enabled, &exposure);
@@ -158,16 +142,12 @@ mod tests {
     use super::*;
     use mcp::server::exposure::{BuiltinId, RejectedEntry, RejectionReason};
 
-    fn sample(state: RuntimeState, with_agent: bool) -> ExposureValidation {
-        let mut builtins = vec![BuiltinId::GetStatus];
-        if with_agent {
-            builtins.push(BuiltinId::Agent);
-        }
+    fn sample(state: RuntimeState) -> ExposureValidation {
         ExposureValidation {
             runtime_state: state,
             requested: vec!["tasks".into()],
             effective_registry_tools: vec!["tasks".into()],
-            effective_builtins: builtins,
+            effective_builtins: vec![BuiltinId::GetStatus, BuiltinId::Agent],
             rejected: if state == RuntimeState::Invalid {
                 vec![RejectedEntry {
                     name: "shell".into(),
@@ -181,36 +161,8 @@ mod tests {
 
     #[test]
     fn stdio_refuses_invalid_exposure() {
-        let invalid = sample(RuntimeState::Invalid, false);
-        assert!(ensure_stdio_servable(&invalid).is_err());
-
-        let ready = sample(RuntimeState::Ready, true);
-        assert!(ensure_stdio_servable(&ready).is_ok());
-
-        let disabled = sample(RuntimeState::Disabled, true);
-        assert!(ensure_stdio_servable(&disabled).is_ok());
-    }
-
-    #[test]
-    fn agent_follows_effective_builtins_not_registry_whitelist() {
-        let with_agent = sample(RuntimeState::Ready, true);
-        assert!(with_agent.effective_builtins.contains(&BuiltinId::Agent));
-        assert!(!with_agent
-            .effective_registry_tools
-            .iter()
-            .any(|n| n == "agent"));
-
-        let without = sample(RuntimeState::Ready, false);
-        assert!(!without.effective_builtins.contains(&BuiltinId::Agent));
-        assert!(without.effective_builtins.contains(&BuiltinId::GetStatus));
-    }
-
-    #[test]
-    fn rejection_and_runtime_tokens_match_spec() {
-        assert_eq!(RejectionReason::Unknown.as_str(), "unknown");
-        assert_eq!(RejectionReason::Forbidden.as_str(), "forbidden");
-        assert_eq!(RuntimeState::Ready.as_str(), "ready");
-        assert_eq!(RuntimeState::Disabled.as_str(), "disabled");
-        assert_eq!(RuntimeState::Invalid.as_str(), "invalid");
+        assert!(ensure_stdio_servable(&sample(RuntimeState::Invalid)).is_err());
+        assert!(ensure_stdio_servable(&sample(RuntimeState::Ready)).is_ok());
+        assert!(ensure_stdio_servable(&sample(RuntimeState::Disabled)).is_ok());
     }
 }

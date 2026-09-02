@@ -264,14 +264,16 @@ impl AppCorePlugin for AiPipelinePlugin {
         let registry = app.agent.tool_registry();
         let registry_guard = registry.read().await;
 
-        let (server_enabled, mut exposed_tools, mut auto_filled) = {
+        // `exposed_tools_auto_filled` is skip_serializing (always false on load);
+        // cutover sets the flag when it fills an empty override.
+        let (server_enabled, mut exposed_tools) = {
             let config = app.config.read().await;
             (
                 config.mcp.server.enabled,
                 config.mcp.server.exposed_tools.clone(),
-                config.mcp.server.exposed_tools_auto_filled,
             )
         };
+        let mut auto_filled = false;
 
         let validation = apply_mcp_exposure_cutover(
             &*registry_guard,

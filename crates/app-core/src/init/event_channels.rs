@@ -16,6 +16,29 @@ pub struct EventChannels {
         Option<tokio::sync::mpsc::Receiver<feature_productivity::distraction::DistractionAlert>>,
 }
 
+impl EventChannels {
+    /// Drain intervention + pipeline receivers in the background so unused
+    /// senders do not block AppCore shutdown (stdio / diagnostic paths).
+    pub fn spawn_background_drain(self) {
+        tokio::spawn(async move {
+            let mut intervention_rx = self.intervention_rx;
+            let mut pipeline_rx = self.pipeline_rx;
+            let mut intervention_closed = false;
+            let mut pipeline_closed = false;
+            while !intervention_closed || !pipeline_closed {
+                tokio::select! {
+                    msg = intervention_rx.recv(), if !intervention_closed => {
+                        if msg.is_none() { intervention_closed = true; }
+                    }
+                    result = pipeline_rx.recv(), if !pipeline_closed => {
+                        if result.is_err() { pipeline_closed = true; }
+                    }
+                }
+            }
+        });
+    }
+}
+
 /// Build EventChannels by extracting registered receivers from the FeatureHost.
 pub fn build(
     host: &crate::plugin::host::FeatureHost,

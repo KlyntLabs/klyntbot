@@ -144,11 +144,12 @@ pub fn validate_mcp_exposure(input: ExposureInput<'_>) -> ExposureValidation {
             }
         }
         effective_registry_tools.sort();
-        for builtin in BuiltinId::all() {
-            if builtin.default_on() && !matches!(builtin, BuiltinId::GetStatus) {
-                effective_builtins.push(*builtin);
-            }
-        }
+        effective_builtins.extend(
+            BuiltinId::all()
+                .iter()
+                .copied()
+                .filter(|b| b.default_on() && !b.is_mandatory()),
+        );
     } else {
         let mut seen = std::collections::HashSet::new();
         let mut agent_selected = false;

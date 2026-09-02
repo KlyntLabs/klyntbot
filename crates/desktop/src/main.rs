@@ -185,23 +185,7 @@ fn run_mcp_stdio() {
         .expect("init failed");
         let app = Arc::new(app);
 
-        // Drain unused EventChannels — both receivers must close before task exits.
-        tokio::spawn(async move {
-            let mut intervention_rx = events.intervention_rx;
-            let mut pipeline_rx = events.pipeline_rx;
-            let mut intervention_closed = false;
-            let mut pipeline_closed = false;
-            while !intervention_closed || !pipeline_closed {
-                tokio::select! {
-                    msg = intervention_rx.recv(), if !intervention_closed => {
-                        if msg.is_none() { intervention_closed = true; }
-                    }
-                    result = pipeline_rx.recv(), if !pipeline_closed => {
-                        if result.is_err() { pipeline_closed = true; }
-                    }
-                }
-            }
-        });
+        events.spawn_background_drain();
 
         // Invalid exposure → unsuccessful exit (EXPO-3.9); MCP is this process's sole purpose.
         if let Err(e) = klyntbot_server::serve_stdio(app).await {
@@ -319,22 +303,19 @@ fn run_desktop_app() {
                         "embedded MCP HTTP server not started (Ready required)"
                     );
                 } else {
+                    // Ready gate above implies mcp_exposure is present.
+                    let exposure = Arc::new(
+                        mcp_core
+                            .mcp_exposure()
+                            .expect("embedded_mcp_bind_allowed requires mcp_exposure")
+                            .clone(),
+                    );
                     tauri::async_runtime::spawn(async move {
                         let config = mcp_core.config.read().await;
                         let host = config.mcp.server.host.clone();
                         let port = config.mcp.server.port;
                         let auth_config = config.mcp.server.auth.clone();
                         drop(config);
-
-                        let exposure = match mcp_core.mcp_exposure().cloned() {
-                            Some(v) => Arc::new(v),
-                            None => {
-                                tracing::error!(
-                                    "embedded MCP: exposure status missing after init; not starting"
-                                );
-                                return;
-                            }
-                        };
 
                         tracing::info!("Starting embedded MCP HTTP server on {host}:{port}");
 

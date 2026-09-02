@@ -33,15 +33,15 @@ impl KlyntbotServerHandler {
     ///
     /// Registry tools come from `effective_registry_tools`. `get_status` is
     /// always advertised; `agent` follows `effective_builtins` (`BuiltinId`),
-    /// not the registry whitelist string (auto-fill no longer inserts `"agent"`).
+    /// not a registry-tool name (auto-fill no longer inserts `"agent"`).
     pub fn new(app: Arc<AppCore>, exposure: &ExposureValidation) -> Self {
         let registry = app.agent.tool_registry();
-        let whitelist = exposure.effective_registry_tools.clone();
+        let effective_registry_tools = exposure.effective_registry_tools.clone();
         let include_agent = exposure.effective_builtins.contains(&BuiltinId::Agent);
         let bridge = if let Ok(bus) = app.domain_event_bus() {
-            ToolRegistryBridge::new_with_bus(registry, whitelist, bus)
+            ToolRegistryBridge::new_with_bus(registry, effective_registry_tools, bus)
         } else {
-            ToolRegistryBridge::new(registry, whitelist)
+            ToolRegistryBridge::new(registry, effective_registry_tools)
         };
         let agent_bridge = AgentBridge::new(Arc::clone(&app));
 
