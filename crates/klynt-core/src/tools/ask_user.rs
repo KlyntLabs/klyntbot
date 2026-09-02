@@ -34,10 +34,6 @@ impl Tool for AskUserTool {
          tools in the same turn - it blocks execution until the user responds."
     }
 
-    fn allowed_channels(&self) -> common::ChannelMask {
-        common::ChannelMask::ALL
-    }
-
     fn metadata(&self) -> tools_core::ToolMetadata {
         tools_core::ToolMetadata {
             category: tools_core::ToolCategory::Communication,
@@ -639,8 +635,21 @@ fn format_text_fallback(request: &InteractionRequest) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use common::Answer;
+    use common::{Answer, ChannelMask};
     use serde_json::json;
+    use tools_core::{ExposurePolicy, McpExposure, Tool};
+
+    #[test]
+    fn ask_user_inherits_forbidden_mcp_default_policy() {
+        let tool = AskUserTool;
+        let policy = tool.exposure_policy();
+        assert_eq!(policy, ExposurePolicy::default());
+        assert_eq!(policy.mcp, McpExposure::Forbidden);
+        assert_eq!(policy.llm_channels, ChannelMask::ALL);
+        assert!(!policy.subagent);
+        assert_eq!(tool.allowed_channels(), policy.llm_channels);
+        assert_eq!(tool.subagent_visible(), policy.subagent);
+    }
 
     #[test]
     fn test_parse_flat_single_select() {

@@ -152,3 +152,20 @@ impl Tool for LearningTool {
         }
     }
 }
+
+#[cfg(test)]
+mod exposure_tests {
+    use super::*;
+    use tools_core::McpExposure;
+
+    #[test]
+    fn historical_mcp_default() {
+        let tool = LearningTool::new(None);
+        let policy = tool.exposure_policy();
+        assert_eq!(tool.name(), "learning");
+        assert_eq!(policy.mcp, McpExposure::Default);
+        assert!(!policy.subagent);
+        assert_eq!(tool.allowed_channels(), policy.llm_channels);
+        assert!(!tool.subagent_visible());
+    }
+}

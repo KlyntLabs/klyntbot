@@ -203,3 +203,30 @@ impl TemporalTool {
 fn tool_err(msg: String) -> common::KlyntbotError {
     common::KlyntbotError::Tool(common::ToolError::ExecutionFailed(msg))
 }
+
+#[cfg(test)]
+mod exposure_tests {
+    use super::*;
+    use cognitive::repos::SemanticFactRepo;
+    use tools_core::{McpExposure, Tool};
+
+    #[tokio::test]
+    async fn historical_mcp_default() {
+        let pool = storage::StoragePool::connect_in_memory().await.unwrap();
+        storage::StoragePool::run_feature_migrations(
+            pool.inner(),
+            &cognitive::repos::cognitive_migrations(),
+        )
+        .await
+        .unwrap();
+        let tool = TemporalTool::new(TemporalService::new(SemanticFactRepo::new(
+            pool.inner().clone(),
+        )));
+        let policy = tool.exposure_policy();
+        assert_eq!(tool.name(), "temporal");
+        assert_eq!(policy.mcp, McpExposure::Default);
+        assert!(!policy.subagent);
+        assert_eq!(tool.allowed_channels(), policy.llm_channels);
+        assert!(!tool.subagent_visible());
+    }
+}

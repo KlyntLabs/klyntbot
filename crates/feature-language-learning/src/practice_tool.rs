@@ -124,3 +124,20 @@ impl Tool for LanguagePracticeTool {
         }
     }
 }
+
+#[cfg(test)]
+mod exposure_tests {
+    use super::*;
+    use tools_core::McpExposure;
+
+    #[test]
+    fn historical_mcp_default() {
+        let tool = LanguagePracticeTool::new();
+        let policy = tool.exposure_policy();
+        assert_eq!(tool.name(), "language_practice");
+        assert_eq!(policy.mcp, McpExposure::Default);
+        assert!(!policy.subagent);
+        assert_eq!(tool.allowed_channels(), policy.llm_channels);
+        assert!(!tool.subagent_visible());
+    }
+}

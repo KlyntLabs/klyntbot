@@ -55,9 +55,6 @@ impl Tool for FakeTool {
     fn is_concurrency_safe(&self, _args: &Value) -> bool {
         true
     }
-    fn allowed_channels(&self) -> common::ChannelMask {
-        common::ChannelMask::ALL
-    }
 }
 
 fn register(reg: &mut ToolRegistry, name: &'static str, marker: &'static str) {

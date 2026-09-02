@@ -324,6 +324,18 @@ impl Tool for CronTool {
 mod tests {
     use super::*;
     use serde_json::json;
+    use tools_core::McpExposure;
+
+    #[test]
+    fn historical_mcp_default() {
+        let tool = CronTool::new();
+        let policy = tool.exposure_policy();
+        assert_eq!(tool.name(), "cron");
+        assert_eq!(policy.mcp, McpExposure::Default);
+        assert!(!policy.subagent);
+        assert_eq!(tool.allowed_channels(), policy.llm_channels);
+        assert!(!tool.subagent_visible());
+    }
 
     /// A handler that records calls — lets us verify the tool rejected before reaching the handler.
     struct RecordingHandler {

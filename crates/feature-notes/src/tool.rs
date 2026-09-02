@@ -525,6 +525,17 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn historical_mcp_default() {
+        let tool = setup().await;
+        let policy = tool.exposure_policy();
+        assert_eq!(tool.name(), "notes");
+        assert_eq!(policy.mcp, tools_core::McpExposure::Default);
+        assert!(!policy.subagent);
+        assert_eq!(tool.allowed_channels(), policy.llm_channels);
+        assert!(!tool.subagent_visible());
+    }
+
+    #[tokio::test]
     async fn test_create_and_get_note() {
         let tool = setup().await;
         let result = tool

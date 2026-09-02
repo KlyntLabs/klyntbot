@@ -29,7 +29,9 @@ pub use tools_core_macros::{tool_actions, ActionParams, DomainEnum, Tool, ToolPa
 
 pub use config_persistence::ConfigPersistence;
 pub use events::ToolEvent;
-pub use exposure::{ExposurePolicy, McpExposure};
+pub use exposure::{
+    ExposurePolicy, McpExposure, EXPO_23_FORBIDDEN_STUB_TOOLS, HISTORICAL_MCP_DEFAULT_TOOLS,
+};
 pub use feature::{FeatureMigration, FeaturePackage, HealthStatus};
 pub use interceptor::{InterceptorChain, ToolCallInterceptor};
 pub use job_supervisor::{

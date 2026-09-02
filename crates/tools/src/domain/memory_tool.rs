@@ -664,6 +664,18 @@ impl MemoryTool {
 mod tests {
     use super::*;
     use crate::conversation_recall::ConversationRecallStatus;
+    use tools_core::McpExposure;
+
+    #[test]
+    fn historical_mcp_default_and_subagent_visible() {
+        let tool = MemoryTool::new();
+        let policy = tool.exposure_policy();
+        assert_eq!(tool.name(), "memory");
+        assert_eq!(policy.mcp, McpExposure::Default);
+        assert!(policy.subagent);
+        assert_eq!(tool.allowed_channels(), policy.llm_channels);
+        assert!(tool.subagent_visible());
+    }
 
     /// Mock handler for testing
     struct MockConversationHandler {

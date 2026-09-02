@@ -257,3 +257,21 @@ fn format_annotations(annotations: &[Annotation]) -> String {
     }
     out
 }
+
+#[cfg(test)]
+mod exposure_tests {
+    use super::*;
+    use tools_core::{McpExposure, Tool};
+
+    #[tokio::test]
+    async fn historical_mcp_default() {
+        let pool = storage::StoragePool::connect_in_memory().await.unwrap();
+        let tool = AnnotateTool::new(AnnotationRepo::new(pool.inner().clone()));
+        let policy = tool.exposure_policy();
+        assert_eq!(tool.name(), "annotate");
+        assert_eq!(policy.mcp, McpExposure::Default);
+        assert!(!policy.subagent);
+        assert_eq!(tool.allowed_channels(), policy.llm_channels);
+        assert!(!tool.subagent_visible());
+    }
+}

@@ -318,6 +318,17 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn historical_mcp_default() {
+        let (tool, _) = setup().await;
+        let policy = tool.exposure_policy();
+        assert_eq!(tool.name(), "alarm");
+        assert_eq!(policy.mcp, tools_core::McpExposure::Default);
+        assert!(!policy.subagent);
+        assert_eq!(tool.allowed_channels(), policy.llm_channels);
+        assert!(!tool.subagent_visible());
+    }
+
+    #[tokio::test]
     async fn create_relative_then_list_finds_it() {
         let (tool, _) = setup().await;
         let r = tool

@@ -161,6 +161,18 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn historical_mcp_default() {
+        use tools_core::{McpExposure, Tool};
+        let tool = setup().await;
+        let policy = tool.exposure_policy();
+        assert_eq!(tool.name(), "mirror");
+        assert_eq!(policy.mcp, McpExposure::Default);
+        assert!(!policy.subagent);
+        assert_eq!(tool.allowed_channels(), policy.llm_channels);
+        assert!(!tool.subagent_visible());
+    }
+
+    #[tokio::test]
     async fn test_get_state_empty() {
         let tool = setup().await;
         let result = tool.get_state(GetStateParams {}, ()).await.unwrap();

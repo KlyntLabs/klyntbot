@@ -43,6 +43,38 @@ impl Default for ExposurePolicy {
     }
 }
 
+/// Historical registry-backed MCP Default tool names (EXPO-2.3).
+///
+/// Authoritative membership is declared on each `Tool` via `exposure_policy`;
+/// this list is the locked name set for annotation / migration tests only —
+/// not a runtime exposure catalog.
+pub const HISTORICAL_MCP_DEFAULT_TOOLS: &[&str] = &[
+    "tasks",
+    "productivity",
+    "notes",
+    "learning",
+    "language_practice",
+    "memory",
+    "annotate",
+    "cron",
+    "alarm",
+    "mirror",
+    "temporal",
+    "launcher",
+];
+
+/// EXPO-2.3 named intentional removals — MCP Forbidden (coding-memory stubs).
+pub const EXPO_23_FORBIDDEN_STUB_TOOLS: &[&str] = &[
+    "recall_index",
+    "recall_timeline",
+    "recall_fetch",
+    "trace_causes",
+    "check_dead_ends",
+    "recall_facts_as_of",
+    "recall_change_history",
+    "recall_decision_points",
+];
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -58,5 +90,24 @@ mod tests {
     #[test]
     fn mcp_exposure_default_is_forbidden() {
         assert_eq!(McpExposure::default(), McpExposure::Forbidden);
+    }
+
+    #[test]
+    fn historical_mcp_default_name_set_is_locked() {
+        assert_eq!(HISTORICAL_MCP_DEFAULT_TOOLS.len(), 12);
+        assert!(HISTORICAL_MCP_DEFAULT_TOOLS.contains(&"memory"));
+        assert!(HISTORICAL_MCP_DEFAULT_TOOLS.contains(&"tasks"));
+        assert!(!HISTORICAL_MCP_DEFAULT_TOOLS.contains(&"agent"));
+        for stub in EXPO_23_FORBIDDEN_STUB_TOOLS {
+            assert!(
+                !HISTORICAL_MCP_DEFAULT_TOOLS.contains(stub),
+                "{stub} must not be a historical Default"
+            );
+        }
+    }
+
+    #[test]
+    fn expo_23_forbidden_stub_name_set_is_locked() {
+        assert_eq!(EXPO_23_FORBIDDEN_STUB_TOOLS.len(), 8);
     }
 }
