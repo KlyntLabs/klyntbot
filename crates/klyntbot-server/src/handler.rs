@@ -315,7 +315,7 @@ impl ServerHandler for KlyntbotServerHandler {
                     .bridge
                     .execute(name, params.clone(), &self.session_id)
                     .await?;
-                emit_entity_update_for_tool(&self.app, &self.app.event_emitter, name, &params);
+                emit_entity_update_for_tool(&self.app.event_emitter, name, &params, &result);
                 Ok(result)
             }
         }
@@ -330,64 +330,147 @@ impl ServerHandler for KlyntbotServerHandler {
     }
 }
 
-/// Read-only actions that should not trigger entity update events.
-const READ_ONLY_ACTIONS: &[&str] = &["list", "show", "get", "search", "status", "stats", "query"];
-
-/// Non-AiFeature tools that still need entity-update fan-out. These are tools
-/// registered directly in the agent builder (OkrTool, ProjectTool, AreaTool,
-/// WorkContextTool) rather than via `FeaturePackage::tools()`. If a tool is
-/// later promoted to an `AiFeature`, its mapping moves into the registry and
-/// this fallback entry becomes dead.
-const NON_FEATURE_TOOL_ENTITY_KINDS: &[(&str, EntityKind)] = &[
-    ("okr", EntityKind::Objective),
-    ("project", EntityKind::Project),
-    ("area", EntityKind::Area),
-    ("work_context", EntityKind::Productivity),
-    ("productivity", EntityKind::Productivity),
-];
-
-/// Emit an `entity:updated` event after a successful MCP tool call,
-/// but only for mutating actions (create, update, delete, etc.).
-///
-/// Dispatch source of truth:
-/// 1. `AiFeatureRegistry` — any tool declared via `#[derive(AiFeature)]` with
-///    `tool_name` + `entity_kind` dispatches automatically.
-/// 2. `NON_FEATURE_TOOL_ENTITY_KINDS` — fallback for tools registered outside
-///    the `FeaturePackage` path (OKR / project / area / work_context).
+/// Emit `entity:updated` after a successful bridge-executed tool call via the
+/// shared `app-core` entity-update intent projection.
 fn emit_entity_update_for_tool(
-    app: &Arc<AppCore>,
     emitter: &Arc<dyn AppEventEmitter>,
     tool_name: &str,
     params: &serde_json::Value,
+    result: &CallToolResult,
 ) {
-    let action = params.get("action").and_then(|v| v.as_str()).unwrap_or("");
-
-    if READ_ONLY_ACTIONS.contains(&action) {
+    if result.is_error.unwrap_or(false) {
         return;
     }
 
-    let entity_kind = app
-        .feature_registry()
-        .iter()
-        .find(|r| r.tool_name == Some(tool_name))
-        .and_then(|r| r.entity_kind.and_then(EntityKind::parse))
-        .or_else(|| {
-            NON_FEATURE_TOOL_ENTITY_KINDS
-                .iter()
-                .find(|(n, _)| *n == tool_name)
-                .map(|(_, k)| k.clone())
+    let action = params.get("action").and_then(|v| v.as_str());
+    for intent in app_core::entity_update_intent::project_entity_update(tool_name, action) {
+        emitter.emit_entity_updated(intent.kind, intent.id);
+    }
+}
+
+#[cfg(test)]
+mod entity_update_tests {
+    use super::*;
+    use desktop_shared::types::EntityKind;
+    use rmcp::model::{CallToolResult, Content};
+    use std::sync::Mutex;
+
+    struct RecordingEmitter {
+        events: Mutex<Vec<(EntityKind, String)>>,
+    }
+
+    impl AppEventEmitter for RecordingEmitter {
+        fn emit_event(&self, _event_name: &str, _payload: serde_json::Value) {}
+
+        fn emit_entity_updated(&self, kind: EntityKind, id: &str) {
+            self.events.lock().unwrap().push((kind, id.to_string()));
+        }
+    }
+
+    #[test]
+    fn emit_entity_update_for_tool_success_mutating() {
+        let emitter = Arc::new(RecordingEmitter {
+            events: Mutex::new(Vec::new()),
         });
+        let result = CallToolResult::success(vec![Content::text("ok")]);
+        emit_entity_update_for_tool(
+            &(emitter.clone() as Arc<dyn AppEventEmitter>),
+            "tasks",
+            &serde_json::json!({"action": "create"}),
+            &result,
+        );
+        let events = emitter.events.lock().unwrap();
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].0, EntityKind::Task);
+        assert_eq!(events[0].1, "*");
+    }
 
-    let Some(entity_kind) = entity_kind else {
-        return;
-    };
+    #[test]
+    fn emit_entity_update_for_tool_read_only_skips() {
+        let emitter = Arc::new(RecordingEmitter {
+            events: Mutex::new(Vec::new()),
+        });
+        let result = CallToolResult::success(vec![Content::text("ok")]);
+        emit_entity_update_for_tool(
+            &(emitter.clone() as Arc<dyn AppEventEmitter>),
+            "tasks",
+            &serde_json::json!({"action": "list"}),
+            &result,
+        );
+        assert!(emitter.events.lock().unwrap().is_empty());
+    }
 
-    let id = params.get("id").and_then(|v| v.as_str()).unwrap_or("*");
+    #[test]
+    fn emit_entity_update_for_tool_error_skips() {
+        let emitter = Arc::new(RecordingEmitter {
+            events: Mutex::new(Vec::new()),
+        });
+        let result = CallToolResult::error(vec![Content::text("boom")]);
+        emit_entity_update_for_tool(
+            &(emitter.clone() as Arc<dyn AppEventEmitter>),
+            "tasks",
+            &serde_json::json!({"action": "create"}),
+            &result,
+        );
+        assert!(emitter.events.lock().unwrap().is_empty());
+    }
 
-    emitter.emit_entity_updated(entity_kind, id);
+    #[test]
+    fn emit_entity_update_for_tool_okr_multi_kind() {
+        let emitter = Arc::new(RecordingEmitter {
+            events: Mutex::new(Vec::new()),
+        });
+        let result = CallToolResult::success(vec![Content::text("ok")]);
+        emit_entity_update_for_tool(
+            &(emitter.clone() as Arc<dyn AppEventEmitter>),
+            "okr",
+            &serde_json::json!({"action": "objective.create"}),
+            &result,
+        );
+        let events = emitter.events.lock().unwrap();
+        assert_eq!(events.len(), 2);
+        assert_eq!(events[0].0, EntityKind::Objective);
+        assert_eq!(events[1].0, EntityKind::KeyResult);
+        assert!(events.iter().all(|(_, id)| id == "*"));
+    }
 
-    // OKR tool can mutate both objectives and key results.
-    if tool_name == "okr" {
-        emitter.emit_entity_updated(EntityKind::KeyResult, id);
+    #[test]
+    fn emit_entity_update_parity_cases_match_projection() {
+        use app_core::entity_update_intent::PARITY_CASES;
+
+        let result = CallToolResult::success(vec![Content::text("ok")]);
+        for (tool, action, expected) in PARITY_CASES {
+            let emitter = Arc::new(RecordingEmitter {
+                events: Mutex::new(Vec::new()),
+            });
+            let params = match action {
+                Some(a) => serde_json::json!({ "action": a }),
+                None => serde_json::json!({}),
+            };
+            emit_entity_update_for_tool(
+                &(emitter.clone() as Arc<dyn AppEventEmitter>),
+                tool,
+                &params,
+                &result,
+            );
+            let kinds: Vec<EntityKind> = emitter
+                .events
+                .lock()
+                .unwrap()
+                .iter()
+                .map(|(k, _)| *k)
+                .collect();
+            assert_eq!(
+                kinds.as_slice(),
+                *expected,
+                "mcp parity {tool:?} {action:?}"
+            );
+            assert!(emitter
+                .events
+                .lock()
+                .unwrap()
+                .iter()
+                .all(|(_, id)| id == "*"));
+        }
     }
 }

@@ -392,10 +392,7 @@ mod cutover_tests {
     fn registry_with(tools: &[(&'static str, McpExposure)]) -> ToolRegistry {
         let mut reg = ToolRegistry::new();
         for (name, mcp) in tools {
-            reg.register(NamedTool {
-                name,
-                mcp: *mcp,
-            });
+            reg.register(NamedTool { name, mcp: *mcp });
         }
         reg
     }

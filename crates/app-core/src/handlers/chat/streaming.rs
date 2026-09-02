@@ -81,8 +81,9 @@ fn format_interaction_summary(response: &common::FormResponse) -> String {
     }
 }
 
-/// Map a tool name to its domain category.
-pub fn tool_domain(tool_name: &str) -> Option<&'static str> {
+/// Session-only tool → domain map for `auto_detect_context`.
+/// Not used for entity-update emission (see `entity_update_intent`).
+fn session_tool_domain(tool_name: &str) -> Option<&'static str> {
     match tool_name {
         "todo" | "tasks" => Some("task"),
         "project" => Some("project"),
@@ -93,18 +94,20 @@ pub fn tool_domain(tool_name: &str) -> Option<&'static str> {
     }
 }
 
-/// Map a tool name to the EntityKind it modifies, derived from `tool_domain`.
-pub fn entity_kind_for_tool(tool_name: &str) -> Option<desktop_shared::types::EntityKind> {
-    tool_domain(tool_name).and_then(desktop_shared::types::EntityKind::parse)
-}
+#[cfg(test)]
+mod session_tool_domain_tests {
+    use super::session_tool_domain;
 
-/// Returns `true` when the action is a write (create/update/delete/toggle/etc.)
-/// rather than a read-only query (list/get/search).
-pub fn is_mutating_action(action: Option<&str>) -> bool {
-    !matches!(
-        action,
-        Some("list" | "get" | "search" | "search-semantic" | "search-hybrid")
-    )
+    #[test]
+    fn session_tool_domain_preserves_legacy_mappings() {
+        assert_eq!(session_tool_domain("tasks"), Some("task"));
+        assert_eq!(session_tool_domain("todo"), Some("task"));
+        assert_eq!(session_tool_domain("project"), Some("project"));
+        assert_eq!(session_tool_domain("area"), Some("area"));
+        assert_eq!(session_tool_domain("okr"), Some("objective"));
+        assert_eq!(session_tool_domain("finance"), Some("finance"));
+        assert_eq!(session_tool_domain("notes"), None);
+    }
 }
 
 /// Map an entity_type from EntityCard to a session context entity_kind.
@@ -128,7 +131,10 @@ pub async fn auto_detect_context(
     entity_cards: &[EntityCard],
 ) -> Result<(), ApiError> {
     // Determine dominant domain from tool names
-    let domains: HashSet<&str> = tool_names.iter().filter_map(|n| tool_domain(n)).collect();
+    let domains: HashSet<&str> = tool_names
+        .iter()
+        .filter_map(|n| session_tool_domain(n))
+        .collect();
     if domains.len() != 1 {
         return Ok(()); // ambiguous or no tools → skip
     }
