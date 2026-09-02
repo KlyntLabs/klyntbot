@@ -117,10 +117,11 @@ fn advertised_equals_builtins_plus_defaults_without_forbidden_expansion() {
     let expected_defaults: HashSet<&str> = HISTORICAL_MCP_DEFAULT_TOOLS.iter().copied().collect();
     assert_eq!(defaults, expected_defaults);
 
-    for forbidden in EXPO_23_FORBIDDEN_STUB_TOOLS
-        .iter()
-        .copied()
-        .chain(["shell", "web_fetch", "agent"])
+    for forbidden in
+        EXPO_23_FORBIDDEN_STUB_TOOLS
+            .iter()
+            .copied()
+            .chain(["shell", "web_fetch", "agent"])
     {
         assert!(
             !defaults.contains(forbidden),

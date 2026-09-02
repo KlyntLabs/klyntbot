@@ -247,10 +247,7 @@ mod tests {
     fn registry_with(tools: &[(&'static str, McpExposure)]) -> ToolRegistry {
         let mut reg = ToolRegistry::new();
         for (name, mcp) in tools {
-            reg.register(NamedTool {
-                name,
-                mcp: *mcp,
-            });
+            reg.register(NamedTool { name, mcp: *mcp });
         }
         reg
     }
@@ -295,7 +292,10 @@ mod tests {
 
         assert_eq!(result.runtime_state, RuntimeState::Ready);
         assert!(result.requested.is_empty());
-        assert_eq!(names(&result.effective_registry_tools), vec!["notes", "tasks"]);
+        assert_eq!(
+            names(&result.effective_registry_tools),
+            vec!["notes", "tasks"]
+        );
         assert_eq!(
             result.effective_builtins,
             vec![BuiltinId::GetStatus, BuiltinId::Agent]

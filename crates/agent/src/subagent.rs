@@ -327,9 +327,7 @@ impl SubagentManager {
         let domain_tools: Vec<tools_core::DynTool> = {
             let parent = self.parent_registry.lock().unwrap().clone();
             match parent {
-                Some(reg) => {
-                    project_subagent_domain_tools(reg.read().await.dyn_tools())
-                }
+                Some(reg) => project_subagent_domain_tools(reg.read().await.dyn_tools()),
                 None => Vec::new(),
             }
         };

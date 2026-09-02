@@ -87,11 +87,7 @@ fn require_exposure(app: &app_core::AppCore) -> Result<ExposureValidation> {
 fn ensure_stdio_servable(exposure: &ExposureValidation) -> Result<()> {
     if exposure.runtime_state == RuntimeState::Invalid {
         for entry in &exposure.rejected {
-            eprintln!(
-                "rejected: {} ({})",
-                entry.name,
-                entry.reason.as_str()
-            );
+            eprintln!("rejected: {} ({})", entry.name, entry.reason.as_str());
         }
         anyhow::bail!("MCP exposure Invalid — refusing to serve (stdio)");
     }
@@ -128,11 +124,7 @@ fn print_exposure_report(server_enabled: bool, exposure: &ExposureValidation) {
     } else {
         println!();
         for entry in &exposure.rejected {
-            println!(
-                "    - {} ({})",
-                entry.name,
-                entry.reason.as_str()
-            );
+            println!("    - {} ({})", entry.name, entry.reason.as_str());
         }
     }
 }

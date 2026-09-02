@@ -193,10 +193,9 @@ impl ChatEventTranslator {
                 });
                 // Emit entity:updated so the UI refreshes affected lists
                 if success {
-                    for intent in crate::entity_update_intent::project_entity_update(
-                        &name,
-                        action.as_deref(),
-                    ) {
+                    for intent in
+                        crate::entity_update_intent::project_entity_update(&name, action.as_deref())
+                    {
                         let payload = serde_json::json!({
                             "entityKind": intent.kind,
                             "id": intent.id,
@@ -954,8 +953,6 @@ impl ChatEventTranslator {
     }
 }
 
-
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1098,7 +1095,11 @@ mod tests {
                         .and_then(|v| serde_json::from_value(v.clone()).ok())
                 })
                 .collect();
-            assert_eq!(kinds.as_slice(), *expected, "chat parity {tool:?} {action:?}");
+            assert_eq!(
+                kinds.as_slice(),
+                *expected,
+                "chat parity {tool:?} {action:?}"
+            );
             for e in emits.iter().filter(|e| e.event == ENTITY_UPDATED) {
                 assert_eq!(e.payload["id"], "*", "chat wildcard {tool:?}");
             }

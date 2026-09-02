@@ -2,8 +2,8 @@
 
 pub mod adapters;
 pub mod brain_voice;
-pub mod entity_update_intent;
 pub mod desktop_approval_channel;
+pub mod entity_update_intent;
 pub mod errors;
 pub mod events;
 pub mod focus;

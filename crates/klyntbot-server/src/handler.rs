@@ -460,7 +460,11 @@ mod entity_update_tests {
                 .iter()
                 .map(|(k, _)| *k)
                 .collect();
-            assert_eq!(kinds.as_slice(), *expected, "mcp parity {tool:?} {action:?}");
+            assert_eq!(
+                kinds.as_slice(),
+                *expected,
+                "mcp parity {tool:?} {action:?}"
+            );
             assert!(emitter
                 .events
                 .lock()

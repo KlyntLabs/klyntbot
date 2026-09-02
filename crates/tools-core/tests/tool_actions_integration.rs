@@ -2,9 +2,7 @@
 
 use common::{ChannelMask, ChannelName, ChatId};
 use serde_json::json;
-use tools_core::{
-    tool_actions, ActionParams, ExposurePolicy, McpExposure, RoutingContext, Tool,
-};
+use tools_core::{tool_actions, ActionParams, ExposurePolicy, McpExposure, RoutingContext, Tool};
 
 // --- Param structs ---
 

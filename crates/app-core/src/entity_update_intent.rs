@@ -152,10 +152,7 @@ static PROJECTION_TABLE: &[ProjectionEntry] = &[
 /// Missing / empty / unknown actions produce intents when a projection entry
 /// exists. Tools without an entry produce none.
 pub fn project_entity_update(tool_name: &str, action: Option<&str>) -> Vec<EntityUpdateIntent> {
-    let Some(entry) = PROJECTION_TABLE
-        .iter()
-        .find(|e| e.tool_name == tool_name)
-    else {
+    let Some(entry) = PROJECTION_TABLE.iter().find(|e| e.tool_name == tool_name) else {
         return Vec::new();
     };
 
@@ -232,7 +229,10 @@ mod tests {
     fn project_entity_update_missing_or_unknown_action_mutates() {
         assert_eq!(kinds_of("tasks", None), vec![EntityKind::Task]);
         assert_eq!(kinds_of("tasks", Some("")), vec![EntityKind::Task]);
-        assert_eq!(kinds_of("tasks", Some("brand_new_write")), vec![EntityKind::Task]);
+        assert_eq!(
+            kinds_of("tasks", Some("brand_new_write")),
+            vec![EntityKind::Task]
+        );
     }
 
     #[test]
