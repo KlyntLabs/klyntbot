@@ -134,17 +134,29 @@ Transform vague tasks into verifiable goals — "fix the bug" → "write a test 
 
 ## Agent skills
 
-### Issue tracker
+This repo is configured for a spec-driven skill set.
 
-Issues and PRDs live as GitHub issues in `KlyntLabs/klyntbot` (use the `gh` CLI). See `docs/agents/issue-tracker.md`.
+- Feature flow: `frame-change` → `specify-behavior` → `design-solution` →
+  `plan-tasks` → `build-in-waves`
+- Vague ask you want turned into a prompt for a fresh session: `/forge-prompt` (user-run)
+- Bug on-ramp: `root-cause` (clear unexpected behavior first, then a guarded fix);
+  deployed env: `debug-remote` then `root-cause`; telemetry readiness:
+  `assess-observability`
+- Capture a conversation/spec/idea into tracker issues: `/publish-issues` (user-run)
+- Incoming issues and PRs: `/triage` (user-run)
+- Traceability check: the docs-only `audit-trace` skill — run by `prove-claim` and `cut-release`;
+  keep it clean
+- Project docs (layer enabled): `/define-project` maintains
+  `docs/product/vision.md`, the `docs/architecture/` invariant spine, and
+  `docs/product/guidelines.md`; the feature skills consult them
 
-### Triage labels
+Repo config the skills read:
 
-Canonical triage vocabulary (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
-
-### Domain docs
-
-Single-context: root `CONTEXT.md` + `docs/adr/`. See `docs/agents/domain.md`.
+- verify commands, release steps, Remote environments: `docs/agents/project.md`
+- Team composition (roster, ownership notes, workflow band): `docs/agents/project.md` (`## Team`)
+- Issue tracker operations: `docs/agents/issue-tracker.md`
+- Triage label mapping: `docs/agents/triage-labels.md`
+- Domain docs (glossary / ADRs): `docs/agents/domain.md`
 
 ## Conventions
 
