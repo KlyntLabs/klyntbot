@@ -1,7 +1,7 @@
 # Requirements: Entity-update intent projection
 
 Feature code: EUPI
-Status: In-progress
+Status: Implemented
 Date: 2026-09-02
 
 ## 1. Classify tool calls into entity-update intents

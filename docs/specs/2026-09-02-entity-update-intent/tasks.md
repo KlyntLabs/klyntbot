@@ -2,7 +2,7 @@
 
 > **For agentic workers:** after plan approval, pick one execute skill —
 > `build-in-waves`, `build-by-story`, or `build-inline`.
-> The chosen skill writes `Execution-mode:`. Steps use checkbox (`- [ ]`) syntax.
+> The chosen skill writes `Execution-mode:`. Steps use checkbox (`- [x]`) syntax.
 
 Feature code: EUPI
 Status: Approved
@@ -55,11 +55,11 @@ Design: ./design.md
 **Depends-on:** none
 
 **Steps:**
-- [ ] Write failing unit tests: no entry ⇒ empty; read-only action ⇒ empty (include `list_recurring` for tasks); missing/unknown action with entry ⇒ kinds with id `"*"`; `okr` ⇒ Objective+KeyResult; cover mismatch verbs (`show`, `status`, `stats`, `query`, `search-semantic`, `search-hybrid`) under the seeded denylists
-- [ ] Run `cargo nextest run -p app-core -E 'test(project_entity_update)'` — expect fail (module missing)
-- [ ] Implement module + export; seed full design table; do not parse params/results; do not touch AiFeatureRegistry
-- [ ] Run same filter — expect pass
-- [ ] Commit `feat(app-core): add entity-update intent projection`
+- [x] Write failing unit tests: no entry ⇒ empty; read-only action ⇒ empty (include `list_recurring` for tasks); missing/unknown action with entry ⇒ kinds with id `"*"`; `okr` ⇒ Objective+KeyResult; cover mismatch verbs (`show`, `status`, `stats`, `query`, `search-semantic`, `search-hybrid`) under the seeded denylists
+- [x] Run `cargo nextest run -p app-core -E 'test(project_entity_update)'` — expect fail (module missing)
+- [x] Implement module + export; seed full design table; do not parse params/results; do not touch AiFeatureRegistry
+- [x] Run same filter — expect pass
+- [x] Commit `feat(app-core): add entity-update intent projection`
 
 _Requirements: EUPI-1.1, EUPI-1.2, EUPI-1.3, EUPI-1.4, EUPI-1.5, EUPI-1.6, EUPI-1.7, EUPI-1.8, EUPI-1.9, EUPI-1.10, EUPI-1.11, EUPI-5.1_
 
@@ -80,10 +80,10 @@ _Requirements: EUPI-1.1, EUPI-1.2, EUPI-1.3, EUPI-1.4, EUPI-1.5, EUPI-1.6, EUPI-
 **Depends-on:** Task 3
 
 **Steps:**
-- [ ] Write/adjust failing tests proving session mapping unchanged for `tasks`/`todo`/`project`/`area`/`okr`/`finance` and that session tests do not import `entity_update_intent`
-- [ ] Run `cargo nextest run -p app-core -E 'test(auto_detect_context) | test(session_tool_domain)'` — expect fail or red on rename
-- [ ] Rename to private `session_tool_domain`; **only after Task 3 removed emit imports**, delete `entity_kind_for_tool` and `is_mutating_action`; ensure no emit path remains in this file
-- [ ] Tests pass; commit `refactor(app-core): narrow session_tool_domain off emission`
+- [x] Write/adjust failing tests proving session mapping unchanged for `tasks`/`todo`/`project`/`area`/`okr`/`finance` and that session tests do not import `entity_update_intent`
+- [x] Run `cargo nextest run -p app-core -E 'test(auto_detect_context) | test(session_tool_domain)'` — expect fail or red on rename
+- [x] Rename to private `session_tool_domain`; **only after Task 3 removed emit imports**, delete `entity_kind_for_tool` and `is_mutating_action`; ensure no emit path remains in this file
+- [x] Tests pass; commit `refactor(app-core): narrow session_tool_domain off emission`
 
 _Requirements: EUPI-4.1, EUPI-4.2, EUPI-4.3, EUPI-4.4, EUPI-6.1_
 
@@ -104,10 +104,10 @@ _Requirements: EUPI-4.1, EUPI-4.2, EUPI-4.3, EUPI-4.4, EUPI-6.1_
 **Depends-on:** Task 1
 
 **Steps:**
-- [ ] Failing tests: successful ToolEnd with mutating projected action emits kinds+`*`; read-only projected action emits nothing; failed ToolEnd emits nothing; EntityCreated still emits concrete `entity_id`
-- [ ] Run `cargo nextest run -p app-core -E 'test(tool_end) | test(entity_created) | test(event_translator)'` (adjust filter to new test names) — expect fail
-- [ ] Wire ToolEnd to `project_entity_update`; remove imports of `is_mutating_action` / `entity_kind_for_tool` from this file (leave the functions in `streaming.rs` until Task 2 deletes them); leave EntityCreated path untouched
-- [ ] Pass; commit `feat(app-core): emit entity updates from shared projection on ToolEnd`
+- [x] Failing tests: successful ToolEnd with mutating projected action emits kinds+`*`; read-only projected action emits nothing; failed ToolEnd emits nothing; EntityCreated still emits concrete `entity_id`
+- [x] Run `cargo nextest run -p app-core -E 'test(tool_end) | test(entity_created) | test(event_translator)'` (adjust filter to new test names) — expect fail
+- [x] Wire ToolEnd to `project_entity_update`; remove imports of `is_mutating_action` / `entity_kind_for_tool` from this file (leave the functions in `streaming.rs` until Task 2 deletes them); leave EntityCreated path untouched
+- [x] Pass; commit `feat(app-core): emit entity updates from shared projection on ToolEnd`
 
 _Requirements: EUPI-2.1, EUPI-2.2, EUPI-2.3, EUPI-2.4, EUPI-6.2, EUPI-6.3_
 
@@ -128,10 +128,10 @@ _Requirements: EUPI-2.1, EUPI-2.2, EUPI-2.3, EUPI-2.4, EUPI-6.2, EUPI-6.3_
 **Depends-on:** Task 1
 
 **Steps:**
-- [ ] Failing tests: success + mutating action emits; read-only skips; tool-error `CallToolResult` (`is_error: Some(true)`) skips; `get_status`/`agent` paths unchanged (no projection); shared cases match Task 1 intents for same name/action
-- [ ] Run `cargo nextest run -p klyntbot-server -E 'test(entity_update) | test(emit_entity)'` — expect fail
-- [ ] Replace `emit_entity_update_for_tool` body; delete `READ_ONLY_ACTIONS`, `NON_FEATURE_TOOL_ENTITY_KINDS`, registry lookup, OKR special-case; gate with `!result.is_error.unwrap_or(false)` before projecting
-- [ ] Pass; commit `feat(klyntbot-server): project entity updates via app-core intent module`
+- [x] Failing tests: success + mutating action emits; read-only skips; tool-error `CallToolResult` (`is_error: Some(true)`) skips; `get_status`/`agent` paths unchanged (no projection); shared cases match Task 1 intents for same name/action
+- [x] Run `cargo nextest run -p klyntbot-server -E 'test(entity_update) | test(emit_entity)'` — expect fail
+- [x] Replace `emit_entity_update_for_tool` body; delete `READ_ONLY_ACTIONS`, `NON_FEATURE_TOOL_ENTITY_KINDS`, registry lookup, OKR special-case; gate with `!result.is_error.unwrap_or(false)` before projecting
+- [x] Pass; commit `feat(klyntbot-server): project entity updates via app-core intent module`
 
 _Requirements: EUPI-3.1, EUPI-3.2, EUPI-3.3, EUPI-3.4, EUPI-3.5, EUPI-3.6, EUPI-6.5, EUPI-6.6_
 
@@ -152,10 +152,10 @@ _Requirements: EUPI-3.1, EUPI-3.2, EUPI-3.3, EUPI-3.4, EUPI-3.5, EUPI-3.6, EUPI-
 **Depends-on:** Task 3, Task 4
 
 **Steps:**
-- [ ] Add shared fixture table (tool, action, expected kinds) asserted in both consumer test suites (EUPI-3.5 / EUPI-5.1)
-- [ ] Guard tests or comments+smoke: handler `EntityUpdate` concrete ids still constructible; `mcp::dispatch_entity_update` still maps kind→domain; document desktop `useMutation` unchanged (no code change)
-- [ ] Run `cargo nextest run -p app-core -p klyntbot-server -p mcp -E 'test(entity_update) | test(parity) | test(dispatch_entity)'` — expect pass
-- [ ] Commit `test(eupi): shared projection parity and leave-path guards`
+- [x] Add shared fixture table (tool, action, expected kinds) asserted in both consumer test suites (EUPI-3.5 / EUPI-5.1)
+- [x] Guard tests or comments+smoke: handler `EntityUpdate` concrete ids still constructible; `mcp::dispatch_entity_update` still maps kind→domain; document desktop `useMutation` unchanged (no code change)
+- [x] Run `cargo nextest run -p app-core -p klyntbot-server -p mcp -E 'test(entity_update) | test(parity) | test(dispatch_entity)'` — expect pass
+- [x] Commit `test(eupi): shared projection parity and leave-path guards`
 
 _Requirements: EUPI-3.5, EUPI-5.1, EUPI-6.4, EUPI-6.7, EUPI-6.8_
 
