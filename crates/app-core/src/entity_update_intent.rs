@@ -21,42 +21,50 @@ struct ProjectionEntry {
     read_only_actions: &'static [&'static str],
 }
 
+const TASKS_READ_ONLY: &[&str] = &[
+    "list",
+    "show",
+    "summary",
+    "tree",
+    "search",
+    "list_recurring",
+    "search-semantic",
+    "search-hybrid",
+    "query",
+    "status",
+    "stats",
+    "get",
+];
+
+/// Shared chat/MCP parity cases: `(tool, action, expected kinds)`.
+pub const PARITY_CASES: &[(&str, Option<&str>, &[EntityKind])] = &[
+    ("tasks", Some("create"), &[EntityKind::Task]),
+    ("tasks", Some("list"), &[]),
+    ("notes", Some("create_note"), &[EntityKind::Note]),
+    ("notes", Some("list_notes"), &[]),
+    (
+        "okr",
+        Some("objective.create"),
+        &[EntityKind::Objective, EntityKind::KeyResult],
+    ),
+    ("okr", Some("kr.show"), &[]),
+    ("project", Some("update"), &[EntityKind::Project]),
+    ("work_context", Some("rename"), &[EntityKind::Productivity]),
+    ("unknown", Some("create"), &[]),
+    ("get_status", Some("x"), &[]),
+    ("agent", Some("x"), &[]),
+];
+
 static PROJECTION_TABLE: &[ProjectionEntry] = &[
     ProjectionEntry {
         tool_name: "tasks",
         kinds: &[EntityKind::Task],
-        read_only_actions: &[
-            "list",
-            "show",
-            "summary",
-            "tree",
-            "search",
-            "list_recurring",
-            "search-semantic",
-            "search-hybrid",
-            "query",
-            "status",
-            "stats",
-            "get",
-        ],
+        read_only_actions: TASKS_READ_ONLY,
     },
     ProjectionEntry {
         tool_name: "todo",
         kinds: &[EntityKind::Task],
-        read_only_actions: &[
-            "list",
-            "show",
-            "summary",
-            "tree",
-            "search",
-            "list_recurring",
-            "search-semantic",
-            "search-hybrid",
-            "query",
-            "status",
-            "stats",
-            "get",
-        ],
+        read_only_actions: TASKS_READ_ONLY,
     },
     ProjectionEntry {
         tool_name: "project",
@@ -244,22 +252,7 @@ mod tests {
     /// Shared chat/MCP parity fixture (same name+action ⇒ same kinds).
     #[test]
     fn project_entity_update_parity_fixture() {
-        let cases: &[(&str, Option<&str>, &[EntityKind])] = &[
-            ("tasks", Some("create"), &[EntityKind::Task]),
-            ("tasks", Some("list"), &[]),
-            ("notes", Some("create_note"), &[EntityKind::Note]),
-            ("notes", Some("list_notes"), &[]),
-            (
-                "okr",
-                Some("objective.create"),
-                &[EntityKind::Objective, EntityKind::KeyResult],
-            ),
-            ("okr", Some("kr.show"), &[]),
-            ("project", Some("update"), &[EntityKind::Project]),
-            ("work_context", Some("rename"), &[EntityKind::Productivity]),
-            ("unknown", Some("create"), &[]),
-        ];
-        for (tool, action, expected) in cases {
+        for (tool, action, expected) in PARITY_CASES {
             assert_eq!(
                 kinds_of(tool, *action).as_slice(),
                 *expected,

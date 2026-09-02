@@ -433,4 +433,40 @@ mod entity_update_tests {
         assert_eq!(events[1].0, EntityKind::KeyResult);
         assert!(events.iter().all(|(_, id)| id == "*"));
     }
+
+    #[test]
+    fn emit_entity_update_parity_cases_match_projection() {
+        use app_core::entity_update_intent::PARITY_CASES;
+
+        let result = CallToolResult::success(vec![Content::text("ok")]);
+        for (tool, action, expected) in PARITY_CASES {
+            let emitter = Arc::new(RecordingEmitter {
+                events: Mutex::new(Vec::new()),
+            });
+            let params = match action {
+                Some(a) => serde_json::json!({ "action": a }),
+                None => serde_json::json!({}),
+            };
+            emit_entity_update_for_tool(
+                &(emitter.clone() as Arc<dyn AppEventEmitter>),
+                tool,
+                &params,
+                &result,
+            );
+            let kinds: Vec<EntityKind> = emitter
+                .events
+                .lock()
+                .unwrap()
+                .iter()
+                .map(|(k, _)| *k)
+                .collect();
+            assert_eq!(kinds.as_slice(), *expected, "mcp parity {tool:?} {action:?}");
+            assert!(emitter
+                .events
+                .lock()
+                .unwrap()
+                .iter()
+                .all(|(_, id)| id == "*"));
+        }
+    }
 }

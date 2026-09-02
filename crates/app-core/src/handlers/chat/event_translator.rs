@@ -1068,6 +1068,65 @@ mod tests {
     }
 
     #[test]
+    fn tool_end_parity_cases_match_projection() {
+        use crate::entity_update_intent::PARITY_CASES;
+        use desktop_shared::types::EntityKind;
+
+        for (tool, action, expected) in PARITY_CASES {
+            let mut tr = ChatEventTranslator::new("sess-parity".to_string(), 0);
+            let action_val = action.unwrap_or("");
+            tr.handle(AgentEvent::ToolStart {
+                name: (*tool).to_string(),
+                args: serde_json::json!({ "action": action_val }),
+                agent: None,
+                call_id: None,
+            });
+            let emits = tr.handle(AgentEvent::ToolEnd {
+                name: (*tool).to_string(),
+                success: true,
+                duration_ms: 1,
+                result: Some("ok".to_string()),
+                agent: None,
+                call_id: None,
+            });
+            let kinds: Vec<EntityKind> = emits
+                .iter()
+                .filter(|e| e.event == ENTITY_UPDATED)
+                .filter_map(|e| {
+                    e.payload
+                        .get("entityKind")
+                        .and_then(|v| serde_json::from_value(v.clone()).ok())
+                })
+                .collect();
+            assert_eq!(kinds.as_slice(), *expected, "chat parity {tool:?} {action:?}");
+            for e in emits.iter().filter(|e| e.event == ENTITY_UPDATED) {
+                assert_eq!(e.payload["id"], "*", "chat wildcard {tool:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn entity_created_still_emits_concrete_id() {
+        let mut tr = ChatEventTranslator::new("sess-1".to_string(), 0);
+        let card = common::EntityCard {
+            entity_type: "task".to_string(),
+            entity_id: "task-concrete-99".to_string(),
+            title: "T".to_string(),
+            subtitle: None,
+            route: None,
+            icon_hint: "task".to_string(),
+            metadata: Default::default(),
+        };
+        let emits = tr.handle(AgentEvent::EntityCreated(card));
+        let entity = emits
+            .iter()
+            .find(|e| e.event == ENTITY_UPDATED)
+            .expect("entity:updated from EntityCreated");
+        assert_eq!(entity.payload["id"], "task-concrete-99");
+        assert_ne!(entity.payload["id"], "*");
+    }
+
+    #[test]
     fn done_yields_terminal_outcome_without_io() {
         let mut tr = ChatEventTranslator::new("sess-1".to_string(), 0);
         tr.handle(AgentEvent::ContentChunk {
