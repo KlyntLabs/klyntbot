@@ -59,7 +59,7 @@ export function VoiceRecorder({ onTranscriptReady, onCancel }: VoiceRecorderProp
   });
 
   const hasStarted = useRef(false);
-  const animationFrame = useRef<number>();
+  const animationFrame = useRef<number | undefined>(undefined);
 
   const forceUpdate = useCallback(() => {
     animationFrame.current = requestAnimationFrame(forceUpdate);

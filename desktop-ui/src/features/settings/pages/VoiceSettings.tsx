@@ -861,7 +861,7 @@ export function VoiceSettings() {
         <SettingsCard title="Voice Persona">
           <div className="space-y-3">
             {(() => {
-              const engine = outputVal("ttsEngine", "qwen3");
+              const engine = outputVal<string>("ttsEngine", "qwen3");
               const personasDisabledReason =
                 engine === "system"
                   ? "Voice personas are not available with system TTS."

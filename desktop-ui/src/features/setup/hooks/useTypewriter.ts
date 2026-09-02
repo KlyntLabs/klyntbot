@@ -9,7 +9,7 @@ interface UseTypewriterOptions {
 export function useTypewriter({ text, speed = 30, onComplete }: UseTypewriterOptions) {
   const [displayed, setDisplayed] = useState("");
   const [isAnimating, setIsAnimating] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setInterval>>();
+  const timerRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
   const indexRef = useRef(0);
   const completeRef = useRef(onComplete);
   completeRef.current = onComplete;

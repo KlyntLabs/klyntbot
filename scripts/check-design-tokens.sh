@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 # Design-system gates for desktop-ui (fast soft/hard modes).
+#
+# Raw-literal carve-outs (intentional, do not "fix" by inlining tokens):
+#   - ThemeSwitcher previews (theme swatches)
+#   - tagColor.ts (deterministic tag palette)
+#   - productivity.tsx app brand map (external app icon colors)
+#   - ProgressRing decorative gradients + tests (shared/ui + composites)
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -53,6 +59,8 @@ hits="$(
     --glob '!**/ThemeSwitcher.tsx' \
     --glob '!**/tagColor.ts' \
     --glob '!**/productivity.tsx' \
+    --glob '!**/ProgressRing.tsx' \
+    --glob '!**/ProgressRing.test.tsx' \
     || true
 )"
 filtered="$(printf '%s\n' "$hits" | rg -v 'var\(--|^\s*/\*|^\s*\*|^\s*\*/|color-mix\(' || true)"
@@ -65,7 +73,7 @@ if [[ -n "${filtered// }" ]]; then
     echo "(soft) Set HARD=1 to fail on these."
   fi
 else
-  echo "OK: no raw chrome literals in styles/shared (excl. ThemeSwitcher)."
+  echo "OK: no raw chrome literals in styles/shared (excl. documented carve-outs)."
 fi
 
 exit "$FAIL"

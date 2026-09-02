@@ -29,7 +29,7 @@ export function NoteEditorPanel({
   const titleRef = useRef<HTMLDivElement>(null);
   const tagsRef = useRef<NoteTagsHandle>(null);
   const lastTitleRef = useRef(note.title);
-  const editorFocusRef = useRef<() => void>();
+  const editorFocusRef = useRef<(() => void) | undefined>(undefined);
   const titleSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Set title content on mount and when switching to a different note.

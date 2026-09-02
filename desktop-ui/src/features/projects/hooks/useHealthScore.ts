@@ -15,8 +15,8 @@ export function useHealthScore(
 ): HealthScoreResult {
   const { data: metrics } = useQuery<ProjectHealthMetrics>(
     "project_health_metrics",
-    projectId ? { projectId } : undefined,
-    { enabled: !!projectId, focusQuality: null, insightFreshness: null },
+    projectId ? { projectId } : null,
+    { focusQuality: null, insightFreshness: null },
   );
 
   return useMemo(() => {

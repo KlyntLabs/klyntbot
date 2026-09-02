@@ -71,7 +71,17 @@ const SCOPE_LABELS: Record<string, { label: string; icon: typeof Link }> = {
 const EMPTY: ScopePreviewResponse = {
   notes: [],
   links: [],
-  contextSummary: { totalNotes: 0, totalWords: 0, strongAtoms: 0, fadingAtoms: 0 },
+  contextSummary: {
+    totalNotes: 0,
+    totalWords: 0,
+    strongAtoms: 0,
+    fadingAtoms: 0,
+    factsCount: 0,
+    memoriesCount: 0,
+    entityCount: 0,
+    includeCognitive: false,
+    deepDive: false,
+  },
 };
 
 // ── Component ────────────────────────────────────────────────────────────

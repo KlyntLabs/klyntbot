@@ -88,6 +88,9 @@ export interface Objective {
   status: string;
   progress: number;
   projectId: string;
+  description?: string | null;
+  priority?: number | null;
+  dueDate?: string | null;
   keyResults?: KeyResult[];
 }
 

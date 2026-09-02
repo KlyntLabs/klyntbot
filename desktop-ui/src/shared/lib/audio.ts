@@ -81,8 +81,9 @@ async function playBase64Audio(base64: string, sampleRate: number): Promise<void
   // Resume if suspended (autoplay policy blocks audio without user gesture)
   if (ctx.state === "suspended") {
     await unlockAudioContext();
-    if (ctx.state !== "running") {
-      console.error("[TTS] AudioContext still suspended after unlock, state:", ctx.state);
+    const stateAfter = getAudioContext().state;
+    if (stateAfter !== "running") {
+      console.error("[TTS] AudioContext still suspended after unlock, state:", stateAfter);
       return;
     }
   }

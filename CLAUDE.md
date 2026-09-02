@@ -31,35 +31,35 @@ Run periodically (e.g. before a release):
 
 ```bash
 cd desktop-ui && bun install        # Install deps (always bun, never npm)
-cd desktop-ui && bun run dev:vite   # Vite dev server (port 1420)
-cd desktop-ui && bun run build      # Production build (tsc + vite build)
-cd desktop-ui && bun run lint       # ESLint check
+cd desktop-ui && bun run dev        # Vite dev server (port 1420)
+cd desktop-ui && bun run build      # Production build (vite)
+cd desktop-ui && bun run build:check  # tsc --noEmit && vite build
+cd desktop-ui && bun run lint       # Biome check
 cd desktop-ui && bun run typecheck  # tsc --noEmit
 cd desktop-ui && bun run test       # Vitest (run once)
 cd desktop-ui && bun run test:watch # Vitest (watch mode)
+cd desktop-ui && bun run check:tokens  # Design-token gate (soft; HARD=1 for hard)
 ```
 
 **Path aliases** (`vite.config.ts` + `tsconfig.json`):
 - `@/*` → `src/*`
-- `@app/*` → `src/features/app/*`
-- `@settings/*` → `src/features/settings/*`
-- `@threads/*` → `src/features/threads/*`
-- `@services/*` → `src/services/*`
-- `@utils/*` → `src/utils/*`
+- `@shared/*` → `src/shared/*`
+- `@features/*` → `src/features/*`
+- `@app/*` → `src/app/*`
 
-Always use these in imports, never relative `../../` paths. Path aliases include `@shared`, `@features`, `@app`.
+Always use these in imports, never relative `../../` paths. Agent pointer: [`desktop-ui/AGENTS.md`](./desktop-ui/AGENTS.md).
 
-**Styling:** Tailwind CSS v4 + `@klyntbot/design-system`. Tokens live only in `packages/design-system/src/tokens/` (`--ds-*`). Map to utilities via `@theme inline` (`text-fg`, `bg-glass`, `rounded-panel`, `text-ui`, …). Themes: `light` | `dark` on `html[data-theme]`. Glass chrome uses DS recipes (`glass`, `liquid-glass`, `island`, `capsule`) — do not approximate with bare `backdrop-blur`. Import UI helpers from `@klyntbot/design-system` (barrel only). Contract: [`docs/standards/design-tokens.md`](./docs/standards/design-tokens.md). Domain CSS (`prose.css`, `editor.css`) may remain plain CSS but must reference tokens. Raw hex/rgb outside `tokens/` is a defect.
+**Styling:** Tailwind CSS v4 + `@klyntbot/design-system`. Tokens live only in `packages/design-system/src/tokens/` (`--ds-*`). Map to utilities via `@theme inline` (`text-fg`, `bg-glass`, `rounded-panel`, `text-ui`, …). Themes: `light` | `dark` on `html[data-theme]`. Glass chrome uses DS recipes (`glass`, `liquid-glass`, `island`, `capsule`) — do not approximate with bare `backdrop-blur`. Import UI from the `@klyntbot/design-system` barrel or `@shared/ui` re-exports (no deep DS imports). Contract: [`docs/standards/design-tokens.md`](./docs/standards/design-tokens.md); conventions: [`docs/standards/ui.md`](./docs/standards/ui.md). Domain CSS (`prose.css`, `editor.css`) may remain plain CSS but must reference tokens. Raw hex/rgb outside `tokens/` is a defect.
 
 **Typography tokens:** Never hardcode `font-size: Npx`. Use the DS scale: `text-ui-xs` (11) / `text-ui-sm` (12) / `text-ui` (13, chrome) / `text-body` (14, default) / `text-title-sm` (17) / `text-title` (20) / `text-title-lg` (22) / `text-display-sm` (26) / `text-display` (52). Prefer the utility; `var(--ds-text-*)` second. If no step fits, add a token in `packages/design-system/src/tokens/typography.css` and register it in `cn.ts`.
 
-**Tauri IPC:** Direct `invoke()` from `@/api/client` (which re-exports `@tauri-apps/api/core`). There is no `useQuery` / `useMutation` / `ipc()` wrapper — call `invoke()` from a `useEffect` and manage state with `useState`. For Tauri events, import `listen` from `@tauri-apps/api/event` directly, or use the per-event hubs in `src/services/events.ts`. Endpoint definitions live under `src/api/endpoints/`.
+**Tauri IPC:** Prefer shared hooks in `@shared/hooks` — `useQuery` / `useMutation` / `ipc` — for cached reads and mutations. Low-level `invoke()` remains available via `@tauri-apps/api/core` (and app wrappers) when a one-off call does not need caching. For Tauri events, import `listen` from `@tauri-apps/api/event` directly, or use shared/feature event hooks (e.g. `useEvent`).
 
-**Markdown rendering:** Reuse `Markdown` from `@/features/messages/components/Markdown` rather than importing `react-markdown` directly.
+**Markdown rendering:** Reuse existing feature Markdown components (e.g. chat `MarkdownContent`) rather than importing `react-markdown` directly in new surfaces.
 
 **Testing:** Vitest + `@testing-library/react`. Test files colocated as `Component.test.tsx`. Mock Tauri APIs per-test via `vi.mock("@tauri-apps/api/core", ...)`.
 
-**Linter:** ESLint via `bun run lint`. No Biome.
+**Linter:** Biome via `bun run lint`.
 
 ## Desktop App (Tauri 2)
 

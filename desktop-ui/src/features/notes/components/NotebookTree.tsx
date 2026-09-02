@@ -425,7 +425,7 @@ export function NotebookTree({
   );
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextTarget>(null);
-  const doubleClickTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const doubleClickTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const pendingClickRef = useRef<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 

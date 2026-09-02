@@ -19,7 +19,7 @@ export function BubbleToolbar({
   return (
     <BubbleMenu
       editor={editor}
-      tippyOptions={{ duration: 150, delay: [200, 0] }}
+      options={{ offset: 8 }}
       shouldShow={({ editor, state }) => {
         if (state.selection.empty) return false;
         if (editor.isActive("codeBlock")) return false;

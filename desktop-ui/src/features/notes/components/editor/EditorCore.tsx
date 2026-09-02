@@ -254,7 +254,9 @@ export function useNoteEditor({
     }),
     content,
     onUpdate: ({ editor: ed }) => {
-      onUpdate(ed.getHTML(), ed.storage.markdown.getMarkdown(), JSON.stringify(ed.getJSON()));
+      // tiptap-markdown extends storage; types omit it
+      const md = (ed.storage as { markdown?: { getMarkdown: () => string } }).markdown;
+      onUpdate(ed.getHTML(), md?.getMarkdown() ?? "", JSON.stringify(ed.getJSON()));
     },
     editorProps: {
       attributes: { class: editorClass },

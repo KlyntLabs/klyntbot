@@ -42,11 +42,9 @@ export function InsightVersionList({ versions, selectedId, currentId, onSelect }
               <div className="flex items-center gap-1.5">
                 <span className="text-ui-xs font-medium text-fg">v{v.version}</span>
                 {v.hasParent && (
-                  <GitBranch
-                    size={10}
-                    className="text-fg-secondary"
-                    title="Merged from related insight"
-                  />
+                  <span title="Merged from related insight">
+                    <GitBranch size={10} className="text-fg-secondary" />
+                  </span>
                 )}
               </div>
               <div className="flex items-center gap-1 text-ui-xs text-fg-dim">

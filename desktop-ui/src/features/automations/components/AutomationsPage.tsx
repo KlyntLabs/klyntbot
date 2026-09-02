@@ -613,7 +613,7 @@ export function AutomationsPage() {
   const [originFilter, setOriginFilter] = useState<OriginFilter>("all");
   const [searchQ, setSearchQ] = useState("");
   const [debouncedQ, setDebouncedQ] = useState("");
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [showCreate, setShowCreate] = useState(false);
 
   const handleSearch = (value: string) => {

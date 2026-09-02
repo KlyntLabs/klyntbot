@@ -58,7 +58,10 @@ export function InsightEvolutionChart({ versions }: Props) {
               borderRadius: 8,
               fontSize: 11,
             }}
-            formatter={(value: number, name: string) => [`${value}%`, LABEL_MAP[name] ?? name]}
+            formatter={(value: number | undefined, name: string | undefined) => [
+              `${value ?? 0}%`,
+              (name && LABEL_MAP[name]) || name || "",
+            ]}
             labelFormatter={(label) => label}
           />
           <Area

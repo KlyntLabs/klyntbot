@@ -67,7 +67,7 @@ export function usePerspective(
   }, [focusedSectionId, config]);
 
   // Debounced save
-  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const saveConfig = useCallback(
     (newConfig: PerspectiveConfig) => {
       if (!noteId) return;

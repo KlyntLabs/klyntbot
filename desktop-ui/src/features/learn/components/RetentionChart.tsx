@@ -35,7 +35,7 @@ export function RetentionChart({ data, height = 200 }: RetentionChartProps) {
             borderRadius: 8,
             fontSize: 11,
           }}
-          formatter={(value: number) => [`${value}%`, "Retention"]}
+          formatter={(value: number | undefined) => [`${value ?? 0}%`, "Retention"]}
         />
         <Area
           type="monotone"

@@ -22,7 +22,7 @@ export function NoteSidebar({
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<NoteListItem[] | null>(null);
   const [searching, setSearching] = useState(false);
-  const searchTimer = useRef<ReturnType<typeof setTimeout>>();
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   // Clean up debounce timer on unmount
   useEffect(() => () => clearTimeout(searchTimer.current), []);

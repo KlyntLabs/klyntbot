@@ -8,7 +8,6 @@ import { useAskAI } from "../hooks/useAskAI";
 import { useEditorActions } from "../hooks/useEditorActions";
 import { useLanguageConfig } from "../hooks/useLanguageConfig";
 import { useQuickTranslate } from "../hooks/useQuickTranslate";
-import { useVocabularySave } from "../hooks/useVocabularySave";
 import { AnnotationPane } from "./AnnotationPane";
 import { AnnotationPopover } from "./AnnotationPopover";
 import { AskAIPopup } from "./editor/AskAIPopup";
@@ -204,7 +203,6 @@ export function NoteEditor({
     note.body ?? undefined,
   );
   const quickTranslate = useQuickTranslate(sourceLang, targetLang);
-  const _vocabSave = useVocabularySave();
 
   // ── Annotation side pane ─────────────────────────────────────────
   const sideNotesContent = useMemo(() => parseSideNotes(note.splitContent), [note.splitContent]);

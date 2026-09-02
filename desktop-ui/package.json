@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite --port 1420",
     "build": "vite build",
+    "build:check": "tsc --noEmit && vite build",
     "preview": "vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.app.json",
     "lint": "biome check src/",
     "lint:fix": "biome check --write src/",
     "format": "biome format --write src/",

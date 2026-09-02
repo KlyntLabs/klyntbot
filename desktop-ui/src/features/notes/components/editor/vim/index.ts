@@ -126,10 +126,10 @@ function createVimPlugins(opts: Required<VimModeOptions>) {
       adapter = new ProseMirrorAdapter(editorView);
 
       // Listen for vim events
-      adapter.on("vim-mode-change", (event: VimModeChangeEvent) => {
+      adapter.on("vim-mode-change", ((event: VimModeChangeEvent) => {
         currentMode = mapVimMode(event);
         opts.onStateChange({ mode: currentMode });
-      });
+      }) as (...args: unknown[]) => void);
 
       adapter.on("vim-command-done", () => {
         // Trigger decoration update
@@ -138,7 +138,7 @@ function createVimPlugins(opts: Required<VimModeOptions>) {
 
       adapter.on(
         "dialog",
-        (data: {
+        ((data: {
           template: unknown;
           callback: (...args: unknown[]) => void;
           options?: unknown;
@@ -151,18 +151,21 @@ function createVimPlugins(opts: Required<VimModeOptions>) {
             else if (text.includes("?")) prefix = "?";
           }
           opts.onOpenCommandLine(prefix);
-        },
+        }) as (...args: unknown[]) => void,
       );
 
       adapter.on("save", () => {
         document.dispatchEvent(new CustomEvent(VIM_SAVE_EVENT));
       });
 
-      adapter.on("searchOverlayChange", (overlay: { query: RegExp } | null) => {
-        searchOverlayQuery = overlay?.query ?? null;
-        // Force decoration recalculation
-        editorView.dispatch(editorView.state.tr);
-      });
+      adapter.on(
+        "searchOverlayChange",
+        ((overlay: { query: RegExp } | null) => {
+          searchOverlayQuery = overlay?.query ?? null;
+          // Force decoration recalculation
+          editorView.dispatch(editorView.state.tr);
+        }) as (...args: unknown[]) => void,
+      );
 
       // Enter vim mode
       vim.enterVimMode(adapter);

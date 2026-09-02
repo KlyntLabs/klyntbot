@@ -11,6 +11,7 @@ export function useDndActive() {
   const query = useQuery<FocusSession | null>(
     "focus_active",
     { mode: "dnd" },
+    null,
     { staleTime: 2_000 },
   );
 

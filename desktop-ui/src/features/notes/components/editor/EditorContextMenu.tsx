@@ -61,9 +61,7 @@ export function EditorContextMenu({
       if (text.length > 0 && sel && sel.rangeCount > 0) {
         savedRangeRef.current = sel.getRangeAt(0).cloneRange();
         try {
-          // @ts-expect-error CSS Highlight API — Chromium 105+
           const highlight = new Highlight(savedRangeRef.current);
-          // @ts-expect-error CSS Highlight API
           CSS.highlights?.set("editor-context-selection", highlight);
         } catch {
           // Fallback: no visual highlight on older browsers
@@ -73,7 +71,6 @@ export function EditorContextMenu({
       setAnnotationId(null);
       savedRangeRef.current = null;
       try {
-        // @ts-expect-error CSS Highlight API
         CSS.highlights?.delete("editor-context-selection");
       } catch {
         // ignore
@@ -87,7 +84,6 @@ export function EditorContextMenu({
       <ContextMenu.Portal>
         <ContextMenu.Content
           className="glass-panel min-w-[200px] rounded-lg p-1.5 shadow-xl"
-          onOpenAutoFocus={(e) => e.preventDefault()}
           onCloseAutoFocus={(e) => e.preventDefault()}
           onFocusOutside={(e) => e.preventDefault()}
         >

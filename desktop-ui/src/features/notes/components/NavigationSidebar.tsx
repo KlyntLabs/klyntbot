@@ -1,5 +1,4 @@
 import type { InboxItem, Notebook, NoteListItem } from "@shared/types";
-import { useCallback, useState } from "react";
 import { InboxSection } from "./InboxSection";
 import { NotebookTree } from "./NotebookTree";
 
@@ -60,20 +59,6 @@ export function NavigationSidebar({
   onInboxCreateAsNote,
   onInboxDiscard,
 }: NavigationSidebarProps) {
-  // ── Tags state ────────────────────────────────────────────────────
-  const [activeTags, setActiveTags] = useState<string[]>([]);
-
-  const handleToggleTag = useCallback((tag: string, additive: boolean) => {
-    setActiveTags((prev) => {
-      if (additive) {
-        return prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag];
-      }
-      return prev.length === 1 && prev[0] === tag ? [] : [tag];
-    });
-  }, []);
-
-  const handleClearTags = useCallback(() => setActiveTags([]), []);
-
   const noteCount = notes.length;
   const notebookCount = notebooks.length;
 

@@ -1,4 +1,4 @@
-import type { Note } from "@shared/types";
+import type { NoteListItem } from "@shared/types";
 import { ExternalLink } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
@@ -20,8 +20,12 @@ export function ProjectNotesTab() {
 
   const { data: notes, loading, refetch } = useProjectNotes(notebookIds);
 
-  const selectedNote = useMemo<Note | null>(
-    () => notes.find((n) => n.id === selectedNoteId) ?? null,
+  // note_list returns NoteListItem; body fields may be absent
+  const selectedNote = useMemo(
+    () =>
+      (notes.find((n) => n.id === selectedNoteId) ?? null) as
+        | (NoteListItem & { body?: string; bodyHtml?: string | null })
+        | null,
     [notes, selectedNoteId],
   );
 

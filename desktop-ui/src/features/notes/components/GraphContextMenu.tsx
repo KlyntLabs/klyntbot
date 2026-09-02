@@ -50,6 +50,14 @@ const MENU_BY_TYPE: Record<ForceNodeType, MenuItem[]> = {
     { action: "create_flashcard", label: "Create flashcard", icon: <GraduationCap size={12} /> },
   ],
   tree_text: [],
+  finance: [],
+  productivity: [],
+  okr: [],
+  learning: [],
+  project: [],
+  topic: [],
+  fact: [],
+  rule: [],
 };
 
 interface GraphContextMenuProps {

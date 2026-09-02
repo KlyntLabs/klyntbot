@@ -56,11 +56,6 @@ const LANGUAGE_LABELS: Record<string, string> = {
   text: "Plain Text",
 };
 
-function getLanguageLabel(lang: string | null | undefined): string {
-  if (!lang || lang === "null") return "Code";
-  return LANGUAGE_LABELS[lang.toLowerCase()] ?? lang;
-}
-
 export function CodeBlockView({ node, updateAttributes, deleteNode, editor }: NodeViewProps) {
   const [copied, setCopied] = useState(false);
   const copyResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -134,7 +129,7 @@ export function CodeBlockView({ node, updateAttributes, deleteNode, editor }: No
         </div>
       </div>
       <pre>
-        <NodeViewContent as="code" />
+        <NodeViewContent<"code"> as="code" />
       </pre>
     </NodeViewWrapper>
   );
