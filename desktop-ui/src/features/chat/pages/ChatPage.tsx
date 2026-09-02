@@ -52,25 +52,7 @@ export function ChatPage() {
     },
   );
 
-  // Detect squad chat from the currently selected thread
-  const currentThread = useMemo(
-    () => threads.find((t) => t.sessionKey === selectedThread),
-    [threads, selectedThread],
-  );
-  // Derive squadId from DB thread metadata, or parse from the session key pattern
-  // (squad:{squadId}:{uuid}) for newly created squad chats that aren't in the DB yet.
-  const squadId = useMemo(() => {
-    if (currentThread?.squadId) return currentThread.squadId;
-    const match = selectedThread.match(/^squad:([^:]+):/);
-    return match?.[1] ?? null;
-  }, [currentThread?.squadId, selectedThread]);
-
-  // Chat session — always use debate mode for squad chats
-  const chat = useChatSession(
-    selectedThread,
-    refetchThreads,
-    squadId ? { squadId, squadMode: "debate" } : undefined,
-  );
+  const chat = useChatSession(selectedThread, refetchThreads);
 
   // Context resume — pre-fill input from navigation state
   const location = useLocation();
@@ -181,13 +163,6 @@ export function ChatPage() {
   const handleNewThread = () => {
     setSelectedThread(`chat:${crypto.randomUUID()}`);
   };
-
-  const handleNewSquadThread = useCallback(
-    (newSquadId: string) => {
-      setSelectedThread(`squad:${newSquadId}:${crypto.randomUUID()}`);
-    },
-    [setSelectedThread],
-  );
 
   // ── Thread actions ─────────────────────────────────────────────────────
   const [contextMenu, setContextMenu] = useState<{
@@ -334,13 +309,9 @@ export function ChatPage() {
           <div className="max-w-3xl mx-auto">
             {chat.messages.length === 0 && !chat.isStreaming ? (
               <div className="flex flex-col items-center justify-center py-20">
-                <p className="text-muted-foreground text-sm font-light">
-                  {squadId ? "Start a squad conversation" : "Start a conversation"}
-                </p>
+                <p className="text-muted-foreground text-sm font-light">Start a conversation</p>
                 <p className="text-dim text-xs font-light mt-1">
-                  {squadId
-                    ? "Your squad members will each share their perspective"
-                    : "Ask Klynt anything about your tasks, projects, or schedule"}
+                  Ask Klynt anything about your tasks, projects, or schedule
                 </p>
               </div>
             ) : (
@@ -359,9 +330,6 @@ export function ChatPage() {
                 liveTransparency={chat.transparency}
                 activeDelegateAgent={chat.activeDelegateAgent}
                 statusPhase={chat.statusPhase}
-                personaMessages={
-                  squadId && chat.personaMessages.length > 0 ? chat.personaMessages : undefined
-                }
               />
             )}
           </div>
@@ -399,11 +367,8 @@ export function ChatPage() {
         <ChatInput
           input={chat.input}
           isStreaming={chat.isStreaming}
-          squadId={squadId}
           onInputChange={chat.setInput}
           onSend={handleSend}
-          onSelectSquad={handleNewSquadThread}
-          onSelectDefault={handleNewThread}
         />
       </div>
     </>

@@ -68,7 +68,7 @@ export function VoiceRecorder({ onTranscriptReady, onCancel }: VoiceRecorderProp
   useEffect(() => {
     if (hasStarted.current) return;
     hasStarted.current = true;
-    ipc("voice_start_capture", {}).catch((e: unknown) => {
+    ipc("voice_start_dictation").catch((e: unknown) => {
       console.error("[VoiceRecorder] Failed to start capture:", e);
       onCancel();
     });
@@ -85,13 +85,13 @@ export function VoiceRecorder({ onTranscriptReady, onCancel }: VoiceRecorderProp
   }, [sessionState, transcript, onTranscriptReady]);
 
   const handleStop = useCallback(() => {
-    ipc("voice_stop_capture", {}).catch((e: unknown) => {
+    ipc("voice_stop_dictation").catch((e: unknown) => {
       console.error("[VoiceRecorder] Failed to stop capture:", e);
     });
   }, []);
 
   const handleCancel = useCallback(() => {
-    ipc("voice_dismiss", {}).catch(() => {});
+    ipc("voice_cancel_dictation").catch(() => {});
     onCancel();
   }, [onCancel]);
 

@@ -119,7 +119,7 @@ export function Launcher() {
 
     listen("voice-recording-reset", () => {
       // Cancel any active capture before resetting
-      ipc("voice_dismiss", {}).catch(() => {});
+      ipc("voice_cancel_dictation").catch(() => {});
       reset();
     }).then((fn) => unlisteners.push(fn));
 

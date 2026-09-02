@@ -156,20 +156,6 @@ export const CONVERSATION_SCHEMA: ConversationNode[] = [
     // No load — always shown (Rust defaults make it always appear "completed")
   },
   {
-    id: "finance_gate",
-    prompt: "Would you like to set up finance tracking? {input}",
-    inputType: "confirm",
-    default: false,
-    // No save — controls flow only
-    // No load — always shown
-  },
-  {
-    id: "finance_setup",
-    prompt: "",
-    inputType: "complex",
-    condition: (values) => values.finance_gate === true,
-  },
-  {
     id: "ai_tools",
     prompt: "Connect me with your AI coding tools: {input}",
     inputType: "checkbox-list",

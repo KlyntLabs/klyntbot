@@ -468,6 +468,7 @@ desktop_macros::klynt_collect_commands![
     crate::commands::voice::voice_start_dictation,
     crate::commands::voice::voice_simulate_event,
     crate::commands::voice::voice_stop_dictation,
+    crate::commands::voice::voice_cancel_dictation,
     crate::commands::voice::voice_list_devices,
     crate::commands::voice::voice_model_status,
     crate::commands::voice::voice_download_model,

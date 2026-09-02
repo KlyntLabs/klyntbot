@@ -32,20 +32,6 @@ const FocusedReviewPage = lazy(() =>
   import("../features/learn").then((m) => ({ default: m.FocusedReview })),
 );
 
-// ── Finance Feature ──────────────────────────────────────────────
-const FinanceOverviewPage = lazy(() =>
-  import("../features/finance").then((m) => ({ default: m.FinanceOverviewPage })),
-);
-const CashFlowPage = lazy(() =>
-  import("../features/finance").then((m) => ({ default: m.CashFlowPage })),
-);
-const InvestmentsPage = lazy(() =>
-  import("../features/finance").then((m) => ({ default: m.InvestmentsPage })),
-);
-const TargetsPage = lazy(() =>
-  import("../features/finance").then((m) => ({ default: m.TargetsPage })),
-);
-
 // ── Mirror Feature ───────────────────────────────────────────
 const MirrorPage = lazy(() =>
   import("../features/mirror").then((m) => ({ default: m.MirrorPage })),
@@ -134,44 +120,6 @@ const WorkContextSettings = lazy(() =>
 );
 const VoiceSettings = lazy(() =>
   import("../features/settings").then((m) => ({ default: m.VoiceSettings })),
-);
-const CodingCliSettings = lazy(() =>
-  import("../features/settings").then((m) => ({ default: m.CodingCliSettings })),
-);
-
-// ── Coding Memory Feature ────────────────────────────────────────
-const CodingMemoryLayout = lazy(() =>
-  import("../features/coding-memory").then((m) => ({ default: m.CodingMemoryLayout })),
-);
-const CliHealthPanel = lazy(() =>
-  import("../features/coding-memory").then((m) => ({ default: m.CliHealthPanel })),
-);
-const SessionReplayPanel = lazy(() =>
-  import("../features/coding-memory").then((m) => ({ default: m.SessionReplayPanel })),
-);
-const MemoryBrowserPanel = lazy(() =>
-  import("../features/coding-memory").then((m) => ({ default: m.MemoryBrowserPanel })),
-);
-const ActivityTimelinePanel = lazy(() =>
-  import("../features/coding-memory").then((m) => ({ default: m.ActivityTimelinePanel })),
-);
-const CostTrackerPanel = lazy(() =>
-  import("../features/coding-memory").then((m) => ({ default: m.CostTrackerPanel })),
-);
-const SensitivityInspectorPanel = lazy(() =>
-  import("../features/coding-memory").then((m) => ({ default: m.SensitivityInspectorPanel })),
-);
-const RecallToolLogPanel = lazy(() =>
-  import("../features/coding-memory").then((m) => ({ default: m.RecallToolLogPanel })),
-);
-const MirrorAlertsFeedPanel = lazy(() =>
-  import("../features/coding-memory").then((m) => ({ default: m.MirrorAlertsFeedPanel })),
-);
-const PatternEffectivenessPanel = lazy(() =>
-  import("../features/coding-memory").then((m) => ({ default: m.PatternEffectivenessPanel })),
-);
-const ReforgeCycleDiffPanel = lazy(() =>
-  import("../features/coding-memory").then((m) => ({ default: m.ReforgeCycleDiffPanel })),
 );
 
 // (Debug feature — now integrated into System page)
@@ -265,16 +213,6 @@ export const router = createHashRouter([
       { path: "/brain", element: <MirrorPage /> },
       { path: "/automations", element: <AutomationsPage /> },
       { path: "/categories", element: <Navigate to="/system/categories" replace /> },
-      { path: "/finance", element: <CashFlowPage /> },
-      { path: "/finance/overview", element: <FinanceOverviewPage /> },
-      { path: "/finance/cashflow", element: <Navigate to="/finance" replace /> },
-      { path: "/finance/accounts", element: <Navigate to="/finance" replace /> },
-      { path: "/finance/transactions", element: <Navigate to="/finance" replace /> },
-      { path: "/finance/budgets", element: <Navigate to="/finance" replace /> },
-      { path: "/finance/investments", element: <InvestmentsPage /> },
-      { path: "/finance/targets", element: <TargetsPage /> },
-      { path: "/finance/goals", element: <Navigate to="/finance/targets" replace /> },
-      { path: "/finance/liabilities", element: <Navigate to="/finance/targets" replace /> },
       {
         path: "/coaching",
         element: (
@@ -396,31 +334,6 @@ export const router = createHashRouter([
             <ArchivedSettings />
           </SettingsLayout>
         ),
-      },
-      {
-        path: "/settings/coding-cli",
-        element: (
-          <SettingsLayout>
-            <CodingCliSettings />
-          </SettingsLayout>
-        ),
-      },
-      {
-        path: "/coding-memory",
-        element: <CodingMemoryLayout />,
-        children: [
-          { index: true, element: <Navigate to="memory" replace /> },
-          { path: "cli-health", element: <CliHealthPanel /> },
-          { path: "session-replay", element: <SessionReplayPanel /> },
-          { path: "memory", element: <MemoryBrowserPanel /> },
-          { path: "activity", element: <ActivityTimelinePanel /> },
-          { path: "cost", element: <CostTrackerPanel /> },
-          { path: "sensitivity", element: <SensitivityInspectorPanel /> },
-          { path: "recall-log", element: <RecallToolLogPanel /> },
-          { path: "mirror-alerts", element: <MirrorAlertsFeedPanel /> },
-          { path: "pattern-effectiveness", element: <PatternEffectivenessPanel /> },
-          { path: "reforge-diff", element: <ReforgeCycleDiffPanel /> },
-        ],
       },
       { path: "/projects", element: <ProjectsListPage /> },
       { path: "/project/:id", element: <ProjectDetailPage /> },

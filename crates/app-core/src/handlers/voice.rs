@@ -77,6 +77,14 @@ impl AppCore {
         }
     }
 
+    /// Cancel an in-progress dictation capture without transcribing it.
+    #[tracing::instrument(skip(self), err)]
+    pub async fn voice_cancel_dictation(&self) -> Result<(), ApiError> {
+        let service = self.voice_service()?;
+        service.cancel().await;
+        Ok(())
+    }
+
     #[tracing::instrument(skip(self, event_json), err)]
     pub async fn voice_simulate_event(
         &self,

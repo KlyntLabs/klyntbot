@@ -79,7 +79,7 @@ export function useConversationRunner() {
   const completedCount = Object.values(state.transcript).filter(
     (e) => e.status === "completed",
   ).length;
-  const totalNodes = schema.filter((n) => n.id !== "complete" && n.id !== "finance_setup").length;
+  const totalNodes = schema.filter((n) => n.id !== "complete").length;
   const progress = totalNodes > 0 ? completedCount / totalNodes : 0;
 
   // ── Resume: load existing values ────────────────────────────
@@ -273,28 +273,6 @@ export function useConversationRunner() {
     setState((prev) => ({ ...prev, isAnimating: false }));
   }, []);
 
-  // ── Finance panel complete ──────────────────────────────────
-
-  const completeFinancePanel = useCallback(() => {
-    const currentValues: TranscriptValues = {};
-    for (const [id, entry] of Object.entries(stateRef.current.transcript)) {
-      if (entry.status === "completed") currentValues[id] = entry.value;
-    }
-    const financeNode = schema.find((n) => n.id === "finance_setup");
-    if (financeNode) {
-      const nextIndex = findNextIndex(stateRef.current.activeIndex, currentValues);
-      setState((prev) => ({
-        ...prev,
-        transcript: {
-          ...prev.transcript,
-          finance_setup: { node: financeNode, value: true, status: "completed" },
-        },
-        activeIndex: nextIndex,
-        isAnimating: true,
-      }));
-    }
-  }, [findNextIndex, schema]);
-
   return {
     // State
     transcript: state.transcript,
@@ -313,6 +291,5 @@ export function useConversationRunner() {
     startEdit,
     cancelEdit,
     setAnimationComplete,
-    completeFinancePanel,
   };
 }

@@ -6,13 +6,7 @@ import { useCallback, useRef, useState } from "react";
 // Public types
 // ---------------------------------------------------------------------------
 
-export type TabId =
-  | "synthesis"
-  | "gaps"
-  | "assessment"
-  | "concept-map"
-  | "perspectives"
-  | "practice";
+export type TabId = "synthesis" | "gaps" | "assessment" | "concept-map" | "practice";
 export type TabStatus = "idle" | "streaming" | "loading" | "done" | "error";
 
 export interface QuizQuestion {
@@ -46,35 +40,6 @@ export interface InsightReviewState {
     gaps: { status: TabStatus; content: string };
     assessment: { status: TabStatus; questions: QuizQuestion[] };
     conceptMap: { status: TabStatus; mermaid: string; fallbackText: string };
-    perspectives: {
-      status: TabStatus;
-      content: string;
-      personas: PersonaMeta[];
-      personaPerspectives: Record<string, string>;
-      debate: {
-        active: boolean;
-        rounds: {
-          round: number;
-          phase: string;
-          personas: {
-            personaId: string;
-            personaName: string;
-            personaIcon: string;
-            personaRole: string;
-            content: string;
-            challenge?: string;
-          }[];
-        }[];
-        judgeDecisions: {
-          round: number;
-          consensusScore: number;
-          decision: string;
-          reasoning: string;
-        }[];
-        consensusReached: boolean;
-        consensusSummary: string | null;
-      };
-    };
   };
   quizState: {
     answers: Record<string, string>;
@@ -100,8 +65,6 @@ export interface InsightReviewActions {
   answerQuestion: (questionId: string, answer: string) => void;
   revealAnswer: (questionId: string) => void;
   revealAll: () => void;
-  setSquadId: (squadId: string) => void;
-  startDebate: () => Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
@@ -155,19 +118,6 @@ const INITIAL_STATE: InsightReviewState = {
     gaps: { status: "idle", content: "" },
     assessment: { status: "idle", questions: [] },
     conceptMap: { status: "idle", mermaid: "", fallbackText: "" },
-    perspectives: {
-      status: "idle",
-      content: "",
-      personas: [],
-      personaPerspectives: {},
-      debate: {
-        active: false,
-        rounds: [],
-        judgeDecisions: [],
-        consensusReached: false,
-        consensusSummary: null,
-      },
-    },
   },
   quizState: {
     answers: {},
@@ -243,8 +193,6 @@ export function useInsightReview(): [InsightReviewState, InsightReviewActions] {
         tabs.assessment = { status: questions.length > 0 ? "done" : "error", questions };
       } else if (tab === "concept-map") {
         tabs.conceptMap = { status: "done", ...parseConceptMap(content) };
-      } else if (tab === "perspectives") {
-        tabs.perspectives = { ...tabs.perspectives, status: "done", content };
       }
 
       return { ...prev, tabs };
@@ -263,46 +211,11 @@ export function useInsightReview(): [InsightReviewState, InsightReviewActions] {
         tabs.assessment = { ...tabs.assessment, status: "error" };
       } else if (tab === "concept-map") {
         tabs.conceptMap = { ...tabs.conceptMap, status: "error" };
-      } else if (tab === "perspectives") {
-        tabs.perspectives = { ...tabs.perspectives, status: "error" };
       }
 
       return { ...prev, tabs };
     });
   });
-
-  useEvent<{ personas: PersonaMeta[] }>("insight:perspectives-meta", ({ personas }) => {
-    setState((prev) => ({
-      ...prev,
-      tabs: {
-        ...prev.tabs,
-        perspectives: {
-          ...prev.tabs.perspectives,
-          personas,
-        },
-      },
-    }));
-  });
-
-  useEvent<{ personaId: string; personaName: string; content: string }>(
-    "insight:persona-perspective",
-    ({ personaId, content }) => {
-      setState((prev) => ({
-        ...prev,
-        tabs: {
-          ...prev.tabs,
-          perspectives: {
-            ...prev.tabs.perspectives,
-            status: "streaming",
-            personaPerspectives: {
-              ...prev.tabs.perspectives.personaPerspectives,
-              [personaId]: content,
-            },
-          },
-        },
-      }));
-    },
-  );
 
   useEvent<{ summary: string }>("insight:changes-summary", ({ summary }) => {
     setState((prev) => ({ ...prev, changesSummary: summary }));
@@ -332,21 +245,6 @@ export function useInsightReview(): [InsightReviewState, InsightReviewActions] {
           conceptMap: cached.conceptMap
             ? { status: "done" as const, ...parseConceptMap(cached.conceptMap) }
             : { status: "idle" as const, mermaid: "", fallbackText: "" },
-          perspectives: cached.perspectives
-            ? {
-                status: "done" as const,
-                content: cached.perspectives,
-                personas: cached.personas ?? [],
-                personaPerspectives: {},
-                debate: INITIAL_STATE.tabs.perspectives.debate,
-              }
-            : {
-                status: "idle" as const,
-                content: "",
-                personas: [],
-                personaPerspectives: {},
-                debate: INITIAL_STATE.tabs.perspectives.debate,
-              },
         },
       }));
     },
@@ -415,8 +313,6 @@ export function useInsightReview(): [InsightReviewState, InsightReviewActions] {
           tabs.assessment = { ...tabs.assessment, status: "loading" };
         } else if (tab === "concept-map") {
           tabs.conceptMap = { ...tabs.conceptMap, status: "loading" };
-        } else if (tab === "perspectives") {
-          tabs.perspectives = { ...tabs.perspectives, status: "loading", personaPerspectives: {} };
         }
 
         return { ...prev, tabs };
@@ -425,7 +321,6 @@ export function useInsightReview(): [InsightReviewState, InsightReviewActions] {
       const response = await ipc<TabContentResponse>("note_insight_regenerate_tab", {
         noteId: state.noteId,
         tab,
-        squadId: state.squadId,
       });
 
       setState((prev) => {
@@ -445,20 +340,12 @@ export function useInsightReview(): [InsightReviewState, InsightReviewActions] {
           tabs.assessment = { status: "done", questions };
         } else if (response.tab === "concept-map") {
           tabs.conceptMap = { status: "done", ...parseConceptMap(response.content) };
-        } else if (response.tab === "perspectives") {
-          tabs.perspectives = {
-            status: "done",
-            content: response.content,
-            personas: response.personas ?? prev.tabs.perspectives.personas,
-            personaPerspectives: prev.tabs.perspectives.personaPerspectives,
-            debate: prev.tabs.perspectives.debate,
-          };
         }
 
         return { ...prev, tabs };
       });
     },
-    [state.noteId, state.squadId],
+    [state.noteId],
   );
 
   const saveFlashcards = useCallback(
@@ -551,122 +438,6 @@ export function useInsightReview(): [InsightReviewState, InsightReviewActions] {
     }
   }, []);
 
-  const setSquadId = useCallback((squadId: string) => {
-    setState((prev) => ({ ...prev, squadId }));
-  }, []);
-
-  // ── Debate events ────────────────────────────────────────────
-  useEvent<{ round: number; totalRounds: number; phase: string }>(
-    "insight:debate-round-started",
-    ({ round, phase }) => {
-      setState((prev) => ({
-        ...prev,
-        tabs: {
-          ...prev.tabs,
-          perspectives: {
-            ...prev.tabs.perspectives,
-            debate: {
-              ...prev.tabs.perspectives.debate,
-              active: true,
-              rounds: [...prev.tabs.perspectives.debate.rounds, { round, phase, personas: [] }],
-            },
-          },
-        },
-      }));
-    },
-  );
-
-  useEvent<{
-    personaId: string;
-    personaName: string;
-    personaIcon: string;
-    personaRole: string;
-    content: string;
-    challenge?: string;
-  }>("insight:debate-persona", (payload) => {
-    setState((prev) => {
-      const debate = prev.tabs.perspectives.debate;
-      const currentRound = debate.rounds.at(-1);
-      if (!currentRound) return prev;
-      return {
-        ...prev,
-        tabs: {
-          ...prev.tabs,
-          perspectives: {
-            ...prev.tabs.perspectives,
-            debate: {
-              ...debate,
-              rounds: debate.rounds.map((r) =>
-                r.round === currentRound.round ? { ...r, personas: [...r.personas, payload] } : r,
-              ),
-            },
-          },
-        },
-      };
-    });
-  });
-
-  useEvent<{ round: number; consensusScore: number; decision: string; reasoning: string }>(
-    "insight:debate-judge",
-    (payload) => {
-      setState((prev) => ({
-        ...prev,
-        tabs: {
-          ...prev.tabs,
-          perspectives: {
-            ...prev.tabs.perspectives,
-            debate: {
-              ...prev.tabs.perspectives.debate,
-              judgeDecisions: [...prev.tabs.perspectives.debate.judgeDecisions, payload],
-            },
-          },
-        },
-      }));
-    },
-  );
-
-  useEvent<{ summary: string }>("insight:debate-consensus", ({ summary }) => {
-    setState((prev) => ({
-      ...prev,
-      tabs: {
-        ...prev.tabs,
-        perspectives: {
-          ...prev.tabs.perspectives,
-          debate: {
-            ...prev.tabs.perspectives.debate,
-            consensusReached: true,
-            consensusSummary: summary,
-          },
-        },
-      },
-    }));
-  });
-
-  const startDebate = useCallback(async () => {
-    if (!state.noteId) return;
-    // Reset debate state
-    setState((prev) => ({
-      ...prev,
-      tabs: {
-        ...prev.tabs,
-        perspectives: {
-          ...prev.tabs.perspectives,
-          debate: {
-            active: true,
-            rounds: [],
-            judgeDecisions: [],
-            consensusReached: false,
-            consensusSummary: null,
-          },
-        },
-      },
-    }));
-    await ipc("note_insight_debate", {
-      noteId: state.noteId,
-      squadId: state.squadId,
-    });
-  }, [state.noteId, state.squadId]);
-
   const actions: InsightReviewActions = {
     open,
     applyCachedContent,
@@ -678,8 +449,6 @@ export function useInsightReview(): [InsightReviewState, InsightReviewActions] {
     answerQuestion,
     revealAnswer,
     revealAll,
-    setSquadId,
-    startDebate,
   };
 
   return [state, actions];

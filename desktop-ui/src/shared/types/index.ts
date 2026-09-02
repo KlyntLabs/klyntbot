@@ -112,35 +112,6 @@ export type {
   TodayTask,
 } from "./tasks";
 
-// ── Finance Types ─────────────────────────────────────────
-
-export type {
-  DailySpending,
-  FinanceAccount,
-  FinanceAccountCreateParams,
-  FinanceAllocationTarget,
-  FinanceAllocationTargetUpsertParams,
-  FinanceBudgetCreateParams,
-  FinanceBudgetUsage,
-  FinanceCategoryReport,
-  FinanceDailySpendingResponse,
-  FinanceGoal,
-  FinanceGoalCreateParams,
-  FinanceInvestment,
-  FinanceInvestmentCreateParams,
-  FinanceInvestmentTx,
-  FinanceInvestmentTxCreateParams,
-  FinanceLiability,
-  FinanceLiabilityCreateParams,
-  FinanceNetWorth,
-  FinancePeriodSummary,
-  FinancePortfolio,
-  FinancePortfolioCreateParams,
-  FinanceTransaction,
-  FinanceTransactionCreateParams,
-  FinanceTrendPoint,
-} from "./finance";
-
 // ── Productivity Types ────────────────────────────────────
 
 export type {
@@ -148,7 +119,6 @@ export type {
   ActivitySwitchPayload,
   ActivityTimeline,
   AppUsage,
-  AutoFocusPayload,
   CategoryRules,
   CategoryUsage,
   FocusDndUnavailablePayload,
@@ -260,18 +230,3 @@ export type {
   FabricTreeNode,
 } from "./fabric";
 
-// ── Coding Memory Types ───────────────────────────────────
-
-export type {
-  CliHealthRow,
-  CodingMemoryStatusResponse,
-  DiagnoseResult,
-  EffectivenessTrendBucket,
-  EffectivenessTrendsResponse,
-  MirrorAlertRow,
-  ProjectSkillRow,
-  RecallInvocationRow,
-  ReforgeCycleDiffResponse,
-  ReforgeCycleSummary,
-  SessionReplayEntry,
-} from "./coding-memory";

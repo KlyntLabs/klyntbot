@@ -3,7 +3,6 @@ import { useCallback, useRef } from "react";
 import { useNavigate } from "react-router";
 import { useConversationRunner } from "../hooks/useConversationRunner";
 import type { ConversationNode, NodeValue } from "../schema";
-import { FinancePanel } from "./FinancePanel";
 import { InlineCheckboxList } from "./InlineCheckboxList";
 import { InlineInput } from "./InlineInput";
 import { InlineMasked } from "./InlineMasked";
@@ -199,12 +198,11 @@ export function ConversationRunner() {
     resubmit,
     startEdit,
     setAnimationComplete,
-    completeFinancePanel,
   } = useConversationRunner();
 
   const isAnyEditing = Object.values(transcript).some((e) => e.status === "editing");
 
-  const visibleNodes = schema.filter((n) => n.id !== "complete" && n.id !== "finance_setup");
+  const visibleNodes = schema.filter((n) => n.id !== "complete");
   const completedCount = Object.values(transcript).filter((e) => e.status === "completed").length;
 
   const handleSubmit = useCallback(
@@ -302,9 +300,6 @@ export function ConversationRunner() {
               </div>
             </div>
           )}
-
-          {/* Finance panel */}
-          {activeNode?.id === "finance_setup" && <FinancePanel onComplete={completeFinancePanel} />}
 
           {/* Error */}
           {error && (

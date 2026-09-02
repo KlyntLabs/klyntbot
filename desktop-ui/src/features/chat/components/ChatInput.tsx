@@ -1,68 +1,20 @@
 import { useAutoResizeTextarea } from "@shared/hooks/useAutoResizeTextarea";
-import { useClickOutside } from "@shared/hooks/useClickOutside";
 import { useEvent } from "@shared/hooks/useEvent";
 import { ipc } from "@shared/hooks/useIpc";
 import { cn } from "@shared/lib/utils";
-import { ChevronDown, Mic, Plus, Send, Users } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
-import { useSquads } from "../../notes/hooks/useSquads";
+import { Mic, Plus, Send } from "lucide-react";
+import { useState } from "react";
 
 interface ChatInputProps {
   input: string;
   isStreaming: boolean;
-  squadId: string | null;
   onInputChange: (value: string) => void;
   onSend: () => void;
-  onSelectSquad: (squadId: string) => void;
-  onSelectDefault: () => void;
 }
 
-export function ChatInput({
-  input,
-  isStreaming,
-  squadId,
-  onInputChange,
-  onSend,
-  onSelectSquad,
-  onSelectDefault,
-}: ChatInputProps) {
+export function ChatInput({ input, isStreaming, onInputChange, onSend }: ChatInputProps) {
   const { ref: textareaRef, handleInput } = useAutoResizeTextarea(input);
-  const { squads } = useSquads();
-  const [popup, setPopup] = useState<{ x: number; y: number } | null>(null);
   const [isDictating, setIsDictating] = useState(false);
-  const popupRef = useRef<HTMLDivElement>(null);
-  useClickOutside(popupRef, () => setPopup(null), !!popup);
-
-  // Close on Escape
-  useEffect(() => {
-    if (!popup) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setPopup(null);
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [popup]);
-
-  const currentSquad = squads.find((s) => s.id === squadId);
-
-  const handleModeClick = (e: React.MouseEvent) => {
-    if (popup) {
-      setPopup(null);
-    } else {
-      setPopup({ x: e.clientX, y: e.clientY });
-    }
-  };
-
-  const handleSquadSelect = (id: string) => {
-    setPopup(null);
-    if (id !== squadId) onSelectSquad(id);
-  };
-
-  const handleDefaultSelect = () => {
-    setPopup(null);
-    if (squadId) onSelectDefault();
-  };
 
   const startDictation = async () => {
     try {
@@ -143,102 +95,7 @@ export function ChatInput({
             <Send className="size-4" strokeWidth={2} />
           </button>
         </div>
-        <div className="flex items-center gap-2 mt-2">
-          {/* Squad mode picker */}
-          <button
-            type="button"
-            onClick={handleModeClick}
-            className={cn(
-              "glass-button flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-light",
-              currentSquad ? "text-purple-400" : "text-muted-foreground",
-            )}
-          >
-            {currentSquad ? (
-              <>
-                <span className="text-xs leading-none">{currentSquad.icon}</span>
-                <span className="truncate max-w-[100px]">{currentSquad.name}</span>
-              </>
-            ) : (
-              <>
-                <Users className="size-3.5" strokeWidth={1.5} />
-                <span>KlyntBot</span>
-              </>
-            )}
-            <ChevronDown
-              className={cn("size-3 transition-transform", popup && "rotate-180")}
-              strokeWidth={1.5}
-            />
-          </button>
-        </div>
       </div>
-
-      {/* Squad mode popup — portal, opens upward from click */}
-      {popup &&
-        createPortal(
-          <div
-            ref={popupRef}
-            role="menu"
-            onMouseDown={(e) => e.stopPropagation()}
-            className="fixed z-50 glass-dropdown rounded-xl py-1.5 px-1.5 animate-[menu-appear_120ms_ease-out]"
-            style={{
-              left: Math.max(8, Math.min(popup.x - 100, window.innerWidth - 240)),
-              bottom: window.innerHeight - popup.y + 4,
-            }}
-          >
-            {/* Squad options — compact single-line rows */}
-            {squads.map((squad) => (
-              <button
-                key={squad.id}
-                type="button"
-                role="menuitem"
-                onClick={() => handleSquadSelect(squad.id)}
-                className={cn(
-                  "flex items-center gap-2 w-full px-2.5 py-[5px] rounded-md text-left transition-colors",
-                  squad.id === squadId
-                    ? "bg-purple-500/20 text-purple-300"
-                    : "text-muted-foreground hover:bg-white/[0.06] hover:text-foreground",
-                )}
-              >
-                <span className="text-xs leading-none shrink-0">{squad.icon}</span>
-                <span className="text-[11px] font-medium truncate flex-1">{squad.name}</span>
-                {/* Inline member avatars */}
-                <div className="flex items-center -space-x-1 shrink-0">
-                  {squad.members.slice(0, 3).map((m) => (
-                    <span
-                      key={m.personaId}
-                      className="size-3.5 rounded-full bg-white/[0.08] flex items-center justify-center text-[7px] ring-1 ring-black/30"
-                      title={m.personaName}
-                    >
-                      {m.personaIcon}
-                    </span>
-                  ))}
-                  {squad.members.length > 3 && (
-                    <span className="text-[8px] text-dim ml-1.5">+{squad.members.length - 3}</span>
-                  )}
-                </div>
-              </button>
-            ))}
-
-            <div className="h-px bg-white/[0.08] my-1 mx-1.5" />
-
-            {/* Default KlyntBot option */}
-            <button
-              type="button"
-              role="menuitem"
-              onClick={handleDefaultSelect}
-              className={cn(
-                "flex items-center gap-2 w-full px-2.5 py-[5px] rounded-md text-left transition-colors",
-                !squadId
-                  ? "bg-brand/15 text-foreground"
-                  : "text-muted-foreground hover:bg-white/[0.06] hover:text-foreground",
-              )}
-            >
-              <Users className="size-3 shrink-0" strokeWidth={1.5} />
-              <span className="text-[11px] font-medium">KlyntBot</span>
-            </button>
-          </div>,
-          document.body,
-        )}
     </div>
   );
 }

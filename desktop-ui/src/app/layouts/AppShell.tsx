@@ -51,11 +51,9 @@ export function AppShell() {
     if (path.startsWith("/tasks") || path.startsWith("/task/")) return "Tasks";
     if (path.startsWith("/notes")) return "Notes";
     if (path.startsWith("/learn")) return "Learn";
-    if (path.startsWith("/finance")) return "Finance";
     if (path.startsWith("/coaching")) return "Coaching";
     if (path.startsWith("/brain")) return "Brain";
     if (path.startsWith("/automations")) return "Automations";
-    if (path.startsWith("/coding-memory")) return "CodingMemory";
     if (path.startsWith("/system")) return "System";
     if (path.startsWith("/settings")) return "Settings";
     return "Dashboard";

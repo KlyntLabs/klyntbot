@@ -5,7 +5,6 @@ import {
   ArrowLeft,
   BrainCircuit,
   Cable,
-  Code,
   Container,
   GitBranch,
   ListChecks,
@@ -34,7 +33,6 @@ const sections = [
   { label: "Work Contexts", path: "/settings/work-contexts", icon: BrainCircuit },
   { label: "Launcher", path: "/settings/launcher", icon: Rocket },
   { label: "Integrations", path: "/settings/integrations", icon: Cable },
-  { label: "Coding CLI", path: "/settings/coding-cli", icon: Code },
   { label: "Archived threads", path: "/settings/archived", icon: Archive },
 ];
 

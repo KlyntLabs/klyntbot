@@ -13,6 +13,11 @@ pub async fn voice_stop_dictation() -> String {
 }
 
 #[klynt_command]
+pub async fn voice_cancel_dictation() -> () {
+    state.voice_cancel_dictation().await
+}
+
+#[klynt_command]
 pub async fn voice_simulate_event(event: desktop_shared::specta_helpers::JsonValueWrapper) -> () {
     state.voice_simulate_event(event.0).await
 }

@@ -4,7 +4,6 @@ export * from "./chat";
 export * from "./dashboard";
 export * from "./debug";
 export * from "./distraction";
-export * from "./finance";
 export * from "./notes";
 export * from "./settings";
 export * from "./setup";

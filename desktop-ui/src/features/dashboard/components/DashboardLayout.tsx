@@ -15,7 +15,6 @@ import {
   useSidebarToggle,
 } from "../lib/layers";
 import { CalendarSync } from "./CalendarSync";
-import { AutoFocusToast } from "./productivity/AutoFocusToast";
 import { FocusStateIndicator } from "./productivity/FocusStateIndicator";
 import { FocusTrayIndicator } from "./productivity/FocusTrayIndicator";
 
@@ -296,7 +295,6 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
 
       {/* Real-time overlays */}
       <FocusStateIndicator />
-      <AutoFocusToast />
 
       {/* Content */}
       <DataModeContext.Provider value="productivity">

@@ -3275,6 +3275,14 @@ async voiceStopDictation() : Promise<Result<string, ApiError>> {
     else return { status: "error", error: e  as any };
 }
 },
+async voiceCancelDictation() : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("voice_cancel_dictation") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async voiceListDevices() : Promise<Result<AudioDevicesResponse, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("voice_list_devices") };

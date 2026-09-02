@@ -162,14 +162,6 @@ export interface ActivitySwitchPayload {
   categoryType: string | null;
 }
 
-export interface AutoFocusPayload {
-  startedAt: string;
-  endedAt: string;
-  durationMins: number;
-  dominantApp: string;
-  productiveRatio: number;
-}
-
 export interface ScorePayload {
   score: number;
   productiveSecs: number;

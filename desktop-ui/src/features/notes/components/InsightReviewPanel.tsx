@@ -25,7 +25,6 @@ import type {
 } from "../hooks/useInsightReview";
 import { useInsightSSE } from "../hooks/useInsightSSE";
 import { useInsightVersions } from "../hooks/useInsightVersions";
-import { usePersonas } from "../hooks/usePersonas";
 import { ChangesBanner } from "./insight/ChangesBanner";
 import { ConceptMapTab } from "./insight/ConceptMapTab";
 import { FlashcardReview } from "./insight/FlashcardReview";
@@ -36,13 +35,9 @@ import {
   type ScopeConfig,
 } from "./insight/InsightScopePopover";
 import { InsightVersionList } from "./insight/InsightVersionList";
-import { ManagePersonasModal } from "./insight/ManagePersonasModal";
-import { PerspectivesTab } from "./insight/PerspectivesTab";
 import { PracticeHistoryTab } from "./insight/PracticeHistoryTab";
 import { ScopePreview } from "./insight/ScopePreview";
 import { SelfAssessmentTab } from "./insight/SelfAssessmentTab";
-import { SquadManager } from "./insight/SquadManager";
-import { SquadPicker } from "./insight/SquadPicker";
 import { SynthesisTab } from "./insight/SynthesisTab";
 
 const InsightEvolutionChart = lazy(() =>
@@ -67,7 +62,6 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "gaps", label: "Gap Analysis" },
   { id: "assessment", label: "Self-Assessment" },
   { id: "concept-map", label: "Concept Map" },
-  { id: "perspectives", label: "Perspectives" },
   { id: "practice", label: "Practice" },
 ];
 
@@ -99,8 +93,6 @@ function tabStatus(state: InsightReviewState, tabId: TabId): TabStatus {
       return state.tabs.assessment.status;
     case "concept-map":
       return state.tabs.conceptMap.status;
-    case "perspectives":
-      return state.tabs.perspectives.status;
     case "practice":
       return "done";
   }
@@ -112,12 +104,9 @@ function tabStatus(state: InsightReviewState, tabId: TabId): TabStatus {
 
 export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) {
   const { copied, copy } = useCopyToClipboard();
-  const [showPersonaManager, setShowPersonaManager] = useState(false);
-  const [showSquadManager, setShowSquadManager] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [scopeConfig, setScopeConfig] = useState<ScopeConfig>(DEFAULT_SCOPE);
   const [showFlashcardReview, setShowFlashcardReview] = useState(false);
-  const [allPersonas, personaActions] = usePersonas();
   const evolution = useInsightEvolution();
   const versions = useInsightVersions();
   const activeStatus = tabStatus(state, state.activeTab);
@@ -164,8 +153,6 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
           .join("\n\n");
       case "concept-map":
         return state.tabs.conceptMap.mermaid || state.tabs.conceptMap.fallbackText;
-      case "perspectives":
-        return state.tabs.perspectives.content;
       case "practice":
         return "";
     }
@@ -222,11 +209,6 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
         >
           <History size={12} />
         </button>
-        <SquadPicker
-          selectedSquadId={state.squadId}
-          onSelect={(id) => actions.setSquadId(id)}
-          onManage={() => setShowSquadManager(true)}
-        />
         <button
           type="button"
           onClick={() => actions.close()}
@@ -365,19 +347,6 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
                 squadId={state.squadId}
               />
             )}
-            {state.activeTab === "perspectives" && (
-              <PerspectivesTab
-                status={state.tabs.perspectives.status}
-                content={state.tabs.perspectives.content}
-                personas={state.tabs.perspectives.personas}
-                personaPerspectives={state.tabs.perspectives.personaPerspectives}
-                noteId={state.noteId}
-                squadId={state.squadId}
-                onSquadChange={(id) => actions.setSquadId(id)}
-                debate={state.tabs.perspectives.debate}
-                onStartDebate={actions.startDebate}
-              />
-            )}
           </>
         )}
       </div>
@@ -469,18 +438,6 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
         </button>
       </div>
       {/* FlashcardReview now renders in a Radix Popover portal above */}
-      {showPersonaManager && (
-        <ManagePersonasModal
-          personas={allPersonas}
-          actions={personaActions}
-          noteId={state.noteId}
-          squadId={state.squadId}
-          onClose={() => setShowPersonaManager(false)}
-        />
-      )}
-      {showSquadManager && (
-        <SquadManager open={showSquadManager} onClose={() => setShowSquadManager(false)} />
-      )}
     </div>
   );
 }
