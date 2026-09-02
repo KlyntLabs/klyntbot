@@ -264,7 +264,7 @@ export function ImmersiveReview({ deck, onExit }: ImmersiveReviewProps) {
                 onCancel={() => setEditing(false)}
               />
             ) : (
-              <div className="glass-card p-8 sm:p-10 relative">
+              <div className="island p-8 sm:p-10 relative">
                 {/* Subtle ambient glow behind the card */}
                 <div className="absolute inset-0 -z-10 rounded-[inherit] bg-white/[0.02] blur-xl scale-105" />
                 <CardRenderer card={current} revealed={revealed} />
@@ -292,7 +292,7 @@ export function ImmersiveReview({ deck, onExit }: ImmersiveReviewProps) {
               Let's understand why
             </button>
           ) : socraticExplanation ? (
-            <div className="glass-card p-4 text-sm text-fg whitespace-pre-wrap animate-[fade-in-up_0.2s_ease-out]">
+            <div className="island p-4 text-sm text-fg whitespace-pre-wrap animate-[fade-in-up_0.2s_ease-out]">
               {socraticExplanation}
               <button
                 type="button"

@@ -62,7 +62,7 @@ function TrendsTab() {
   const [days, setDays] = useState<30 | 90>(30);
   const { data: retentionData } = useRetentionHistory(days);
   return (
-    <div className="glass-card rounded-xl p-5">
+    <div className="island rounded-xl p-5">
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-ui-sm font-medium text-fg-secondary uppercase tracking-wider">
           Retention Trends
@@ -120,15 +120,15 @@ export function KnowledgeHealth() {
 
       {/* Summary stats */}
       <div className="grid grid-cols-3 gap-3">
-        <div className="glass-card rounded-xl p-4 text-center">
+        <div className="island rounded-xl p-4 text-center">
           <p className="text-2xl font-bold text-fg tabular-nums">{health.totalAtoms}</p>
           <p className="text-ui-xs text-fg-secondary mt-0.5">Total Atoms</p>
         </div>
-        <div className="glass-card rounded-xl p-4 text-center">
+        <div className="island rounded-xl p-4 text-center">
           <p className="text-2xl font-bold text-fg tabular-nums">{health.activeAtoms}</p>
           <p className="text-ui-xs text-fg-secondary mt-0.5">Active</p>
         </div>
-        <div className="glass-card rounded-xl p-4 text-center">
+        <div className="island rounded-xl p-4 text-center">
           <p
             className={`text-2xl font-bold tabular-nums ${retentionTextColor(health.avgRetention)}`}
           >
@@ -159,7 +159,7 @@ export function KnowledgeHealth() {
       {/* Tab content */}
       {activeTab === "topics" &&
         (isEmpty ? (
-          <div className="glass-card rounded-xl p-8 text-center">
+          <div className="island rounded-xl p-8 text-center">
             <Brain size={32} className="mx-auto text-fg-secondary mb-3" strokeWidth={1.5} />
             <p className="text-sm text-fg-secondary">
               No knowledge atoms yet. Accept suggested atoms from your notes to start tracking
@@ -167,7 +167,7 @@ export function KnowledgeHealth() {
             </p>
           </div>
         ) : (
-          <div className="glass-card rounded-xl p-5">
+          <div className="island rounded-xl p-5">
             <h2 className="text-ui-sm font-medium text-fg-secondary uppercase tracking-wider mb-3">
               Topics ({health.topics.length})
             </h2>
@@ -182,7 +182,7 @@ export function KnowledgeHealth() {
       {activeTab === "trends" && <TrendsTab />}
 
       {activeTab === "graph" && (
-        <div className="glass-card rounded-xl p-5">
+        <div className="island rounded-xl p-5">
           <h2 className="text-ui-sm font-medium text-fg-secondary uppercase tracking-wider mb-3">
             Knowledge Graph
           </h2>

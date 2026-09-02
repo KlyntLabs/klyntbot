@@ -71,7 +71,7 @@ export function ObjectiveCard({ objective, onEdit }: ObjectiveCardProps) {
   );
 
   return (
-    <div className="glass-card rounded-lg border border-separator">
+    <div className="island rounded-lg border border-separator">
       {/* Objective header */}
       <div className="flex items-center gap-3 px-4 py-3">
         {/* Expand/collapse */}

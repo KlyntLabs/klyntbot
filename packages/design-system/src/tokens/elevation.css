@@ -19,6 +19,8 @@
 
   --ds-blur: blur(28px) saturate(1.8);
   --ds-blur-strong: blur(42px) saturate(1.9);
+  /* Compact controls (legacy glass-input) — lighter than pane blur */
+  --ds-blur-subtle: blur(16px) saturate(1.3);
 }
 
 html[data-theme="dark"] {

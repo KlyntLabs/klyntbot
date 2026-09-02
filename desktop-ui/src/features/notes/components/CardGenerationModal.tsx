@@ -43,7 +43,7 @@ function CardPreviewRow({
         : "bg-control-hover text-fg-secondary";
 
   return (
-    <div className={`glass-card p-3 transition-all ${isApproved ? "opacity-100" : "opacity-40"}`}>
+    <div className={`island p-3 transition-all ${isApproved ? "opacity-100" : "opacity-40"}`}>
       <div className="flex items-start gap-2">
         <button
           type="button"
@@ -179,7 +179,7 @@ export function CardGenerationModal({
           )}
 
           {error && (
-            <div className="glass-card p-3 border border-red-500/20">
+            <div className="island p-3 border border-red-500/20">
               <p className="text-sm text-red-400">{error}</p>
             </div>
           )}

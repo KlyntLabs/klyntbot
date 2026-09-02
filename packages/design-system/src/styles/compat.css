@@ -100,7 +100,7 @@
   --timeline-dot-task-done: var(--ds-timeline-dot-task-done);
   --timeline-dot-finance: var(--ds-timeline-dot-finance);
 
-  /* Glass material aliases used by legacy glass.css / components */
+  /* Glass material aliases used by recipes/legacy-glass.css / components */
   --surface-glass: var(--ds-glass-bg);
   --surface-glass-sidebar: var(--ds-glass-bg-subtle);
   --surface-glass-subtle: var(--ds-glass-bg-subtle);

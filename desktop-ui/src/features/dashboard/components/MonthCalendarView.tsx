@@ -148,7 +148,7 @@ export function MonthCalendarView() {
 
   return (
     <div className="flex gap-2 h-full">
-      <div className="flex-1 glass-card p-3 flex flex-col overflow-hidden">
+      <div className="flex-1 island p-3 flex flex-col overflow-hidden">
         {loading && <div className="text-ui-sm text-fg-secondary mb-1">Loading...</div>}
 
         {/* Day-of-week header */}

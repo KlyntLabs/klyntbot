@@ -11,15 +11,15 @@ export function AutoTunerPanel() {
   if (statusLoading) {
     return (
       <div className="flex flex-col gap-3">
-        <div className="glass-card p-4 h-28 animate-pulse" />
-        <div className="glass-card p-4 h-40 animate-pulse" />
+        <div className="island p-4 h-28 animate-pulse" />
+        <div className="island p-4 h-40 animate-pulse" />
       </div>
     );
   }
 
   if (!status) {
     return (
-      <div className="glass-card p-4">
+      <div className="island p-4">
         <p className="text-ui-sm font-light text-fg-dim">AutoTuner unavailable</p>
       </div>
     );

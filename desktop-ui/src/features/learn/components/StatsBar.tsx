@@ -22,7 +22,7 @@ function StatCard({
   valueClass?: string;
 }) {
   return (
-    <div className="glass-card flex items-center gap-2.5 px-3 py-2.5 flex-1 min-w-0">
+    <div className="island flex items-center gap-2.5 px-3 py-2.5 flex-1 min-w-0">
       <div className="text-fg-secondary shrink-0">{icon}</div>
       <div className="min-w-0">
         <p className="text-ui-xs text-fg-secondary leading-none mb-0.5">{label}</p>
@@ -53,7 +53,7 @@ export function StatsBar({ totalDue, streak, retention, weekly }: StatsBarProps)
         value={retPct > 0 && retPct < 100 ? `${retPct}%` : "--"}
         valueClass={retention < 1.0 ? retentionTextColor(retention) : undefined}
       />
-      <div className="glass-card flex items-center gap-2.5 px-3 py-2.5 flex-1 min-w-0">
+      <div className="island flex items-center gap-2.5 px-3 py-2.5 flex-1 min-w-0">
         <div className="text-fg-secondary shrink-0">
           <BarChart3 size={16} strokeWidth={1.5} />
         </div>

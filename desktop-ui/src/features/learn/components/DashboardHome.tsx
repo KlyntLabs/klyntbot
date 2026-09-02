@@ -141,7 +141,7 @@ export function DashboardHome({
           type="button"
           onClick={() => onStartReview()}
           disabled={totalDue === 0}
-          className="glass-card p-4 text-left transition-all duration-200 hover:bg-white/[0.06] disabled:opacity-40 disabled:cursor-not-allowed group"
+          className="island p-4 text-left transition-all duration-200 hover:bg-white/[0.06] disabled:opacity-40 disabled:cursor-not-allowed group"
         >
           <div className="flex items-center gap-2 mb-2">
             <div className="p-1.5 rounded-lg bg-brand/10">
@@ -166,7 +166,7 @@ export function DashboardHome({
       {/* Focused review link */}
       <Link
         to="/learn/review"
-        className="glass-card p-4 flex items-center gap-3 transition-all duration-200 hover:bg-white/[0.06] group"
+        className="island p-4 flex items-center gap-3 transition-all duration-200 hover:bg-white/[0.06] group"
       >
         <div className="p-1.5 rounded-lg bg-purple-500/10">
           <Focus size={16} className="text-purple-400" strokeWidth={1.5} />
@@ -182,7 +182,7 @@ export function DashboardHome({
       {/* Knowledge Health link */}
       <Link
         to="/learn/knowledge"
-        className="glass-card p-4 flex items-center gap-3 transition-all duration-200 hover:bg-white/[0.06] group"
+        className="island p-4 flex items-center gap-3 transition-all duration-200 hover:bg-white/[0.06] group"
       >
         <div className="p-1.5 rounded-lg bg-green-500/10">
           <Activity size={16} className="text-green-400" strokeWidth={1.5} />
@@ -205,7 +205,7 @@ export function DashboardHome({
           </div>
           <div className="space-y-1.5">
             {struggling.map((card) => (
-              <div key={card.id} className="glass-card p-3 flex items-center gap-3 group">
+              <div key={card.id} className="island p-3 flex items-center gap-3 group">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-fg truncate">{card.front}</p>
                   <div className="flex items-center gap-2 mt-0.5">
@@ -236,7 +236,7 @@ export function DashboardHome({
         icon={<TrendingUp size={14} strokeWidth={1.5} />}
         storageKey="learn-retention-open"
       >
-        <div className="glass-card p-4">
+        <div className="island p-4">
           <Suspense
             fallback={
               <div className="flex items-center justify-center h-full text-fg-secondary text-sm">
@@ -254,7 +254,7 @@ export function DashboardHome({
         icon={<Network size={14} strokeWidth={1.5} />}
         storageKey="learn-graph-open"
       >
-        <div className="glass-card p-4">
+        <div className="island p-4">
           <AtomGraph />
         </div>
       </CollapsibleSection>

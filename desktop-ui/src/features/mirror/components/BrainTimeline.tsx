@@ -49,7 +49,7 @@ export function BrainTimeline() {
               style={{ marginLeft: "7px" }}
             />
 
-            <div className="glass-card rounded-xl p-3 flex-1">
+            <div className="island rounded-xl p-3 flex-1">
               <div className="flex items-center justify-between">
                 <div>
                   <span className="text-ui-sm font-medium text-fg">

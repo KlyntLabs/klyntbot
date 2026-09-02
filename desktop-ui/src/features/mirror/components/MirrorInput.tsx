@@ -45,7 +45,7 @@ export function MirrorInput() {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="glass-card rounded-xl p-4">
+      <div className="island rounded-xl p-4">
         <div className="flex items-end gap-2">
           <textarea
             ref={textareaRef}

@@ -45,7 +45,7 @@ export function ExperimentWatchlist({ previews, onAction }: ExperimentWatchlistP
         const delta = preview.earlySignals.correctionRateDelta;
 
         return (
-          <div key={preview.id} className="glass-card rounded-xl p-4">
+          <div key={preview.id} className="island rounded-xl p-4">
             <div className="flex items-center justify-between">
               <span className="text-ui-sm font-medium text-fg">
                 Trial {preview.trialId.slice(0, 8)}

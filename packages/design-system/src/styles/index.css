@@ -10,6 +10,7 @@
 @import "./variants.css";
 @import "./compat.css";
 @import "../recipes/recipes.css";
+@import "../recipes/legacy-glass.css";
 @import "./base.css";
 
 @import "tailwindcss/utilities.css" layer(utilities);

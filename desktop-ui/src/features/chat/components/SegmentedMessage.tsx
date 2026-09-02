@@ -82,7 +82,7 @@ function CompletedToolSegment({ segment, nested }: { segment: ToolSegment; neste
       {expanded && (
         <div className="mt-1 ml-5 space-y-1">
           {formattedResult && (
-            <pre className="p-2 text-ui-xs font-light text-fg-secondary glass-card overflow-x-auto whitespace-pre-wrap break-words">
+            <pre className="p-2 text-ui-xs font-light text-fg-secondary island overflow-x-auto whitespace-pre-wrap break-words">
               {formattedResult}
             </pre>
           )}

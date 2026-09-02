@@ -41,7 +41,7 @@ function ConversationPicker({
 
   if (loading || selecting) {
     return (
-      <div className="glass-card p-4 text-center">
+      <div className="island p-4 text-center">
         <p className="text-ui-sm text-fg-secondary">
           {selecting ? "Loading conversation..." : "Loading conversations..."}
         </p>
@@ -51,7 +51,7 @@ function ConversationPicker({
 
   if (sessions.length === 0) {
     return (
-      <div className="glass-card p-4 space-y-2">
+      <div className="island p-4 space-y-2">
         <p className="text-ui-sm text-fg-secondary">No recent conversations found.</p>
         <button
           type="button"
@@ -65,7 +65,7 @@ function ConversationPicker({
   }
 
   return (
-    <div className="glass-card p-4 space-y-2">
+    <div className="island p-4 space-y-2">
       <p className="text-ui-sm text-fg-secondary mb-2">Select a conversation:</p>
       {sessions.map((s) => (
         <button
@@ -113,7 +113,7 @@ export function QuickGenerate({
 
   if (generating) {
     return (
-      <div className="glass-card p-4 flex items-center justify-center gap-2">
+      <div className="island p-4 flex items-center justify-center gap-2">
         <ThinkingDots size="sm" />
         <span className="text-sm text-fg-secondary">Generating cards</span>
       </div>
@@ -122,7 +122,7 @@ export function QuickGenerate({
 
   if (mode === "note") {
     return (
-      <div className="glass-card p-4">
+      <div className="island p-4">
         <p className="text-ui-sm text-fg-secondary mb-2">Select a note to generate from:</p>
         <NotePicker
           onSelect={(note) => {
@@ -137,7 +137,7 @@ export function QuickGenerate({
 
   if (mode === "clipboard") {
     return (
-      <div className="glass-card p-4 space-y-2">
+      <div className="island p-4 space-y-2">
         <p className="text-ui-sm text-fg-secondary">Paste text to generate flashcards:</p>
         <textarea
           value={clipboardText}
@@ -179,7 +179,7 @@ export function QuickGenerate({
   }
 
   return (
-    <div className="glass-card p-4 text-left">
+    <div className="island p-4 text-left">
       <p className="text-sm font-medium text-fg mb-3">Quick Generate</p>
       <div className="space-y-1.5">
         <button

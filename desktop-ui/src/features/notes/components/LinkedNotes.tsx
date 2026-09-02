@@ -23,7 +23,7 @@ export function LinkedNotes({ entityType, entityId }: LinkedNotesProps) {
       <h3 className="text-ui-sm font-light text-fg-secondary uppercase tracking-wider mb-3">
         Linked Notes
       </h3>
-      <div className="glass-card overflow-hidden">
+      <div className="island overflow-hidden">
         {notes.map((note) => (
           <button
             key={note.id}

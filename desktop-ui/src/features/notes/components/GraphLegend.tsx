@@ -86,7 +86,7 @@ export function GraphLegend({
   const hasHidden = hiddenClusters.size > 0;
 
   return (
-    <div className="absolute bottom-4 left-4 z-10 glass-card px-3 py-2 max-w-[240px]">
+    <div className="absolute bottom-4 left-4 z-10 island px-3 py-2 max-w-[240px]">
       <button
         type="button"
         onClick={() => setCollapsed(!collapsed)}

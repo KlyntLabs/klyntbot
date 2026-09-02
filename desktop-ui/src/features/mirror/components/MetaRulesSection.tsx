@@ -35,7 +35,7 @@ export function MetaRulesSection({
       </h2>
 
       {pendingRules.map((rule) => (
-        <div key={rule.id} className="glass-card rounded-xl p-4 border border-brand/20">
+        <div key={rule.id} className="island rounded-xl p-4 border border-brand/20">
           <p className="text-ui-sm text-fg mb-1">
             I think I should: &ldquo;{rule.triggerCondition}&rdquo;
           </p>
@@ -68,7 +68,7 @@ export function MetaRulesSection({
       ))}
 
       {activeRules.map((rule) => (
-        <div key={rule.id} className="glass-card rounded-xl p-4 opacity-80">
+        <div key={rule.id} className="island rounded-xl p-4 opacity-80">
           <div className="flex items-center justify-between">
             <p className="text-ui-xs text-fg">{rule.triggerCondition}</p>
             <span className="text-ui-xs text-status-success px-1.5 py-0.5 rounded bg-status-success/10">

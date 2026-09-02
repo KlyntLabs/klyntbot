@@ -59,7 +59,7 @@ export function CardEditor({ card, onSaved, onCancel }: CardEditorProps) {
 
   return (
     <div className="w-full max-w-lg space-y-4">
-      <div className="glass-card p-6 space-y-4">
+      <div className="island p-6 space-y-4">
         <label className="block">
           <span className="block text-ui-xs text-fg-secondary mb-1">Front</span>
           <textarea

@@ -21,7 +21,7 @@ export function ExperimentPaceControl() {
   };
 
   return (
-    <div className="glass-card p-4 flex flex-col gap-2">
+    <div className="island p-4 flex flex-col gap-2">
       <p className="text-ui-sm font-medium text-fg-secondary">Experiment Pace</p>
       <div className="flex rounded-lg border border-separator overflow-hidden">
         {PACES.map((p) => (

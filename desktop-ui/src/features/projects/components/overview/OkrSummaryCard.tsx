@@ -13,7 +13,7 @@ export function OkrSummaryCard() {
       <button
         type="button"
         onClick={() => navigate(`/project/${project?.id ?? ""}/okr`)}
-        className="glass-card rounded-xl p-5 text-left transition-colors hover:border-brand/30"
+        className="island rounded-xl p-5 text-left transition-colors hover:border-brand/30"
       >
         <p className="text-ui-xs text-fg-secondary uppercase tracking-wider mb-3">OKR Summary</p>
         <p className="text-ui-xs text-fg-secondary">
@@ -24,7 +24,7 @@ export function OkrSummaryCard() {
   }
 
   return (
-    <div className="glass-card rounded-xl p-5">
+    <div className="island rounded-xl p-5">
       <p className="text-ui-xs text-fg-secondary uppercase tracking-wider mb-3">OKR Summary</p>
       <div className="flex flex-col gap-3">
         {top3.map((obj) => (

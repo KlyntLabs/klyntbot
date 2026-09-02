@@ -908,7 +908,7 @@ export function GraphView({
               <Settings2 size={14} />
             </button>
             {settingsOpen && (
-              <div className="absolute bottom-9 right-0 glass-card p-3">
+              <div className="absolute bottom-9 right-0 island p-3">
                 <GraphSettingsPopover
                   settings={settings}
                   defaults={defaults}

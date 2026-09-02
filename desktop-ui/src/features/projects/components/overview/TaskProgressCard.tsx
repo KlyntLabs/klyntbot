@@ -30,7 +30,7 @@ export function TaskProgressCard() {
     <button
       type="button"
       onClick={() => navigate(`/project/${project?.id ?? ""}/tasks`)}
-      className="glass-card rounded-xl p-5 text-left transition-colors hover:border-brand/30"
+      className="island rounded-xl p-5 text-left transition-colors hover:border-brand/30"
     >
       <p className="text-ui-xs text-fg-secondary uppercase tracking-wider mb-3">Task Progress</p>
       <span className="text-2xl font-bold text-fg">{activeCount}</span>

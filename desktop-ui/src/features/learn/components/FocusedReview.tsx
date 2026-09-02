@@ -153,7 +153,7 @@ export function FocusedReview() {
       <div className="flex-1 flex flex-col items-center justify-center px-6 py-8">
         {current && (
           <div className="w-full max-w-lg">
-            <div className="glass-card p-8">
+            <div className="island p-8">
               <CardRenderer card={current} revealed={revealed} />
             </div>
           </div>

@@ -55,7 +55,7 @@ export function ContextDayView({ date, isToday }: ContextDayViewProps) {
 
   return (
     <div className="flex gap-2 h-full">
-      <div className="flex-1 glass-card overflow-hidden flex flex-col">
+      <div className="flex-1 island overflow-hidden flex flex-col">
         <div ref={scrollRef} className="flex-1 overflow-y-auto">
           {/* Header */}
           <div className="sticky top-0 z-20 border-b border-separator bg-glass-strong px-4 py-1.5">
@@ -95,7 +95,7 @@ export function ContextDayView({ date, isToday }: ContextDayViewProps) {
 
       {/* Context sidebar */}
       {sidebarOpen && (
-        <div className="w-72 glass-card overflow-y-auto p-3">
+        <div className="w-72 island overflow-y-auto p-3">
           <ContextSidebar
             contexts={contexts}
             selectedId={selectedContextId ?? undefined}

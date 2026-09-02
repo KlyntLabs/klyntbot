@@ -65,7 +65,7 @@ export function NavigationSidebar({
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: sidebar disables default context menu
     <div
-      className="glass-sidebar flex flex-col min-h-0 h-full"
+      className="island flex flex-col min-h-0 h-full"
       onContextMenu={(e) => e.preventDefault()}
     >
       <div className="flex-1 overflow-y-auto min-h-0 flex flex-col">

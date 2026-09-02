@@ -64,7 +64,7 @@ export function ActivityTimeline() {
 
   if (grouped.size === 0) {
     return (
-      <div className="glass-card rounded-xl p-5">
+      <div className="island rounded-xl p-5">
         <p className="text-ui-xs text-fg-secondary uppercase tracking-wider mb-3">
           Recent Activity
         </p>
@@ -74,7 +74,7 @@ export function ActivityTimeline() {
   }
 
   return (
-    <div className="glass-card rounded-xl p-5">
+    <div className="island rounded-xl p-5">
       <p className="text-ui-xs text-fg-secondary uppercase tracking-wider mb-4">
         Recent Activity
       </p>

@@ -32,7 +32,7 @@ export function NarrativeCard({ narrative }: NarrativeCardProps) {
 
   if (!narrative) {
     return (
-      <div className="glass-card rounded-xl p-5">
+      <div className="island rounded-xl p-5">
         <h2 className="text-ui font-medium text-fg-secondary mb-2">Weekly Reflection</h2>
         <p className="text-ui-xs text-fg-secondary">
           Your first weekly reflection will appear after 7 days of use.
@@ -42,7 +42,7 @@ export function NarrativeCard({ narrative }: NarrativeCardProps) {
   }
 
   return (
-    <div className="glass-card rounded-xl p-5">
+    <div className="island rounded-xl p-5">
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-ui font-medium text-fg-secondary">Weekly Reflection</h2>
         <span className="text-ui-xs text-fg-dim">

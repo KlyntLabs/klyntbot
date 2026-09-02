@@ -149,7 +149,7 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
   return (
     <div className="flex-1 flex flex-col gap-2 min-w-0">
       {/* Top bar */}
-      <div className="glass-card px-4 py-2 flex items-center gap-4">
+      <div className="island px-4 py-2 flex items-center gap-4">
         {/* Date label */}
         <span className="text-sm font-medium text-fg whitespace-nowrap">
           {formatDateDisplay(mode, dateParam)}

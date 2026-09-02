@@ -903,7 +903,7 @@ export function AutomationsPage() {
         </button>
       </div>
 
-      <div className="flex-1 flex flex-col overflow-hidden glass-card">
+      <div className="flex-1 flex flex-col overflow-hidden island">
         {showCreate && (
           <AutomationCreateForm onClose={() => setShowCreate(false)} onCreated={refetch} />
         )}

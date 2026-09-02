@@ -11,7 +11,7 @@ interface GraphNodeTooltipProps {
 export function GraphNodeTooltip({ node, x, y }: GraphNodeTooltipProps) {
   return createPortal(
     <div
-      className="fixed z-[100] glass-card rounded-xl px-4 py-3 max-w-[260px] pointer-events-none"
+      className="fixed z-[100] island rounded-xl px-4 py-3 max-w-[260px] pointer-events-none"
       style={{ left: x + 14, top: y + 14 }}
     >
       <div className="text-ui font-semibold text-fg leading-tight">{node.title}</div>

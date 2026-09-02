@@ -49,7 +49,7 @@ export function GradeDisplay({ result, userAnswer }: GradeDisplayProps) {
       </div>
 
       {/* Your answer vs expected */}
-      <div className="glass-card p-3 space-y-2 text-sm">
+      <div className="island p-3 space-y-2 text-sm">
         <div>
           <span className="text-ui-xs text-fg-secondary uppercase tracking-wider">
             Your answer
@@ -91,7 +91,7 @@ export function GradeDisplay({ result, userAnswer }: GradeDisplayProps) {
 
       {/* Explanation */}
       {result.explanation && (
-        <div className="glass-card p-3 text-sm text-fg">
+        <div className="island p-3 text-sm text-fg">
           <div className="flex items-start gap-2">
             <Info size={14} className="text-fg-secondary mt-0.5 shrink-0" strokeWidth={1.5} />
             <p className="whitespace-pre-wrap">{result.explanation}</p>

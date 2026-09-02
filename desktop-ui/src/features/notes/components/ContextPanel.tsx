@@ -215,13 +215,13 @@ export function ContextPanel({
   onOpenInsight,
 }: ContextPanelProps) {
   if (!noteId || !note) {
-    return <div className="glass-sidebar flex flex-col flex-shrink-0 h-full w-full" />;
+    return <div className="island flex flex-col flex-shrink-0 h-full w-full" />;
   }
 
   // Graph mode: show note preview instead of context sections
   if (isGraphMode) {
     return (
-      <div className="glass-sidebar flex flex-col flex-shrink-0 h-full w-full overflow-y-auto">
+      <div className="island flex flex-col flex-shrink-0 h-full w-full overflow-y-auto">
         <NotePreview note={note} onSelectNote={onSelectNote} />
       </div>
     );
@@ -230,7 +230,7 @@ export function ContextPanel({
   // Editor mode: insight panel takes over when open
   if (insightOpen && insightState && insightActions) {
     return (
-      <div className="glass-sidebar flex flex-col flex-shrink-0 h-full w-full">
+      <div className="island flex flex-col flex-shrink-0 h-full w-full">
         <InsightReviewPanel state={insightState} actions={insightActions} />
       </div>
     );
@@ -238,7 +238,7 @@ export function ContextPanel({
 
   // Editor mode: show all context sections
   return (
-    <div className="glass-sidebar flex flex-col flex-shrink-0 h-full w-full overflow-y-auto">
+    <div className="island flex flex-col flex-shrink-0 h-full w-full overflow-y-auto">
       <AISuggestionsPanel
         noteId={noteId}
         perspectiveConfig={note.perspectiveConfig}

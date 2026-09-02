@@ -16,7 +16,7 @@ function formatDate(iso: string): string {
 
 export function ExperimentTimeline({ experiments, loading }: ExperimentTimelineProps) {
   return (
-    <div className="glass-card p-4 flex flex-col gap-3">
+    <div className="island p-4 flex flex-col gap-3">
       <h2 className="text-ui font-medium text-fg-secondary flex items-center gap-2">
         <FlaskConical className="size-3.5 text-fg-secondary" />
         Experiment History

@@ -189,7 +189,7 @@ export function InteractionCard({
       onKeyDown={handleKeyDown}
       className="flex justify-start border-none p-0 m-0"
     >
-      <div className="w-full max-w-[85%] rounded-xl glass-card overflow-hidden">
+      <div className="w-full max-w-[85%] rounded-xl island overflow-hidden">
         {/* Header */}
         <div className="px-4 pt-3 pb-2 text-ui-xs font-light text-fg-secondary">
           Klynt is asking…

@@ -41,7 +41,7 @@ export function TokenBadge({ transparency }: TokenBadgeProps) {
       </button>
 
       {expanded && (
-        <div className="mt-1.5 p-2.5 glass-card text-ui-xs font-light space-y-1">
+        <div className="mt-1.5 p-2.5 island text-ui-xs font-light space-y-1">
           <div className="flex justify-between text-fg-secondary">
             <span>Input tokens</span>
             <span className="text-fg-secondary">{usage.promptTokens.toLocaleString()}</span>

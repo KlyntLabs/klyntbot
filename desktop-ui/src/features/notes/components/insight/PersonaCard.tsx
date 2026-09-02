@@ -43,7 +43,7 @@ export function PersonaCard({
   const [showChat, setShowChat] = useState(false);
 
   return (
-    <div className={`glass-card border-l-2 ${colors.border} rounded-lg p-3 space-y-2`}>
+    <div className={`island border-l-2 ${colors.border} rounded-lg p-3 space-y-2`}>
       {/* Header */}
       <div className="flex items-center gap-2">
         <span

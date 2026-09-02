@@ -87,7 +87,7 @@ export function SidebarChat({
   const label = contextLabel(pageContext?.entityKind);
 
   return (
-    <div className="w-96 glass-sidebar flex flex-col shrink-0">
+    <div className="w-96 island flex flex-col shrink-0">
       {/* Header */}
       <div className="h-14 flex items-center justify-between px-5">
         <span className="text-ui font-light text-fg-secondary">{label}</span>

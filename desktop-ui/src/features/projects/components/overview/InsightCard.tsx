@@ -51,7 +51,7 @@ export function InsightCard() {
 
   if (loading) {
     return (
-      <div className="glass-card rounded-xl p-5">
+      <div className="island rounded-xl p-5">
         <div className="text-ui-xs text-fg-secondary uppercase tracking-wider mb-3">
           Latest Insight
         </div>
@@ -62,7 +62,7 @@ export function InsightCard() {
 
   if (!insight) {
     return (
-      <div className="glass-card rounded-xl p-5">
+      <div className="island rounded-xl p-5">
         <div className="text-ui-xs text-fg-secondary uppercase tracking-wider mb-3">
           Latest Insight
         </div>
@@ -81,7 +81,7 @@ export function InsightCard() {
   }
 
   return (
-    <div className="glass-card rounded-xl p-5 border border-brand/15">
+    <div className="island rounded-xl p-5 border border-brand/15">
       <div className="text-ui-xs text-brand uppercase tracking-wider mb-3">Latest Insight</div>
       <p className="text-ui-xs text-fg-secondary line-clamp-3 leading-relaxed">
         {insight.synthesis}

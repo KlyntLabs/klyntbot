@@ -44,7 +44,7 @@ export function CategoryList({ categories, selectedId, onSelect, onCreated }: Ca
   };
 
   return (
-    <div className="glass-card p-3 flex flex-col gap-2">
+    <div className="island p-3 flex flex-col gap-2">
       <div className="flex items-center justify-between">
         <h3 className="text-ui-sm font-medium text-fg-secondary">Categories</h3>
         <button

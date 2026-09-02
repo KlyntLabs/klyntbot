@@ -31,12 +31,12 @@ export function PostSession({
         </div>
 
         <div className="flex gap-3 justify-center">
-          <div className="glass-card px-4 py-3 text-center flex-1">
+          <div className="island px-4 py-3 text-center flex-1">
             <p className="text-2xl font-semibold text-fg tabular-nums">{totalReviewed}</p>
             <p className="text-ui-xs text-fg-secondary mt-0.5">Cards reviewed</p>
           </div>
 
-          <div className="glass-card px-4 py-3 text-center flex-1">
+          <div className="island px-4 py-3 text-center flex-1">
             <div className="flex items-center justify-center gap-1">
               <Target size={14} className="text-brand" strokeWidth={1.5} />
               <p className="text-2xl font-semibold text-fg tabular-nums">{accuracy}%</p>
@@ -44,7 +44,7 @@ export function PostSession({
             <p className="text-ui-xs text-fg-secondary mt-0.5">Accuracy</p>
           </div>
 
-          <div className="glass-card px-4 py-3 text-center flex-1">
+          <div className="island px-4 py-3 text-center flex-1">
             <div className="flex items-center justify-center gap-1">
               <Clock size={14} className="text-status-info" strokeWidth={1.5} />
               <p className="text-2xl font-semibold text-fg tabular-nums">

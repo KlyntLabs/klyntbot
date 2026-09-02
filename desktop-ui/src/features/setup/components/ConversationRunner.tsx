@@ -255,7 +255,7 @@ export function ConversationRunner() {
         {/* Glass card container */}
         <div
           ref={containerRef}
-          className="glass-card rounded-2xl border border-separator p-8"
+          className="island rounded-2xl border border-separator p-8"
           style={{ animation: "glass-appear 0.3s ease-out" }}
         >
           {/* Completed nodes (compact list) */}

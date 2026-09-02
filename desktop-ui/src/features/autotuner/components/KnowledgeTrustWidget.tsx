@@ -26,7 +26,7 @@ export function KnowledgeTrustWidget() {
   const { data, loading } = useQuery<MemoryHealthResponse>("memory_health");
 
   if (loading) {
-    return <div className="glass-card p-4 h-28 animate-pulse" />;
+    return <div className="island p-4 h-28 animate-pulse" />;
   }
 
   if (!data || data.totalFacts90d === 0) {
@@ -34,7 +34,7 @@ export function KnowledgeTrustWidget() {
   }
 
   return (
-    <div className="glass-card p-4 flex flex-col gap-3">
+    <div className="island p-4 flex flex-col gap-3">
       <div className="flex items-baseline justify-between">
         <div>
           <h3 className="text-ui font-medium text-fg">Knowledge Trust</h3>

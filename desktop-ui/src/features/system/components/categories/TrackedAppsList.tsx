@@ -124,7 +124,7 @@ export function TrackedAppsList({ apps, categories, onReassigned }: TrackedAppsL
   };
 
   return (
-    <div className="glass-card p-3 flex flex-col gap-2">
+    <div className="island p-3 flex flex-col gap-2">
       <h3 className="text-ui-sm font-medium text-fg-secondary">Tracked Apps & Sites</h3>
 
       {/* Search */}

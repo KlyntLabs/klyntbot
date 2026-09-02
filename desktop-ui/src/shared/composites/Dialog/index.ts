@@ -1,4 +1,7 @@
-export type { ConfirmDialogProps } from "./ConfirmDialog";
-export { ConfirmDialog } from "./ConfirmDialog";
-export type { DialogProps } from "./Dialog";
-export { Dialog } from "./Dialog";
+export {
+  ConfirmDialog,
+  Dialog,
+  type ConfirmDialogProps,
+  type DialogProps,
+  type DialogSize,
+} from "@klyntbot/design-system";

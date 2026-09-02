@@ -38,7 +38,7 @@ function StatCard({
   accent?: string;
 }) {
   return (
-    <div className="glass-card rounded-xl p-4 flex items-center gap-3">
+    <div className="island rounded-xl p-4 flex items-center gap-3">
       <div
         className="size-9 rounded-lg flex items-center justify-center"
         style={{ backgroundColor: `${accent ?? "#6B7280"}20` }}
@@ -197,7 +197,7 @@ export function InferenceTab() {
           <h3 className="text-ui-xs font-medium text-fg-dim uppercase tracking-wider mb-3">
             Inference Configuration
           </h3>
-          <div className="glass-card rounded-xl p-5 space-y-4">
+          <div className="island rounded-xl p-5 space-y-4">
             <Slider
               label="Assignment Threshold"
               value={draft.assignmentThreshold}

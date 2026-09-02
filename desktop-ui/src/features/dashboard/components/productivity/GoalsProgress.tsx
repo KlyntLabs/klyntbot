@@ -52,7 +52,7 @@ export function GoalsProgress() {
 
   return (
     <>
-      <div className="glass-card p-4 flex flex-col gap-3">
+      <div className="island p-4 flex flex-col gap-3">
         <div className="flex items-center justify-between">
           <h2 className="text-ui font-medium text-fg-secondary">Goals</h2>
           <button

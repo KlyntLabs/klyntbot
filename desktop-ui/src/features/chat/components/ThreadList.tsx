@@ -74,7 +74,7 @@ export function ThreadList({
   );
 
   return (
-    <div className="w-[250px] glass-sidebar flex flex-col">
+    <div className="w-[250px] island flex flex-col">
       {/* Quick Links */}
       <div className="px-4 py-3 space-y-1">
         <button

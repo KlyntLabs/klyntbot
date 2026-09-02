@@ -11,7 +11,7 @@ export function PromotionToast({ impact, onDismiss }: PromotionToastProps) {
   return (
     <div className="animate-[slideIn_0.2s_ease-out]">
       <div
-        className="glass-card p-4 flex items-center gap-3 border-l-2"
+        className="island p-4 flex items-center gap-3 border-l-2"
         style={{ borderLeftColor: "var(--ds-status-success)" }}
       >
         <div className="flex-1 min-w-0">

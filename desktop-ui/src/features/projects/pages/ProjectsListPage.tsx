@@ -18,7 +18,7 @@ function ProjectCard({ project }: { project: Project }) {
     <button
       type="button"
       onClick={() => navigate(`/project/${project.id}`)}
-      className="glass-card rounded-xl p-5 text-left hover:bg-control-hover/30 transition-colors group"
+      className="island rounded-xl p-5 text-left hover:bg-control-hover/30 transition-colors group"
     >
       <div className="flex items-center gap-3 mb-3">
         <div
@@ -74,7 +74,7 @@ export function ProjectsListPage() {
       </div>
 
       {creating && (
-        <div className="glass-card rounded-xl p-4 mb-4 flex items-center gap-3">
+        <div className="island rounded-xl p-4 mb-4 flex items-center gap-3">
           <input
             type="text"
             value={newName}
@@ -104,7 +104,7 @@ export function ProjectsListPage() {
       )}
 
       {projects.length === 0 && !creating ? (
-        <div className="glass-card rounded-xl p-12 text-center">
+        <div className="island rounded-xl p-12 text-center">
           <p className="text-sm text-fg-secondary mb-4">
             No projects yet. Create your first project to get started.
           </p>

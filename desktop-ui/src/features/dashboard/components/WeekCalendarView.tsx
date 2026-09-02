@@ -232,7 +232,7 @@ export function WeekCalendarView() {
 
   return (
     <div className="flex gap-2 h-full">
-      <div className="flex-1 glass-card overflow-hidden flex flex-col">
+      <div className="flex-1 island overflow-hidden flex flex-col">
         {/* Day header with active time */}
         <div className="flex border-b border-separator" style={{ paddingLeft: HOUR_GUTTER }}>
           {days.map((day, i) => {

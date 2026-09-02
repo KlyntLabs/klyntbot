@@ -9,7 +9,7 @@ export function CoachingCard() {
   return (
     <button
       type="button"
-      className="glass-card rounded-xl p-5 cursor-pointer hover:bg-control-hover/5 transition-colors w-full text-left"
+      className="island rounded-xl p-5 cursor-pointer hover:bg-control-hover/5 transition-colors w-full text-left"
       onClick={() => navigate("/coaching")}
     >
       <p className="text-ui-xs text-fg-secondary uppercase tracking-wider mb-3">Coaching</p>

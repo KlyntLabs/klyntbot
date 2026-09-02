@@ -20,7 +20,7 @@ interface RoutingDonutProps {
 export function RoutingDonut({ snapshot }: RoutingDonutProps) {
   if (!snapshot || Object.keys(snapshot.distribution).length === 0) {
     return (
-      <div className="glass-card rounded-xl p-5">
+      <div className="island rounded-xl p-5">
         <h2 className="text-ui font-medium text-fg-secondary mb-3">Skill Routing</h2>
         <p className="text-ui-xs text-fg-secondary">
           No routing data yet. Keep chatting and the Mirror will learn your patterns.
@@ -33,7 +33,7 @@ export function RoutingDonut({ snapshot }: RoutingDonutProps) {
   const avgConfidencePct = Math.round(snapshot.avgRoutingConfidence * 100);
 
   return (
-    <div className="glass-card rounded-xl p-5">
+    <div className="island rounded-xl p-5">
       <h2 className="text-ui font-medium text-fg-secondary mb-3">Skill Routing</h2>
       <div className="flex flex-col gap-2">
         {entries.map(([skillName, stats]) => (

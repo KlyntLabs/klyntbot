@@ -5,8 +5,7 @@
 @source "../**/*.{ts,tsx}";
 @import "./prose.css";
 @import "./editor.css";
-/* Legacy glass class names — Wave 2 migrates consumers to DS recipes */
-@import "../shared/styles/glass.css";
+/* Legacy glass-* classes live in @klyntbot/design-system recipes/legacy-glass.css */
 
 body {
   overflow: hidden;

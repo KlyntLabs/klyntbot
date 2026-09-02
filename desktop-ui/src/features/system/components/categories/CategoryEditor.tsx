@@ -53,7 +53,7 @@ export function CategoryEditor({ category, onSaved, onDeleted }: CategoryEditorP
 
   if (!category) {
     return (
-      <div className="glass-card p-6 flex items-center justify-center h-full">
+      <div className="island p-6 flex items-center justify-center h-full">
         <p className="text-ui font-light text-fg-dim">Select a category to edit</p>
       </div>
     );
@@ -81,7 +81,7 @@ export function CategoryEditor({ category, onSaved, onDeleted }: CategoryEditorP
   };
 
   return (
-    <div className="glass-card p-4 flex flex-col gap-4">
+    <div className="island p-4 flex flex-col gap-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">

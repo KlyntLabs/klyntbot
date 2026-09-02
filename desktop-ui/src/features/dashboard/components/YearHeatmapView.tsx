@@ -71,7 +71,7 @@ export function YearHeatmapView() {
 
   return (
     <div className="flex gap-2 h-full">
-      <div className="flex-1 glass-card p-4 overflow-y-auto">
+      <div className="flex-1 island p-4 overflow-y-auto">
         {loading && <div className="text-ui-sm text-fg-secondary mb-2">Loading...</div>}
 
         <div className="grid grid-cols-3 gap-4">
