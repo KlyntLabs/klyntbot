@@ -1,7 +1,7 @@
 # Design: Tool exposure policy
 
 Feature code: EXPO
-Status: Draft
+Status: Approved
 Date: 2026-09-02
 Requirements: ./requirements.md
 
@@ -38,7 +38,7 @@ Interface: `ExposurePolicy { llm_channels: ChannelMask, subagent: bool, mcp: Mcp
 Depth: n/a — extends `Tool` / derive
 Locality: change lands in `tools-core` + macros + per-tool annotations; neighbor `agent`/`subagent` **extend** to call `exposure_policy()` (or accessors); `ToolMetadata` **leave**
 
-`McpExposure` default for unspecified tools is **Forbidden** (ADR-0102). Historical Default tools get explicit derive/attr or inherent impl overrides. The eight stub tools set `Forbidden` explicitly (already default) and are named in the migration fixture as intentional removals from the old default set.
+`McpExposure` default for unspecified tools is **Forbidden** (ADR-0102). Historical **registry-backed Default** names (annotate in code/attrs): `tasks`, `productivity`, `notes`, `learning`, `language_practice`, `memory`, `annotate`, `cron`, `alarm`, `mirror`, `temporal`, `launcher`. The eight EXPO-2.3 stub names stay Forbidden (named removals). Builtin `agent` is not a Tool Default.
 
 ### MCP exposure projection (`mcp::server::exposure`)
 
@@ -46,9 +46,9 @@ Satisfies: EXPO-3.1, EXPO-3.2, EXPO-3.3, EXPO-3.4, EXPO-3.5, EXPO-3.6, EXPO-3.7,
 Reuse: rung 7 — new module inside existing `mcp` crate (already depends on `tools-core`; no `app-core`)
 Surface:
 - Future callers (`app-core` post_init, `klyntbot-server` diagnostic/stdio, tests) — new readers only (omit Surface inventory of pre-existing readers)
-Interface: pure function(s), e.g. `validate_mcp_exposure(registry: &ToolRegistry, override: Option<&[String]>, builtins: &BuiltinSet) -> ExposureValidation` where result carries `runtime_state` (`Ready` | `Disabled` | `Invalid`), `requested`, `effective_registry_tools`, `effective_builtins`, `rejected: Vec<{name, reason: Unknown|Forbidden}>`, and helpers to compute default fill when override empty. `BuiltinId` enum `{ GetStatus, Agent }` with mandatory/default-on metadata — single typed source.
-Depth: If this module vanished, callers would only need “given registry + override + builtin rules → effective set or typed rejections”; they would not need AiFeature or allowlist knowledge.
-Locality: new code under `crates/mcp/src/server/exposure.rs` (+ `mod` export); `mcp::server` **extend**; `app-core` **extend** (new dep on `mcp`)
+Interface: `validate_mcp_exposure(input: ExposureInput) -> ExposureValidation` where `ExposureInput` carries `registry: &ToolRegistry`, `server_enabled: bool`, `override_tools: Option<&[String]>` (None/empty = auto-default), and builtin rules are read from the typed `BuiltinId` table inside the module. `ExposureValidation` carries `runtime_state` (`Ready` when enabled+valid, `Disabled` when `server_enabled` is false, `Invalid` when enabled+rejected entries), `requested`, `effective_registry_tools`, `effective_builtins`, `rejected: [{name, reason: Unknown|Forbidden}]`. Callers never pass AiFeature records or allowlist slices.
+Depth: Callers must still know their `ToolRegistry` handle, whether the embedded server is enabled, and the user’s override list; they must not know Default/OptIn/Forbidden projection rules, builtin mandatory/default-on tables, or rejection classification.
+Locality: new code under `crates/mcp/src/server/exposure.rs` (+ `mod` export); `mcp::server` **extend**; `app-core` **extend** (new **crate** dep on `mcp` — distinct from `app_core::handlers::settings::mcp` module)
 
 Does not execute tools or own HTTP/stdio servers.
 
@@ -61,9 +61,9 @@ Surface:
 - `EXPLICIT_TOOL_ALLOWLIST` runtime consumers — **replace** (delete from fill/diagnostic reconstruction; may remain only inside migration test evidence fixture)
 - `AiFeatureRegistry::tool_names` MCP fill — **replace** (stop using for exposure)
 - In-memory `exposed_tools_auto_filled` flag — **compat** until settings/diagnostics stop relying on it; follow-up: derive “auto vs override” from empty-override detection only
-Interface: post_init reads `app.agent.tool_registry()` (not host tool clone); calls `mcp::server::exposure::validate...`; on Ready with empty override, writes effective registry tool names into config’s exposed list (or stores projection beside config); on Invalid, records status and skips starting embedded MCP later; never `process::exit` in desktop path.
+Interface: post_init reads `app.agent.tool_registry()` (not host tool clone); calls `mcp::server::exposure::validate_mcp_exposure` with `server_enabled` + override; **always** stores the full `ExposureValidation` on AppCore (embedded MCP status source for UI/desktop). When override is empty and state is Ready, also writes `effective_registry_tools` into in-memory `config.mcp.server.exposed_tools` and sets `exposed_tools_auto_filled` so existing whitelist snapshots keep working. When Invalid, leaves override untouched, stores Invalid status, and does not rewrite defaults. Desktop `main` consults AppCore status before binding embedded HTTP (does not start server when Invalid/Disabled); never `process::exit` on the Tauri app path.
 Depth: n/a — extends plugin post_init
-Locality: `crates/app-core/src/plugins/ai_pipeline.rs` + AppCore status field; add `mcp` to `app-core` Cargo.toml; **leave** AiFeature recall registration
+Locality: `crates/app-core/src/plugins/ai_pipeline.rs` + AppCore status field; add crate `mcp` to `app-core` Cargo.toml; desktop start path **extend**; **leave** AiFeature recall registration
 
 ### klyntbot-server (handlers + diagnostics)
 
