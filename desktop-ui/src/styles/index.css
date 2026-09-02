@@ -1,14 +1,13 @@
 @import "./fonts.css";
-@import "./tailwind.css";
-@import "./theme.css";
+/* Design system owns Tailwind theme/preflight/utilities + tokens/recipes */
+@import "@klyntbot/design-system/styles/index.css";
+/* App source scan — DS package already @source's itself */
+@source "../**/*.{ts,tsx}";
 @import "./prose.css";
 @import "./editor.css";
-@import "../shared/styles/themes/_base.css";
-@import "../shared/styles/themes/dark.css";
-@import "../shared/styles/themes/retro.css";
+/* Legacy glass class names — Wave 2 migrates consumers to DS recipes */
 @import "../shared/styles/glass.css";
 
 body {
-  margin: 0;
   overflow: hidden;
 }

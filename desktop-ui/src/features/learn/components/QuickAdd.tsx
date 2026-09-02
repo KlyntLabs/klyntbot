@@ -105,11 +105,11 @@ export function QuickAdd({ open, onClose, onCreated }: QuickAddProps) {
       >
         {/* Header */}
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-foreground">Quick Add Card</h3>
+          <h3 className="text-sm font-semibold text-fg">Quick Add Card</h3>
           <button
             type="button"
             onClick={onClose}
-            className="p-1 rounded-md text-muted-foreground hover:text-foreground transition-colors"
+            className="p-1 rounded-md text-fg-secondary hover:text-fg transition-colors"
           >
             <X size={16} strokeWidth={1.5} />
           </button>
@@ -117,48 +117,48 @@ export function QuickAdd({ open, onClose, onCreated }: QuickAddProps) {
 
         {/* Front */}
         <label className="block">
-          <span className="block text-[11px] text-muted-foreground mb-1">Front</span>
+          <span className="block text-ui-xs text-fg-secondary mb-1">Front</span>
           <textarea
             ref={frontRef}
             value={front}
             onChange={(e) => setFront(e.target.value)}
             rows={3}
             placeholder="Question or prompt..."
-            className="glass-input w-full px-3 py-2 text-sm text-foreground resize-none placeholder:text-muted-foreground"
+            className="glass-input w-full px-3 py-2 text-sm text-fg resize-none placeholder:text-fg-secondary"
           />
         </label>
 
         {/* Back */}
         <label className="block">
-          <span className="block text-[11px] text-muted-foreground mb-1">Back</span>
+          <span className="block text-ui-xs text-fg-secondary mb-1">Back</span>
           <textarea
             value={back}
             onChange={(e) => setBack(e.target.value)}
             onKeyDown={handleBackKeyDown}
             rows={3}
             placeholder="Answer..."
-            className="glass-input w-full px-3 py-2 text-sm text-foreground resize-none placeholder:text-muted-foreground"
+            className="glass-input w-full px-3 py-2 text-sm text-fg resize-none placeholder:text-fg-secondary"
           />
         </label>
 
         {/* Deck + Card Type row */}
         <div className="flex gap-3">
           <label className="flex-1 block">
-            <span className="block text-[11px] text-muted-foreground mb-1">Deck</span>
+            <span className="block text-ui-xs text-fg-secondary mb-1">Deck</span>
             <input
               type="text"
               value={deck}
               onChange={(e) => setDeck(e.target.value)}
               placeholder="general"
-              className="glass-input w-full px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground"
+              className="glass-input w-full px-3 py-1.5 text-sm text-fg placeholder:text-fg-secondary"
             />
           </label>
           <label className="flex-1 block">
-            <span className="block text-[11px] text-muted-foreground mb-1">Type</span>
+            <span className="block text-ui-xs text-fg-secondary mb-1">Type</span>
             <select
               value={cardType}
               onChange={(e) => setCardType(e.target.value as CardType)}
-              className="glass-input w-full px-3 py-1.5 text-sm text-foreground bg-transparent"
+              className="glass-input w-full px-3 py-1.5 text-sm text-fg bg-transparent"
             >
               {cardTypeOptions.map((opt) => (
                 <option key={opt.value} value={opt.value}>
@@ -174,7 +174,7 @@ export function QuickAdd({ open, onClose, onCreated }: QuickAddProps) {
           <button
             type="button"
             onClick={onClose}
-            className="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            className="px-3 py-1.5 text-sm text-fg-secondary hover:text-fg transition-colors"
           >
             Cancel
           </button>
@@ -182,7 +182,7 @@ export function QuickAdd({ open, onClose, onCreated }: QuickAddProps) {
             type="button"
             onClick={handleCreate}
             disabled={!front.trim() || creating}
-            className="glass-button px-4 py-1.5 text-sm text-foreground disabled:opacity-40 disabled:cursor-not-allowed"
+            className="glass-button px-4 py-1.5 text-sm text-fg disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {creating ? "Creating..." : "Create"}
           </button>

@@ -52,8 +52,8 @@ export function FabricPulseBadge({
         type="button"
         onClick={() => setPopoverOpen(!popoverOpen)}
         className="flex items-center gap-1.5 px-2.5 py-1 rounded-full
-          glass-panel text-2xs text-muted-foreground
-          hover:text-foreground transition-colors"
+          glass-panel text-ui-xs text-fg-secondary
+          hover:text-fg transition-colors"
       >
         <span className="relative flex size-2">
           <span
@@ -71,26 +71,26 @@ export function FabricPulseBadge({
         <div className="absolute bottom-full left-0 mb-2 glass-panel rounded-lg py-1 min-w-[200px] shadow-xl">
           <button
             type="button"
-            className="flex items-center gap-2 w-full px-3 py-2 text-xs text-foreground
-              hover:bg-surface-raised/50 transition-colors text-left"
+            className="flex items-center gap-2 w-full px-3 py-2 text-ui-sm text-fg
+              hover:bg-glass-subtle/50 transition-colors text-left"
             onClick={() => {
               onViewUpdates();
               setPopoverOpen(false);
             }}
           >
-            <Activity size={12} className="text-muted-foreground" />
+            <Activity size={12} className="text-fg-secondary" />
             View latest updates
           </button>
           <button
             type="button"
-            className="flex items-center gap-2 w-full px-3 py-2 text-xs text-foreground
-              hover:bg-surface-raised/50 transition-colors text-left"
+            className="flex items-center gap-2 w-full px-3 py-2 text-ui-sm text-fg
+              hover:bg-glass-subtle/50 transition-colors text-left"
             onClick={() => {
               onSwitchToSemantic();
               setPopoverOpen(false);
             }}
           >
-            <ArrowRight size={12} className="text-muted-foreground" />
+            <ArrowRight size={12} className="text-fg-secondary" />
             Switch to Semantic
           </button>
         </div>
@@ -121,13 +121,13 @@ export function BatchActionBar({
       className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20
         glass-panel rounded-full px-2 py-1.5 flex items-center gap-1.5 shadow-xl"
     >
-      <span className="text-2xs text-muted-foreground px-2">{selectedCount} selected</span>
+      <span className="text-ui-xs text-fg-secondary px-2">{selectedCount} selected</span>
       <div className="w-px h-4 bg-border-subtle" />
       <button
         type="button"
         onClick={onExpandAllTrees}
-        className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-2xs
-          text-foreground hover:bg-surface-raised/50 transition-colors"
+        className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-ui-xs
+          text-fg hover:bg-glass-subtle/50 transition-colors"
       >
         <Radio size={10} />
         Expand all trees
@@ -135,8 +135,8 @@ export function BatchActionBar({
       <button
         type="button"
         onClick={onCreateBridgeNote}
-        className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-2xs
-          text-foreground hover:bg-surface-raised/50 transition-colors"
+        className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-ui-xs
+          text-fg hover:bg-glass-subtle/50 transition-colors"
       >
         <Activity size={10} />
         Create bridge note
@@ -144,8 +144,8 @@ export function BatchActionBar({
       <button
         type="button"
         onClick={onCompareInChat}
-        className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-2xs
-          text-foreground hover:bg-surface-raised/50 transition-colors"
+        className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-ui-xs
+          text-fg hover:bg-glass-subtle/50 transition-colors"
       >
         <ArrowRight size={10} />
         Compare in chat

@@ -14,10 +14,10 @@ export function GraphNodeTooltip({ node, x, y }: GraphNodeTooltipProps) {
       className="fixed z-[100] glass-card rounded-xl px-4 py-3 max-w-[260px] pointer-events-none"
       style={{ left: x + 14, top: y + 14 }}
     >
-      <div className="text-[13px] font-semibold text-foreground leading-tight">{node.title}</div>
+      <div className="text-ui font-semibold text-fg leading-tight">{node.title}</div>
 
       {node.bodyPreview && (
-        <div className="text-xs text-muted-foreground mt-1.5 leading-relaxed line-clamp-2">
+        <div className="text-ui-sm text-fg-secondary mt-1.5 leading-relaxed line-clamp-2">
           {node.bodyPreview}
         </div>
       )}
@@ -27,7 +27,7 @@ export function GraphNodeTooltip({ node, x, y }: GraphNodeTooltipProps) {
           {node.tags.map((tag) => (
             <span
               key={tag}
-              className="px-1.5 py-0.5 rounded-full text-2xs font-medium"
+              className="px-1.5 py-0.5 rounded-full text-ui-xs font-medium"
               style={{
                 color: tagColor(tag),
                 backgroundColor: tagBgColor(tag),
@@ -39,7 +39,7 @@ export function GraphNodeTooltip({ node, x, y }: GraphNodeTooltipProps) {
         </div>
       )}
 
-      <div className="text-2xs text-dim mt-2">
+      <div className="text-ui-xs text-fg-dim mt-2">
         {node.linkCount} {node.linkCount === 1 ? "link" : "links"}
       </div>
     </div>,

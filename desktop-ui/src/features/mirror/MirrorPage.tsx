@@ -46,8 +46,8 @@ export function MirrorPage() {
       <div className="flex flex-col gap-6 p-6 max-w-2xl w-full mx-auto">
         {/* Header */}
         <div className="flex items-center gap-2.5">
-          <Eye className="size-5 text-muted-foreground" strokeWidth={1.5} />
-          <h1 className="text-[15px] font-semibold text-foreground">The Mirror</h1>
+          <Eye className="size-5 text-fg-secondary" strokeWidth={1.5} />
+          <h1 className="text-[15px] font-semibold text-fg">The Mirror</h1>
         </div>
 
         {/* Weekly Reflection */}

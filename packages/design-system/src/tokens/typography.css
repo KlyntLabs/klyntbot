@@ -1,0 +1,35 @@
+/* Typography — system SF stack, role-based sizes with paired line-heights. */
+
+:root {
+  --ds-font-sans:
+    "SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, system-ui, "Helvetica Neue",
+    sans-serif;
+  --ds-font-mono: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+
+  --ds-font-weight-light: 300;
+  --ds-font-weight-normal: 400;
+  --ds-font-weight-medium: 500;
+  --ds-font-weight-semibold: 600;
+
+  --ds-text-ui-xs: 11px;
+  --ds-text-ui-xs-lh: 1.3;
+  --ds-text-ui-sm: 12px;
+  --ds-text-ui-sm-lh: 1.3;
+  --ds-text-ui: 13px;
+  --ds-text-ui-lh: 1.3;
+
+  --ds-text-body: 14px;
+  --ds-text-body-lh: 1.5;
+
+  --ds-text-title-sm: 17px;
+  --ds-text-title-sm-lh: 1.3;
+  --ds-text-title: 20px;
+  --ds-text-title-lh: 1.25;
+  --ds-text-title-lg: 22px;
+  --ds-text-title-lg-lh: 1.2;
+
+  --ds-text-display-sm: 26px;
+  --ds-text-display-sm-lh: 1.15;
+  --ds-text-display: 52px;
+  --ds-text-display-lh: 1.05;
+}

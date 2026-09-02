@@ -10,13 +10,13 @@ export function HistoryPage() {
   );
 
   if (loading) {
-    return <div className="text-[11px] text-muted-foreground">Loading history...</div>;
+    return <div className="text-ui-xs text-fg-secondary">Loading history...</div>;
   }
 
   if (!history || history.length === 0) {
     return (
       <div className="flex items-center justify-center h-48">
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-ui-xs text-fg-secondary">
           No coaching interventions yet. The system will start offering suggestions as it learns
           your patterns.
         </p>
@@ -25,7 +25,7 @@ export function HistoryPage() {
   }
 
   return (
-    <div className="glass-card rounded-xl p-5">
+    <div className="island p-5">
       {history.map((h) => (
         <InterventionRow key={h.id} {...h} />
       ))}

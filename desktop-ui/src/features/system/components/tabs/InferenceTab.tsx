@@ -46,8 +46,8 @@ function StatCard({
         <Icon className="size-4.5" strokeWidth={1.5} style={{ color: accent ?? "#6B7280" }} />
       </div>
       <div>
-        <p className="text-lg font-semibold text-foreground leading-tight">{value}</p>
-        <p className="text-[11px] text-muted-foreground">{label}</p>
+        <p className="text-lg font-semibold text-fg leading-tight">{value}</p>
+        <p className="text-ui-xs text-fg-secondary">{label}</p>
       </div>
     </div>
   );
@@ -73,7 +73,7 @@ function Slider({
   const display = format ? format(value) : value.toFixed(2);
   return (
     <div className="flex items-center gap-3">
-      <span className="text-xs text-muted-foreground w-40 shrink-0">{label}</span>
+      <span className="text-ui-sm text-fg-secondary w-40 shrink-0">{label}</span>
       <input
         type="range"
         min={min}
@@ -83,7 +83,7 @@ function Slider({
         onChange={(e) => onChange(Number(e.target.value))}
         className="flex-1 accent-accent"
       />
-      <span className="text-xs text-muted-foreground w-12 text-right tabular-nums">{display}</span>
+      <span className="text-ui-sm text-fg-secondary w-12 text-right tabular-nums">{display}</span>
     </div>
   );
 }
@@ -129,7 +129,7 @@ export function InferenceTab() {
     <div className="overflow-y-auto p-4 space-y-6">
       {/* Stats Grid */}
       <section>
-        <h3 className="text-[11px] font-medium text-dim uppercase tracking-wider mb-3">
+        <h3 className="text-ui-xs font-medium text-fg-dim uppercase tracking-wider mb-3">
           Real-time Stats
         </h3>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -185,7 +185,7 @@ export function InferenceTab() {
         <button
           type="button"
           onClick={() => refetch()}
-          className="mt-2 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+          className="mt-2 text-ui-xs text-fg-secondary hover:text-fg transition-colors"
         >
           Refresh
         </button>
@@ -194,7 +194,7 @@ export function InferenceTab() {
       {/* Config Section */}
       {draft && (
         <section>
-          <h3 className="text-[11px] font-medium text-dim uppercase tracking-wider mb-3">
+          <h3 className="text-ui-xs font-medium text-fg-dim uppercase tracking-wider mb-3">
             Inference Configuration
           </h3>
           <div className="glass-card rounded-xl p-5 space-y-4">
@@ -209,8 +209,8 @@ export function InferenceTab() {
               onChange={(v) => update("mergeThreshold", v)}
             />
 
-            <div className="border-t border-border my-3" />
-            <p className="text-[11px] text-muted-foreground">Scoring weights (should sum to 1.0)</p>
+            <div className="border-t border-separator my-3" />
+            <p className="text-ui-xs text-fg-secondary">Scoring weights (should sum to 1.0)</p>
 
             <Slider
               label="Semantic Weight"
@@ -228,7 +228,7 @@ export function InferenceTab() {
               onChange={(v) => update("resourceWeight", v)}
             />
 
-            <div className="border-t border-border my-3" />
+            <div className="border-t border-separator my-3" />
 
             <Slider
               label="Inference Interval (min)"

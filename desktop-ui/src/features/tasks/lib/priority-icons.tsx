@@ -16,7 +16,7 @@ export const NoPriorityIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) =
 
 export const UrgentPriorityIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
   <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" {...props}>
-    <rect x="2" y="2" width="12" height="12" rx="2" fill="var(--destructive)" />
+    <rect x="2" y="2" width="12" height="12" rx="2" fill="var(--ds-status-danger)" />
     <path d="M8 4.5V9" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
     <circle cx="8" cy="11" r="0.75" fill="white" />
   </svg>

@@ -20,9 +20,9 @@ interface SegmentedMessageProps {
 // Rotate through accent colors for active tool spinners
 const TOOL_COLORS = [
   { ring: "border-brand/60", text: "text-brand", dot: "bg-brand" }, // orange
-  { ring: "border-info/60", text: "text-info", dot: "bg-info" }, // blue
+  { ring: "border-status-info/60", text: "text-status-info", dot: "bg-status-info" }, // blue
   { ring: "border-purple/60", text: "text-purple", dot: "bg-purple" }, // purple
-  { ring: "border-success/60", text: "text-success", dot: "bg-success" }, // green
+  { ring: "border-status-success/60", text: "text-status-success", dot: "bg-status-success" }, // green
 ] as const;
 
 function toolColor(name: string) {
@@ -61,7 +61,7 @@ function CompletedToolSegment({ segment, nested }: { segment: ToolSegment; neste
       <button
         type="button"
         onClick={() => canExpand && setExpanded(!expanded)}
-        className={`flex items-center gap-1.5 text-[11px] font-light transition-colors ${color.text} ${canExpand ? "hover:opacity-80" : "cursor-default"}`}
+        className={`flex items-center gap-1.5 text-ui-xs font-light transition-colors ${color.text} ${canExpand ? "hover:opacity-80" : "cursor-default"}`}
       >
         {canExpand ? (
           <ChevronRight
@@ -74,19 +74,19 @@ function CompletedToolSegment({ segment, nested }: { segment: ToolSegment; neste
         {segment.success ? (
           <Check className="size-3" strokeWidth={2} />
         ) : (
-          <X className="size-3 text-destructive" strokeWidth={2} />
+          <X className="size-3 text-status-danger" strokeWidth={2} />
         )}
         <span>{qualifiedName}</span>
-        {durationLabel && <span className="text-dim">{durationLabel}</span>}
+        {durationLabel && <span className="text-fg-dim">{durationLabel}</span>}
       </button>
       {expanded && (
         <div className="mt-1 ml-5 space-y-1">
           {formattedResult && (
-            <pre className="p-2 text-[11px] font-light text-muted-foreground glass-card overflow-x-auto whitespace-pre-wrap break-words">
+            <pre className="p-2 text-ui-xs font-light text-fg-secondary glass-card overflow-x-auto whitespace-pre-wrap break-words">
               {formattedResult}
             </pre>
           )}
-          <div className="flex items-center gap-2 text-2xs font-light text-dim">
+          <div className="flex items-center gap-2 text-ui-xs font-light text-fg-dim">
             {durationLabel && <span>{durationLabel}</span>}
             {segment.estimatedTokens && (
               <span>~{formatTokens(segment.estimatedTokens)} tokens</span>
@@ -108,7 +108,7 @@ function DelegateGroup({ delegate, subTools }: { delegate: ToolSegment; subTools
       <button
         type="button"
         onClick={() => setExpanded(!expanded)}
-        className={`flex items-center gap-1.5 text-[11px] font-light transition-colors ${color.text} hover:opacity-80`}
+        className={`flex items-center gap-1.5 text-ui-xs font-light transition-colors ${color.text} hover:opacity-80`}
       >
         <ChevronRight
           className={`size-3 transition-transform ${expanded ? "rotate-90" : ""}`}
@@ -117,20 +117,20 @@ function DelegateGroup({ delegate, subTools }: { delegate: ToolSegment; subTools
         {delegate.success ? (
           <Check className="size-3" strokeWidth={2} />
         ) : (
-          <X className="size-3 text-destructive" strokeWidth={2} />
+          <X className="size-3 text-status-danger" strokeWidth={2} />
         )}
         <span>delegate</span>
         {delegate.durationMs > 0 && (
-          <span className="text-dim">{formatDuration(delegate.durationMs)}</span>
+          <span className="text-fg-dim">{formatDuration(delegate.durationMs)}</span>
         )}
         {subTools.length > 0 && (
-          <span className="text-dim">
+          <span className="text-fg-dim">
             ({subTools.length} tool{subTools.length !== 1 ? "s" : ""})
           </span>
         )}
       </button>
       {expanded && (
-        <div className="ml-5 border-l border-border/40 pl-2">
+        <div className="ml-5 border-l border-separator/40 pl-2">
           {subTools.map((child) => (
             <CompletedToolSegment
               key={`sub-${child.name}-${child.durationMs}`}
@@ -149,13 +149,13 @@ export function ActiveToolIndicator({ name, nested }: { name: string; nested?: b
 
   return (
     <div
-      className={`${nested ? "my-0.5" : "my-1.5"} flex items-center gap-1.5 text-[11px] font-light`}
+      className={`${nested ? "my-0.5" : "my-1.5"} flex items-center gap-1.5 text-ui-xs font-light`}
     >
       <div
         className={`size-3 rounded-full border-[1.5px] ${color.ring} border-t-transparent animate-spin`}
       />
       <span className={color.text}>{name}</span>
-      <span className="text-dim">&hellip;</span>
+      <span className="text-fg-dim">&hellip;</span>
     </div>
   );
 }
@@ -293,7 +293,7 @@ export function SegmentedMessage({
         <div className="my-1.5">
           <ActiveToolIndicator name="delegate" />
           {(trailingSubTools.length > 0 || subAgentActiveTools.length > 0) && (
-            <div className="ml-5 border-l border-border/40 pl-2">
+            <div className="ml-5 border-l border-separator/40 pl-2">
               {trailingSubTools.map((seg) => (
                 <CompletedToolSegment
                   key={`sub-done-${seg.name}-${seg.durationMs}`}
@@ -311,7 +311,7 @@ export function SegmentedMessage({
 
       {/* Cursor when streaming but last segment isn't text */}
       {isStreaming && !lastIsText && activeTools?.length === 0 && segments.length > 0 && (
-        <span className="inline-block w-1.5 h-4 bg-muted/50 ml-0.5 animate-pulse align-text-bottom" />
+        <span className="inline-block w-1.5 h-4 bg-control-hover/50 ml-0.5 animate-pulse align-text-bottom" />
       )}
     </div>
   );

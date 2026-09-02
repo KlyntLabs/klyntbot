@@ -300,11 +300,11 @@ export function DayColumnsView({
         {/* Context color ribbon — subtle work context indicator per hour */}
         <ContextRibbon date={date} />
 
-        {loading && <div className="px-4 py-2 text-xs text-muted-foreground">Loading...</div>}
+        {loading && <div className="px-4 py-2 text-ui-sm text-fg-secondary">Loading...</div>}
 
         {/* Zoom indicator — shown when zoomed away from default */}
         {hourHeight !== DEFAULT_HOUR_HEIGHT && (
-          <div className="px-3 py-1 flex items-center justify-between border-b border-border text-2xs text-muted-foreground">
+          <div className="px-3 py-1 flex items-center justify-between border-b border-separator text-ui-xs text-fg-secondary">
             <span className="tabular-nums">
               Zoom: {Math.round((hourHeight / DEFAULT_HOUR_HEIGHT) * 100)}%
             </span>
@@ -323,14 +323,14 @@ export function DayColumnsView({
         <div ref={scrollRef} className="flex-1 overflow-y-auto">
           {/* Sticky column headers — CSS grid ensures pixel-perfect alignment with tracks */}
           <div
-            className="sticky top-0 z-20 grid border-b border-border bg-popover"
+            className="sticky top-0 z-20 grid border-b border-separator bg-glass-strong"
             style={{ gridTemplateColumns: gridTemplate }}
           >
             <div />
             {visibleColumns.map((col) => (
               <div
                 key={col.key}
-                className="text-[11px] text-muted-foreground font-medium py-1.5 px-1.5 border-r border-border last:border-r-0 flex items-center gap-1.5 truncate min-w-0"
+                className="text-ui-xs text-fg-secondary font-medium py-1.5 px-1.5 border-r border-separator last:border-r-0 flex items-center gap-1.5 truncate min-w-0"
               >
                 <span
                   className="w-1.5 h-1.5 rounded-full shrink-0"
@@ -358,7 +358,7 @@ export function DayColumnsView({
                   aria-valuemax={h === 0 ? MAX_HOUR_HEIGHT : undefined}
                   aria-valuenow={h === 0 ? hourHeight : undefined}
                   tabIndex={h === 0 ? 0 : undefined}
-                  className="text-2xs text-muted-foreground text-right pr-2 select-none cursor-ns-resize"
+                  className="text-ui-xs text-fg-secondary text-right pr-2 select-none cursor-ns-resize"
                   style={{ width: HOUR_GUTTER }}
                   onMouseDown={handleGutterMouseDown}
                   onKeyDown={
@@ -381,7 +381,7 @@ export function DayColumnsView({
                 >
                   {h === 0 ? "" : formatHour(h)}
                 </div>
-                <div className="flex-1 border-t border-border" />
+                <div className="flex-1 border-t border-separator" />
               </div>
             ))}
 
@@ -397,7 +397,7 @@ export function DayColumnsView({
                   return (
                     <div
                       key={col.key}
-                      className="relative border-r border-border last:border-r-0 min-w-0"
+                      className="relative border-r border-separator last:border-r-0 min-w-0"
                     >
                       <ActivityTrack
                         date={date}
@@ -418,7 +418,7 @@ export function DayColumnsView({
                   return (
                     <div
                       key={col.key}
-                      className="relative border-r border-border last:border-r-0 min-w-0"
+                      className="relative border-r border-separator last:border-r-0 min-w-0"
                     >
                       <CalendarTrack
                         date={date}
@@ -452,7 +452,7 @@ export function DayColumnsView({
                   return (
                     <div
                       key={col.key}
-                      className="relative border-r border-border last:border-r-0 min-w-0 flex flex-col"
+                      className="relative border-r border-separator last:border-r-0 min-w-0 flex flex-col"
                     >
                       <DueTodayTray
                         entries={trayTaskEntries}
@@ -495,7 +495,7 @@ export function DayColumnsView({
                 return (
                   <div
                     key={col.key}
-                    className="relative border-r border-border last:border-r-0 min-w-0"
+                    className="relative border-r border-separator last:border-r-0 min-w-0"
                   >
                     {colEntries.map((entry) => (
                       <ColumnEntry
@@ -518,13 +518,13 @@ export function DayColumnsView({
         {/* Collapsible activity feed — only for today */}
         {isToday && (
           <div
-            className="border-t border-border transition-[max-height] duration-300 ease-in-out"
+            className="border-t border-separator transition-[max-height] duration-300 ease-in-out"
             style={{ maxHeight: feedExpanded ? 260 : 36, overflow: "hidden" }}
           >
             <button
               type="button"
               onClick={() => setFeedExpanded(!feedExpanded)}
-              className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground hover:text-foreground transition-colors w-full"
+              className="flex items-center gap-2 px-3 py-2 text-ui-sm text-fg-secondary hover:text-fg transition-colors w-full"
             >
               {feedExpanded ? (
                 <ChevronDown className="size-3.5" />
@@ -602,16 +602,16 @@ function ColumnEntry({
         type="button"
         onClick={onClick}
         className={cn(
-          "absolute rounded-md px-1.5 py-0.5 text-[11px] leading-tight overflow-hidden cursor-pointer",
+          "absolute rounded-md px-1.5 py-0.5 text-ui-xs leading-tight overflow-hidden cursor-pointer",
           "border-l-2 border-l-timeline-task bg-timeline-task/15 hover:bg-timeline-task/25 transition-colors",
           selected && "ring-1 ring-brand",
         )}
         style={{ ...posStyle, height }}
         title={entry.title}
       >
-        <span className="text-muted-foreground truncate block">{entry.title}</span>
+        <span className="text-fg-secondary truncate block">{entry.title}</span>
         {height > 28 && (
-          <span className="text-muted-foreground text-2xs truncate block">
+          <span className="text-fg-secondary text-ui-xs truncate block">
             {dur > 0 && `${formatHumanDuration(dur)} · `}
             {timeStr}
           </span>
@@ -630,7 +630,7 @@ function ColumnEntry({
         type="button"
         onClick={onClick}
         className={cn(
-          "absolute rounded-md px-1.5 py-0.5 text-[11px] leading-tight overflow-hidden cursor-pointer transition-colors",
+          "absolute rounded-md px-1.5 py-0.5 text-ui-xs leading-tight overflow-hidden cursor-pointer transition-colors",
           isDue
             ? "border-l-2 border-l-[var(--timeline-todo)] bg-[var(--timeline-todo)]/15 hover:bg-[var(--timeline-todo)]/25"
             : "border-l-2 border-l-[var(--timeline-todo)]/50 bg-[var(--timeline-todo)]/8 hover:bg-[var(--timeline-todo)]/15",
@@ -640,9 +640,9 @@ function ColumnEntry({
         style={{ ...posStyle, height: Math.max(height, 20) }}
         title={entry.title}
       >
-        <span className="text-muted-foreground truncate block">{entry.title}</span>
+        <span className="text-fg-secondary truncate block">{entry.title}</span>
         {isDue && status && height > 28 && (
-          <span className="text-muted-foreground text-2xs truncate block capitalize">{status}</span>
+          <span className="text-fg-secondary text-ui-xs truncate block capitalize">{status}</span>
         )}
       </button>
     );
@@ -656,7 +656,7 @@ function ColumnEntry({
         type="button"
         onClick={onClick}
         className={cn(
-          "absolute rounded-md px-1.5 py-0.5 text-2xs leading-tight overflow-hidden cursor-pointer transition-colors",
+          "absolute rounded-md px-1.5 py-0.5 text-ui-xs leading-tight overflow-hidden cursor-pointer transition-colors",
           isExpense
             ? "border-l-2 border-l-[var(--timeline-finance-expense)] bg-[var(--timeline-finance-expense)]/15 hover:bg-[var(--timeline-finance-expense)]/25"
             : "border-l-2 border-l-[var(--timeline-finance-income)] bg-[var(--timeline-finance-income)]/15 hover:bg-[var(--timeline-finance-income)]/25",
@@ -686,14 +686,14 @@ function ColumnEntry({
         type="button"
         onClick={onClick}
         className={cn(
-          "absolute rounded-md px-1.5 py-0.5 text-2xs leading-tight overflow-hidden cursor-pointer transition-colors",
+          "absolute rounded-md px-1.5 py-0.5 text-ui-xs leading-tight overflow-hidden cursor-pointer transition-colors",
           "border-l-2 border-l-[var(--timeline-note)]/60 bg-[var(--timeline-note)]/8 hover:bg-[var(--timeline-note)]/15",
           selected && "ring-1 ring-brand",
         )}
         style={{ ...posStyle, height: Math.max(height, 18) }}
         title={entry.title}
       >
-        <span className="text-muted-foreground truncate block">{entry.title}</span>
+        <span className="text-fg-secondary truncate block">{entry.title}</span>
       </button>
     );
   }
@@ -704,7 +704,7 @@ function ColumnEntry({
       type="button"
       onClick={onClick}
       className={cn(
-        "absolute flex items-center gap-1 text-2xs text-muted-foreground hover:text-muted-foreground cursor-pointer transition-colors",
+        "absolute flex items-center gap-1 text-ui-xs text-fg-secondary hover:text-fg-secondary cursor-pointer transition-colors",
         selected && "text-brand",
       )}
       style={posStyle}
@@ -727,8 +727,8 @@ function NowLine({ pxPerMin }: { pxPerMin: number }) {
   return (
     <div className="absolute w-full pointer-events-none z-10" style={{ top, left: HOUR_GUTTER }}>
       <div className="flex items-center">
-        <div className="size-2 rounded-full bg-destructive -ml-1" />
-        <div className="flex-1 border-t border-destructive" />
+        <div className="size-2 rounded-full bg-status-danger -ml-1" />
+        <div className="flex-1 border-t border-status-danger" />
       </div>
     </div>
   );

@@ -35,9 +35,9 @@ function parseGaps(content: string): { markdown: string; gaps: Gap[] } {
 function SkeletonLoader() {
   return (
     <div className="space-y-3 animate-pulse">
-      <div className="h-3 bg-card rounded w-3/4" />
-      <div className="h-3 bg-card rounded w-full" />
-      <div className="h-3 bg-card rounded w-5/6" />
+      <div className="h-3 bg-bg-elevated rounded w-3/4" />
+      <div className="h-3 bg-bg-elevated rounded w-full" />
+      <div className="h-3 bg-bg-elevated rounded w-5/6" />
     </div>
   );
 }
@@ -52,7 +52,7 @@ export function GapAnalysisTab({
   const chat = useInsightChat(noteId, "gaps", status === "done", squadId, content);
   if (status === "idle") {
     return (
-      <p className="text-[11px] text-dim italic">Start an insight review to see gap analysis</p>
+      <p className="text-ui-xs text-fg-dim italic">Start an insight review to see gap analysis</p>
     );
   }
 
@@ -62,7 +62,7 @@ export function GapAnalysisTab({
 
   if (status === "error") {
     return (
-      <p className="text-[11px] text-destructive">
+      <p className="text-ui-xs text-status-danger">
         Failed to generate gap analysis. Try regenerating.
       </p>
     );
@@ -73,13 +73,13 @@ export function GapAnalysisTab({
   return (
     <div>
       <div className="space-y-4">
-        <div className="text-xs text-muted-foreground leading-relaxed">
+        <div className="text-ui-sm text-fg-secondary leading-relaxed">
           <MarkdownContent content={markdown} />
         </div>
 
         {gaps.length > 0 && (
-          <div className="space-y-2 pt-2 border-t border-border">
-            <div className="text-2xs font-medium text-dim uppercase tracking-wider">
+          <div className="space-y-2 pt-2 border-t border-separator">
+            <div className="text-ui-xs font-medium text-fg-dim uppercase tracking-wider">
               Knowledge Gaps — Deep Dive
             </div>
             {gaps.map((gap) => (
@@ -87,14 +87,14 @@ export function GapAnalysisTab({
                 key={gap.topic}
                 type="button"
                 onClick={() => onCreateNote?.(gap.suggestedTitle, gap.description)}
-                className="w-full flex items-start gap-2 p-2 rounded-lg bg-card hover:bg-accent transition-colors text-left group"
+                className="w-full flex items-start gap-2 p-2 rounded-lg bg-bg-elevated hover:bg-control-hover transition-colors text-left group"
               >
-                <FilePlus size={12} className="text-dim group-hover:text-brand mt-0.5 shrink-0" />
+                <FilePlus size={12} className="text-fg-dim group-hover:text-brand mt-0.5 shrink-0" />
                 <div>
-                  <div className="text-[11px] text-muted-foreground group-hover:text-foreground">
+                  <div className="text-ui-xs text-fg-secondary group-hover:text-fg">
                     {gap.topic}
                   </div>
-                  <div className="text-2xs text-dim mt-0.5 line-clamp-2">{gap.description}</div>
+                  <div className="text-ui-xs text-fg-dim mt-0.5 line-clamp-2">{gap.description}</div>
                 </div>
               </button>
             ))}

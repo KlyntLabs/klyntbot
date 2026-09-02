@@ -31,23 +31,23 @@ export function Dialog({ open, onClose, title, children, size = "md", className 
         <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-overlay backdrop-blur-sm" />
         <DialogPrimitive.Content
           className={cn(
-            "fixed left-1/2 top-[15vh] z-50 -translate-x-1/2 glass-panel w-full",
+            "fixed left-1/2 top-[15vh] z-50 -translate-x-1/2 glass rounded-card p-1.5 w-full",
             sizeClasses[size],
             className,
           )}
           style={{ animation: "glass-appear 0.2s ease-out" }}
         >
           <DialogPrimitive.Description className="sr-only">{title}</DialogPrimitive.Description>
-          <div className="bg-card rounded-[var(--glass-radius-inner)]">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-              <DialogPrimitive.Title className="text-[14px] font-medium text-foreground">
+          <div className="bg-bg-elevated rounded-[var(--glass-radius-inner)]">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-separator">
+              <DialogPrimitive.Title className="text-body font-medium text-fg">
                 {title}
               </DialogPrimitive.Title>
               <DialogPrimitive.Close asChild>
                 <button
                   type="button"
                   aria-label="Close dialog"
-                  className="size-7 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                  className="size-7 rounded-control flex items-center justify-center text-fg-secondary hover:text-fg hover:bg-control-hover transition-colors"
                 >
                   <X className="size-4" />
                 </button>

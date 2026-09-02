@@ -1,0 +1,252 @@
+/* Tailwind v4 @theme map for --ds-* tokens.
+   Prefer mapped utilities (text-fg, bg-glass, rounded-panel) over raw var(--ds-*). */
+
+@theme inline {
+  /* Colors */
+  --color-bg: var(--ds-bg);
+  --color-bg-elevated: var(--ds-bg-elevated);
+  --color-fg: var(--ds-text);
+  --color-fg-secondary: var(--ds-text-secondary);
+  --color-fg-dim: var(--ds-text-dim);
+  /* Primary brand blue — use bg-brand / text-brand for CTAs */
+  --color-brand: var(--ds-accent);
+  --color-brand-hover: var(--ds-accent-hover);
+  --color-brand-foreground: var(--ds-accent-foreground);
+  --color-highlight: var(--ds-highlight);
+  /* shadcn-compat: accent = neutral wash, NOT brand blue */
+  --color-accent: var(--ds-control-hover);
+  --color-accent-hover: var(--ds-control-active);
+  --color-accent-foreground: var(--ds-text);
+  --color-separator: var(--ds-separator);
+  --color-control-hover: var(--ds-control-hover);
+  --color-control-active: var(--ds-control-active);
+  --color-glass: var(--ds-glass-bg);
+  --color-glass-strong: var(--ds-glass-bg-strong);
+  --color-glass-subtle: var(--ds-glass-bg-subtle);
+  --color-glass-border: var(--ds-glass-border);
+  --color-status-success: var(--ds-status-success);
+  --color-status-danger: var(--ds-status-danger);
+  --color-status-warning: var(--ds-status-warning);
+  --color-status-info: var(--ds-status-info);
+  --color-selection: var(--ds-selection);
+  --color-selection-foreground: var(--ds-selection-foreground);
+  --color-overlay: var(--ds-overlay);
+  --color-overlay-heavy: var(--ds-overlay-heavy);
+
+  /* Domain */
+  --color-chart-1: var(--ds-chart-1);
+  --color-chart-2: var(--ds-chart-2);
+  --color-chart-3: var(--ds-chart-3);
+  --color-chart-4: var(--ds-chart-4);
+  --color-chart-5: var(--ds-chart-5);
+  --color-origin-system: var(--ds-origin-system);
+  --color-origin-ai: var(--ds-origin-ai);
+  --color-origin-user: var(--ds-origin-user);
+  --color-origin-plugin: var(--ds-origin-plugin);
+  --color-purple: var(--ds-purple);
+  --color-timeline-app-productive: var(--ds-timeline-app-productive);
+  --color-timeline-app-distracting: var(--ds-timeline-app-distracting);
+  --color-timeline-app-neutral: var(--ds-timeline-app-neutral);
+  --color-timeline-focus: var(--ds-timeline-focus);
+  --color-timeline-task: var(--ds-timeline-task);
+  --color-timeline-note: var(--ds-timeline-note);
+  --color-timeline-finance: var(--ds-timeline-finance);
+  --color-timeline-todo: var(--ds-timeline-todo);
+  --color-timeline-finance-expense: var(--ds-timeline-finance-expense);
+  --color-timeline-finance-income: var(--ds-timeline-finance-income);
+  --color-timeline-system: var(--ds-timeline-system);
+  --color-timeline-calendar: var(--ds-timeline-calendar);
+  --color-timeline-focus-high: var(--ds-timeline-focus-high);
+  --color-timeline-focus-low: var(--ds-timeline-focus-low);
+  --color-timeline-unfocused: var(--ds-timeline-unfocused);
+  --color-timeline-dot-note: var(--ds-timeline-dot-note);
+  --color-timeline-dot-task-done: var(--ds-timeline-dot-task-done);
+  --color-timeline-dot-finance: var(--ds-timeline-dot-finance);
+  --color-code: var(--ds-code-bg);
+  --color-code-foreground: var(--ds-code-foreground);
+  --color-code-number: var(--ds-code-number);
+
+  /* Temporary migration aliases (Wave 1–4). Prefer DS names above. */
+  --color-background: var(--ds-bg);
+  --color-foreground: var(--ds-text);
+  --color-card: var(--ds-bg-elevated);
+  --color-card-foreground: var(--ds-text);
+  --color-popover: var(--ds-glass-bg-strong);
+  --color-popover-foreground: var(--ds-text);
+  --color-primary: var(--ds-accent);
+  --color-primary-foreground: var(--ds-accent-foreground);
+  --color-secondary: var(--ds-control-hover);
+  --color-secondary-foreground: var(--ds-text);
+  --color-muted: var(--ds-control-hover);
+  --color-muted-foreground: var(--ds-text-secondary);
+  --color-destructive: var(--ds-status-danger);
+  --color-destructive-foreground: var(--ds-accent-foreground);
+  --color-border: var(--ds-separator);
+  --color-border-subtle: var(--ds-separator);
+  --color-input: var(--ds-glass-bg-subtle);
+  /* Neutral focus ring — brand reserved for CTAs, not form controls */
+  --color-ring: var(--ds-separator);
+  --color-success: var(--ds-status-success);
+  --color-info: var(--ds-status-info);
+  --color-warning: var(--ds-status-warning);
+  --color-dim: var(--ds-text-dim);
+  --color-sidebar: var(--ds-bg);
+  --color-sidebar-foreground: var(--ds-text);
+  --color-sidebar-primary: var(--ds-accent);
+  --color-sidebar-primary-foreground: var(--ds-accent-foreground);
+  --color-sidebar-accent: var(--ds-control-hover);
+  --color-sidebar-accent-foreground: var(--ds-text);
+  --color-sidebar-border: var(--ds-separator);
+  --color-sidebar-ring: var(--ds-accent);
+  --color-surface-lowest: var(--ds-bg);
+  --color-surface-low: var(--ds-bg);
+  --color-surface-base: var(--ds-bg-elevated);
+  --color-surface-raised: var(--ds-glass-bg-subtle);
+  --color-surface-highest: var(--ds-glass-bg-strong);
+  --color-text-primary: var(--ds-text);
+  --color-text-secondary: var(--ds-text-secondary);
+  --color-text-muted: var(--ds-text-secondary);
+
+  /* Typography */
+  --font-sans: var(--ds-font-sans);
+  --font-mono: var(--ds-font-mono);
+  --text-ui-xs: var(--ds-text-ui-xs);
+  --text-ui-xs--line-height: var(--ds-text-ui-xs-lh);
+  --text-ui-sm: var(--ds-text-ui-sm);
+  --text-ui-sm--line-height: var(--ds-text-ui-sm-lh);
+  --text-ui: var(--ds-text-ui);
+  --text-ui--line-height: var(--ds-text-ui-lh);
+  --text-body: var(--ds-text-body);
+  --text-body--line-height: var(--ds-text-body-lh);
+  --text-title-sm: var(--ds-text-title-sm);
+  --text-title-sm--line-height: var(--ds-text-title-sm-lh);
+  --text-title: var(--ds-text-title);
+  --text-title--line-height: var(--ds-text-title-lh);
+  --text-title-lg: var(--ds-text-title-lg);
+  --text-title-lg--line-height: var(--ds-text-title-lg-lh);
+  --text-display-sm: var(--ds-text-display-sm);
+  --text-display-sm--line-height: var(--ds-text-display-sm-lh);
+  --text-display: var(--ds-text-display);
+  --text-display--line-height: var(--ds-text-display-lh);
+
+  /* Radii by role */
+  --radius-sm: var(--ds-radius-sm);
+  --radius-row: var(--ds-radius-row);
+  --radius-control: var(--ds-radius-control);
+  --radius-md: var(--ds-radius-md);
+  --radius-menu: var(--ds-radius-menu);
+  --radius-panel: var(--ds-radius-panel);
+  --radius-card: var(--ds-radius-card);
+  --radius-lg: var(--ds-radius-lg);
+  --radius-full: var(--ds-radius-full);
+  /* shadcn-compat radius aliases */
+  --radius-xl: var(--ds-radius-card);
+  --radius-2xl: var(--ds-radius-lg);
+  --radius-pill: var(--ds-radius-full);
+
+  /* Spacing extras */
+  --spacing-gap-tight: var(--ds-space-gap-tight);
+  --spacing-gap-row: var(--ds-space-gap-row);
+
+  /* Z-index bands */
+  --z-index-raised: var(--ds-z-raised);
+  --z-index-sticky: var(--ds-z-sticky);
+  --z-index-menu: var(--ds-z-menu);
+  --z-index-overlay: var(--ds-z-overlay);
+  --z-index-modal: var(--ds-z-modal);
+  --z-index-toast: var(--ds-z-toast);
+
+  /* Shadows */
+  --shadow-glass: var(--ds-elevation-glass);
+  --shadow-glass-strong: var(--ds-elevation-glass-strong);
+  --shadow-window: var(--ds-elevation-window);
+  --shadow-island: var(--ds-elevation-island);
+  --shadow-tooltip: var(--ds-shadow-tooltip);
+
+  /* Motion */
+  --animate-fade-in: ds-fade-in var(--ds-duration-normal) var(--ds-ease-out);
+  --animate-glass-appear: ds-glass-appear var(--ds-duration-normal) var(--ds-ease-out);
+  --animate-menu-appear: ds-menu-appear var(--ds-duration-fast) var(--ds-ease-out);
+  --animate-fade-in-up: ds-fade-in-up var(--ds-duration-moderate) var(--ds-ease-out);
+  --animate-shimmer: ds-shimmer 1.5s var(--ds-ease-in-out) infinite;
+  --animate-breathing: ds-breathe 2s var(--ds-ease-in-out) infinite;
+  --animate-thinking: ds-thinking 1.4s var(--ds-ease-in-out) infinite;
+
+  @keyframes ds-fade-in {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes ds-glass-appear {
+    from {
+      opacity: 0;
+      transform: scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  @keyframes ds-menu-appear {
+    from {
+      opacity: 0;
+      transform: translateY(-4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes ds-fade-in-up {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes ds-shimmer {
+    0% {
+      background-position: -200% 0;
+    }
+    100% {
+      background-position: 200% 0;
+    }
+  }
+
+  @keyframes ds-breathe {
+    0%,
+    100% {
+      opacity: 0.55;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1.04);
+    }
+  }
+
+  @keyframes ds-thinking {
+    0%,
+    80%,
+    100% {
+      opacity: 0.35;
+      transform: translateY(0);
+    }
+    40% {
+      opacity: 1;
+      transform: translateY(-2px);
+    }
+  }
+}

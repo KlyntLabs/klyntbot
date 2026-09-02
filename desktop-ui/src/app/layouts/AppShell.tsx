@@ -103,7 +103,7 @@ export function AppShell() {
   if (setupState === "needed") return <Navigate to="/setup/welcome" replace />;
 
   return (
-    <div className="h-screen w-screen bg-background text-foreground flex flex-col overflow-hidden">
+    <div className="h-screen w-screen bg-bg text-fg flex flex-col overflow-hidden">
       {/* Bridge global events (brain:ambient, etc.) from dev server SSE → window CustomEvents */}
       <BrainEventBridge />
       {/* ── Custom titlebar (drag region) ────────────────────────────── */}
@@ -112,8 +112,8 @@ export function AppShell() {
         <div className="w-[68px] shrink-0 pointer-events-none" />
         {/* Center branding */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
-          <KlyntLogo className="w-3.5 h-3.5 text-muted-foreground" />
-          <span className="ml-1.5 text-xs font-medium text-muted-foreground tracking-wide">
+          <KlyntLogo className="w-3.5 h-3.5 text-fg-secondary" />
+          <span className="ml-1.5 text-ui-sm font-medium text-fg-secondary tracking-wide">
             Klynt
           </span>
         </div>

@@ -1,15 +1,15 @@
-import { cn } from "@shared/lib/utils";
+import { cn } from "@klyntbot/design-system";
 import { cva, type VariantProps } from "class-variance-authority";
-import type { InputHTMLAttributes } from "react";
+import type { InputHTMLAttributes, Ref } from "react";
 
 const inputVariants = cva(
-  "px-3 py-1.5 text-sm font-light rounded-lg transition-colors focus:outline-none",
+  "px-3 py-1.5 text-ui font-light rounded-control transition-colors focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-separator focus-visible:border-fg-secondary/50",
   {
     variants: {
       variant: {
         default:
-          "bg-accent border border-border text-foreground placeholder:text-dim hover:border-border focus:border-brand/50",
-        glass: "glass-input text-foreground placeholder:text-dim",
+          "bg-control-hover border border-separator text-fg placeholder:text-fg-dim hover:border-fg-secondary/40",
+        glass: "glass-input text-fg placeholder:text-fg-dim",
       },
     },
     defaultVariants: {
@@ -21,7 +21,7 @@ const inputVariants = cva(
 export interface InputProps
   extends InputHTMLAttributes<HTMLInputElement>,
     VariantProps<typeof inputVariants> {
-  ref?: React.Ref<HTMLInputElement>;
+  ref?: Ref<HTMLInputElement>;
 }
 
 export function Input({ variant, className, ref, ...props }: InputProps) {

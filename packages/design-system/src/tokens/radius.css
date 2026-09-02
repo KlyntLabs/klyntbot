@@ -1,0 +1,14 @@
+/* Radius scale — pick by role, not by pixel value. */
+
+:root {
+  --ds-radius-none: 0px;
+  --ds-radius-sm: 4px;
+  --ds-radius-row: 6px;
+  --ds-radius-control: 7px;
+  --ds-radius-md: 9px;
+  --ds-radius-menu: 10px;
+  --ds-radius-panel: 12px;
+  --ds-radius-card: 14px;
+  --ds-radius-lg: 18px;
+  --ds-radius-full: 9999px;
+}

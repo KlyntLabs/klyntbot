@@ -42,7 +42,7 @@ const NOTIFICATION_TARGET_OPTIONS = [
 const DEFAULT_TARGETS: string[] = ["os_native"];
 
 const INPUT_CLASS =
-  "w-full px-3 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim";
+  "w-full px-3 py-1.5 text-ui-sm text-fg bg-control-hover border border-separator rounded-control focus:outline-none focus:border-fg-secondary/50 focus:ring-2 focus:ring-separator transition-colors placeholder:text-fg-dim";
 
 // ── Component ────────────────────────────────────────────────────────
 
@@ -104,8 +104,8 @@ export function TasksSettings() {
   return (
     <div>
       <div className="mb-8">
-        <h2 className="text-lg font-medium text-foreground">Tasks & Notifications</h2>
-        <p className="text-[13px] text-muted-foreground mt-1">
+        <h2 className="text-lg font-medium text-fg">Tasks & Notifications</h2>
+        <p className="text-ui text-fg-secondary mt-1">
           Focus mode, notifications, enrichment, and planning settings
         </p>
       </div>
@@ -115,10 +115,10 @@ export function TasksSettings() {
         <SettingsCard title="Focus mode">
           <div className="space-y-3">
             <label className="block">
-              <span className="block text-[11px] text-muted-foreground mb-0.5">
+              <span className="block text-ui-xs text-fg-secondary mb-0.5">
                 Maximum focus slots
               </span>
-              <p className="text-[11px] text-dim mb-1">
+              <p className="text-ui-xs text-fg-dim mb-1">
                 How many tasks can be in focus simultaneously
               </p>
               <input
@@ -134,10 +134,10 @@ export function TasksSettings() {
             </label>
 
             <label className="block">
-              <span className="block text-[11px] text-muted-foreground mb-0.5">
+              <span className="block text-ui-xs text-fg-secondary mb-0.5">
                 Deadline horizon (hours)
               </span>
-              <p className="text-[11px] text-dim mb-1">
+              <p className="text-ui-xs text-fg-dim mb-1">
                 Tasks due within this window are considered urgent
               </p>
               <input
@@ -162,7 +162,7 @@ export function TasksSettings() {
         <SettingsCard title="Notifications">
           <div className="space-y-3">
             <div>
-              <span className="block text-[11px] text-muted-foreground mb-1.5">
+              <span className="block text-ui-xs text-fg-secondary mb-1.5">
                 Notification targets
               </span>
               <div className="flex flex-wrap gap-2">
@@ -173,10 +173,10 @@ export function TasksSettings() {
                       type="button"
                       key={opt.value}
                       onClick={() => toggleTarget(opt.value)}
-                      className={`px-2.5 py-1 text-[11px] rounded-md border transition-colors ${
+                      className={`px-2.5 py-1 text-ui-xs rounded-md border transition-colors ${
                         active
                           ? "bg-brand/10 border-brand/30 text-brand"
-                          : "bg-accent border-border text-muted-foreground hover:border-border-hover"
+                          : "bg-control-hover border-separator text-fg-secondary hover:border-fg-secondary/40"
                       }`}
                     >
                       {opt.label}
@@ -188,8 +188,8 @@ export function TasksSettings() {
 
             <div className="flex items-center justify-between">
               <div>
-                <span className="text-xs text-muted-foreground">Focus reminders</span>
-                <p className="text-[11px] text-dim">Remind you when a focused task is overdue</p>
+                <span className="text-ui-xs text-fg-secondary">Focus reminders</span>
+                <p className="text-ui-xs text-fg-dim">Remind you when a focused task is overdue</p>
               </div>
               <Toggle
                 checked={val("notifications", "focusReminders", true)}
@@ -199,8 +199,8 @@ export function TasksSettings() {
 
             <div className="flex items-center justify-between">
               <div>
-                <span className="text-xs text-muted-foreground">Daily digest</span>
-                <p className="text-[11px] text-dim">
+                <span className="text-ui-xs text-fg-secondary">Daily digest</span>
+                <p className="text-ui-xs text-fg-dim">
                   Receive a summary of upcoming tasks each morning
                 </p>
               </div>
@@ -211,7 +211,7 @@ export function TasksSettings() {
             </div>
 
             <label className="block">
-              <span className="block text-[11px] text-muted-foreground mb-1">
+              <span className="block text-ui-xs text-fg-secondary mb-1">
                 Daily digest time
               </span>
               <input
@@ -236,8 +236,8 @@ export function TasksSettings() {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <div>
-                <span className="text-xs text-muted-foreground">Auto-enrich tasks</span>
-                <p className="text-[11px] text-dim">
+                <span className="text-ui-xs text-fg-secondary">Auto-enrich tasks</span>
+                <p className="text-ui-xs text-fg-dim">
                   Automatically infer priority, project, and tags on creation
                 </p>
               </div>
@@ -248,10 +248,10 @@ export function TasksSettings() {
             </div>
 
             <label className="block">
-              <span className="block text-[11px] text-muted-foreground mb-0.5">
+              <span className="block text-ui-xs text-fg-secondary mb-0.5">
                 Auto-apply confidence threshold
               </span>
-              <p className="text-[11px] text-dim mb-1">
+              <p className="text-ui-xs text-fg-dim mb-1">
                 Suggestions above this confidence are applied without confirmation (0.0–1.0)
               </p>
               <input
@@ -273,8 +273,8 @@ export function TasksSettings() {
 
             <div className="flex items-center justify-between">
               <div>
-                <span className="text-xs text-muted-foreground">Use LLM for enrichment</span>
-                <p className="text-[11px] text-dim">
+                <span className="text-ui-xs text-fg-secondary">Use LLM for enrichment</span>
+                <p className="text-ui-xs text-fg-dim">
                   Use an AI model instead of keyword matching (uses tokens)
                 </p>
               </div>
@@ -295,8 +295,8 @@ export function TasksSettings() {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <div>
-                <span className="text-xs text-muted-foreground">Semantic search</span>
-                <p className="text-[11px] text-dim">
+                <span className="text-ui-xs text-fg-secondary">Semantic search</span>
+                <p className="text-ui-xs text-fg-dim">
                   Enable meaning-based search in addition to keyword matching
                 </p>
               </div>
@@ -307,10 +307,10 @@ export function TasksSettings() {
             </div>
 
             <label className="block">
-              <span className="block text-[11px] text-muted-foreground mb-0.5">
+              <span className="block text-ui-xs text-fg-secondary mb-0.5">
                 Similarity threshold
               </span>
-              <p className="text-[11px] text-dim mb-1">
+              <p className="text-ui-xs text-fg-dim mb-1">
                 Minimum cosine similarity for semantic results (0.0–1.0)
               </p>
               <input
@@ -327,7 +327,7 @@ export function TasksSettings() {
             </label>
 
             <label className="block">
-              <span className="block text-[11px] text-muted-foreground mb-0.5">
+              <span className="block text-ui-xs text-fg-secondary mb-0.5">
                 Embedding model
               </span>
               <input
@@ -339,10 +339,10 @@ export function TasksSettings() {
             </label>
 
             <label className="block">
-              <span className="block text-[11px] text-muted-foreground mb-0.5">
+              <span className="block text-ui-xs text-fg-secondary mb-0.5">
                 RRF k parameter
               </span>
-              <p className="text-[11px] text-dim mb-1">
+              <p className="text-ui-xs text-fg-dim mb-1">
                 Reciprocal rank fusion constant for hybrid search (higher = more weight on keyword)
               </p>
               <input
@@ -368,8 +368,8 @@ export function TasksSettings() {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <div>
-                <span className="text-xs text-muted-foreground">Enable daily planning</span>
-                <p className="text-[11px] text-dim">
+                <span className="text-ui-xs text-fg-secondary">Enable daily planning</span>
+                <p className="text-ui-xs text-fg-dim">
                   Automatically generate a daily plan each morning
                 </p>
               </div>
@@ -380,7 +380,7 @@ export function TasksSettings() {
             </div>
 
             <label className="block">
-              <span className="block text-[11px] text-muted-foreground mb-1">Planning time</span>
+              <span className="block text-ui-xs text-fg-secondary mb-1">Planning time</span>
               <input
                 type="time"
                 value={val("dailyPlanning", "planningTime", "08:00")}

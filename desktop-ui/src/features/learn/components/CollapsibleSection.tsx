@@ -37,7 +37,7 @@ export function CollapsibleSection({
       <button
         type="button"
         onClick={toggle}
-        className="w-full flex items-center gap-2 px-1 py-2 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+        className="w-full flex items-center gap-2 px-1 py-2 text-ui-sm font-medium text-fg-secondary hover:text-fg transition-colors"
       >
         <span className="shrink-0">{icon}</span>
         {title}

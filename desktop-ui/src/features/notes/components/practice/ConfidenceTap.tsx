@@ -12,7 +12,7 @@ export function ConfidenceTap({ value, onChange }: ConfidenceTapProps) {
           type="button"
           onClick={() => onChange(star)}
           className={`cursor-pointer transition-colors ${
-            star <= value ? "text-yellow-400" : "text-muted"
+            star <= value ? "text-yellow-400" : "text-fg-secondary"
           }`}
         >
           {star <= value ? "\u2605" : "\u2606"}

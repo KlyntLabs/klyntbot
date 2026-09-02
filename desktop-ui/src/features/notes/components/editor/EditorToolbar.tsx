@@ -213,10 +213,10 @@ function VimToggleButton({
       type="button"
       onClick={onToggleVim}
       title={vimEnabled ? "Disable Vim mode" : "Enable Vim mode"}
-      className={`px-2 h-7 rounded-lg font-mono text-xs font-bold transition-all ${
+      className={`px-2 h-7 rounded-lg font-mono text-ui-sm font-bold transition-all ${
         vimEnabled
           ? "bg-brand/15 text-brand shadow-[0_0_8px_rgba(249,115,22,0.12)]"
-          : "text-muted-foreground hover:text-foreground hover:bg-muted"
+          : "text-fg-secondary hover:text-fg hover:bg-control-hover"
       }`}
     >
       Vi
@@ -255,7 +255,7 @@ export function EditorToolbar({
           className={`p-1.5 rounded-lg transition-all ${
             practiceActive
               ? "bg-purple/15 text-purple"
-              : "text-dim hover:text-muted-foreground hover:bg-card"
+              : "text-fg-dim hover:text-fg-secondary hover:bg-bg-elevated"
           }`}
         >
           <Languages className="size-3.5" strokeWidth={1.5} />
@@ -269,7 +269,7 @@ export function EditorToolbar({
           className={`p-1.5 rounded-lg transition-all ${
             annotationPaneActive
               ? "bg-purple/15 text-purple"
-              : "text-dim hover:text-muted-foreground hover:bg-card"
+              : "text-fg-dim hover:text-fg-secondary hover:bg-bg-elevated"
           }`}
         >
           <StickyNote className="size-3.5" strokeWidth={1.5} />
@@ -285,7 +285,7 @@ export function EditorToolbar({
             onGenerateCards(selectedText);
           }}
           title="Generate flashcards from note (or selection)"
-          className="p-1.5 rounded-lg transition-all text-dim hover:text-muted-foreground hover:bg-card"
+          className="p-1.5 rounded-lg transition-all text-fg-dim hover:text-fg-secondary hover:bg-bg-elevated"
         >
           <Sparkles className="size-3.5" strokeWidth={1.5} />
         </button>
@@ -297,8 +297,8 @@ export function EditorToolbar({
           title="Focus mode"
           className={`p-1.5 rounded-lg transition-all ${
             focusModeActive
-              ? "bg-muted text-foreground"
-              : "text-dim hover:text-muted-foreground hover:bg-card"
+              ? "bg-control-hover text-fg"
+              : "text-fg-dim hover:text-fg-secondary hover:bg-bg-elevated"
           }`}
         >
           <Expand className="size-3.5" strokeWidth={1.5} />
@@ -311,8 +311,8 @@ export function EditorToolbar({
           title="Graph mode"
           className={`p-1.5 rounded-lg transition-all ${
             graphModeActive
-              ? "bg-muted text-foreground"
-              : "text-dim hover:text-muted-foreground hover:bg-card"
+              ? "bg-control-hover text-fg"
+              : "text-fg-dim hover:text-fg-secondary hover:bg-bg-elevated"
           }`}
         >
           <GitGraph className="size-3.5" strokeWidth={1.5} />
@@ -325,8 +325,8 @@ export function EditorToolbar({
           title="Version history"
           className={`p-1.5 rounded-lg transition-all ${
             versionHistoryActive
-              ? "bg-muted text-foreground"
-              : "text-dim hover:text-muted-foreground hover:bg-card"
+              ? "bg-control-hover text-fg"
+              : "text-fg-dim hover:text-fg-secondary hover:bg-bg-elevated"
           }`}
         >
           <History className="size-3.5" strokeWidth={1.5} />
@@ -356,7 +356,7 @@ export function EditorToolbar({
           key={`toolbar-group-${group[0]?.label ?? groupIdx}`}
           className="flex items-center gap-0.5"
         >
-          {groupIdx > 0 && <div className="w-px h-4 bg-muted mx-1.5" />}
+          {groupIdx > 0 && <div className="w-px h-4 bg-control-hover mx-1.5" />}
           {group.map((btn) => {
             const Icon = btn.icon;
             const active = btn.isActive?.(editor) ?? false;
@@ -369,7 +369,7 @@ export function EditorToolbar({
                 className={`size-7 rounded-lg flex items-center justify-center transition-all ${
                   active
                     ? "bg-brand/15 text-brand shadow-[0_0_8px_rgba(249,115,22,0.12)]"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                    : "text-fg-secondary hover:text-fg hover:bg-control-hover"
                 }`}
               >
                 <Icon className="size-3.5" strokeWidth={1.5} />
@@ -378,7 +378,7 @@ export function EditorToolbar({
           })}
         </div>
       ))}
-      <div className="w-px h-4 bg-muted mx-1.5" />
+      <div className="w-px h-4 bg-control-hover mx-1.5" />
       <VimToggleButton vimEnabled={vimEnabled} onToggleVim={onToggleVim} />
       {modeButtons}
     </div>

@@ -43,7 +43,7 @@ export function GradeDisplay({ result, userAnswer }: GradeDisplayProps) {
             {pct}%
           </span>
         </div>
-        <span className="text-[11px] text-muted-foreground glass-badge px-2 py-0.5">
+        <span className="text-ui-xs text-fg-secondary glass-badge px-2 py-0.5">
           {gradingMethodLabel(result.gradingMethod)}
         </span>
       </div>
@@ -51,17 +51,17 @@ export function GradeDisplay({ result, userAnswer }: GradeDisplayProps) {
       {/* Your answer vs expected */}
       <div className="glass-card p-3 space-y-2 text-sm">
         <div>
-          <span className="text-[11px] text-muted-foreground uppercase tracking-wider">
+          <span className="text-ui-xs text-fg-secondary uppercase tracking-wider">
             Your answer
           </span>
-          <p className="text-foreground mt-0.5">{userAnswer}</p>
+          <p className="text-fg mt-0.5">{userAnswer}</p>
         </div>
         <div className="glass-divider" />
         <div>
-          <span className="text-[11px] text-muted-foreground uppercase tracking-wider">
+          <span className="text-ui-xs text-fg-secondary uppercase tracking-wider">
             Expected
           </span>
-          <p className="text-foreground mt-0.5">{result.expectedAnswer}</p>
+          <p className="text-fg mt-0.5">{result.expectedAnswer}</p>
         </div>
       </div>
 
@@ -71,7 +71,7 @@ export function GradeDisplay({ result, userAnswer }: GradeDisplayProps) {
           {result.keyConceptsPresent.map((concept) => (
             <span
               key={concept}
-              className="inline-flex items-center gap-1 text-[11px] text-green-400 glass-badge px-2 py-0.5"
+              className="inline-flex items-center gap-1 text-ui-xs text-green-400 glass-badge px-2 py-0.5"
             >
               <Check size={10} strokeWidth={2} />
               {concept}
@@ -80,7 +80,7 @@ export function GradeDisplay({ result, userAnswer }: GradeDisplayProps) {
           {result.keyConceptsMissing.map((concept) => (
             <span
               key={concept}
-              className="inline-flex items-center gap-1 text-[11px] text-red-400 glass-badge px-2 py-0.5"
+              className="inline-flex items-center gap-1 text-ui-xs text-red-400 glass-badge px-2 py-0.5"
             >
               <X size={10} strokeWidth={2} />
               {concept}
@@ -91,9 +91,9 @@ export function GradeDisplay({ result, userAnswer }: GradeDisplayProps) {
 
       {/* Explanation */}
       {result.explanation && (
-        <div className="glass-card p-3 text-sm text-foreground">
+        <div className="glass-card p-3 text-sm text-fg">
           <div className="flex items-start gap-2">
-            <Info size={14} className="text-muted-foreground mt-0.5 shrink-0" strokeWidth={1.5} />
+            <Info size={14} className="text-fg-secondary mt-0.5 shrink-0" strokeWidth={1.5} />
             <p className="whitespace-pre-wrap">{result.explanation}</p>
           </div>
         </div>
@@ -101,7 +101,7 @@ export function GradeDisplay({ result, userAnswer }: GradeDisplayProps) {
 
       {/* Coaching nudge */}
       {result.coachingNudge && (
-        <div className="flex items-start gap-2 px-1 text-[12px] text-muted-foreground">
+        <div className="flex items-start gap-2 px-1 text-ui-sm text-fg-secondary">
           <Lightbulb size={13} className="mt-0.5 shrink-0" strokeWidth={1.5} />
           <p>{result.coachingNudge}</p>
         </div>

@@ -234,7 +234,7 @@ export function WeekCalendarView() {
     <div className="flex gap-2 h-full">
       <div className="flex-1 glass-card overflow-hidden flex flex-col">
         {/* Day header with active time */}
-        <div className="flex border-b border-border" style={{ paddingLeft: HOUR_GUTTER }}>
+        <div className="flex border-b border-separator" style={{ paddingLeft: HOUR_GUTTER }}>
           {days.map((day, i) => {
             const activeSecs = activeByDay.get(day) || 0;
             return (
@@ -243,14 +243,14 @@ export function WeekCalendarView() {
                 key={day}
                 onClick={() => navigate(`/day/${day}`)}
                 className={cn(
-                  "flex-1 text-center py-1.5 text-xs cursor-pointer hover:bg-card transition-colors",
-                  day === today ? "text-brand font-semibold" : "text-muted-foreground",
+                  "flex-1 text-center py-1.5 text-ui-sm cursor-pointer hover:bg-bg-elevated transition-colors",
+                  day === today ? "text-brand font-semibold" : "text-fg-secondary",
                 )}
               >
                 <div>{DAY_LABELS[i]}</div>
-                <div className="text-2xs">{new Date(`${day}T00:00:00`).getDate()}</div>
+                <div className="text-ui-xs">{new Date(`${day}T00:00:00`).getDate()}</div>
                 {activeSecs > 0 && (
-                  <div className="text-[9px] text-muted-foreground/60 mt-0.5">
+                  <div className="text-[9px] text-fg-secondary/60 mt-0.5">
                     {formatHumanDuration(activeSecs)}
                   </div>
                 )}
@@ -259,7 +259,7 @@ export function WeekCalendarView() {
           })}
         </div>
 
-        {loading && <div className="px-4 py-1 text-xs text-muted-foreground">Loading...</div>}
+        {loading && <div className="px-4 py-1 text-ui-sm text-fg-secondary">Loading...</div>}
 
         <div ref={scrollRef} className="flex-1 overflow-y-auto">
           <div className="relative" style={{ height: TOTAL_HEIGHT }}>
@@ -271,12 +271,12 @@ export function WeekCalendarView() {
                 style={{ top: h * HOUR_HEIGHT }}
               >
                 <div
-                  className="text-[9px] text-muted-foreground text-right pr-1 select-none"
+                  className="text-[9px] text-fg-secondary text-right pr-1 select-none"
                   style={{ width: HOUR_GUTTER }}
                 >
                   {formatHour(h)}
                 </div>
-                <div className="flex-1 border-t border-border" />
+                <div className="flex-1 border-t border-separator" />
               </div>
             ))}
 
@@ -289,7 +289,7 @@ export function WeekCalendarView() {
                 };
 
                 return (
-                  <div key={day} className="flex-1 relative border-r border-border last:border-r-0">
+                  <div key={day} className="flex-1 relative border-r border-separator last:border-r-0">
                     {/* Activity session blocks — clean, merged bars */}
                     {activitySessions.map((session) => {
                       const top = session.startMin * PX_PER_MIN;
@@ -312,13 +312,13 @@ export function WeekCalendarView() {
                             height,
                             left: leftOffset,
                             right: 2,
-                            backgroundColor: "var(--success)",
+                            backgroundColor: "var(--ds-status-success)",
                             opacity: sessionOpacity(session.totalSecs),
                           }}
                           title={`${session.label}${appSuffix} · ${durationLabel}`}
                         >
                           {height > 20 && (
-                            <span className="text-[8px] text-foreground font-medium px-1 truncate block leading-tight mt-0.5">
+                            <span className="text-[8px] text-fg font-medium px-1 truncate block leading-tight mt-0.5">
                               {session.label}
                             </span>
                           )}
@@ -384,7 +384,7 @@ function WeekNowLine() {
   const top = mins * PX_PER_MIN;
   return (
     <div className="absolute w-full pointer-events-none z-10" style={{ top }}>
-      <div className="border-t border-destructive" />
+      <div className="border-t border-status-danger" />
     </div>
   );
 }

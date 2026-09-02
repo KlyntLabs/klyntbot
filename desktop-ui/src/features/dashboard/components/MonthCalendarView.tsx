@@ -149,14 +149,14 @@ export function MonthCalendarView() {
   return (
     <div className="flex gap-2 h-full">
       <div className="flex-1 glass-card p-3 flex flex-col overflow-hidden">
-        {loading && <div className="text-xs text-muted-foreground mb-1">Loading...</div>}
+        {loading && <div className="text-ui-sm text-fg-secondary mb-1">Loading...</div>}
 
         {/* Day-of-week header */}
         <div className="grid grid-cols-7 mb-1">
           {DAY_LABELS.map((label) => (
             <div
               key={label}
-              className="text-center text-2xs text-muted-foreground font-medium py-1"
+              className="text-center text-ui-xs text-fg-secondary font-medium py-1"
             >
               {label}
             </div>
@@ -185,8 +185,8 @@ export function MonthCalendarView() {
                     onClick={() => navigate(`/day/${cell.date}`)}
                     className={cn(
                       "rounded-lg p-1.5 flex flex-col items-start text-left transition-colors min-h-[64px]",
-                      "hover:bg-accent cursor-pointer",
-                      cell.isCurrentMonth ? "text-foreground" : "text-muted-foreground/40",
+                      "hover:bg-control-hover cursor-pointer",
+                      cell.isCurrentMonth ? "text-fg" : "text-fg-secondary/40",
                       cell.date === today && "ring-1 ring-brand/50",
                       cell.date === focusedDate && cell.date !== today && "ring-1 ring-white/30",
                     )}
@@ -198,14 +198,14 @@ export function MonthCalendarView() {
                     <div className="flex items-center justify-between w-full">
                       <span
                         className={cn(
-                          "text-[11px] font-medium",
+                          "text-ui-xs font-medium",
                           cell.date === today && "text-brand",
                         )}
                       >
                         {cell.day}
                       </span>
                       {stats.focusSecs > 0 && (
-                        <span className="text-[8px] text-muted-foreground/60">
+                        <span className="text-[8px] text-fg-secondary/60">
                           {formatHumanDuration(stats.focusSecs)}
                         </span>
                       )}
@@ -214,17 +214,17 @@ export function MonthCalendarView() {
                     {/* Activity bar — proportional to active time */}
                     {stats.activeSecs > 0 && (
                       <div className="w-full mt-auto flex flex-col gap-0.5">
-                        <div className="w-full h-[3px] rounded-full bg-accent overflow-hidden">
+                        <div className="w-full h-[3px] rounded-full bg-control-hover overflow-hidden">
                           <div
                             className="h-full rounded-full"
                             style={{
                               width: `${Math.max(aRatio * 100, 8)}%`,
-                              backgroundColor: "var(--success)",
+                              backgroundColor: "var(--ds-status-success)",
                               opacity: 0.7 + aRatio * 0.3,
                             }}
                           />
                         </div>
-                        <span className="text-[8px] text-muted-foreground/50">
+                        <span className="text-[8px] text-fg-secondary/50">
                           {formatHumanDuration(stats.activeSecs)}
                         </span>
                       </div>

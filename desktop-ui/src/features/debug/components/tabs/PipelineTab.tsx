@@ -33,13 +33,13 @@ interface PipelineEventRow {
 }
 
 const opColors: Record<string, string> = {
-  ADD: "bg-success/20 text-success",
-  add: "bg-success/20 text-success",
-  UPDATE: "bg-info/20 text-info",
-  update: "bg-info/20 text-info",
-  DELETE: "bg-destructive/20 text-destructive",
-  delete: "bg-destructive/20 text-destructive",
-  NOOP: "bg-accent text-muted-foreground",
+  ADD: "bg-status-success/20 text-status-success",
+  add: "bg-status-success/20 text-status-success",
+  UPDATE: "bg-status-info/20 text-status-info",
+  update: "bg-status-info/20 text-status-info",
+  DELETE: "bg-status-danger/20 text-status-danger",
+  delete: "bg-status-danger/20 text-status-danger",
+  NOOP: "bg-control-hover text-fg-secondary",
 };
 
 export function PipelineTab() {
@@ -107,17 +107,17 @@ export function PipelineTab() {
       <div className="grid grid-cols-2 gap-6">
         {/* Extraction Log */}
         <div>
-          <h2 className="text-[13px] font-medium text-muted-foreground mb-3 flex items-center gap-1.5">
+          <h2 className="text-ui font-medium text-fg-secondary mb-3 flex items-center gap-1.5">
             <GitBranch className="size-3.5" /> Extraction Log
           </h2>
           <div className="space-y-2">
             {extractions.map((e) => (
               <div
                 key={`ext-${e.ts}-${e.observation.slice(0, 20)}`}
-                className="p-3 bg-card rounded-lg border border-border"
+                className="p-3 bg-bg-elevated rounded-panel border border-separator"
               >
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="text-2xs text-muted-foreground font-mono">
+                  <span className="text-ui-xs text-fg-secondary font-mono">
                     {new Date(e.ts).toLocaleTimeString(undefined, {
                       hour: "2-digit",
                       minute: "2-digit",
@@ -125,15 +125,15 @@ export function PipelineTab() {
                       hour12: false,
                     })}
                   </span>
-                  <span className="text-2xs bg-brand/20 text-brand px-1 py-0.5 rounded">
+                  <span className="text-ui-xs bg-brand/20 text-brand px-1 py-0.5 rounded">
                     {e.factsExtracted} facts
                   </span>
                 </div>
-                <p className="text-[11px] text-muted-foreground">{e.observation}</p>
+                <p className="text-ui-xs text-fg-secondary">{e.observation}</p>
               </div>
             ))}
             {extractions.length === 0 && (
-              <p className="text-xs text-muted-foreground text-center py-4">
+              <p className="text-ui-sm text-fg-secondary text-center py-4">
                 No extraction events yet
               </p>
             )}
@@ -142,15 +142,15 @@ export function PipelineTab() {
 
         {/* Consolidation Log */}
         <div>
-          <h2 className="text-[13px] font-medium text-muted-foreground mb-3">Consolidation Log</h2>
+          <h2 className="text-ui font-medium text-fg-secondary mb-3">Consolidation Log</h2>
           <div className="space-y-2">
             {consolidations.map((c) => (
               <div
                 key={`con-${c.ts}-${c.fact.slice(0, 20)}`}
-                className="p-3 bg-card rounded-lg border border-border"
+                className="p-3 bg-bg-elevated rounded-panel border border-separator"
               >
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="text-2xs text-muted-foreground font-mono">
+                  <span className="text-ui-xs text-fg-secondary font-mono">
                     {new Date(c.ts).toLocaleTimeString(undefined, {
                       hour: "2-digit",
                       minute: "2-digit",
@@ -159,16 +159,16 @@ export function PipelineTab() {
                     })}
                   </span>
                   <span
-                    className={`text-2xs px-1 py-0.5 rounded ${opColors[c.operation] ?? opColors.NOOP}`}
+                    className={`text-ui-xs px-1 py-0.5 rounded ${opColors[c.operation] ?? opColors.NOOP}`}
                   >
                     {c.operation}
                   </span>
                 </div>
-                <p className="text-[11px] text-muted-foreground">{c.fact}</p>
+                <p className="text-ui-xs text-fg-secondary">{c.fact}</p>
               </div>
             ))}
             {consolidations.length === 0 && (
-              <p className="text-xs text-muted-foreground text-center py-4">
+              <p className="text-ui-sm text-fg-secondary text-center py-4">
                 No consolidation events yet
               </p>
             )}
@@ -177,21 +177,21 @@ export function PipelineTab() {
       </div>
 
       {/* Pipeline stats summary */}
-      <div className="flex items-center gap-4 p-3 bg-card rounded-lg border border-border">
-        <span className="text-[11px] text-muted-foreground">
-          Extractions: <span className="text-muted-foreground">{extractions.length}</span>
+      <div className="flex items-center gap-4 p-3 bg-bg-elevated rounded-panel border border-separator">
+        <span className="text-ui-xs text-fg-secondary">
+          Extractions: <span className="text-fg-secondary">{extractions.length}</span>
         </span>
-        <span className="text-[11px] text-muted-foreground">
-          Consolidations: <span className="text-muted-foreground">{consolidations.length}</span>
+        <span className="text-ui-xs text-fg-secondary">
+          Consolidations: <span className="text-fg-secondary">{consolidations.length}</span>
         </span>
-        <span className="text-[11px] text-muted-foreground">
-          ADDs: <span className="text-success">{opCounts.ADD}</span>
+        <span className="text-ui-xs text-fg-secondary">
+          ADDs: <span className="text-status-success">{opCounts.ADD}</span>
         </span>
-        <span className="text-[11px] text-muted-foreground">
-          UPDATEs: <span className="text-info">{opCounts.UPDATE}</span>
+        <span className="text-ui-xs text-fg-secondary">
+          UPDATEs: <span className="text-status-info">{opCounts.UPDATE}</span>
         </span>
-        <span className="text-[11px] text-muted-foreground">
-          DELETEs: <span className="text-destructive">{opCounts.DELETE}</span>
+        <span className="text-ui-xs text-fg-secondary">
+          DELETEs: <span className="text-status-danger">{opCounts.DELETE}</span>
         </span>
       </div>
     </div>

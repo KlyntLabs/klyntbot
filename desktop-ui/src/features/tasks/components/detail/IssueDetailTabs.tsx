@@ -20,7 +20,7 @@ export function IssueDetailTabs({ detail }: IssueDetailTabsProps) {
 
   return (
     <div className="flex flex-col min-h-0">
-      <div className="flex gap-4 border-b border-border mb-4">
+      <div className="flex gap-4 border-b border-separator mb-4">
         {tabs.map((tab) => (
           <button
             key={tab.id}
@@ -29,8 +29,8 @@ export function IssueDetailTabs({ detail }: IssueDetailTabsProps) {
             className={cn(
               "pb-2 text-sm font-medium transition-colors border-b-2 -mb-px",
               activeTab === tab.id
-                ? "border-primary text-foreground"
-                : "border-transparent text-muted-foreground hover:text-foreground",
+                ? "border-brand text-fg"
+                : "border-transparent text-fg-secondary hover:text-fg",
             )}
           >
             {tab.label}

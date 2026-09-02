@@ -59,7 +59,7 @@ export function NotePicker({ onSelect, onCancel }: NotePickerProps) {
       <div className="relative">
         <Search
           size={14}
-          className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+          className="absolute left-2.5 top-1/2 -translate-y-1/2 text-fg-secondary"
         />
         <input
           ref={inputRef}
@@ -67,7 +67,7 @@ export function NotePicker({ onSelect, onCancel }: NotePickerProps) {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search notes..."
-          className="w-full bg-muted/50 rounded-lg pl-8 pr-3 py-2 text-sm text-foreground placeholder:text-dim"
+          className="w-full bg-control-hover/50 rounded-lg pl-8 pr-3 py-2 text-sm text-fg placeholder:text-fg-dim"
         />
       </div>
 
@@ -78,9 +78,9 @@ export function NotePicker({ onSelect, onCancel }: NotePickerProps) {
               key={note.id}
               type="button"
               onClick={() => onSelect({ id: note.id, title: note.title })}
-              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left text-sm text-foreground hover:bg-accent transition-colors"
+              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left text-sm text-fg hover:bg-control-hover transition-colors"
             >
-              <FileText size={14} className="text-muted-foreground flex-shrink-0" />
+              <FileText size={14} className="text-fg-secondary flex-shrink-0" />
               <span className="truncate">{note.title}</span>
             </button>
           ))}
@@ -88,7 +88,7 @@ export function NotePicker({ onSelect, onCancel }: NotePickerProps) {
       )}
 
       {query.length >= 2 && !loading && results.length === 0 && (
-        <p className="text-xs text-muted-foreground text-center py-2">No notes found</p>
+        <p className="text-ui-sm text-fg-secondary text-center py-2">No notes found</p>
       )}
     </div>
   );

@@ -7,16 +7,16 @@ export function ArchivedSettings() {
   return (
     <div>
       <div className="mb-8">
-        <h2 className="text-lg font-medium text-foreground">Archived threads</h2>
-        <p className="text-[13px] text-muted-foreground mt-1">
+        <h2 className="text-lg font-medium text-fg">Archived threads</h2>
+        <p className="text-ui text-fg-secondary mt-1">
           View and restore archived conversations
         </p>
       </div>
 
-      <div className="bg-card rounded-lg border border-border p-8 flex flex-col items-center text-center">
-        <Archive className="size-8 text-dim mb-3" strokeWidth={1.5} />
-        <p className="text-[13px] text-muted-foreground mb-1">No archived threads</p>
-        <p className="text-[11px] text-dim">
+      <div className="island rounded-lg p-8 flex flex-col items-center text-center">
+        <Archive className="size-8 text-fg-dim mb-3" strokeWidth={1.5} />
+        <p className="text-ui text-fg-secondary mb-1">No archived threads</p>
+        <p className="text-ui-xs text-fg-dim">
           Archived conversations will appear here. Thread archiving is coming soon.
         </p>
       </div>

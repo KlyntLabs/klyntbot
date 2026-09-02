@@ -90,7 +90,7 @@ export function SidebarChat({
     <div className="w-96 glass-sidebar flex flex-col shrink-0">
       {/* Header */}
       <div className="h-14 flex items-center justify-between px-5">
-        <span className="text-[13px] font-light text-muted-foreground">{label}</span>
+        <span className="text-ui font-light text-fg-secondary">{label}</span>
         <div className="flex items-center gap-1">
           {pageContext && (
             <button
@@ -98,7 +98,7 @@ export function SidebarChat({
               onClick={handlePin}
               aria-label="Pin to Chat threads"
               title="Pin to Chat threads"
-              className="size-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-all"
+              className="size-7 rounded-lg flex items-center justify-center text-fg-secondary hover:text-fg hover:bg-control-hover transition-all"
             >
               <Pin className="size-3.5" strokeWidth={1.5} />
             </button>
@@ -107,7 +107,7 @@ export function SidebarChat({
             type="button"
             onClick={onClose}
             aria-label="Close chat"
-            className="size-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-all"
+            className="size-7 rounded-lg flex items-center justify-center text-fg-secondary hover:text-fg hover:bg-control-hover transition-all"
           >
             <X className="size-4" strokeWidth={1.5} />
           </button>
@@ -120,7 +120,7 @@ export function SidebarChat({
       <div className="flex-1 overflow-y-auto p-5">
         {chat.messages.length === 0 && !chat.isStreaming ? (
           <div className="flex flex-col items-center justify-center py-12">
-            <p className="text-muted-foreground text-xs font-light text-center">
+            <p className="text-fg-secondary text-ui-sm font-light text-center">
               {pageContext
                 ? `Ask about this ${pageContext.entityKind?.split(".")[0] || "item"}`
                 : "Ask me anything"}
@@ -186,7 +186,7 @@ function SidebarChatInput({
           aria-label="Message input"
           placeholder="Ask about this page\u2026"
           rows={1}
-          className="flex-1 glass-input px-4 py-2.5 text-[13px] text-foreground placeholder:text-muted-foreground font-light resize-none overflow-hidden outline-none"
+          className="flex-1 glass-input px-4 py-2.5 text-ui text-fg placeholder:text-fg-secondary font-light resize-none overflow-hidden outline-none"
           style={{ maxHeight: "120px" }}
         />
         <button
@@ -194,7 +194,7 @@ function SidebarChatInput({
           onClick={onSend}
           disabled={!input.trim() || isStreaming}
           aria-label="Send message"
-          className="size-10 rounded-xl bg-brand hover:bg-brand-hover disabled:bg-accent disabled:text-muted-foreground flex items-center justify-center transition-all shrink-0"
+          className="size-10 rounded-xl bg-brand text-brand-foreground hover:bg-brand-hover disabled:bg-control-hover disabled:text-fg-secondary flex items-center justify-center transition-all shrink-0"
         >
           <Send className="size-4" strokeWidth={2} />
         </button>

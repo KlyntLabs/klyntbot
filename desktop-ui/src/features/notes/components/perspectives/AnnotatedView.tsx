@@ -10,7 +10,7 @@ export function AnnotatedView({ noteId, sectionId: _ }: AnnotatedViewProps) {
 
   if (annotations.length === 0) {
     return (
-      <div className="flex h-full items-center justify-center text-xs text-muted">
+      <div className="flex h-full items-center justify-center text-ui-sm text-fg-secondary">
         No annotations yet. Select text and press ⌥A to annotate.
       </div>
     );
@@ -18,7 +18,7 @@ export function AnnotatedView({ noteId, sectionId: _ }: AnnotatedViewProps) {
 
   return (
     <div className="flex h-full flex-col gap-3 overflow-y-auto p-4">
-      <h3 className="text-xs font-medium text-muted">
+      <h3 className="text-ui-sm font-medium text-fg-secondary">
         {annotations.length} annotation{annotations.length !== 1 ? "s" : ""}
       </h3>
 
@@ -29,11 +29,11 @@ export function AnnotatedView({ noteId, sectionId: _ }: AnnotatedViewProps) {
         >
           {ann.quotedText && (
             <div className="mb-2 border-l-2 border-brand/50 pl-2">
-              <p className="text-[11px] text-muted italic">"{ann.quotedText}"</p>
+              <p className="text-ui-xs text-fg-secondary italic">"{ann.quotedText}"</p>
             </div>
           )}
 
-          {ann.content && <p className="text-xs text-primary">{ann.content}</p>}
+          {ann.content && <p className="text-ui-sm text-brand">{ann.content}</p>}
 
           <div className="mt-2 flex items-center justify-between">
             <div className="flex gap-1">
@@ -43,13 +43,13 @@ export function AnnotatedView({ noteId, sectionId: _ }: AnnotatedViewProps) {
                 .map((tag) => (
                   <span
                     key={tag}
-                    className="rounded-full bg-surface-hover px-1.5 py-0.5 text-[9px] text-muted"
+                    className="rounded-full bg-control-hover px-1.5 py-0.5 text-[9px] text-fg-secondary"
                   >
                     {tag}
                   </span>
                 ))}
             </div>
-            <span className="text-2xs text-muted">
+            <span className="text-ui-xs text-fg-secondary">
               {new Date(ann.createdAt).toLocaleDateString()}
             </span>
           </div>

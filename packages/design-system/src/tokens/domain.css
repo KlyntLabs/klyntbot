@@ -1,0 +1,50 @@
+/* jdbot domain palettes — art/status colour, not chrome theme colour.
+   Same values in light and dark unless a role needs a theme flip. */
+
+:root {
+  /* Charts */
+  --ds-chart-1: var(--ds-accent);
+  --ds-chart-2: #5ac8fa;
+  --ds-chart-3: #8e8e93;
+  --ds-chart-4: #5856d6;
+  --ds-chart-5: #af52de;
+
+  /* Origin badges */
+  --ds-origin-system: #5ac8fa;
+  --ds-origin-ai: #af52de;
+  --ds-origin-user: #28c840;
+  --ds-origin-plugin: #ff9f0a;
+
+  /* Semantic extras used in product UI */
+  --ds-purple: #af52de;
+
+  /* Timeline / dashboard activity */
+  --ds-timeline-app-productive: #34c759;
+  --ds-timeline-app-distracting: #ff453a;
+  --ds-timeline-app-neutral: #8e8e93;
+  --ds-timeline-focus: #bf5af2;
+  --ds-timeline-task: #0a7cff;
+  --ds-timeline-note: #ffd60a;
+  --ds-timeline-finance: #30d158;
+  --ds-timeline-todo: #64d2ff;
+  --ds-timeline-finance-expense: #ff453a;
+  --ds-timeline-finance-income: #30d158;
+  --ds-timeline-system: #8e8e93;
+  --ds-timeline-calendar: #5e5ce6;
+  --ds-timeline-focus-high: #bf5af2;
+  --ds-timeline-focus-low: #d6a8f5;
+  --ds-timeline-unfocused: rgba(0, 0, 0, 0.04);
+  --ds-timeline-dot-note: #64d2ff;
+  --ds-timeline-dot-task-done: #30d158;
+  --ds-timeline-dot-finance: #ffd60a;
+
+  /* Code surfaces */
+  --ds-code-bg: rgba(0, 0, 0, 0.04);
+  --ds-code-foreground: var(--ds-text);
+  --ds-code-number: var(--ds-text-secondary);
+}
+
+html[data-theme="dark"] {
+  --ds-timeline-unfocused: rgba(255, 255, 255, 0.03);
+  --ds-code-bg: rgba(255, 255, 255, 0.06);
+}

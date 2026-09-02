@@ -32,8 +32,8 @@ export function CalendarSync() {
       onClick={handleSync}
       disabled={loading}
       className={cn(
-        "flex items-center gap-1.5 px-2 py-1 rounded-md text-xs",
-        "text-muted-foreground hover:text-foreground hover:bg-accent transition-colors",
+        "flex items-center gap-1.5 px-2 py-1 rounded-md text-ui-sm",
+        "text-fg-secondary hover:text-fg hover:bg-control-hover transition-colors",
         loading && "opacity-50 cursor-not-allowed",
       )}
       title={
@@ -46,7 +46,7 @@ export function CalendarSync() {
     >
       {loading ? <Loader2 className="size-3.5 animate-spin" /> : <Calendar className="size-3.5" />}
       <span className="hidden sm:inline">Sync</span>
-      {lastSynced && !loading && <RefreshCw className="size-3 text-success" />}
+      {lastSynced && !loading && <RefreshCw className="size-3 text-status-success" />}
     </button>
   );
 }

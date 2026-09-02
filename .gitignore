@@ -48,3 +48,7 @@ desktop-ui/result
 desktop-ui/skills-lock.json
 references/
 benchmark-out/
+
+# Local agent / browser artifacts
+.skills/
+.playwright-mcp/

@@ -10,7 +10,7 @@ interface Props {
 
 export function InsightVersionList({ versions, selectedId, currentId, onSelect }: Props) {
   if (versions.length === 0) {
-    return <p className="text-[11px] text-dim italic px-3 py-4">No version history yet.</p>;
+    return <p className="text-ui-xs text-fg-dim italic px-3 py-4">No version history yet.</p>;
   }
 
   return (
@@ -40,16 +40,16 @@ export function InsightVersionList({ versions, selectedId, currentId, onSelect }
           >
             <div className="flex flex-col gap-0.5 min-w-0">
               <div className="flex items-center gap-1.5">
-                <span className="text-[11px] font-medium text-foreground">v{v.version}</span>
+                <span className="text-ui-xs font-medium text-fg">v{v.version}</span>
                 {v.hasParent && (
                   <GitBranch
                     size={10}
-                    className="text-muted-foreground"
+                    className="text-fg-secondary"
                     title="Merged from related insight"
                   />
                 )}
               </div>
-              <div className="flex items-center gap-1 text-2xs text-dim">
+              <div className="flex items-center gap-1 text-ui-xs text-fg-dim">
                 <Clock size={9} />
                 <span>
                   {dateStr} {timeStr}

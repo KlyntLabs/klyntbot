@@ -341,7 +341,7 @@ export function EntityMentionMenu({ editor }: EntityMentionMenuProps) {
       style={{ left: coords.x, top: coords.y + 4 }}
     >
       {results.length === 0 && (
-        <div className="px-3 py-2 text-xs text-dim">
+        <div className="px-3 py-2 text-ui-sm text-fg-dim">
           {state.query ? "No matching entities" : "Type to search tasks & projects..."}
         </div>
       )}
@@ -351,16 +351,16 @@ export function EntityMentionMenu({ editor }: EntityMentionMenuProps) {
           type="button"
           onClick={() => insertMention(item)}
           className={`w-full px-3 py-1.5 text-sm text-left flex items-center gap-2 transition-colors ${
-            i === selectedIndex ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-card"
+            i === selectedIndex ? "bg-control-hover text-fg" : "text-fg-secondary hover:bg-bg-elevated"
           }`}
         >
           <span
             className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-              item.entityType === "task" ? "bg-brand" : "bg-info"
+              item.entityType === "task" ? "bg-brand" : "bg-status-info"
             }`}
           />
           <span className="truncate">{item.title}</span>
-          <span className="text-2xs text-dim ml-auto shrink-0">{item.entityType}</span>
+          <span className="text-ui-xs text-fg-dim ml-auto shrink-0">{item.entityType}</span>
         </button>
       ))}
     </div>,

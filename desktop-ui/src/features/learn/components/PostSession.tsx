@@ -27,38 +27,38 @@ export function PostSession({
       <div className="text-center max-w-sm w-full space-y-6 animate-[fade-in-up_0.3s_ease-out]">
         <div>
           <CheckCircle size={40} className="mx-auto text-emerald-400 mb-3" strokeWidth={1.5} />
-          <h2 className="text-xl font-semibold text-foreground">Review Complete!</h2>
+          <h2 className="text-xl font-semibold text-fg">Review Complete!</h2>
         </div>
 
         <div className="flex gap-3 justify-center">
           <div className="glass-card px-4 py-3 text-center flex-1">
-            <p className="text-2xl font-semibold text-foreground tabular-nums">{totalReviewed}</p>
-            <p className="text-[11px] text-muted-foreground mt-0.5">Cards reviewed</p>
+            <p className="text-2xl font-semibold text-fg tabular-nums">{totalReviewed}</p>
+            <p className="text-ui-xs text-fg-secondary mt-0.5">Cards reviewed</p>
           </div>
 
           <div className="glass-card px-4 py-3 text-center flex-1">
             <div className="flex items-center justify-center gap-1">
               <Target size={14} className="text-brand" strokeWidth={1.5} />
-              <p className="text-2xl font-semibold text-foreground tabular-nums">{accuracy}%</p>
+              <p className="text-2xl font-semibold text-fg tabular-nums">{accuracy}%</p>
             </div>
-            <p className="text-[11px] text-muted-foreground mt-0.5">Accuracy</p>
+            <p className="text-ui-xs text-fg-secondary mt-0.5">Accuracy</p>
           </div>
 
           <div className="glass-card px-4 py-3 text-center flex-1">
             <div className="flex items-center justify-center gap-1">
-              <Clock size={14} className="text-info" strokeWidth={1.5} />
-              <p className="text-2xl font-semibold text-foreground tabular-nums">
+              <Clock size={14} className="text-status-info" strokeWidth={1.5} />
+              <p className="text-2xl font-semibold text-fg tabular-nums">
                 {formatTime(elapsedSeconds)}
               </p>
             </div>
-            <p className="text-[11px] text-muted-foreground mt-0.5">Time spent</p>
+            <p className="text-ui-xs text-fg-secondary mt-0.5">Time spent</p>
           </div>
         </div>
 
         <button
           type="button"
           onClick={onBackToDashboard}
-          className="glass-button px-5 py-2.5 text-sm text-foreground"
+          className="glass-button px-5 py-2.5 text-sm text-fg"
         >
           Back to Dashboard
         </button>

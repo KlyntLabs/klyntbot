@@ -3,9 +3,9 @@ import type { FocusStatePayload } from "@shared/types";
 import { useState } from "react";
 
 const STATE_CONFIG: Record<string, { label: string; color: string; pulse: boolean }> = {
-  building: { label: "Building focus", color: "var(--brand)", pulse: true },
-  focused: { label: "Deep focus", color: "var(--success)", pulse: false },
-  cooldown: { label: "Cooldown", color: "var(--text-muted-foreground)", pulse: true },
+  building: { label: "Building focus", color: "var(--ds-accent)", pulse: true },
+  focused: { label: "Deep focus", color: "var(--ds-status-success)", pulse: false },
+  cooldown: { label: "Cooldown", color: "var(--ds-text-secondary)", pulse: true },
 };
 
 export function FocusStateIndicator() {
@@ -31,7 +31,7 @@ export function FocusStateIndicator() {
         className={`w-1.5 h-1.5 rounded-full ${config.pulse ? "animate-pulse" : ""}`}
         style={{ backgroundColor: config.color }}
       />
-      <span className="text-2xs font-medium" style={{ color: config.color }}>
+      <span className="text-ui-xs font-medium" style={{ color: config.color }}>
         {config.label}
       </span>
     </div>

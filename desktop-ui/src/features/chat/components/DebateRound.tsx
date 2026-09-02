@@ -18,7 +18,7 @@ export function DebateRound({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <span className="text-2xs font-medium text-muted-foreground">
+        <span className="text-ui-xs font-medium text-fg-secondary">
           Round {round.round}
           {isCurrentRound && <span className="ml-1 text-purple-400 animate-pulse">Active</span>}
         </span>

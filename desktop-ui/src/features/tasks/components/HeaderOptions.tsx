@@ -24,7 +24,7 @@ export default function HeaderOptions({ issues, projects }: HeaderOptionsProps) 
   const displayProjects = useMemo(() => projects.map(projectToDisplayProject), [projects]);
 
   return (
-    <div className="flex items-center justify-between px-4 py-1.5 border-b border-border">
+    <div className="flex items-center justify-between px-4 py-1.5 border-b border-separator">
       {/* Left */}
       <div className="flex items-center gap-2">
         <Filter issues={issues} projects={displayProjects} />

@@ -16,11 +16,11 @@ export function RelevantAtoms({ domain, limit = 5 }: RelevantAtomsProps) {
   if (matchingTopics.length === 0) return null;
 
   return (
-    <div className="glass-card rounded-lg p-3 space-y-1">
-      <span className="text-2xs text-muted uppercase tracking-wider">Related Knowledge</span>
+    <div className="island rounded-panel p-3 space-y-1">
+      <span className="text-2xs text-fg-secondary uppercase tracking-wider">Related Knowledge</span>
       {matchingTopics.map((topic) => (
-        <div key={topic.id} className="flex items-center justify-between text-xs">
-          <span className="text-primary truncate">{topic.name}</span>
+        <div key={topic.id} className="flex items-center justify-between text-ui-sm">
+          <span className="text-fg truncate">{topic.name}</span>
           <span className={`text-2xs tabular-nums ${retentionTextColor(topic.avgRetention)}`}>
             {Math.round(topic.avgRetention * 100)}%
           </span>

@@ -52,10 +52,10 @@ export function InsightCard() {
   if (loading) {
     return (
       <div className="glass-card rounded-xl p-5">
-        <div className="text-2xs text-muted-foreground uppercase tracking-wider mb-3">
+        <div className="text-ui-xs text-fg-secondary uppercase tracking-wider mb-3">
           Latest Insight
         </div>
-        <div className="h-12 bg-accent/20 rounded animate-pulse" />
+        <div className="h-12 bg-control-hover/20 rounded animate-pulse" />
       </div>
     );
   }
@@ -63,16 +63,16 @@ export function InsightCard() {
   if (!insight) {
     return (
       <div className="glass-card rounded-xl p-5">
-        <div className="text-2xs text-muted-foreground uppercase tracking-wider mb-3">
+        <div className="text-ui-xs text-fg-secondary uppercase tracking-wider mb-3">
           Latest Insight
         </div>
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-ui-xs text-fg-secondary">
           No insights yet. Visit the Notes tab and click "Generate Insight" on a note.
         </p>
         <button
           type="button"
           onClick={() => navigate(`/project/${project?.id}/notes`)}
-          className="mt-3 text-2xs px-3 py-1 rounded bg-brand/10 text-brand hover:bg-brand/20 transition-colors"
+          className="mt-3 text-ui-xs px-3 py-1 rounded bg-brand/10 text-brand hover:bg-brand/20 transition-colors"
         >
           Go to Notes
         </button>
@@ -82,15 +82,15 @@ export function InsightCard() {
 
   return (
     <div className="glass-card rounded-xl p-5 border border-brand/15">
-      <div className="text-2xs text-brand uppercase tracking-wider mb-3">Latest Insight</div>
-      <p className="text-[11px] text-muted-foreground line-clamp-3 leading-relaxed">
+      <div className="text-ui-xs text-brand uppercase tracking-wider mb-3">Latest Insight</div>
+      <p className="text-ui-xs text-fg-secondary line-clamp-3 leading-relaxed">
         {insight.synthesis}
       </p>
       <div className="flex gap-2 mt-3">
         <button
           type="button"
           onClick={() => navigate(`/project/${project?.id}/notes`)}
-          className="text-2xs px-3 py-1 rounded bg-brand/10 text-brand hover:bg-brand/20 transition-colors"
+          className="text-ui-xs px-3 py-1 rounded bg-brand/10 text-brand hover:bg-brand/20 transition-colors"
         >
           View Insight
         </button>

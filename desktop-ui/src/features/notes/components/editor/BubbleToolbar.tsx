@@ -56,7 +56,7 @@ function ToolbarButton({
     <button
       type="button"
       onClick={onClick}
-      className={`flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs hover:bg-surface-hover ${className}`}
+      className={`flex items-center gap-1 rounded-md px-2.5 py-1.5 text-ui-sm hover:bg-control-hover ${className}`}
       title={shortcut ? `${label} (${shortcut})` : label}
     >
       {label}

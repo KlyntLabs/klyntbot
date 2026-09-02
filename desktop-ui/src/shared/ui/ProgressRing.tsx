@@ -18,7 +18,7 @@ export function ProgressRing({ progress, size, color, gradient, className }: Pro
   const dasharray = `${clamped} ${100 - clamped}`;
   const gradientId = `pr-grad-${size}`;
 
-  const strokeColor = gradient ? `url(#${gradientId})` : (color ?? "var(--brand)");
+  const strokeColor = gradient ? `url(#${gradientId})` : (color ?? "var(--ds-accent)");
 
   return (
     <svg

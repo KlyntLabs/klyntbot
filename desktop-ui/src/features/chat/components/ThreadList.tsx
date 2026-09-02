@@ -80,21 +80,21 @@ export function ThreadList({
         <button
           type="button"
           onClick={onNewThread}
-          className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-accent transition-all text-xs font-light text-muted-foreground hover:text-foreground"
+          className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-control-hover transition-all text-ui-sm font-light text-fg-secondary hover:text-fg"
         >
           <Plus className="w-[13px] h-[13px]" strokeWidth={1.5} />
           New thread
         </button>
         <button
           type="button"
-          className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-accent transition-all text-xs font-light text-muted-foreground hover:text-foreground"
+          className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-control-hover transition-all text-ui-sm font-light text-fg-secondary hover:text-fg"
         >
           <RotateCcw className="w-[13px] h-[13px]" strokeWidth={1.5} />
           Automations
         </button>
         <button
           type="button"
-          className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-accent transition-all text-xs font-light text-muted-foreground hover:text-foreground"
+          className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-control-hover transition-all text-ui-sm font-light text-fg-secondary hover:text-fg"
         >
           <Settings className="w-[13px] h-[13px]" strokeWidth={1.5} />
           Skills and Apps
@@ -176,7 +176,7 @@ export function ThreadList({
           )}
 
           {threads.length === 0 && (
-            <div className="text-center py-8 text-muted-foreground text-xs font-light">
+            <div className="text-center py-8 text-fg-secondary text-ui-sm font-light">
               No conversations yet
             </div>
           )}

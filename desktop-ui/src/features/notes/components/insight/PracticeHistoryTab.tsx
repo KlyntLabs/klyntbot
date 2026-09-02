@@ -36,17 +36,17 @@ function statusBadge(status: string): { label: string; className: string } {
     case "completed":
       return {
         label: "Completed",
-        className: "bg-success/15 text-success",
+        className: "bg-status-success/15 text-status-success",
       };
     case "in_progress":
       return {
         label: "In Progress",
-        className: "bg-warning/15 text-warning",
+        className: "bg-status-warning/15 text-status-warning",
       };
     default:
       return {
         label: "Abandoned",
-        className: "bg-muted-foreground/15 text-muted-foreground",
+        className: "bg-fg-secondary/15 text-fg-secondary",
       };
   }
 }
@@ -74,21 +74,21 @@ export function PracticeHistoryTab({ noteId }: PracticeHistoryTabProps) {
 
   if (!noteId) {
     return (
-      <p className="text-muted text-sm text-center py-8">Select a note to see practice history</p>
+      <p className="text-fg-secondary text-sm text-center py-8">Select a note to see practice history</p>
     );
   }
 
   if (loading) {
     return (
       <div className="flex items-center justify-center py-8">
-        <span className="text-muted-foreground text-xs animate-pulse">Loading sessions...</span>
+        <span className="text-fg-secondary text-ui-sm animate-pulse">Loading sessions...</span>
       </div>
     );
   }
 
   if (!sessions || sessions.length === 0) {
     return (
-      <p className="text-muted text-sm text-center py-8">
+      <p className="text-fg-secondary text-sm text-center py-8">
         No practice sessions yet. Select text and tap &lsquo;Practice this note&rsquo; to start.
       </p>
     );
@@ -108,25 +108,25 @@ export function PracticeHistoryTab({ noteId }: PracticeHistoryTabProps) {
         return (
           <div
             key={session.id}
-            className="rounded-lg border border-border bg-surface-raised/50 p-3 space-y-1.5"
+            className="rounded-lg border border-separator bg-glass-subtle/50 p-3 space-y-1.5"
           >
             <div className="flex items-center justify-between">
-              <span className="text-[11px] text-muted-foreground">
+              <span className="text-ui-xs text-fg-secondary">
                 {formatSessionDate(session.startedAt)}
               </span>
-              <span className={`text-2xs font-medium rounded-full px-2 py-0.5 ${badge.className}`}>
+              <span className={`text-ui-xs font-medium rounded-full px-2 py-0.5 ${badge.className}`}>
                 {badge.label}
               </span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-xs text-foreground">
+              <span className="text-ui-sm text-fg">
                 {stats}
                 {avgLabel}
               </span>
               {session.status === "in_progress" && (
                 <button
                   type="button"
-                  className="text-2xs font-medium text-brand hover:text-brand/80 transition-colors"
+                  className="text-ui-xs font-medium text-brand hover:text-brand/80 transition-colors"
                 >
                   Resume
                 </button>
@@ -134,7 +134,7 @@ export function PracticeHistoryTab({ noteId }: PracticeHistoryTabProps) {
               {session.status === "completed" && (
                 <button
                   type="button"
-                  className="text-2xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+                  className="text-ui-xs font-medium text-fg-secondary hover:text-fg transition-colors"
                 >
                   Review
                 </button>

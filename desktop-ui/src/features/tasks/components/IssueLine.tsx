@@ -23,7 +23,7 @@ export function IssueLine({ issue }: IssueLineProps) {
       {/* biome-ignore lint/a11y/useKeyWithClickEvents: row click navigates, keyboard nav handled by parent list */}
       {/* biome-ignore lint/a11y/noStaticElementInteractions: row click navigates */}
       <div
-        className="group flex items-center gap-2 px-4 py-2 border-b border-border hover:bg-accent/50 transition-colors cursor-pointer"
+        className="group flex items-center gap-2 px-4 py-2 border-b border-separator hover:bg-control-hover/50 transition-colors cursor-pointer"
         onClick={() => navigateInPlace("issue", issue.id, issue.identifier)}
       >
         {/* Priority — stop propagation so clicking it doesn't navigate */}
@@ -34,7 +34,7 @@ export function IssueLine({ issue }: IssueLineProps) {
         </div>
 
         {/* Identifier */}
-        <span className="text-xs text-muted-foreground w-[72px] shrink-0">{issue.identifier}</span>
+        <span className="text-ui-sm text-fg-secondary w-[72px] shrink-0">{issue.identifier}</span>
 
         {/* Status — stop propagation */}
         {/* biome-ignore lint/a11y/useKeyWithClickEvents: stop-propagation wrapper, not interactive */}
@@ -44,7 +44,7 @@ export function IssueLine({ issue }: IssueLineProps) {
         </div>
 
         {/* Title */}
-        <span className="text-sm text-foreground truncate flex-1 min-w-0">{issue.title}</span>
+        <span className="text-sm text-fg truncate flex-1 min-w-0">{issue.title}</span>
 
         {/* Labels */}
         <div className="hidden lg:flex items-center gap-1 shrink-0">
@@ -59,7 +59,7 @@ export function IssueLine({ issue }: IssueLineProps) {
         )}
 
         {/* Date */}
-        <span className="text-xs text-muted-foreground w-[60px] shrink-0 text-right">
+        <span className="text-ui-sm text-fg-secondary w-[60px] shrink-0 text-right">
           {createdDate}
         </span>
 

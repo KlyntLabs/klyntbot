@@ -187,8 +187,8 @@ export function McpServersSettings() {
   return (
     <div>
       <div className="mb-8">
-        <h2 className="text-lg font-medium text-foreground">MCP servers</h2>
-        <p className="text-[13px] text-muted-foreground mt-1">
+        <h2 className="text-lg font-medium text-fg">MCP servers</h2>
+        <p className="text-ui text-fg-secondary mt-1">
           Connect external tools and data sources via the Model Context Protocol
         </p>
       </div>
@@ -196,11 +196,11 @@ export function McpServersSettings() {
       {/* Custom servers */}
       <div className="mb-8">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-[13px] font-medium text-muted-foreground">Custom servers</h3>
+          <h3 className="text-ui font-medium text-fg-secondary">Custom servers</h3>
           <button
             type="button"
             onClick={handleOpenAdd}
-            className="flex items-center gap-1.5 text-xs text-brand hover:text-brand-hover transition-colors"
+            className="flex items-center gap-1.5 text-ui-sm text-brand hover:text-brand-hover transition-colors"
           >
             <Plus className="size-3.5" />
             Add server
@@ -208,10 +208,10 @@ export function McpServersSettings() {
         </div>
 
         {customServers.length === 0 ? (
-          <div className="bg-card rounded-lg border border-border p-8 flex flex-col items-center text-center">
-            <Plug className="size-8 text-dim mb-3" strokeWidth={1.5} />
-            <p className="text-[13px] text-muted-foreground">No custom MCP servers connected</p>
-            <p className="text-[11px] text-dim mt-1">
+          <div className="island rounded-lg p-8 flex flex-col items-center text-center">
+            <Plug className="size-8 text-fg-dim mb-3" strokeWidth={1.5} />
+            <p className="text-ui text-fg-secondary">No custom MCP servers connected</p>
+            <p className="text-ui-xs text-fg-dim mt-1">
               Add a server manually or install one from the recommended list below
             </p>
           </div>
@@ -233,7 +233,7 @@ export function McpServersSettings() {
       {/* Recommended servers */}
       <div>
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-[13px] font-medium text-muted-foreground">Recommended servers</h3>
+          <h3 className="text-ui font-medium text-fg-secondary">Recommended servers</h3>
         </div>
 
         <div className="space-y-1.5">

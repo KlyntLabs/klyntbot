@@ -117,11 +117,11 @@ export function VoiceRecorder({ onTranscriptReady, onCancel }: VoiceRecorderProp
       <div className="relative">
         <div
           className={`size-16 rounded-full flex items-center justify-center ${
-            isCapturing ? "bg-brand/20" : "bg-muted/20"
+            isCapturing ? "bg-brand/20" : "bg-control-hover/20"
           }`}
         >
           <Mic
-            className={`size-7 ${isCapturing ? "text-brand" : "text-muted-foreground"}`}
+            className={`size-7 ${isCapturing ? "text-brand" : "text-fg-secondary"}`}
             strokeWidth={1.5}
           />
         </div>
@@ -133,14 +133,14 @@ export function VoiceRecorder({ onTranscriptReady, onCancel }: VoiceRecorderProp
       {isCapturing && <Waveform level={audioLevel} />}
 
       <div className="text-center">
-        {isCapturing && <p className="text-sm text-muted-foreground font-light">Listening...</p>}
+        {isCapturing && <p className="text-sm text-fg-secondary font-light">Listening...</p>}
         {isProcessing && (
-          <p className="text-sm text-muted-foreground font-light animate-pulse">Transcribing...</p>
+          <p className="text-sm text-fg-secondary font-light animate-pulse">Transcribing...</p>
         )}
       </div>
 
       {transcript && (
-        <p className="text-xs text-muted-foreground/60 text-center max-w-[400px] line-clamp-2 italic">
+        <p className="text-ui-sm text-fg-secondary/60 text-center max-w-[400px] line-clamp-2 italic">
           {transcript}
         </p>
       )}
@@ -150,7 +150,7 @@ export function VoiceRecorder({ onTranscriptReady, onCancel }: VoiceRecorderProp
           <button
             type="button"
             onClick={handleStop}
-            className="flex items-center gap-2 px-4 py-2 rounded-full bg-brand text-white text-xs font-medium hover:bg-brand/90 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 rounded-full bg-brand text-white text-ui-sm font-medium hover:bg-brand/90 transition-colors"
           >
             <Square className="size-3" fill="currentColor" />
             Done
@@ -158,7 +158,7 @@ export function VoiceRecorder({ onTranscriptReady, onCancel }: VoiceRecorderProp
         )}
       </div>
 
-      <div className="flex items-center gap-4 text-[11px] text-muted-foreground/50">
+      <div className="flex items-center gap-4 text-ui-xs text-fg-secondary/50">
         <span className="flex items-center gap-1">
           <kbd className="px-1 py-0.5 glass-badge text-[10px]">Enter</kbd> Stop
         </span>

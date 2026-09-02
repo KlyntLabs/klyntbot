@@ -39,14 +39,14 @@ export class ErrorBoundary extends Component<Props, State> {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="flex items-center justify-center min-h-screen bg-surface-base p-8">
+        <div className="flex items-center justify-center min-h-screen bg-bg-elevated p-8">
           <div className="max-w-md text-center space-y-4">
-            <h1 className="text-xl font-semibold text-foreground">Something went wrong</h1>
-            <p className="text-sm text-muted-foreground">
+            <h1 className="text-xl font-semibold text-fg">Something went wrong</h1>
+            <p className="text-ui text-fg-secondary">
               An unexpected error occurred. You can try again or reload the app.
             </p>
             {this.state.error && (
-              <pre className="text-xs text-left bg-surface-raised p-3 rounded-lg overflow-auto max-h-32 text-muted-foreground border border-border">
+              <pre className="text-ui-sm text-left bg-glass-subtle p-3 rounded-panel overflow-auto max-h-32 text-fg-secondary border border-separator">
                 {this.state.error.message}
               </pre>
             )}
@@ -54,14 +54,14 @@ export class ErrorBoundary extends Component<Props, State> {
               <button
                 type="button"
                 onClick={this.handleRetry}
-                className="px-4 py-2 text-sm rounded-lg border border-border text-foreground hover:bg-surface-raised transition-colors"
+                className="px-4 py-2 text-ui rounded-control border border-separator text-fg hover:bg-glass-subtle transition-colors"
               >
                 Try Again
               </button>
               <button
                 type="button"
                 onClick={this.handleReload}
-                className="px-4 py-2 text-sm rounded-lg bg-accent-primary text-white hover:opacity-90 transition-opacity"
+                className="px-4 py-2 text-ui rounded-control bg-brand text-brand-foreground hover:bg-brand-hover transition-opacity"
               >
                 Reload App
               </button>

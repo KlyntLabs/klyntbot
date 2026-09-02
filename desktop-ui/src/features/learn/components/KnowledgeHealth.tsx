@@ -18,12 +18,12 @@ function TopicRow({ topic }: { topic: TopicHealth }) {
     <div className="flex items-center gap-3 py-2">
       {/* Name + domain */}
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium text-primary truncate">{topic.name}</p>
-        <p className="text-2xs text-muted truncate">{topic.domain}</p>
+        <p className="text-sm font-medium text-brand truncate">{topic.name}</p>
+        <p className="text-ui-xs text-fg-secondary truncate">{topic.domain}</p>
       </div>
 
       {/* Atom count */}
-      <span className="text-2xs text-muted-foreground tabular-nums shrink-0">
+      <span className="text-ui-xs text-fg-secondary tabular-nums shrink-0">
         {topic.atomCount} atom{topic.atomCount !== 1 ? "s" : ""}
       </span>
 
@@ -39,7 +39,7 @@ function TopicRow({ topic }: { topic: TopicHealth }) {
 
       {/* Retention % */}
       <span
-        className={`text-xs font-medium tabular-nums w-10 text-right shrink-0 ${retentionTextColor(topic.avgRetention)}`}
+        className={`text-ui-sm font-medium tabular-nums w-10 text-right shrink-0 ${retentionTextColor(topic.avgRetention)}`}
       >
         {pct}%
       </span>
@@ -47,7 +47,7 @@ function TopicRow({ topic }: { topic: TopicHealth }) {
       {/* Review button */}
       <Link
         to={`/learn/review/${topic.id}`}
-        className="flex items-center gap-1 px-2 py-1 rounded-md text-2xs font-medium text-purple-400 hover:bg-purple-500/15 transition-colors shrink-0"
+        className="flex items-center gap-1 px-2 py-1 rounded-md text-ui-xs font-medium text-purple-400 hover:bg-purple-500/15 transition-colors shrink-0"
       >
         <Play size={10} strokeWidth={1.5} />
         Review
@@ -64,7 +64,7 @@ function TrendsTab() {
   return (
     <div className="glass-card rounded-xl p-5">
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+        <h2 className="text-ui-sm font-medium text-fg-secondary uppercase tracking-wider">
           Retention Trends
         </h2>
         <div className="flex items-center gap-1">
@@ -73,10 +73,10 @@ function TrendsTab() {
               type="button"
               key={d}
               onClick={() => setDays(d)}
-              className={`px-2 py-0.5 text-2xs rounded-md transition-colors ${
+              className={`px-2 py-0.5 text-ui-xs rounded-md transition-colors ${
                 days === d
                   ? "bg-brand/20 text-brand font-medium"
-                  : "text-muted-foreground hover:text-foreground"
+                  : "text-fg-secondary hover:text-fg"
               }`}
             >
               {d}d
@@ -86,7 +86,7 @@ function TrendsTab() {
       </div>
       <Suspense
         fallback={
-          <div className="flex items-center justify-center h-full text-muted text-sm">
+          <div className="flex items-center justify-center h-full text-fg-secondary text-sm">
             Loading...
           </div>
         }
@@ -110,23 +110,23 @@ export function KnowledgeHealth() {
       <div className="flex items-center gap-3">
         <Link
           to="/learn"
-          className="p-1 rounded-md text-muted-foreground hover:text-primary hover:bg-surface-hover transition-colors"
+          className="p-1 rounded-md text-fg-secondary hover:text-brand hover:bg-control-hover transition-colors"
         >
           <ArrowLeft size={18} strokeWidth={1.5} />
         </Link>
         <Activity size={20} className="text-brand" strokeWidth={1.5} />
-        <h1 className="text-lg font-semibold text-foreground">Knowledge Health</h1>
+        <h1 className="text-lg font-semibold text-fg">Knowledge Health</h1>
       </div>
 
       {/* Summary stats */}
       <div className="grid grid-cols-3 gap-3">
         <div className="glass-card rounded-xl p-4 text-center">
-          <p className="text-2xl font-bold text-foreground tabular-nums">{health.totalAtoms}</p>
-          <p className="text-[11px] text-muted-foreground mt-0.5">Total Atoms</p>
+          <p className="text-2xl font-bold text-fg tabular-nums">{health.totalAtoms}</p>
+          <p className="text-ui-xs text-fg-secondary mt-0.5">Total Atoms</p>
         </div>
         <div className="glass-card rounded-xl p-4 text-center">
-          <p className="text-2xl font-bold text-foreground tabular-nums">{health.activeAtoms}</p>
-          <p className="text-[11px] text-muted-foreground mt-0.5">Active</p>
+          <p className="text-2xl font-bold text-fg tabular-nums">{health.activeAtoms}</p>
+          <p className="text-ui-xs text-fg-secondary mt-0.5">Active</p>
         </div>
         <div className="glass-card rounded-xl p-4 text-center">
           <p
@@ -134,21 +134,21 @@ export function KnowledgeHealth() {
           >
             {avgPct}%
           </p>
-          <p className="text-[11px] text-muted-foreground mt-0.5">Avg Retention</p>
+          <p className="text-ui-xs text-fg-secondary mt-0.5">Avg Retention</p>
         </div>
       </div>
 
       {/* Tab bar */}
-      <div className="flex items-center gap-1 border-b border-border/30 pb-0">
+      <div className="flex items-center gap-1 border-b border-separator/30 pb-0">
         {(["topics", "trends", "graph"] as const).map((tab) => (
           <button
             type="button"
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`px-3 py-2 text-xs font-medium capitalize transition-colors border-b-2 -mb-px ${
+            className={`px-3 py-2 text-ui-sm font-medium capitalize transition-colors border-b-2 -mb-px ${
               activeTab === tab
                 ? "border-brand text-brand"
-                : "border-transparent text-muted-foreground hover:text-foreground"
+                : "border-transparent text-fg-secondary hover:text-fg"
             }`}
           >
             {tab}
@@ -160,18 +160,18 @@ export function KnowledgeHealth() {
       {activeTab === "topics" &&
         (isEmpty ? (
           <div className="glass-card rounded-xl p-8 text-center">
-            <Brain size={32} className="mx-auto text-muted-foreground mb-3" strokeWidth={1.5} />
-            <p className="text-sm text-muted-foreground">
+            <Brain size={32} className="mx-auto text-fg-secondary mb-3" strokeWidth={1.5} />
+            <p className="text-sm text-fg-secondary">
               No knowledge atoms yet. Accept suggested atoms from your notes to start tracking
               retention.
             </p>
           </div>
         ) : (
           <div className="glass-card rounded-xl p-5">
-            <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
+            <h2 className="text-ui-sm font-medium text-fg-secondary uppercase tracking-wider mb-3">
               Topics ({health.topics.length})
             </h2>
-            <div className="divide-y divide-border/30">
+            <div className="divide-y divide-separator/30">
               {health.topics.map((topic) => (
                 <TopicRow key={topic.id} topic={topic} />
               ))}
@@ -183,7 +183,7 @@ export function KnowledgeHealth() {
 
       {activeTab === "graph" && (
         <div className="glass-card rounded-xl p-5">
-          <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
+          <h2 className="text-ui-sm font-medium text-fg-secondary uppercase tracking-wider mb-3">
             Knowledge Graph
           </h2>
           <AtomGraph />

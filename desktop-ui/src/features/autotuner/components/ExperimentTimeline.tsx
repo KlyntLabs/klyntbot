@@ -17,20 +17,20 @@ function formatDate(iso: string): string {
 export function ExperimentTimeline({ experiments, loading }: ExperimentTimelineProps) {
   return (
     <div className="glass-card p-4 flex flex-col gap-3">
-      <h2 className="text-[13px] font-medium text-muted-foreground flex items-center gap-2">
-        <FlaskConical className="size-3.5 text-muted-foreground" />
+      <h2 className="text-ui font-medium text-fg-secondary flex items-center gap-2">
+        <FlaskConical className="size-3.5 text-fg-secondary" />
         Experiment History
         {experiments.length > 0 && (
-          <span className="text-2xs text-dim font-light ml-auto">
+          <span className="text-ui-xs text-fg-dim font-light ml-auto">
             {experiments.length} {experiments.length === 1 ? "experiment" : "experiments"}
           </span>
         )}
       </h2>
 
-      {loading && <p className="text-xs font-light text-dim">Loading&hellip;</p>}
+      {loading && <p className="text-ui-sm font-light text-fg-dim">Loading&hellip;</p>}
 
       {!loading && experiments.length === 0 && (
-        <p className="text-xs font-light text-dim">No experiments yet</p>
+        <p className="text-ui-sm font-light text-fg-dim">No experiments yet</p>
       )}
 
       {!loading && experiments.length > 0 && (
@@ -45,10 +45,10 @@ export function ExperimentTimeline({ experiments, loading }: ExperimentTimelineP
 
               {/* Content */}
               <div className="flex flex-col gap-0.5 pb-2 min-w-0">
-                <p className="text-xs font-light text-foreground leading-snug truncate">
+                <p className="text-ui-sm font-light text-fg leading-snug truncate">
                   {exp.hypothesis}
                 </p>
-                <p className="text-2xs font-light text-dim tabular-nums">
+                <p className="text-ui-xs font-light text-fg-dim tabular-nums">
                   {exp.variant_count}v &middot; {exp.messages_scored} scored &middot;{" "}
                   {formatDate(exp.started_at)}
                 </p>

@@ -13,12 +13,12 @@ interface InteractionCardProps {
 
 function optionButtonClass(isSelected: boolean, isFocused: boolean) {
   return cn(
-    "rounded-lg border text-xs font-light transition-colors",
+    "rounded-lg border text-ui-sm font-light transition-colors",
     isSelected
-      ? "border-brand bg-brand/10 text-foreground"
+      ? "border-brand bg-brand/10 text-fg"
       : isFocused
-        ? "border-border bg-muted text-foreground"
-        : "border-transparent bg-muted/50 text-muted-foreground hover:bg-muted",
+        ? "border-separator bg-control-hover text-fg"
+        : "border-transparent bg-control-hover/50 text-fg-secondary hover:bg-control-hover",
   );
 }
 
@@ -191,7 +191,7 @@ export function InteractionCard({
     >
       <div className="w-full max-w-[85%] rounded-xl glass-card overflow-hidden">
         {/* Header */}
-        <div className="px-4 pt-3 pb-2 text-[11px] font-light text-muted-foreground">
+        <div className="px-4 pt-3 pb-2 text-ui-xs font-light text-fg-secondary">
           Klynt is asking…
         </div>
 
@@ -203,10 +203,10 @@ export function InteractionCard({
                 type="button"
                 key={q.id}
                 onClick={() => setActiveTab(i)}
-                className={`px-3 py-1 rounded-md text-[11px] font-light transition-colors ${
+                className={`px-3 py-1 rounded-md text-ui-xs font-light transition-colors ${
                   i === activeTab
-                    ? "bg-muted text-foreground"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                    ? "bg-control-hover text-fg"
+                    : "text-fg-secondary hover:text-fg hover:bg-control-hover"
                 }`}
               >
                 {q.title}
@@ -217,7 +217,7 @@ export function InteractionCard({
 
         {/* Question body */}
         <div className="px-4 pb-3">
-          <p className="text-[13px] font-light text-foreground mb-3">{question.text}</p>
+          <p className="text-ui font-light text-fg mb-3">{question.text}</p>
 
           {/* Single / Multi select */}
           {(question.answer_type.type === "single_select" ||
@@ -241,9 +241,9 @@ export function InteractionCard({
                       optionButtonClass(isSelected, focusIndex === i),
                     )}
                   >
-                    <div className="text-xs font-light">{opt.label}</div>
+                    <div className="text-ui-sm font-light">{opt.label}</div>
                     {opt.description && (
-                      <div className="text-[11px] font-light text-muted-foreground mt-0.5">
+                      <div className="text-ui-xs font-light text-fg-secondary mt-0.5">
                         {opt.description}
                       </div>
                     )}
@@ -294,19 +294,19 @@ export function InteractionCard({
                     }
                   }}
                   placeholder={question.answer_type.placeholder ?? ""}
-                  className="w-full bg-muted text-foreground text-xs font-light px-3 py-2 rounded-lg border border-border"
+                  className="w-full bg-control-hover text-fg text-ui-sm font-light px-3 py-2 rounded-lg border border-separator"
                 />
               );
             })()}
         </div>
 
         {/* Footer: Submit / Cancel */}
-        <div className="flex items-center justify-end gap-2 px-4 py-2 border-t border-border">
+        <div className="flex items-center justify-end gap-2 px-4 py-2 border-t border-separator">
           <button
             type="button"
             onClick={handleCancel}
             disabled={submitting}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-light text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-ui-xs font-light text-fg-secondary hover:text-fg hover:bg-control-hover transition-colors disabled:opacity-50"
           >
             <X className="size-3" strokeWidth={1.5} />
             Cancel
@@ -315,7 +315,7 @@ export function InteractionCard({
             type="button"
             onClick={handleSubmit}
             disabled={submitting}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand text-[11px] font-light hover:bg-brand/90 transition-colors disabled:opacity-50"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand text-brand-foreground text-ui-xs font-light hover:bg-brand/90 transition-colors disabled:opacity-50"
           >
             <Check className="size-3" strokeWidth={2} />
             Submit

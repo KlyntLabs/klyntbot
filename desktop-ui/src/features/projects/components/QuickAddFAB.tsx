@@ -21,7 +21,7 @@ export function QuickAddFAB({ onAddTask, onAddNote, onAddObjective }: QuickAddFA
       <button
         type="button"
         onClick={onAddTask}
-        className="flex items-center gap-1.5 px-4 py-2.5 rounded-l-lg bg-brand text-white text-xs font-medium hover:bg-brand/90 transition-colors"
+        className="flex items-center gap-1.5 px-4 py-2.5 rounded-l-lg bg-brand text-white text-ui-sm font-medium hover:bg-brand/90 transition-colors"
       >
         <Plus className="size-3.5" /> Add Task
       </button>
@@ -40,7 +40,7 @@ export function QuickAddFAB({ onAddTask, onAddNote, onAddObjective }: QuickAddFA
               onAddTask();
               setOpen(false);
             }}
-            className="w-full px-3 py-2 text-left text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+            className="w-full px-3 py-2 text-left text-ui-sm text-fg-secondary hover:text-fg hover:bg-control-hover transition-colors"
           >
             New Task
           </button>
@@ -50,7 +50,7 @@ export function QuickAddFAB({ onAddTask, onAddNote, onAddObjective }: QuickAddFA
               onAddNote();
               setOpen(false);
             }}
-            className="w-full px-3 py-2 text-left text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+            className="w-full px-3 py-2 text-left text-ui-sm text-fg-secondary hover:text-fg hover:bg-control-hover transition-colors"
           >
             New Note
           </button>
@@ -60,7 +60,7 @@ export function QuickAddFAB({ onAddTask, onAddNote, onAddObjective }: QuickAddFA
               onAddObjective();
               setOpen(false);
             }}
-            className="w-full px-3 py-2 text-left text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+            className="w-full px-3 py-2 text-left text-ui-sm text-fg-secondary hover:text-fg hover:bg-control-hover transition-colors"
           >
             New Objective
           </button>

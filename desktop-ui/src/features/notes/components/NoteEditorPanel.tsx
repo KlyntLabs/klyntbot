@@ -113,7 +113,7 @@ export function NoteEditorPanel({
           onInput={handleTitleInput}
           onKeyDown={handleTitleKeyDown}
           data-placeholder="Untitled"
-          className="text-4xl font-bold text-foreground outline-none min-h-[1.5em] empty:before:content-[attr(data-placeholder)] empty:before:text-muted-foreground/50"
+          className="text-4xl font-bold text-fg outline-none min-h-[1.5em] empty:before:content-[attr(data-placeholder)] empty:before:text-fg-secondary/50"
         />
 
         {/* Tags */}

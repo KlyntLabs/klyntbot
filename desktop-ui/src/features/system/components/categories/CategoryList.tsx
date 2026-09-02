@@ -46,11 +46,11 @@ export function CategoryList({ categories, selectedId, onSelect, onCreated }: Ca
   return (
     <div className="glass-card p-3 flex flex-col gap-2">
       <div className="flex items-center justify-between">
-        <h3 className="text-xs font-medium text-muted-foreground">Categories</h3>
+        <h3 className="text-ui-sm font-medium text-fg-secondary">Categories</h3>
         <button
           type="button"
           onClick={handleCreate}
-          className="p-1 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+          className="p-1 rounded-md hover:bg-control-hover text-fg-secondary hover:text-fg transition-colors"
           title="Add category"
         >
           <Plus size={14} />
@@ -61,7 +61,7 @@ export function CategoryList({ categories, selectedId, onSelect, onCreated }: Ca
         <div key={group.type} className="flex flex-col gap-0.5">
           <div className="flex items-center gap-1.5 py-1">
             <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: group.color }} />
-            <span className="text-2xs font-medium text-muted-foreground uppercase tracking-wider">
+            <span className="text-ui-xs font-medium text-fg-secondary uppercase tracking-wider">
               {group.label}
             </span>
           </div>
@@ -74,15 +74,15 @@ export function CategoryList({ categories, selectedId, onSelect, onCreated }: Ca
                 onClick={() => onSelect(cat.id)}
                 className={`flex items-center gap-2 px-2 py-1.5 rounded-lg text-left transition-colors ${
                   isSelected
-                    ? "bg-muted text-foreground"
-                    : "text-muted-foreground hover:bg-card hover:text-foreground"
+                    ? "bg-control-hover text-fg"
+                    : "text-fg-secondary hover:bg-bg-elevated hover:text-fg"
                 }`}
               >
                 <span
                   className="size-2.5 rounded-sm flex-shrink-0"
                   style={{ backgroundColor: cat.color ?? getCategoryColor(cat.id) }}
                 />
-                <span className="text-[11px] font-light truncate">{cat.name}</span>
+                <span className="text-ui-xs font-light truncate">{cat.name}</span>
               </button>
             );
           })}

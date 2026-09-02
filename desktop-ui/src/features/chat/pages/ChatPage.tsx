@@ -273,14 +273,14 @@ export function ChatPage() {
       {/* Right Panel — Conversation */}
       <div className="flex-1 flex flex-col overflow-hidden rounded-xl relative">
         {/* Toolbar: resume banner, squad header, voice toggle, transparency */}
-        <div className="flex items-center justify-between px-4 py-2 border-b border-border-subtle">
+        <div className="flex items-center justify-between px-4 py-2 border-b border-separator">
           {resumeBanner ? (
-            <div className="flex items-center gap-2 text-xs">
+            <div className="flex items-center gap-2 text-ui-sm">
               <span className="text-brand font-medium">Resuming: {resumeBanner}</span>
               <button
                 type="button"
                 onClick={() => setResumeBanner(null)}
-                className="text-muted-foreground hover:text-foreground"
+                className="text-fg-secondary hover:text-fg"
               >
                 ×
               </button>
@@ -290,8 +290,8 @@ export function ChatPage() {
           )}
           <div className="flex items-center gap-2">
             {voicePhase !== "idle" && (
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <span className="h-2 w-2 rounded-full bg-success animate-pulse" />
+              <div className="flex items-center gap-1.5 text-ui-sm text-fg-secondary">
+                <span className="h-2 w-2 rounded-full bg-status-success animate-pulse" />
                 <span>
                   {voicePhase === "listening"
                     ? "Listening"
@@ -309,8 +309,8 @@ export function ChatPage() {
           <div className="max-w-3xl mx-auto">
             {chat.messages.length === 0 && !chat.isStreaming ? (
               <div className="flex flex-col items-center justify-center py-20">
-                <p className="text-muted-foreground text-sm font-light">Start a conversation</p>
-                <p className="text-dim text-xs font-light mt-1">
+                <p className="text-fg-secondary text-sm font-light">Start a conversation</p>
+                <p className="text-fg-dim text-ui-sm font-light mt-1">
                   Ask Klynt anything about your tasks, projects, or schedule
                 </p>
               </div>
@@ -346,7 +346,7 @@ export function ChatPage() {
         {providerStatus === "fallback" && (
           <div className="px-6 pb-2">
             <div className="max-w-3xl mx-auto">
-              <div className="px-4 py-2 text-xs text-amber-400 bg-amber-400/5 rounded-lg">
+              <div className="px-4 py-2 text-ui-sm text-amber-400 bg-amber-400/5 rounded-lg">
                 Claude is taking a moment. I'm working from what I already know about you — give me
                 a sec.
               </div>
@@ -356,7 +356,7 @@ export function ChatPage() {
         {providerStatus === "offline" && (
           <div className="px-6 pb-2">
             <div className="max-w-3xl mx-auto">
-              <div className="px-4 py-2 text-xs text-muted-foreground bg-accent rounded-lg">
+              <div className="px-4 py-2 text-ui-sm text-fg-secondary bg-control-hover rounded-lg">
                 All my cloud connections are down right now. I can still search your tasks, notes,
                 and memory locally — just ask.
               </div>

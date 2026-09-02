@@ -17,7 +17,7 @@ export function DueTodayTray({
   if (entries.length === 0) return null;
 
   return (
-    <div className="flex flex-wrap gap-1 px-1.5 py-1 border-b border-border bg-surface-base/50">
+    <div className="flex flex-wrap gap-1 px-1.5 py-1 border-b border-separator bg-bg-elevated/50">
       {entries.map((entry) => {
         const meta = entry.metadata as Record<string, unknown> | undefined;
         const taskId = (meta?.taskId as string) ?? entry.entityId ?? entry.id;
@@ -29,7 +29,7 @@ export function DueTodayTray({
             key={entry.id}
             type="button"
             className={cn(
-              "px-1.5 py-0.5 rounded text-2xs truncate max-w-[120px] cursor-grab",
+              "px-1.5 py-0.5 rounded text-ui-xs truncate max-w-[120px] cursor-grab",
               "bg-[var(--timeline-todo)]/15 text-[var(--timeline-todo)]",
               "hover:bg-[var(--timeline-todo)]/25 transition-colors",
               isSelected && "ring-1 ring-brand",

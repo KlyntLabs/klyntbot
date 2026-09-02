@@ -59,7 +59,7 @@ export function DraggableTaskBlock({
       {/* biome-ignore lint/a11y/noStaticElementInteractions: drag handle for timeline scheduling */}
       <div
         className={cn(
-          "absolute rounded-md px-1.5 py-0.5 text-[11px] leading-tight overflow-hidden",
+          "absolute rounded-md px-1.5 py-0.5 text-ui-xs leading-tight overflow-hidden",
           "border-l-2 border-l-[var(--timeline-todo)] bg-[var(--timeline-todo)]/15",
           "hover:bg-[var(--timeline-todo)]/25 transition-colors",
           isDragging && "opacity-50",
@@ -86,9 +86,9 @@ export function DraggableTaskBlock({
           }
         }}
       >
-        <span className="text-muted-foreground truncate block">{entry.title}</span>
+        <span className="text-fg-secondary truncate block">{entry.title}</span>
         {status && height > 28 && (
-          <span className="text-muted-foreground text-2xs truncate block capitalize">{status}</span>
+          <span className="text-fg-secondary text-ui-xs truncate block capitalize">{status}</span>
         )}
         {/* Resize handle zone */}
         {/* biome-ignore lint/a11y/noStaticElementInteractions: resize handle for timeline block */}

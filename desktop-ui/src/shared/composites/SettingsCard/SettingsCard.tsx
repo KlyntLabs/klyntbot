@@ -1,4 +1,4 @@
-import { cn } from "@shared/lib/utils";
+import { cn } from "@klyntbot/design-system";
 import type { ReactNode } from "react";
 
 interface SettingsCardProps {
@@ -9,8 +9,8 @@ interface SettingsCardProps {
 
 export function SettingsCard({ title, children, className }: SettingsCardProps) {
   return (
-    <div className={cn("bg-card rounded-lg border border-border p-4", className)}>
-      <h3 className="text-[13px] font-medium text-muted-foreground mb-3">{title}</h3>
+    <div className={cn("island rounded-panel p-4", className)}>
+      <h3 className="text-ui font-medium text-fg-secondary mb-3">{title}</h3>
       {children}
     </div>
   );

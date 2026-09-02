@@ -54,13 +54,13 @@ export function MirrorInput() {
             onKeyDown={handleKeyDown}
             placeholder="Ask me about how I think..."
             rows={1}
-            className="flex-1 bg-transparent text-[12px] text-foreground placeholder:text-dim resize-none outline-none leading-relaxed max-h-32 overflow-y-auto"
+            className="flex-1 bg-transparent text-ui-sm text-fg placeholder:text-fg-dim resize-none outline-none leading-relaxed max-h-32 overflow-y-auto"
           />
           <button
             type="button"
             onClick={handleSubmit}
             disabled={!query.trim() || loading}
-            className="shrink-0 p-1.5 rounded-lg text-muted-foreground hover:text-brand hover:bg-brand/10 transition-colors disabled:opacity-40 disabled:pointer-events-none"
+            className="shrink-0 p-1.5 rounded-lg text-fg-secondary hover:text-brand hover:bg-brand/10 transition-colors disabled:opacity-40 disabled:pointer-events-none"
             aria-label="Send"
           >
             <Send className="size-4" />
@@ -70,19 +70,19 @@ export function MirrorInput() {
 
       {loading && (
         <div className="glass-panel rounded-xl p-4">
-          <p className="text-[11px] text-muted-foreground animate-pulse">Thinking...</p>
+          <p className="text-ui-xs text-fg-secondary animate-pulse">Thinking...</p>
         </div>
       )}
 
       {response && !loading && (
         <div className="glass-panel rounded-xl p-4">
-          <p className="text-[12px] text-foreground leading-relaxed">{response.answer}</p>
+          <p className="text-ui-sm text-fg leading-relaxed">{response.answer}</p>
           {response.dataSourcesUsed.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-3">
               {response.dataSourcesUsed.map((src) => (
                 <span
                   key={src}
-                  className="text-2xs px-1.5 py-0.5 rounded bg-accent/40 text-muted-foreground"
+                  className="text-ui-xs px-1.5 py-0.5 rounded bg-control-hover/40 text-fg-secondary"
                 >
                   {src}
                 </span>

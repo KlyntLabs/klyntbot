@@ -125,20 +125,20 @@ export function TrackedAppsList({ apps, categories, onReassigned }: TrackedAppsL
 
   return (
     <div className="glass-card p-3 flex flex-col gap-2">
-      <h3 className="text-xs font-medium text-muted-foreground">Tracked Apps & Sites</h3>
+      <h3 className="text-ui-sm font-medium text-fg-secondary">Tracked Apps & Sites</h3>
 
       {/* Search */}
       <div className="relative">
         <Search
           size={12}
-          className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+          className="absolute left-2.5 top-1/2 -translate-y-1/2 text-fg-secondary"
         />
         <input
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search..."
-          className="glass-input w-full pl-7 pr-2.5 py-1.5 text-[11px] rounded-lg"
+          className="glass-input w-full pl-7 pr-2.5 py-1.5 text-ui-xs rounded-lg"
         />
       </div>
 
@@ -147,8 +147,8 @@ export function TrackedAppsList({ apps, categories, onReassigned }: TrackedAppsL
         <button
           type="button"
           onClick={() => setShowUncategorized(!showUncategorized)}
-          className={`text-2xs font-light px-2 py-1 rounded-lg transition-colors ${
-            showUncategorized ? "bg-brand/20 text-brand" : "text-muted-foreground hover:bg-card"
+          className={`text-ui-xs font-light px-2 py-1 rounded-lg transition-colors ${
+            showUncategorized ? "bg-brand/20 text-brand" : "text-fg-secondary hover:bg-bg-elevated"
           }`}
         >
           Uncategorized ({uncategorizedCount})
@@ -173,7 +173,7 @@ export function TrackedAppsList({ apps, categories, onReassigned }: TrackedAppsL
           );
         })}
         {filtered.length === 0 && (
-          <p className="text-[11px] font-light text-dim py-4 text-center">No apps found</p>
+          <p className="text-ui-xs font-light text-fg-dim py-4 text-center">No apps found</p>
         )}
       </div>
     </div>
@@ -198,21 +198,21 @@ function TrackedAppRow({
   onCancel: () => void;
 }) {
   return (
-    <div className="flex items-center gap-2 px-1.5 py-1 rounded-md hover:bg-card group">
+    <div className="flex items-center gap-2 px-1.5 py-1 rounded-md hover:bg-bg-elevated group">
       {color ? (
         <span className="size-2 rounded-sm flex-shrink-0" style={{ backgroundColor: color }} />
       ) : (
         <span className="size-2 rounded-sm flex-shrink-0 border border-dashed border-muted" />
       )}
       <div className="flex-1 min-w-0">
-        <div className="text-[11px] font-light text-foreground truncate">{app.displayName}</div>
-        <div className="text-[9px] font-light text-dim">
+        <div className="text-ui-xs font-light text-fg truncate">{app.displayName}</div>
+        <div className="text-[9px] font-light text-fg-dim">
           {app.categoryName ?? "Uncategorized"} · {formatHumanDuration(app.totalSecs)}
         </div>
       </div>
       {isEditing ? (
         <select
-          className="glass-input text-2xs px-1.5 py-0.5 rounded-md w-24"
+          className="glass-input text-ui-xs px-1.5 py-0.5 rounded-md w-24"
           defaultValue={app.categoryId ?? ""}
           onChange={(e) => onReassign(e.target.value)}
           onBlur={onCancel}
@@ -230,7 +230,7 @@ function TrackedAppRow({
         <button
           type="button"
           onClick={onEdit}
-          className="text-[9px] font-light text-dim opacity-0 group-hover:opacity-100 transition-opacity hover:text-foreground"
+          className="text-[9px] font-light text-fg-dim opacity-0 group-hover:opacity-100 transition-opacity hover:text-fg"
         >
           Edit
         </button>

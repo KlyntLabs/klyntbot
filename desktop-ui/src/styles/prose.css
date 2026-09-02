@@ -10,7 +10,7 @@
 /* ── Base ──────────────────────────────────────────────────────────────── */
 
 .prose-content {
-  color: var(--color-foreground);
+  color: var(--ds-text);
   font-size: 0.8125rem; /* 13px — chat-appropriate */
   line-height: 1.75;
 }
@@ -25,14 +25,14 @@
   font-size: 1.25rem;
   font-weight: 700;
   margin: 1.25rem 0 0.5rem;
-  color: var(--color-foreground);
+  color: var(--ds-text);
   letter-spacing: -0.025em;
   padding-bottom: 0.35rem;
   border-bottom: 2px solid transparent;
   border-image: linear-gradient(
       90deg,
-      var(--color-brand) 0%,
-      rgba(167, 139, 250, 0.6) 40%,
+      var(--ds-accent) 0%,
+      color-mix(in srgb, var(--ds-purple) 60%, transparent) 40%,
       transparent 80%
     )
     1;
@@ -43,7 +43,7 @@
   font-weight: 600;
   margin: 1rem 0 0.4rem;
   letter-spacing: -0.02em;
-  background: linear-gradient(135deg, var(--color-foreground) 0%, var(--color-info) 100%);
+  background: linear-gradient(135deg, var(--ds-text) 0%, var(--ds-status-info) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -54,7 +54,7 @@
   font-weight: 600;
   margin: 0.75rem 0 0.35rem;
   letter-spacing: -0.015em;
-  background: linear-gradient(135deg, var(--color-foreground) 0%, var(--color-purple) 100%);
+  background: linear-gradient(135deg, var(--ds-text) 0%, var(--ds-purple) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -66,18 +66,18 @@
   font-size: 0.875rem;
   font-weight: 600;
   margin: 0.625rem 0 0.25rem;
-  color: var(--color-foreground);
+  color: var(--ds-text);
 }
 
 /* ── Strong & emphasis ─────────────────────────────────────────────────── */
 
 .prose-content strong {
   font-weight: 700;
-  color: var(--color-foreground);
+  color: var(--ds-text);
 }
 
 .prose-content em {
-  color: var(--color-muted-foreground);
+  color: var(--ds-text-secondary);
   font-style: italic;
 }
 
@@ -118,16 +118,20 @@
 }
 
 .prose-content li::marker {
-  color: color-mix(in srgb, var(--brand) 50%, var(--color-muted-foreground));
+  color: color-mix(in srgb, var(--ds-accent) 50%, var(--ds-text-secondary));
 }
 
 /* ── Blockquote ────────────────────────────────────────────────────────── */
 
 .prose-content blockquote {
-  border-left: 3px solid var(--color-brand);
+  border-left: 3px solid var(--ds-accent);
   margin: 0.625rem 0;
-  color: var(--color-muted-foreground);
-  background: linear-gradient(135deg, rgba(249, 115, 22, 0.06) 0%, rgba(249, 115, 22, 0.02) 100%);
+  color: var(--ds-text-secondary);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--ds-accent) 6%, transparent) 0%,
+    color-mix(in srgb, var(--ds-accent) 2%, transparent) 100%
+  );
   border-radius: 0 0.625rem 0.625rem 0;
   padding: 0.625rem 1rem;
 }
@@ -139,20 +143,20 @@
 /* ── Inline code ───────────────────────────────────────────────────────── */
 
 .prose-content code {
-  background: color-mix(in srgb, var(--brand) 8%, rgba(255, 255, 255, 0.06));
-  border: 1px solid color-mix(in srgb, var(--brand) 12%, transparent);
+  background: color-mix(in srgb, var(--ds-accent) 8%, var(--ds-code-bg));
+  border: 1px solid color-mix(in srgb, var(--ds-accent) 12%, transparent);
   border-radius: 5px;
   padding: 0.1rem 0.4rem;
   font-size: 0.84em;
   font-family: var(--font-mono, ui-monospace, monospace);
-  color: var(--color-brand-hover);
+  color: var(--ds-accent-hover);
 }
 
 /* ── Code blocks ───────────────────────────────────────────────────────── */
 
 .prose-content pre {
-  background: rgba(0, 0, 0, 0.4);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--ds-overlay);
+  border: 1px solid var(--ds-glass-badge-border);
   border-radius: 0.75rem;
   padding: 0.875rem 1rem;
   margin: 0.625rem 0;
@@ -170,7 +174,7 @@
   background: linear-gradient(
     90deg,
     transparent,
-    color-mix(in srgb, var(--brand) 20%, transparent),
+    color-mix(in srgb, var(--ds-accent) 20%, transparent),
     transparent
   );
 }
@@ -182,7 +186,7 @@
   border-radius: 0;
   font-size: 0.8125rem;
   line-height: 1.6;
-  color: var(--color-foreground);
+  color: var(--ds-text);
 }
 
 /* ── Tables ────────────────────────────────────────────────────────────── */
@@ -193,28 +197,28 @@
   margin: 0.625rem 0;
   border-radius: 0.625rem;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--ds-glass-badge-border);
 }
 
 .prose-content th,
 .prose-content td {
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--ds-separator);
   padding: 0.4rem 0.625rem;
   text-align: left;
   font-size: 0.8125rem;
 }
 
 .prose-content th {
-  background: color-mix(in srgb, var(--brand) 6%, rgba(255, 255, 255, 0.03));
+  background: color-mix(in srgb, var(--ds-accent) 6%, var(--ds-glass-badge));
   font-weight: 600;
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.03em;
-  color: var(--color-brand-hover);
+  color: var(--ds-accent-hover);
 }
 
 .prose-content tr:hover td {
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--ds-control-hover);
 }
 
 /* ── Horizontal rule ───────────────────────────────────────────────────── */
@@ -225,8 +229,8 @@
   background: linear-gradient(
     90deg,
     transparent 0%,
-    color-mix(in srgb, var(--brand) 25%, rgba(255, 255, 255, 0.08)) 30%,
-    color-mix(in srgb, var(--brand) 25%, rgba(255, 255, 255, 0.08)) 70%,
+    color-mix(in srgb, var(--ds-accent) 25%, var(--ds-glass-badge-border)) 30%,
+    color-mix(in srgb, var(--ds-accent) 25%, var(--ds-glass-badge-border)) 70%,
     transparent 100%
   );
   margin: 1.25rem 0;
@@ -235,9 +239,9 @@
 /* ── Links ─────────────────────────────────────────────────────────────── */
 
 .prose-content a {
-  color: var(--color-brand);
+  color: var(--ds-accent);
   text-decoration: underline;
-  text-decoration-color: color-mix(in srgb, var(--color-brand) 40%, transparent);
+  text-decoration-color: color-mix(in srgb, var(--ds-accent) 40%, transparent);
   text-underline-offset: 3px;
   transition:
     text-decoration-color 0.15s ease,
@@ -245,15 +249,15 @@
 }
 
 .prose-content a:hover {
-  color: var(--color-brand-hover);
-  text-decoration-color: var(--color-brand-hover);
+  color: var(--ds-accent-hover);
+  text-decoration-color: var(--ds-accent-hover);
 }
 
 /* ── Strikethrough (GFM) ───────────────────────────────────────────────── */
 
 .prose-content del {
-  color: var(--color-muted-foreground);
-  text-decoration-color: var(--color-muted-foreground);
+  color: var(--ds-text-secondary);
+  text-decoration-color: var(--ds-text-secondary);
 }
 
 /* ── Images ────────────────────────────────────────────────────────────── */
@@ -263,16 +267,20 @@
   height: auto;
   border-radius: 0.75rem;
   margin: 0.5rem 0;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--ds-glass-badge-border);
 }
 
 /* ── Highlight / mark ──────────────────────────────────────────────────── */
 
 .prose-content mark {
-  background: linear-gradient(135deg, rgba(249, 115, 22, 0.3) 0%, rgba(251, 146, 60, 0.2) 100%);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--ds-status-warning) 30%, transparent) 0%,
+    color-mix(in srgb, var(--ds-status-warning) 20%, transparent) 100%
+  );
   border-radius: 3px;
   padding: 1px 4px;
-  color: var(--color-foreground);
+  color: var(--ds-text);
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
 }
@@ -281,69 +289,69 @@
 
 .prose-content .hljs-comment,
 .prose-content .hljs-quote {
-  color: var(--color-muted-foreground);
+  color: var(--ds-text-secondary);
   font-style: italic;
 }
 
 .prose-content .hljs-keyword,
 .prose-content .hljs-selector-tag {
-  color: var(--color-purple);
+  color: var(--ds-purple);
   font-weight: 500;
 }
 
 .prose-content .hljs-type {
-  color: var(--color-info);
+  color: var(--ds-status-info);
   font-weight: 500;
 }
 
 .prose-content .hljs-string,
 .prose-content .hljs-addition {
-  color: var(--color-success);
+  color: var(--ds-status-success);
 }
 
 .prose-content .hljs-number,
 .prose-content .hljs-literal,
 .prose-content .hljs-symbol,
 .prose-content .hljs-bullet {
-  color: var(--color-brand);
+  color: var(--ds-accent);
 }
 
 .prose-content .hljs-title,
 .prose-content .hljs-section {
-  color: var(--color-info);
+  color: var(--ds-status-info);
   font-weight: 600;
 }
 
 .prose-content .hljs-built_in {
-  color: var(--color-info);
+  color: var(--ds-status-info);
 }
 
 .prose-content .hljs-attr,
 .prose-content .hljs-attribute {
-  color: var(--color-brand-hover);
+  color: var(--ds-accent-hover);
 }
 
 .prose-content .hljs-name,
 .prose-content .hljs-tag {
-  color: var(--color-destructive);
+  color: var(--ds-status-danger);
 }
 
 .prose-content .hljs-variable,
 .prose-content .hljs-template-variable {
-  color: var(--color-foreground);
+  color: var(--ds-text);
 }
 
 .prose-content .hljs-regexp,
 .prose-content .hljs-link {
-  color: var(--color-brand);
+  color: var(--ds-accent);
 }
 
 .prose-content .hljs-deletion {
-  color: var(--color-destructive);
+  color: var(--ds-status-danger);
 }
 
 .prose-content .hljs-meta {
-  color: var(--color-muted-foreground);
+  color: var(--ds-text-secondary);
 }
 
 .prose-content .hljs-emphasis {
@@ -355,13 +363,13 @@
 }
 
 .prose-content .hljs-params {
-  color: var(--color-foreground);
+  color: var(--ds-text);
 }
 
 .prose-content .hljs-property {
-  color: var(--color-brand-hover);
+  color: var(--ds-accent-hover);
 }
 
 .prose-content .hljs-function {
-  color: var(--color-info);
+  color: var(--ds-status-info);
 }

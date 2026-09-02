@@ -53,10 +53,10 @@ function SortableTab({
       style={style}
       type="button"
       onClick={() => navigate(path)}
-      className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium transition-colors border-b-2 -mb-px ${
+      className={`flex items-center gap-1.5 px-4 py-2.5 text-ui-sm font-medium transition-colors border-b-2 -mb-px ${
         isActive
-          ? "border-brand text-foreground"
-          : "border-transparent text-muted-foreground hover:text-foreground"
+          ? "border-brand text-fg"
+          : "border-transparent text-fg-secondary hover:text-fg"
       }`}
       {...attributes}
       {...listeners}
@@ -66,7 +66,7 @@ function SortableTab({
       )}
       {tab.label}
       {tab.badge != null && (
-        <span className="glass-badge px-1.5 py-0.5 text-2xs text-muted-foreground font-light">
+        <span className="glass-badge px-1.5 py-0.5 text-ui-xs text-fg-secondary font-light">
           {tab.badge}
         </span>
       )}
@@ -96,7 +96,7 @@ export function GlassTabBar({ tabs, activeTab, basePath, onReorder }: GlassTabBa
   );
 
   return (
-    <div className="flex gap-0.5 px-6 glass-toolbar border-b border-border">
+    <div className="flex gap-0.5 px-6 glass-toolbar border-b border-separator">
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={tabIds} strategy={horizontalListSortingStrategy}>
           {tabs.map((tab) => (

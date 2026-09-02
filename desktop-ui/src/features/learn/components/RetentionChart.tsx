@@ -8,7 +8,7 @@ interface RetentionChartProps {
 export function RetentionChart({ data, height = 200 }: RetentionChartProps) {
   if (data.length === 0) {
     return (
-      <div className="flex items-center justify-center h-[200px] text-[11px] text-muted-foreground">
+      <div className="flex items-center justify-center h-[200px] text-ui-xs text-fg-secondary">
         No retention data yet. Start reviewing flashcards to see trends.
       </div>
     );
@@ -40,8 +40,8 @@ export function RetentionChart({ data, height = 200 }: RetentionChartProps) {
         <Area
           type="monotone"
           dataKey="retention"
-          stroke="var(--brand)"
-          fill="var(--brand)"
+          stroke="var(--ds-accent)"
+          fill="var(--ds-accent)"
           fillOpacity={0.1}
           strokeWidth={2}
         />

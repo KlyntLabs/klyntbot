@@ -75,13 +75,13 @@ export function KeyResultRow({
   };
 
   return (
-    <div className="border-l-2 border-border ml-4">
-      <div className="flex items-center gap-2 px-3 py-2 hover:bg-accent/50 transition-colors rounded-r-md group">
+    <div className="border-l-2 border-separator ml-4">
+      <div className="flex items-center gap-2 px-3 py-2 hover:bg-control-hover/50 transition-colors rounded-r-md group">
         {/* Expand toggle */}
         <button
           type="button"
           onClick={() => toggleKr(keyResult.id)}
-          className="text-muted-foreground hover:text-foreground"
+          className="text-fg-secondary hover:text-fg"
         >
           {expanded ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
         </button>
@@ -90,10 +90,10 @@ export function KeyResultRow({
         <ProgressRing progress={keyResult.progress} size="sm" />
 
         {/* Title */}
-        <span className="text-xs text-foreground flex-1 truncate">{keyResult.title}</span>
+        <span className="text-ui-sm text-fg flex-1 truncate">{keyResult.title}</span>
 
         {/* Current / Target metric */}
-        <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+        <div className="flex items-center gap-1 text-ui-xs text-fg-secondary">
           {editing ? (
             <input
               ref={inputRef}
@@ -102,13 +102,13 @@ export function KeyResultRow({
               onChange={(e) => setEditValue(e.target.value)}
               onBlur={handleMetricSave}
               onKeyDown={handleMetricKeyDown}
-              className="w-16 px-1.5 py-0.5 text-[11px] bg-accent border border-border rounded text-foreground focus:outline-none focus:ring-1 focus:ring-brand"
+              className="w-16 px-1.5 py-0.5 text-ui-xs bg-control-hover border border-separator rounded text-fg focus:outline-none focus:ring-1 focus:ring-fg-secondary/30"
             />
           ) : (
             <button
               type="button"
               onClick={startEditing}
-              className="px-1.5 py-0.5 rounded hover:bg-accent transition-colors cursor-text"
+              className="px-1.5 py-0.5 rounded hover:bg-control-hover transition-colors cursor-text"
               title="Click to edit metric"
             >
               {keyResult.current}
@@ -124,7 +124,7 @@ export function KeyResultRow({
         <button
           type="button"
           onClick={() => toggleKr(keyResult.id)}
-          className="text-2xs px-1.5 py-0.5 rounded-full bg-brand/10 text-brand opacity-0 group-hover:opacity-100 transition-opacity"
+          className="text-ui-xs px-1.5 py-0.5 rounded-full bg-brand/10 text-brand opacity-0 group-hover:opacity-100 transition-opacity"
         >
           {linkedTaskCount > 0
             ? `${linkedTaskCount} task${linkedTaskCount !== 1 ? "s" : ""}`
@@ -136,19 +136,19 @@ export function KeyResultRow({
           <button
             type="button"
             onClick={() => setMenuOpen(!menuOpen)}
-            className="text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+            className="text-fg-secondary hover:text-fg opacity-0 group-hover:opacity-100 transition-opacity"
           >
             <MoreHorizontal className="size-3.5" />
           </button>
           {menuOpen && (
-            <div className="absolute right-0 top-full mt-1 z-20 glass-panel rounded-lg py-1 min-w-[120px] bg-card border border-border shadow-lg">
+            <div className="absolute right-0 top-full mt-1 z-20 glass-panel rounded-lg py-1 min-w-[120px] bg-bg-elevated border border-separator shadow-lg">
               <button
                 type="button"
                 onClick={() => {
                   setMenuOpen(false);
                   onEdit?.(keyResult);
                 }}
-                className="w-full px-3 py-1.5 text-left text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors flex items-center gap-2"
+                className="w-full px-3 py-1.5 text-left text-ui-sm text-fg-secondary hover:text-fg hover:bg-control-hover transition-colors flex items-center gap-2"
               >
                 <Pencil className="size-3" /> Edit
               </button>
@@ -158,7 +158,7 @@ export function KeyResultRow({
                   setMenuOpen(false);
                   onDelete?.(keyResult);
                 }}
-                className="w-full px-3 py-1.5 text-left text-xs text-red-400 hover:text-red-300 hover:bg-accent transition-colors flex items-center gap-2"
+                className="w-full px-3 py-1.5 text-left text-ui-sm text-red-400 hover:text-red-300 hover:bg-control-hover transition-colors flex items-center gap-2"
               >
                 <Trash2 className="size-3" /> Delete
               </button>

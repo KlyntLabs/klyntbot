@@ -64,12 +64,12 @@ export function PracticeDocPanel({
             }
           }}
         >
-          <p className="text-sm leading-relaxed text-primary">
+          <p className="text-sm leading-relaxed text-brand">
             {result.finalTranslation}
             <button
               type="button"
               onClick={() => onGradeClick?.(result.index)}
-              className={`ml-2 text-xs font-medium cursor-pointer hover:underline ${gradeColorClass(result.grade)}`}
+              className={`ml-2 text-ui-sm font-medium cursor-pointer hover:underline ${gradeColorClass(result.grade)}`}
             >
               {result.grade}
             </button>
@@ -78,7 +78,7 @@ export function PracticeDocPanel({
       ))}
 
       {/* Current unit placeholder */}
-      {!isComplete && <p className="text-muted italic text-sm">Waiting for your translation...</p>}
+      {!isComplete && <p className="text-fg-secondary italic text-sm">Waiting for your translation...</p>}
 
       <div ref={bottomRef} />
     </div>

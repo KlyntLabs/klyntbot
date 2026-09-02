@@ -71,14 +71,14 @@ export function Sidebar({ active, onNavigate, isChatOpen, onToggleChat }: Sideba
   const bottomItems = items.filter((i) => i.bottom);
 
   return (
-    <div className="w-[52px] glass-sidebar flex flex-col items-center gap-1 py-2">
+    <div className="w-[52px] island flex flex-col items-center gap-1 py-2">
       {/* Logo */}
       <div className="flex items-center mb-1">
         <button
           type="button"
           onClick={() => navigate("/")}
           aria-label="Home"
-          className="w-8 h-8 rounded-xl bg-muted flex items-center justify-center p-0.5 hover:bg-muted transition-all"
+          className="w-8 h-8 rounded-row bg-control-hover flex items-center justify-center p-0.5 hover:bg-control-active transition-all"
         >
           <KlyntLogo className="w-full h-full" />
         </button>
@@ -96,20 +96,20 @@ export function Sidebar({ active, onNavigate, isChatOpen, onToggleChat }: Sideba
             key={item.key}
             onClick={() => handleClick(item)}
             aria-label={item.key}
-            className={`relative w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-200 ${
+            className={`relative w-8 h-8 rounded-row flex items-center justify-center transition-all duration-200 ${
               isActive
-                ? "glass-button-active text-brand"
-                : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                ? "bg-control-active text-brand"
+                : "text-fg-secondary hover:text-fg hover:bg-control-hover"
             }`}
           >
             <Icon className="w-[17px] h-[17px]" strokeWidth={1.5} aria-hidden="true" />
             {showBadge && (
-              <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] rounded-full bg-brand text-[8px] text-white flex items-center justify-center font-medium px-0.5">
+              <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] rounded-full bg-brand text-[8px] text-brand-foreground flex items-center justify-center font-medium px-0.5">
                 {dueCount > 99 ? "99" : dueCount}
               </span>
             )}
             {showBrainPulse && (
-              <div className="absolute top-1 right-1 size-1 rounded-full bg-amber-400" />
+              <div className="absolute top-1 right-1 size-1 rounded-full bg-status-warning" />
             )}
           </button>
         );
@@ -124,10 +124,10 @@ export function Sidebar({ active, onNavigate, isChatOpen, onToggleChat }: Sideba
           onClick={onToggleChat}
           aria-label="Quick chat panel"
           title="Quick chat"
-          className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-200 ${
+          className={`w-8 h-8 rounded-row flex items-center justify-center transition-all duration-200 ${
             isChatOpen
-              ? "glass-button-active text-brand"
-              : "text-muted-foreground hover:text-foreground hover:bg-accent"
+              ? "bg-control-active text-brand"
+              : "text-fg-secondary hover:text-fg hover:bg-control-hover"
           }`}
         >
           <MessageCircle className="w-[17px] h-[17px]" strokeWidth={1.5} aria-hidden="true" />
@@ -144,10 +144,10 @@ export function Sidebar({ active, onNavigate, isChatOpen, onToggleChat }: Sideba
             key={item.key}
             onClick={() => handleClick(item)}
             aria-label={item.key}
-            className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-200 ${
+            className={`w-8 h-8 rounded-row flex items-center justify-center transition-all duration-200 ${
               isActive
-                ? "glass-button-active text-brand"
-                : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                ? "bg-control-active text-brand"
+                : "text-fg-secondary hover:text-fg hover:bg-control-hover"
             }`}
           >
             <Icon className="w-[17px] h-[17px]" strokeWidth={1.5} aria-hidden="true" />

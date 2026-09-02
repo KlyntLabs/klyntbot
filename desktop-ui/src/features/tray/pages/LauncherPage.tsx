@@ -162,7 +162,7 @@ export function Launcher() {
   );
 
   return (
-    <div className="w-screen text-foreground">
+    <div className="w-screen text-fg">
       {focusOnboarding.element}
       <div
         ref={contentRef}
@@ -251,9 +251,9 @@ function ShortcutHints() {
       {hints.map((h) => (
         <span
           key={h.key}
-          className="inline-flex items-center gap-1 text-[11px] text-muted-foreground"
+          className="inline-flex items-center gap-1 text-ui-xs text-fg-secondary"
         >
-          <kbd className="px-1.5 py-0.5 rounded bg-accent/60 text-foreground/70 font-mono text-[10px]">
+          <kbd className="px-1.5 py-0.5 rounded bg-control-hover/60 text-fg/70 font-mono text-[10px]">
             {h.key}
           </kbd>
           {h.label}

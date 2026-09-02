@@ -59,14 +59,14 @@ export function InlineCheckboxList({
               onClick={() => toggle(opt.value)}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200 border ${
                 isChecked
-                  ? "bg-brand/8 border-brand/25 text-foreground"
-                  : "bg-card border-border-subtle text-muted-foreground hover:bg-accent hover:border-border"
+                  ? "bg-brand/8 border-brand/25 text-fg"
+                  : "bg-bg-elevated border-separator text-fg-secondary hover:bg-control-hover hover:border-separator"
               }`}
             >
               {/* Checkbox */}
               <div
                 className={`w-[18px] h-[18px] rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-all duration-200 ${
-                  isChecked ? "bg-brand border-brand" : "border-border"
+                  isChecked ? "bg-brand border-brand" : "border-separator"
                 }`}
               >
                 {isChecked && <Check className="size-3 text-white" />}
@@ -78,8 +78,8 @@ export function InlineCheckboxList({
               {/* Detection badge */}
               {opt.detected !== undefined && (
                 <span
-                  className={`text-2xs font-medium px-1.5 py-0.5 rounded-md flex-shrink-0 ${
-                    opt.detected ? "bg-success/10 text-success" : "bg-accent text-dim"
+                  className={`text-ui-xs font-medium px-1.5 py-0.5 rounded-md flex-shrink-0 ${
+                    opt.detected ? "bg-status-success/10 text-status-success" : "bg-control-hover text-fg-dim"
                   }`}
                 >
                   {opt.detected ? "Found" : "N/A"}

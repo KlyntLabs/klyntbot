@@ -104,7 +104,7 @@ const SOURCE_DEFS: SourceDef[] = [
 ];
 
 const INPUT_CLASS =
-  "w-full px-3 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim";
+  "w-full px-3 py-1.5 text-ui-sm text-fg bg-control-hover border border-separator rounded-control focus:outline-none focus:border-fg-secondary/50 focus:ring-2 focus:ring-separator transition-colors placeholder:text-fg-dim";
 
 // ── Component ────────────────────────────────────────────────────────
 
@@ -175,8 +175,8 @@ export function LauncherSettings() {
   return (
     <div>
       <div className="mb-8">
-        <h2 className="text-lg font-medium text-foreground">Launcher</h2>
-        <p className="text-[13px] text-muted-foreground mt-1">
+        <h2 className="text-lg font-medium text-fg">Launcher</h2>
+        <p className="text-ui text-fg-secondary mt-1">
           Configure which sources the launcher searches
         </p>
       </div>
@@ -186,8 +186,8 @@ export function LauncherSettings() {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <div>
-                <span className="text-xs text-muted-foreground">Enable launcher</span>
-                <p className="text-[11px] text-dim">Global toggle for the command launcher</p>
+                <span className="text-ui-xs text-fg-secondary">Enable launcher</span>
+                <p className="text-ui-xs text-fg-dim">Global toggle for the command launcher</p>
               </div>
               <Toggle
                 checked={
@@ -208,13 +208,13 @@ export function LauncherSettings() {
               const enabled = sourceVal(src.key, "enabled", true);
 
               return (
-                <div key={src.key} className="bg-card rounded-lg border border-border-subtle">
+                <div key={src.key} className="island rounded-lg">
                   <div className="flex items-center gap-2 p-3">
                     {hasExtra ? (
                       <button
                         type="button"
                         onClick={() => setExpanded(isExpanded ? null : src.key)}
-                        className="text-muted-foreground hover:text-foreground transition-colors"
+                        className="text-fg-secondary hover:text-fg transition-colors"
                       >
                         {isExpanded ? (
                           <ChevronDown className="size-3.5" />
@@ -225,7 +225,7 @@ export function LauncherSettings() {
                     ) : (
                       <span className="w-3.5" />
                     )}
-                    <span className="flex-1 text-[13px] font-medium text-muted-foreground">
+                    <span className="flex-1 text-ui font-medium text-fg-secondary">
                       {src.label}
                     </span>
                     <Toggle
@@ -236,14 +236,14 @@ export function LauncherSettings() {
                   </div>
 
                   {isExpanded && hasExtra && (
-                    <div className="px-3 pb-3 space-y-2 border-t border-border-subtle pt-2">
+                    <div className="px-3 pb-3 space-y-2 border-t border-separator pt-2">
                       {src.extraFields?.map((field) => (
                         <label
                           key={field.key}
                           className="block"
                           htmlFor={`launcher-${src.key}-${field.key}`}
                         >
-                          <span className="block text-[11px] text-muted-foreground mb-1">
+                          <span className="block text-ui-xs text-fg-secondary mb-1">
                             {field.label}
                           </span>
                           {field.type === "dirs" ? (

@@ -70,12 +70,12 @@ export function LinkInsertDialog({ type, isOpen, onClose, onInsert }: LinkInsert
         role="dialog"
         onClick={(e) => e.stopPropagation()}
       >
-        <h3 className="text-sm font-semibold text-foreground mb-3">
+        <h3 className="text-sm font-semibold text-fg mb-3">
           {type === "image" ? "Insert Image" : "Insert Link"}
         </h3>
 
         <form onSubmit={handleSubmit}>
-          <label className="block text-xs text-muted-foreground mb-1.5" htmlFor="link-url-input">
+          <label className="block text-ui-sm text-fg-secondary mb-1.5" htmlFor="link-url-input">
             {type === "image" ? "Image URL" : "URL"}
           </label>
           <input
@@ -88,12 +88,12 @@ export function LinkInsertDialog({ type, isOpen, onClose, onInsert }: LinkInsert
               setPreviewError(false);
             }}
             placeholder={type === "image" ? "https://example.com/image.png" : "https://example.com"}
-            className="w-full px-3 py-2 text-sm rounded-lg bg-accent border border-border text-foreground placeholder:text-dim outline-none focus:border-brand/40 transition-colors"
+            className="w-full px-3 py-2 text-sm rounded-lg bg-control-hover border border-separator text-fg placeholder:text-fg-dim outline-none focus:border-fg-secondary/40 transition-colors"
           />
 
           {/* Image preview */}
           {type === "image" && url.trim() && (
-            <div className="mt-3 rounded-lg overflow-hidden bg-card flex items-center justify-center min-h-[80px] max-h-[160px]">
+            <div className="mt-3 rounded-lg overflow-hidden bg-bg-elevated flex items-center justify-center min-h-[80px] max-h-[160px]">
               {!previewError ? (
                 <img
                   src={url.trim()}
@@ -102,7 +102,7 @@ export function LinkInsertDialog({ type, isOpen, onClose, onInsert }: LinkInsert
                   onError={() => setPreviewError(true)}
                 />
               ) : (
-                <div className="text-xs text-dim py-4">Unable to preview image</div>
+                <div className="text-ui-sm text-fg-dim py-4">Unable to preview image</div>
               )}
             </div>
           )}
@@ -112,14 +112,14 @@ export function LinkInsertDialog({ type, isOpen, onClose, onInsert }: LinkInsert
             <button
               type="button"
               onClick={onClose}
-              className="px-3 py-1.5 text-xs rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              className="px-3 py-1.5 text-ui-sm rounded-lg text-fg-secondary hover:text-fg hover:bg-control-hover transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={!url.trim()}
-              className="px-3 py-1.5 text-xs rounded-lg bg-brand/20 text-brand hover:bg-brand/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              className="px-3 py-1.5 text-ui-sm rounded-lg bg-brand/20 text-brand hover:bg-brand/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Insert
             </button>

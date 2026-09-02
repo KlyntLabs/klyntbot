@@ -75,13 +75,13 @@ export function ConfusableSection({ words, sourceLang }: ConfusableSectionProps)
             className="rounded-md border border-amber-500/20 bg-amber-500/5 p-2"
           >
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-amber-400 text-xs">⚠</span>
-              <span className="text-xs text-primary font-medium">
+              <span className="text-amber-400 text-ui-sm">⚠</span>
+              <span className="text-ui-sm text-brand font-medium">
                 {a.word} vs {a.confusableWord}
               </span>
-              <span className="text-2xs text-muted">({a.confusableMeaning})</span>
+              <span className="text-ui-xs text-fg-secondary">({a.confusableMeaning})</span>
             </div>
-            {a.explanation && <p className="text-[11px] text-muted ml-5">{a.explanation}</p>}
+            {a.explanation && <p className="text-ui-xs text-fg-secondary ml-5">{a.explanation}</p>}
           </div>
         ))}
       </div>

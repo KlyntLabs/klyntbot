@@ -53,7 +53,7 @@ export function QuickTranslatePopup({
       {loading && !hasData && (
         <div className="flex items-center gap-2 py-1">
           <ThinkingDots size="sm" />
-          <span className="text-xs text-muted">Translating...</span>
+          <span className="text-ui-sm text-fg-secondary">Translating...</span>
         </div>
       )}
 
@@ -69,11 +69,11 @@ function TranslationResult({ text }: { text: string }) {
 
   return (
     <div className="flex items-start gap-2">
-      <p className="text-sm text-primary leading-relaxed flex-1">{text}</p>
+      <p className="text-sm text-brand leading-relaxed flex-1">{text}</p>
       <button
         type="button"
         onClick={() => copy(text)}
-        className="shrink-0 mt-0.5 p-1 rounded text-muted hover:text-primary transition-colors"
+        className="shrink-0 mt-0.5 p-1 rounded text-fg-secondary hover:text-brand transition-colors"
         title="Copy translation"
       >
         {copied ? <Check size={14} /> : <Copy size={14} />}

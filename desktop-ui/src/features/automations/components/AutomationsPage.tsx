@@ -27,7 +27,7 @@ function OriginBadge({ origin }: { origin: CronOrigin }) {
   return (
     <span
       className={cn(
-        "px-1 py-px rounded text-2xs leading-tight font-medium uppercase tracking-wide",
+        "px-1 py-px rounded text-ui-xs leading-tight font-medium uppercase tracking-wide",
         style.className,
       )}
     >
@@ -41,7 +41,7 @@ function OriginBadge({ origin }: { origin: CronOrigin }) {
 function ScheduleTypeBadge({ schedule }: { schedule: CronSchedule }) {
   const label = schedule.kind === "every" ? "Interval" : schedule.kind === "cron" ? "Cron" : "Once";
   return (
-    <span className="px-1 py-px rounded text-2xs leading-tight font-light text-dim bg-accent">
+    <span className="px-1 py-px rounded text-ui-xs leading-tight font-light text-fg-dim bg-control-hover">
       {label}
     </span>
   );
@@ -91,7 +91,7 @@ function InlineTextCell({
         onClick={(e) => e.stopPropagation()}
         placeholder={placeholder}
         className={cn(
-          "bg-transparent border-b border-brand outline-none w-full text-xs font-light text-foreground",
+          "bg-transparent border-b border-brand outline-none w-full text-ui-sm font-light text-fg",
           className,
         )}
       />
@@ -104,11 +104,11 @@ function InlineTextCell({
       onClick={startEdit}
       className={cn(
         "text-left truncate max-w-full",
-        editable && "cursor-text rounded px-1 -mx-1 transition-colors hover:bg-accent",
+        editable && "cursor-text rounded px-1 -mx-1 transition-colors hover:bg-control-hover",
         className,
       )}
     >
-      {value || <span className="text-dim">{placeholder ?? "—"}</span>}
+      {value || <span className="text-fg-dim">{placeholder ?? "—"}</span>}
     </button>
   );
 }
@@ -245,20 +245,20 @@ function SchedulePanel({
 
       {(fields.mode === "once" || fields.mode === "cron") && (
         <div className="flex flex-col gap-1.5">
-          <span className="text-[11px] text-dim uppercase tracking-wider font-medium">Time</span>
+          <span className="text-ui-xs text-fg-dim uppercase tracking-wider font-medium">Time</span>
           <input
             type="time"
-            className="glass-input text-[13px] px-3 py-2 w-full rounded-lg"
+            className="glass-input text-ui px-3 py-2 w-full rounded-lg"
             value={fields.time}
             onChange={(e) => update({ time: e.target.value })}
           />
         </div>
       )}
 
-      <div className="border-t border-border" />
+      <div className="border-t border-separator" />
 
       <div className="flex flex-col gap-2">
-        <span className="text-[11px] text-dim uppercase tracking-wider font-medium">Type</span>
+        <span className="text-ui-xs text-fg-dim uppercase tracking-wider font-medium">Type</span>
         <div className="flex gap-4">
           {(
             [
@@ -281,17 +281,17 @@ function SchedulePanel({
               <span
                 className={cn(
                   "size-4 rounded-full border-2 transition-colors flex items-center justify-center",
-                  fields.mode === key ? "border-brand" : "border-border group-hover:border-border",
+                  fields.mode === key ? "border-brand" : "border-separator group-hover:border-separator",
                 )}
               >
                 {fields.mode === key && <span className="size-2 rounded-full bg-brand" />}
               </span>
               <span
                 className={cn(
-                  "text-[13px] transition-colors",
+                  "text-ui transition-colors",
                   fields.mode === key
-                    ? "text-muted-foreground font-medium"
-                    : "text-muted-foreground font-light",
+                    ? "text-fg-secondary font-medium"
+                    : "text-fg-secondary font-light",
                 )}
               >
                 {label}
@@ -303,19 +303,19 @@ function SchedulePanel({
 
       {showRepeatEvery && (
         <div className="flex flex-col gap-2">
-          <span className="text-[11px] text-dim uppercase tracking-wider font-medium">
+          <span className="text-ui-xs text-fg-dim uppercase tracking-wider font-medium">
             Repeat Every
           </span>
           <div className="flex items-center gap-2">
             <input
               type="number"
               min={1}
-              className="glass-input w-16 text-[13px] text-center py-2 rounded-lg"
+              className="glass-input w-16 text-ui text-center py-2 rounded-lg"
               value={fields.intervalValue}
               onChange={(e) => update({ intervalValue: Math.max(1, Number(e.target.value)) })}
             />
             <select
-              className="glass-input text-[13px] px-3 py-2 flex-1 rounded-lg"
+              className="glass-input text-ui px-3 py-2 flex-1 rounded-lg"
               value={fields.intervalUnit}
               onChange={(e) => update({ intervalUnit: e.target.value as IntervalUnit })}
             >
@@ -330,7 +330,7 @@ function SchedulePanel({
 
       {fields.mode === "cron" && (
         <div className="flex flex-col gap-2">
-          <span className="text-[11px] text-dim uppercase tracking-wider font-medium">
+          <span className="text-ui-xs text-fg-dim uppercase tracking-wider font-medium">
             Frequency
           </span>
           <div className="flex gap-2">
@@ -340,10 +340,10 @@ function SchedulePanel({
                 type="button"
                 onClick={() => update({ intervalUnit: u })}
                 className={cn(
-                  "px-4 py-2 text-[13px] rounded-lg font-medium transition-colors",
+                  "px-4 py-2 text-ui rounded-lg font-medium transition-colors",
                   fields.intervalUnit === u
                     ? "bg-brand/20 text-brand border border-brand/30"
-                    : "bg-accent text-muted-foreground hover:text-foreground hover:bg-muted border border-transparent",
+                    : "bg-control-hover text-fg-secondary hover:text-fg hover:bg-control-hover border border-transparent",
                 )}
               >
                 {u === "days" ? "Every Day" : "Every Week"}
@@ -355,7 +355,7 @@ function SchedulePanel({
 
       {showDayPicker && (
         <div className="flex flex-col gap-2">
-          <span className="text-[11px] text-dim uppercase tracking-wider font-medium">
+          <span className="text-ui-xs text-fg-dim uppercase tracking-wider font-medium">
             Execute On
           </span>
           <div className="flex gap-1.5">
@@ -365,10 +365,10 @@ function SchedulePanel({
                 type="button"
                 onClick={() => toggleWeekday(i)}
                 className={cn(
-                  "flex-1 py-2 rounded-lg text-[11px] font-semibold transition-colors",
+                  "flex-1 py-2 rounded-lg text-ui-xs font-semibold transition-colors",
                   fields.weekdays[i]
                     ? "bg-brand text-white"
-                    : "bg-accent text-dim hover:text-muted-foreground hover:bg-muted",
+                    : "bg-control-hover text-fg-dim hover:text-fg-secondary hover:bg-control-hover",
                 )}
               >
                 {day}
@@ -430,8 +430,8 @@ function InlineScheduleCell({
         type="button"
         onClick={handleOpen}
         className={cn(
-          "text-xs font-light text-muted-foreground text-left truncate",
-          editable && "cursor-text rounded px-1 -mx-1 transition-colors hover:bg-accent",
+          "text-ui-sm font-light text-fg-secondary text-left truncate",
+          editable && "cursor-text rounded px-1 -mx-1 transition-colors hover:bg-control-hover",
         )}
       >
         {humanizeSchedule(schedule)}
@@ -455,21 +455,21 @@ function InlineScheduleCell({
               onKeyDown={(e) => e.stopPropagation()}
             >
               <SchedulePanel fields={fields} onChange={setFields} />
-              <div className="flex gap-3 mt-5 pt-4 border-t border-border">
+              <div className="flex gap-3 mt-5 pt-4 border-t border-separator">
                 <button
                   type="button"
                   onClick={() => {
                     onSave(fieldsToSchedule(fields));
                     setOpen(false);
                   }}
-                  className="bg-brand hover:bg-brand-hover text-white px-5 py-2 rounded-lg text-[13px] font-medium transition-colors"
+                  className="bg-brand hover:bg-brand-hover text-white px-5 py-2 rounded-lg text-ui font-medium transition-colors"
                 >
                   Save
                 </button>
                 <button
                   type="button"
                   onClick={() => setOpen(false)}
-                  className="glass-button px-5 py-2 text-[13px] font-medium rounded-lg"
+                  className="glass-button px-5 py-2 text-ui font-medium rounded-lg"
                 >
                   Cancel
                 </button>
@@ -536,10 +536,10 @@ function AutomationCreateForm({
   };
 
   return (
-    <div className="border border-border rounded-xl p-4 bg-card space-y-3 mx-4 mt-3">
+    <div className="border border-separator rounded-xl p-4 bg-bg-elevated space-y-3 mx-4 mt-3">
       <div className="flex items-center justify-between">
-        <h3 className="text-[13px] font-medium text-muted-foreground">New Automation</h3>
-        <button type="button" onClick={onClose} className="text-dim hover:text-muted-foreground">
+        <h3 className="text-ui font-medium text-fg-secondary">New Automation</h3>
+        <button type="button" onClick={onClose} className="text-fg-dim hover:text-fg-secondary">
           <X size={14} />
         </button>
       </div>
@@ -561,16 +561,16 @@ function AutomationCreateForm({
         <JobScheduleBuilder value={schedule} onChange={setSchedule} />
       </div>
 
-      {createError && <p className="text-destructive text-xs font-light">{createError.message}</p>}
+      {createError && <p className="text-status-danger text-ui-sm font-light">{createError.message}</p>}
       <div className="flex justify-end gap-2">
-        <button type="button" onClick={onClose} className="glass-button px-3 py-1.5 text-xs">
+        <button type="button" onClick={onClose} className="glass-button px-3 py-1.5 text-ui-sm">
           Cancel
         </button>
         <button
           type="button"
           onClick={handleSubmit}
           disabled={loading || !name.trim() || !message.trim()}
-          className="bg-brand hover:bg-brand-hover text-white px-3 py-1.5 rounded-xl text-xs font-light disabled:opacity-40 transition-colors"
+          className="bg-brand hover:bg-brand-hover text-white px-3 py-1.5 rounded-xl text-ui-sm font-light disabled:opacity-40 transition-colors"
         >
           {loading ? "Creating…" : "Create"}
         </button>
@@ -689,8 +689,8 @@ export function AutomationsPage() {
               editable={editable}
               onSave={(v) => handleUpdate(job.id, { name: v })}
               className={cn(
-                "text-[13px] font-light",
-                job.enabled ? "text-muted-foreground" : "text-dim",
+                "text-ui font-light",
+                job.enabled ? "text-fg-secondary" : "text-fg-dim",
               )}
             />
           );
@@ -719,7 +719,7 @@ export function AutomationsPage() {
               value={job.payload.message}
               editable={editable}
               onSave={(v) => handleUpdate(job.id, { message: v })}
-              className="text-xs font-light text-muted-foreground"
+              className="text-ui-sm font-light text-fg-secondary"
               placeholder="No message"
             />
           );
@@ -746,10 +746,10 @@ export function AutomationsPage() {
         width: "w-28",
         align: "right",
         renderCell: (job) => (
-          <span className="text-xs font-light text-dim">
+          <span className="text-ui-sm font-light text-fg-dim">
             {job.state.lastRunAtMs ? relativeTime(job.state.lastRunAtMs) : "—"}
             {job.state.lastStatus && job.state.lastStatus !== "ok" && (
-              <span className="ml-1 text-destructive">!</span>
+              <span className="ml-1 text-status-danger">!</span>
             )}
           </span>
         ),
@@ -760,7 +760,7 @@ export function AutomationsPage() {
         width: "w-24",
         align: "right",
         renderCell: (job) => (
-          <span className="text-xs font-light text-dim">
+          <span className="text-ui-sm font-light text-fg-dim">
             {job.enabled && job.state.nextRunAtMs ? relativeTime(job.state.nextRunAtMs) : "—"}
           </span>
         ),
@@ -780,7 +780,7 @@ export function AutomationsPage() {
             <button
               type="button"
               onClick={() => handleRun(job.id)}
-              className="p-1 rounded text-dim hover:text-brand hover:bg-accent transition-colors"
+              className="p-1 rounded text-fg-dim hover:text-brand hover:bg-brand/10 transition-colors"
               title="Run now"
             >
               <Play size={12} />
@@ -789,7 +789,7 @@ export function AutomationsPage() {
               <button
                 type="button"
                 onClick={() => handleDelete(job.id)}
-                className="p-1 rounded text-dim hover:text-destructive hover:bg-destructive/10 transition-colors"
+                className="p-1 rounded text-fg-dim hover:text-status-danger hover:bg-status-danger/10 transition-colors"
                 title="Delete"
               >
                 <Trash2 size={12} />
@@ -815,12 +815,12 @@ export function AutomationsPage() {
 
   const emptyState = useMemo(
     () => (
-      <div className="flex flex-col items-center justify-center py-16 text-dim">
+      <div className="flex flex-col items-center justify-center py-16 text-fg-dim">
         <Clock size={32} className="mb-3 opacity-30" />
-        <p className="text-muted-foreground text-sm font-light">
+        <p className="text-fg-secondary text-sm font-light">
           {debouncedQ || originFilter !== "all" ? "No matching automations" : "No automations yet"}
         </p>
-        <p className="text-dim text-xs font-light mt-1">
+        <p className="text-fg-dim text-ui-sm font-light mt-1">
           {debouncedQ || originFilter !== "all"
             ? "Try adjusting your filters"
             : "Create an automation to get started"}
@@ -829,7 +829,7 @@ export function AutomationsPage() {
           <button
             type="button"
             onClick={() => setShowCreate(true)}
-            className="bg-brand hover:bg-brand-hover text-white mt-4 px-3 py-1.5 rounded-xl text-xs font-light flex items-center gap-2 transition-colors"
+            className="bg-brand hover:bg-brand-hover text-white mt-4 px-3 py-1.5 rounded-xl text-ui-sm font-light flex items-center gap-2 transition-colors"
           >
             <Plus className="w-[14px] h-[14px]" strokeWidth={1.5} /> Create your first automation
           </button>
@@ -849,27 +849,27 @@ export function AutomationsPage() {
               type="button"
               onClick={() => setOriginFilter(tab.key)}
               className={cn(
-                "px-3 py-1.5 rounded-lg text-xs font-light transition-colors",
+                "px-3 py-1.5 rounded-lg text-ui-sm font-light transition-colors",
                 originFilter === tab.key
-                  ? "bg-muted text-foreground"
-                  : "text-muted-foreground hover:text-foreground",
+                  ? "bg-control-hover text-fg"
+                  : "text-fg-secondary hover:text-fg",
               )}
             >
               {tab.label}
             </button>
           ))}
 
-          <div className="w-px h-5 bg-muted mx-1" />
+          <div className="w-px h-5 bg-control-hover mx-1" />
 
           <div className="relative">
             <Search
               size={13}
-              className="absolute left-2.5 top-1/2 -translate-y-1/2 text-dim"
+              className="absolute left-2.5 top-1/2 -translate-y-1/2 text-fg-dim"
               strokeWidth={1.5}
             />
             <input
               type="text"
-              className="glass-input pl-8 pr-3 py-1.5 text-xs font-light w-48 rounded-lg"
+              className="glass-input pl-8 pr-3 py-1.5 text-ui-sm font-light w-48 rounded-lg"
               placeholder="Search automations…"
               value={searchQ}
               onChange={(e) => handleSearch(e.target.value)}
@@ -885,10 +885,10 @@ export function AutomationsPage() {
                 status.enabled ? "bg-green-500" : "bg-red-500",
               )}
             />
-            <span className="text-[11px] text-muted-foreground">
+            <span className="text-ui-xs text-fg-secondary">
               {status.enabled ? "Running" : "Stopped"}
               {status.enabled && status.nextWakeAtMs != null && (
-                <span className="text-dim"> · next {relativeTime(status.nextWakeAtMs)}</span>
+                <span className="text-fg-dim"> · next {relativeTime(status.nextWakeAtMs)}</span>
               )}
             </span>
           </div>
@@ -897,7 +897,7 @@ export function AutomationsPage() {
         <button
           type="button"
           onClick={() => setShowCreate(true)}
-          className="bg-brand hover:bg-brand-hover text-white px-3 py-1.5 rounded-xl text-xs font-light flex items-center gap-2 transition-colors"
+          className="bg-brand hover:bg-brand-hover text-white px-3 py-1.5 rounded-xl text-ui-sm font-light flex items-center gap-2 transition-colors"
         >
           <Plus className="w-[14px] h-[14px]" strokeWidth={1.5} /> Add automation
         </button>

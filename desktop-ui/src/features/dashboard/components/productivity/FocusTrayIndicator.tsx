@@ -22,8 +22,8 @@ export function FocusTrayIndicator() {
   if (!inFocus) return null;
 
   return (
-    <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-success/10 text-success text-2xs font-medium">
-      <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
+    <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-status-success/10 text-status-success text-ui-xs font-medium">
+      <span className="w-1.5 h-1.5 rounded-full bg-status-success animate-pulse" />
       Focus
     </div>
   );

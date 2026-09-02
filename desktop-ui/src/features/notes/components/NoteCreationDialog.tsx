@@ -98,14 +98,14 @@ export function NoteCreationDialog({
       <div className="absolute inset-0 bg-overlay-heavy" onClick={onClose} />
 
       {/* Dialog */}
-      <div className="relative w-full max-w-[480px] mx-4 glass-panel rounded-2xl border border-border-subtle shadow-2xl">
+      <div className="relative w-full max-w-[480px] mx-4 glass-panel rounded-2xl border border-separator shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between px-5 pt-4 pb-2">
-          <h2 className="text-sm font-medium text-foreground">New Note</h2>
+          <h2 className="text-sm font-medium text-fg">New Note</h2>
           <button
             type="button"
             onClick={onClose}
-            className="p-1 rounded-md text-dim hover:text-foreground transition-colors"
+            className="p-1 rounded-md text-fg-dim hover:text-fg transition-colors"
             aria-label="Close"
           >
             <X size={16} />
@@ -121,21 +121,21 @@ export function NoteCreationDialog({
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             onKeyDown={handleKeyDown}
-            className="w-full text-lg bg-transparent border-none outline-none text-foreground placeholder:text-dim/50 font-medium"
+            className="w-full text-lg bg-transparent border-none outline-none text-fg placeholder:text-fg-dim/50 font-medium"
           />
         </div>
 
         {/* Similar notes */}
         {(similarNotes.length > 0 || searching) && (
-          <div className="border-t border-border-subtle px-5 py-3">
+          <div className="border-t border-separator px-5 py-3">
             <div className="flex items-center gap-1.5 mb-2">
               <Sparkles size={12} className="text-brand" />
-              <span className="text-2xs uppercase tracking-wider text-muted-foreground">
+              <span className="text-ui-xs uppercase tracking-wider text-fg-secondary">
                 Similar notes
               </span>
             </div>
             {searching && similarNotes.length === 0 ? (
-              <div className="text-xs text-dim py-1">Searching...</div>
+              <div className="text-ui-sm text-fg-dim py-1">Searching...</div>
             ) : (
               <div className="flex flex-col gap-0.5">
                 {similarNotes.map((note) => (
@@ -143,13 +143,13 @@ export function NoteCreationDialog({
                     key={note.id}
                     type="button"
                     onClick={() => handleNavigate(note.id)}
-                    className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-left hover:bg-accent transition-colors group"
+                    className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-left hover:bg-control-hover transition-colors group"
                   >
                     <FileText
                       size={14}
-                      className="text-dim group-hover:text-muted-foreground shrink-0"
+                      className="text-fg-dim group-hover:text-fg-secondary shrink-0"
                     />
-                    <span className="text-sm text-muted-foreground group-hover:text-foreground truncate">
+                    <span className="text-sm text-fg-secondary group-hover:text-fg truncate">
                       {note.title || "Untitled"}
                     </span>
                   </button>
@@ -160,11 +160,11 @@ export function NoteCreationDialog({
         )}
 
         {/* Actions */}
-        <div className="border-t border-border-subtle px-5 py-3 flex items-center justify-between">
+        <div className="border-t border-separator px-5 py-3 flex items-center justify-between">
           <button
             type="button"
             onClick={handleCreate}
-            className="text-xs text-dim hover:text-muted-foreground transition-colors"
+            className="text-ui-sm text-fg-dim hover:text-fg-secondary transition-colors"
           >
             Create blank
           </button>

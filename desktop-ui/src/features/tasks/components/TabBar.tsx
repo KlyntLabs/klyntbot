@@ -54,7 +54,7 @@ export function TabBar({ areas, projects }: TabBarProps) {
   };
 
   return (
-    <div className="flex items-end gap-0.5 px-2 pt-1.5 border-b border-border bg-background overflow-x-auto">
+    <div className="flex items-end gap-0.5 px-2 pt-1.5 border-b border-separator bg-bg overflow-x-auto">
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={tabs.map((t) => t.id)} strategy={horizontalListSortingStrategy}>
           {tabs.map((tab) => (

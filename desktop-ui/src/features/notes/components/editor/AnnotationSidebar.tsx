@@ -44,14 +44,14 @@ export function AnnotationSidebar({
   return (
     <div className="flex h-full flex-col">
       {!hideHeader && (
-        <div className="px-3 py-1.5 text-2xs text-muted-foreground uppercase tracking-wider border-b border-border shrink-0 flex items-center justify-between">
+        <div className="px-3 py-1.5 text-ui-xs text-fg-secondary uppercase tracking-wider border-b border-separator shrink-0 flex items-center justify-between">
           <span>Annotations ({annotations.length})</span>
         </div>
       )}
 
       <div className="flex-1 overflow-y-auto">
         {annotations.length === 0 ? (
-          <div className="flex items-center justify-center h-32 text-xs text-muted-foreground">
+          <div className="flex items-center justify-center h-32 text-ui-sm text-fg-secondary">
             Select text in the editor and right-click to annotate.
           </div>
         ) : (
@@ -129,14 +129,14 @@ function AnnotationCard({
     <div
       ref={cardRef}
       onClick={onClick}
-      className={`border-b border-border px-2.5 py-2 cursor-pointer transition-colors ${
-        isActive ? "bg-brand/10 border-l-2 border-l-brand" : "hover:bg-surface-hover"
+      className={`border-b border-separator px-2.5 py-2 cursor-pointer transition-colors ${
+        isActive ? "bg-brand/10 border-l-2 border-l-brand" : "hover:bg-control-hover"
       }`}
     >
       {/* Quoted text */}
       {annotation.quotedText && (
         <div className="mb-1 border-l-2 border-brand/40 pl-1.5">
-          <p className="text-2xs text-muted-foreground italic leading-snug">
+          <p className="text-ui-xs text-fg-secondary italic leading-snug">
             &ldquo;{annotation.quotedText}&rdquo;
           </p>
         </div>
@@ -145,17 +145,17 @@ function AnnotationCard({
       {/* Language enrichment (Smart Detection) */}
       {enrichment && (
         <div className="mb-2 space-y-1.5">
-          <div className="rounded-md bg-surface-hover/50 px-2 py-1.5 text-[11px] text-muted-foreground">
+          <div className="rounded-md bg-control-hover/50 px-2 py-1.5 text-ui-xs text-fg-secondary">
             {enrichment.translation}
           </div>
           <div className="flex flex-wrap gap-1">
             {enrichment.words.map((w) => (
               <span
                 key={w.word}
-                className="inline-flex items-center gap-1 rounded bg-surface-hover px-1.5 py-0.5 text-2xs text-primary"
+                className="inline-flex items-center gap-1 rounded bg-control-hover px-1.5 py-0.5 text-ui-xs text-brand"
               >
                 {w.word}
-                {w.reading && <span className="text-[9px] text-muted-foreground">{w.reading}</span>}
+                {w.reading && <span className="text-[9px] text-fg-secondary">{w.reading}</span>}
                 {w.proficiencyLevel && (
                   <span className="text-[9px] text-purple-400">{w.proficiencyLevel}</span>
                 )}
@@ -174,7 +174,7 @@ function AnnotationCard({
 
       {/* Footer: date + delete */}
       <div className="mt-1 flex items-center justify-between">
-        <span className="text-[9px] text-muted-foreground">
+        <span className="text-[9px] text-fg-secondary">
           {new Date(annotation.createdAt).toLocaleString(undefined, {
             month: "short",
             day: "numeric",
@@ -188,7 +188,7 @@ function AnnotationCard({
             e.stopPropagation();
             onDelete(annotation.id);
           }}
-          className="text-[9px] text-muted-foreground hover:text-red-400 transition-colors"
+          className="text-[9px] text-fg-secondary hover:text-red-400 transition-colors"
         >
           Delete
         </button>

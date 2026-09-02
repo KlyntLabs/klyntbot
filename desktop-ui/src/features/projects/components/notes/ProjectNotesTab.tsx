@@ -53,11 +53,11 @@ export function ProjectNotesTab() {
         {selectedNote ? (
           <>
             {/* Note header */}
-            <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
-              <h2 className="text-sm font-semibold text-foreground truncate">
+            <div className="flex items-center gap-3 px-4 py-3 border-b border-separator">
+              <h2 className="text-sm font-semibold text-fg truncate">
                 {selectedNote.title || "Untitled"}
               </h2>
-              <span className="text-2xs text-muted-foreground">
+              <span className="text-ui-xs text-fg-secondary">
                 Updated {new Date(selectedNote.updatedAt).toLocaleDateString()}
               </span>
               {selectedNote.tags.length > 0 && (
@@ -65,7 +65,7 @@ export function ProjectNotesTab() {
                   {selectedNote.tags.slice(0, 3).map((tag) => (
                     <span
                       key={tag}
-                      className="text-2xs px-1.5 py-0.5 rounded bg-accent text-muted-foreground"
+                      className="text-ui-xs px-1.5 py-0.5 rounded bg-control-hover text-fg-secondary"
                     >
                       {tag}
                     </span>
@@ -75,7 +75,7 @@ export function ProjectNotesTab() {
               <button
                 type="button"
                 onClick={handleOpenInNotes}
-                className="ml-auto flex items-center gap-1 text-xs text-brand hover:text-brand/80 transition-colors"
+                className="ml-auto flex items-center gap-1 text-ui-sm text-brand hover:text-brand/80 transition-colors"
               >
                 <ExternalLink className="size-3.5" />
                 Open in Notes
@@ -86,14 +86,14 @@ export function ProjectNotesTab() {
             <div className="flex-1 overflow-y-auto px-6 py-4">
               {selectedNote.bodyHtml ? (
                 <div
-                  className="prose prose-sm prose-invert max-w-none text-foreground"
+                  className="prose prose-sm prose-invert max-w-none text-fg"
                   // biome-ignore lint/security/noDangerouslySetInnerHtml: read-only note preview
                   dangerouslySetInnerHTML={{
                     __html: selectedNote.bodyHtml,
                   }}
                 />
               ) : (
-                <div className="text-sm text-muted-foreground whitespace-pre-wrap">
+                <div className="text-sm text-fg-secondary whitespace-pre-wrap">
                   {selectedNote.body || "Empty note"}
                 </div>
               )}
@@ -111,15 +111,15 @@ export function ProjectNotesTab() {
           <div className="flex-1 flex flex-col items-center justify-center text-center px-6">
             {notes.length === 0 && !loading ? (
               <>
-                <p className="text-sm text-muted-foreground mb-2">
+                <p className="text-sm text-fg-secondary mb-2">
                   No notes linked to this project.
                 </p>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-ui-sm text-fg-secondary">
                   Create a note or link an existing notebook to get started.
                 </p>
               </>
             ) : (
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-fg-secondary">
                 Select a note from the sidebar to view it.
               </p>
             )}

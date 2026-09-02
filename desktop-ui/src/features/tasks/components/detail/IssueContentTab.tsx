@@ -48,24 +48,24 @@ function AcceptanceCriteria({ text }: { text: string }) {
   const preview = lines[0] ?? "";
 
   return (
-    <div className="border border-border rounded-md">
+    <div className="border border-separator rounded-md">
       <button
         type="button"
         onClick={() => setExpanded(!expanded)}
-        className="flex items-center gap-2 w-full px-3 py-2 text-sm font-medium text-foreground hover:bg-accent/50 transition-colors"
+        className="flex items-center gap-2 w-full px-3 py-2 text-sm font-medium text-fg hover:bg-control-hover/50 transition-colors"
       >
         {expanded ? (
-          <ChevronDown className="size-4 text-muted-foreground" />
+          <ChevronDown className="size-4 text-fg-secondary" />
         ) : (
-          <ChevronRight className="size-4 text-muted-foreground" />
+          <ChevronRight className="size-4 text-fg-secondary" />
         )}
         Acceptance Criteria
         {!expanded && (
-          <span className="text-muted-foreground font-normal truncate">— {preview}</span>
+          <span className="text-fg-secondary font-normal truncate">— {preview}</span>
         )}
       </button>
       {expanded && (
-        <div className="px-3 pb-3 text-sm text-foreground whitespace-pre-wrap font-mono">
+        <div className="px-3 pb-3 text-sm text-fg whitespace-pre-wrap font-mono">
           {text}
         </div>
       )}
@@ -80,11 +80,11 @@ function SubIssuesList({ issues }: { issues: SubIssue[] }) {
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
-        <h3 className="text-sm font-medium text-foreground">
+        <h3 className="text-sm font-medium text-fg">
           Sub-issues ({completedCount}/{issues.length} done)
         </h3>
       </div>
-      <div className="border border-border rounded-md divide-y divide-border">
+      <div className="border border-separator rounded-md divide-y divide-separator">
         {issues.map((issue) => {
           const PriorityIcon = issue.priority.icon;
           return (
@@ -92,14 +92,14 @@ function SubIssuesList({ issues }: { issues: SubIssue[] }) {
               key={issue.id}
               type="button"
               onClick={() => navigateInPlace("issue", issue.id, issue.identifier)}
-              className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-accent/50 transition-colors text-left"
+              className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-control-hover/50 transition-colors text-left"
             >
               <span className="flex items-center justify-center size-4">
                 {renderStatusIcon(issue.status)}
               </span>
-              <PriorityIcon className="size-3.5 text-muted-foreground shrink-0" />
-              <span className="text-xs text-muted-foreground shrink-0">{issue.identifier}</span>
-              <span className="truncate text-foreground">{issue.title}</span>
+              <PriorityIcon className="size-3.5 text-fg-secondary shrink-0" />
+              <span className="text-ui-sm text-fg-secondary shrink-0">{issue.identifier}</span>
+              <span className="truncate text-fg">{issue.title}</span>
             </button>
           );
         })}

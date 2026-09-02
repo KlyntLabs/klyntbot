@@ -1,0 +1,36 @@
+/* Elevation / blur — glass recipes consume these composites. */
+
+:root {
+  --ds-shadow-inset-light: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  --ds-shadow-inset-strong: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  --ds-shadow-inset-window: inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  --ds-shadow-inset-subtle: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+
+  --ds-shadow-glass: 0 8px 28px var(--ds-glass-shadow);
+  --ds-shadow-glass-strong: 0 12px 40px var(--ds-glass-shadow);
+  --ds-shadow-window: 0 24px 70px rgba(0, 0, 0, 0.35), 0 4px 14px rgba(0, 0, 0, 0.18);
+  --ds-shadow-island: 0 1px 3px rgba(0, 0, 0, 0.1);
+  --ds-shadow-tooltip: 0 4px 20px rgba(0, 0, 0, 0.2);
+
+  --ds-elevation-glass: var(--ds-shadow-inset-light), var(--ds-shadow-glass);
+  --ds-elevation-glass-strong: var(--ds-shadow-inset-strong), var(--ds-shadow-glass-strong);
+  --ds-elevation-window: var(--ds-shadow-inset-window), var(--ds-shadow-window);
+  --ds-elevation-island: var(--ds-shadow-inset-subtle), var(--ds-shadow-island);
+
+  --ds-blur: blur(28px) saturate(1.8);
+  --ds-blur-strong: blur(42px) saturate(1.9);
+}
+
+html[data-theme="dark"] {
+  --ds-shadow-inset-light: inset 0 1px 0 rgba(255, 255, 255, 0.09);
+  --ds-shadow-inset-strong: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  --ds-shadow-inset-window: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  --ds-shadow-inset-subtle: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  --ds-shadow-window: 0 24px 70px rgba(0, 0, 0, 0.6), 0 4px 14px rgba(0, 0, 0, 0.35);
+  --ds-shadow-island: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --ds-shadow-tooltip: 0 4px 20px rgba(0, 0, 0, 0.45);
+  --ds-elevation-glass: var(--ds-shadow-inset-light), var(--ds-shadow-glass);
+  --ds-elevation-glass-strong: var(--ds-shadow-inset-strong), var(--ds-shadow-glass-strong);
+  --ds-elevation-window: var(--ds-shadow-inset-window), var(--ds-shadow-window);
+  --ds-elevation-island: var(--ds-shadow-inset-subtle), var(--ds-shadow-island);
+}

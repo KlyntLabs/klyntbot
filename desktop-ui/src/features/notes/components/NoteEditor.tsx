@@ -584,7 +584,7 @@ export function NoteEditor({
                     <div className="w-px h-full group-hover:bg-purple/40 transition-colors" />
                   </div>
 
-                  <div className="flex-1 min-w-0 min-h-0 overflow-hidden border-l border-border">
+                  <div className="flex-1 min-w-0 min-h-0 overflow-hidden border-l border-separator">
                     <AnnotationPane
                       initialSideNotes={sideNotesContent}
                       annotations={annotations}
@@ -609,7 +609,7 @@ export function NoteEditor({
               className="h-[2px] mx-2 mb-2 shrink-0"
               style={{
                 background:
-                  "linear-gradient(90deg, transparent 0%, var(--brand) 30%, rgba(167, 139, 250, 0.6) 50%, var(--brand) 70%, transparent 100%)",
+                  "linear-gradient(90deg, transparent 0%, var(--ds-accent) 30%, rgba(167, 139, 250, 0.6) 50%, var(--ds-accent) 70%, transparent 100%)",
               }}
             />
 
@@ -690,7 +690,7 @@ export function NoteEditor({
       {annotationTooltip &&
         createPortal(
           <div
-            className="fixed z-[60] max-w-[280px] rounded-lg pointer-events-none bg-popover text-popover-foreground border border-border shadow-md editor-content-compact"
+            className="fixed z-[60] max-w-[280px] rounded-lg pointer-events-none bg-glass-strong text-fg border border-separator shadow-md editor-content-compact"
             style={{
               top: annotationTooltip.position.top,
               left: annotationTooltip.position.left,

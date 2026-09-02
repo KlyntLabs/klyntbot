@@ -82,7 +82,7 @@ export function PracticePreview({
         {loading ? (
           <div className="flex flex-col items-center justify-center py-16 gap-3">
             <ThinkingDots />
-            <p className="text-[11px] text-muted">Preparing your session...</p>
+            <p className="text-ui-xs text-fg-secondary">Preparing your session...</p>
           </div>
         ) : hasExistingSession ? (
           <ResumeView
@@ -127,19 +127,19 @@ function FirstVisitView({
       {/* Header */}
       <div className="px-6 pt-5 pb-3 flex items-start justify-between">
         <div>
-          <p className="text-purple text-2xs uppercase tracking-[0.12em] font-medium">
+          <p className="text-purple text-ui-xs uppercase tracking-[0.12em] font-medium">
             Practice Session
           </p>
           <div className="flex items-baseline gap-2 mt-1.5">
-            <span className="text-primary text-base font-semibold">{segments.length} units</span>
-            <span className="text-muted-foreground text-sm">~{estimatedMins} min</span>
+            <span className="text-brand text-base font-semibold">{segments.length} units</span>
+            <span className="text-fg-secondary text-sm">~{estimatedMins} min</span>
           </div>
-          {focusSummary && <p className="text-muted-foreground text-xs mt-0.5">{focusSummary}</p>}
+          {focusSummary && <p className="text-fg-secondary text-ui-sm mt-0.5">{focusSummary}</p>}
         </div>
         <button
           type="button"
           onClick={onCancel}
-          className="text-muted hover:text-primary p-1 -m-1 rounded transition-colors"
+          className="text-fg-secondary hover:text-brand p-1 -m-1 rounded transition-colors"
         >
           <X size={14} strokeWidth={1.5} />
         </button>
@@ -156,11 +156,11 @@ function FirstVisitView({
               key={seg.index}
               className="flex items-center gap-2.5 py-1.5 px-3.5 hover:bg-white/[0.03] transition-colors"
             >
-              <span className="text-muted-foreground/50 text-2xs w-5 text-right shrink-0 tabular-nums">
+              <span className="text-fg-secondary/50 text-ui-xs w-5 text-right shrink-0 tabular-nums">
                 {seg.index + 1}
               </span>
               <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${typeDot(seg.type)}`} />
-              <span className="text-xs text-muted-foreground truncate flex-1 min-w-0">
+              <span className="text-ui-sm text-fg-secondary truncate flex-1 min-w-0">
                 {seg.text}
               </span>
             </div>
@@ -173,14 +173,14 @@ function FirstVisitView({
         <button
           type="button"
           onClick={onCancel}
-          className="text-xs text-muted hover:text-primary transition-colors"
+          className="text-ui-sm text-fg-secondary hover:text-brand transition-colors"
         >
           Edit segments
         </button>
         <button
           type="button"
           onClick={onStart}
-          className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs font-medium text-white transition-all hover:brightness-110"
+          className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-ui-sm font-medium text-white transition-all hover:brightness-110"
           style={{
             background: "linear-gradient(135deg, #a78bfa 0%, #7c3aed 100%)",
             boxShadow: "0 0 20px rgba(167,139,250,0.25)",
@@ -220,20 +220,20 @@ function ResumeView({
       {/* Header */}
       <div className="px-6 pt-5 pb-3 flex items-start justify-between">
         <div>
-          <p className="text-purple text-2xs uppercase tracking-[0.12em] font-medium">
+          <p className="text-purple text-ui-xs uppercase tracking-[0.12em] font-medium">
             Resume Session
           </p>
           <div className="flex items-baseline gap-2 mt-1.5">
-            <span className="text-primary text-base font-semibold">
+            <span className="text-brand text-base font-semibold">
               {current}/{total} completed
             </span>
-            {scoreText && <span className="text-muted-foreground text-xs">{scoreText}</span>}
+            {scoreText && <span className="text-fg-secondary text-ui-sm">{scoreText}</span>}
           </div>
         </div>
         <button
           type="button"
           onClick={onCancel}
-          className="text-muted hover:text-primary p-1 -m-1 rounded transition-colors"
+          className="text-fg-secondary hover:text-brand p-1 -m-1 rounded transition-colors"
         >
           <X size={14} strokeWidth={1.5} />
         </button>
@@ -250,7 +250,7 @@ function ResumeView({
             style={{ width: `${pct}%` }}
           />
         </div>
-        <p className="text-2xs text-muted mt-1.5">Pick up where you left off</p>
+        <p className="text-ui-xs text-fg-secondary mt-1.5">Pick up where you left off</p>
       </div>
 
       {/* Actions */}
@@ -258,7 +258,7 @@ function ResumeView({
         <button
           type="button"
           onClick={onResume}
-          className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs font-medium text-white transition-all hover:brightness-110"
+          className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-ui-sm font-medium text-white transition-all hover:brightness-110"
           style={{
             background: "linear-gradient(135deg, #a78bfa 0%, #7c3aed 100%)",
             boxShadow: "0 0 20px rgba(167,139,250,0.25)",
@@ -271,7 +271,7 @@ function ResumeView({
           <button
             type="button"
             onClick={onStart}
-            className="flex items-center gap-1 text-[11px] text-muted hover:text-primary transition-colors"
+            className="flex items-center gap-1 text-ui-xs text-fg-secondary hover:text-brand transition-colors"
           >
             <RotateCcw size={10} />
             Start fresh
@@ -279,7 +279,7 @@ function ResumeView({
           <button
             type="button"
             onClick={onCancel}
-            className="text-[11px] text-muted hover:text-primary transition-colors"
+            className="text-ui-xs text-fg-secondary hover:text-brand transition-colors"
           >
             Cancel
           </button>

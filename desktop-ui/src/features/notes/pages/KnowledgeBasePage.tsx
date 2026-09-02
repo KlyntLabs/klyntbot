@@ -49,7 +49,7 @@ function ViewModeToggle({
         type="button"
         aria-label="Editor view"
         onClick={() => onChange("editor")}
-        className={`p-1.5 rounded-md transition-colors ${viewMode === "editor" ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+        className={`p-1.5 rounded-md transition-colors ${viewMode === "editor" ? "bg-control-hover text-fg" : "text-fg-secondary hover:text-fg"}`}
       >
         <PenLine size={16} />
       </button>
@@ -57,7 +57,7 @@ function ViewModeToggle({
         type="button"
         aria-label="Graph view"
         onClick={() => onChange("graph")}
-        className={`p-1.5 rounded-md transition-colors ${viewMode === "graph" ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+        className={`p-1.5 rounded-md transition-colors ${viewMode === "graph" ? "bg-control-hover text-fg" : "text-fg-secondary hover:text-fg"}`}
       >
         <GitGraph size={16} />
       </button>
@@ -660,14 +660,14 @@ export default function KnowledgeBasePage() {
               <ViewModeToggle viewMode={viewMode} onChange={setViewMode} />
             </div>
             <div className="flex-1 flex flex-col items-center justify-center gap-3">
-              <div className="size-12 rounded-2xl bg-card flex items-center justify-center">
-                <FileText className="size-6 text-dim" strokeWidth={1.5} />
+              <div className="size-12 rounded-2xl bg-bg-elevated flex items-center justify-center">
+                <FileText className="size-6 text-fg-dim" strokeWidth={1.5} />
               </div>
               <div className="text-center">
-                <div className="text-muted-foreground text-sm">Select a note to view</div>
-                <div className="text-dim text-xs mt-1">
+                <div className="text-fg-secondary text-sm">Select a note to view</div>
+                <div className="text-fg-dim text-ui-sm mt-1">
                   or press{" "}
-                  <kbd className="px-1.5 py-0.5 rounded bg-accent text-2xs font-mono">Cmd+N</kbd> to
+                  <kbd className="px-1.5 py-0.5 rounded bg-control-hover text-ui-xs font-mono">Cmd+N</kbd> to
                   create one
                 </div>
               </div>

@@ -14,11 +14,11 @@ export function ProjectHeader() {
   if (!project) return null;
 
   return (
-    <div className="flex items-center gap-3 px-6 py-3 border-b border-border">
+    <div className="flex items-center gap-3 px-6 py-3 border-b border-separator">
       <button
         type="button"
         onClick={() => navigate(-1)}
-        className="text-muted-foreground hover:text-foreground"
+        className="text-fg-secondary hover:text-fg"
       >
         <ArrowLeft className="size-4" />
       </button>
@@ -26,7 +26,7 @@ export function ProjectHeader() {
         className="size-2.5 rounded-full flex-shrink-0"
         style={{ backgroundColor: project.color }}
       />
-      <h1 className="text-base font-semibold text-foreground truncate">{project.name}</h1>
+      <h1 className="text-base font-semibold text-fg truncate">{project.name}</h1>
       <div className="ml-auto flex items-center gap-3">
         <button
           type="button"
@@ -39,7 +39,7 @@ export function ProjectHeader() {
         <button
           type="button"
           onClick={() => navigate(`/chat?project=${project.id}`)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent text-muted-foreground hover:text-foreground text-[11px] transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-control-hover text-fg-secondary hover:text-fg text-ui-xs transition-colors"
           title="Ask AI about this project"
         >
           <MessageSquare className="size-3.5" />

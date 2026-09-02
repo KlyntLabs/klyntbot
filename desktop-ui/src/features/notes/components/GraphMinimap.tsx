@@ -198,7 +198,7 @@ export function GraphMinimap({
         type="button"
         onClick={onToggle}
         className={`size-7 glass-button flex items-center justify-center transition-colors ${
-          visible ? "text-brand" : "text-muted-foreground hover:text-foreground"
+          visible ? "text-brand" : "text-fg-secondary hover:text-fg"
         }`}
         aria-label={visible ? "Hide minimap" : "Show minimap"}
       >

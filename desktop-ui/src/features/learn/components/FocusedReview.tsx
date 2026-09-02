@@ -91,11 +91,11 @@ export function FocusedReview() {
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center space-y-3">
           <CheckCircle size={32} className="mx-auto text-emerald-400" strokeWidth={1.5} />
-          <p className="text-sm text-muted-foreground">No cards due for review</p>
+          <p className="text-sm text-fg-secondary">No cards due for review</p>
           <Link
             to="/learn"
             onClick={handleFinish}
-            className="glass-button px-4 py-2 text-sm text-foreground inline-block"
+            className="glass-button px-4 py-2 text-sm text-fg inline-block"
           >
             Back to Learning Hub
           </Link>
@@ -110,14 +110,14 @@ export function FocusedReview() {
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center space-y-3 animate-[fade-in-up_0.3s_ease-out]">
           <CheckCircle size={40} className="mx-auto text-emerald-400" strokeWidth={1.5} />
-          <h2 className="text-xl font-semibold text-foreground">Review Complete!</h2>
-          <p className="text-sm text-muted-foreground">
+          <h2 className="text-xl font-semibold text-fg">Review Complete!</h2>
+          <p className="text-sm text-fg-secondary">
             You reviewed {cards.length} card{cards.length !== 1 ? "s" : ""}
           </p>
           <Link
             to="/learn"
             onClick={handleFinish}
-            className="glass-button px-5 py-2.5 text-sm text-foreground inline-block"
+            className="glass-button px-5 py-2.5 text-sm text-fg inline-block"
           >
             Back to Learning Hub
           </Link>
@@ -132,19 +132,19 @@ export function FocusedReview() {
   return (
     <div className="flex-1 flex flex-col">
       {/* Top bar */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-separator">
         <Link
           to="/learn"
           onClick={handleFinish}
-          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          className="flex items-center gap-1.5 text-sm text-fg-secondary hover:text-fg transition-colors"
         >
           <ArrowLeft size={16} strokeWidth={1.5} />
-          <span className="text-xs">Back</span>
+          <span className="text-ui-sm">Back</span>
         </Link>
 
-        <span className="text-[13px] font-medium text-foreground">{heading}</span>
+        <span className="text-ui font-medium text-fg">{heading}</span>
 
-        <span className="text-xs text-muted-foreground tabular-nums">
+        <span className="text-ui-sm text-fg-secondary tabular-nums">
           Card {currentIndex + 1} of {cards.length}
         </span>
       </div>
@@ -167,10 +167,10 @@ export function FocusedReview() {
             <button
               type="button"
               onClick={reveal}
-              className="glass-button px-8 py-2.5 text-sm text-foreground"
+              className="glass-button px-8 py-2.5 text-sm text-fg"
             >
               Show Answer
-              <span className="text-2xs text-muted-foreground ml-2">Space</span>
+              <span className="text-ui-xs text-fg-secondary ml-2">Space</span>
             </button>
           </div>
         ) : (

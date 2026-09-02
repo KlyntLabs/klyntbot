@@ -22,8 +22,8 @@ export function CoachingNudge({ isStreaming }: { isStreaming: boolean }) {
           className="flex items-start gap-3 px-4 py-3 rounded-xl bg-[var(--glass-tint-info)] border border-[var(--glass-border)] backdrop-blur-sm"
           style={{ animation: "nudge-slide-in 0.25s ease-out" }}
         >
-          <Lightbulb className="size-4 text-info shrink-0 mt-0.5" strokeWidth={1.5} />
-          <p className="flex-1 text-[13px] text-muted-foreground font-light leading-relaxed">
+          <Lightbulb className="size-4 text-status-info shrink-0 mt-0.5" strokeWidth={1.5} />
+          <p className="flex-1 text-ui text-fg-secondary font-light leading-relaxed">
             {nudge.message}
           </p>
           <div className="flex items-center gap-1 shrink-0">
@@ -31,7 +31,7 @@ export function CoachingNudge({ isStreaming }: { isStreaming: boolean }) {
               type="button"
               onClick={() => handleFeedback(nudge.id, "helpful")}
               title="Helpful"
-              className="size-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-success hover:bg-accent transition-colors"
+              className="size-7 flex items-center justify-center rounded-lg text-fg-secondary hover:text-status-success hover:bg-control-hover transition-colors"
             >
               <Check className="size-3.5" strokeWidth={2} />
             </button>
@@ -39,7 +39,7 @@ export function CoachingNudge({ isStreaming }: { isStreaming: boolean }) {
               type="button"
               onClick={() => handleFeedback(nudge.id, "dismissed")}
               title="Dismiss"
-              className="size-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              className="size-7 flex items-center justify-center rounded-lg text-fg-secondary hover:text-fg hover:bg-control-hover transition-colors"
             >
               <X className="size-3.5" strokeWidth={2} />
             </button>
@@ -47,7 +47,7 @@ export function CoachingNudge({ isStreaming }: { isStreaming: boolean }) {
               type="button"
               onClick={() => handleFeedback(nudge.id, "stop")}
               title="Stop suggesting this"
-              className="size-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-destructive hover:bg-accent transition-colors"
+              className="size-7 flex items-center justify-center rounded-lg text-fg-secondary hover:text-status-danger hover:bg-control-hover transition-colors"
             >
               <XCircle className="size-3.5" strokeWidth={2} />
             </button>

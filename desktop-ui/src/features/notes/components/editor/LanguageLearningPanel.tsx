@@ -50,12 +50,12 @@ export function LanguageLearningPanel({
       {/* Selection indicator */}
       {isSelection && (
         <div className="flex items-center justify-between border-b border-brand/20 bg-brand/5 px-3 py-1.5">
-          <span className="text-2xs text-brand">Translating selection</span>
+          <span className="text-ui-xs text-brand">Translating selection</span>
           {onClearSelection && (
             <button
               type="button"
               onClick={onClearSelection}
-              className="text-2xs text-muted-foreground hover:text-primary"
+              className="text-ui-xs text-fg-secondary hover:text-brand"
             >
               Translate full document
             </button>
@@ -65,7 +65,7 @@ export function LanguageLearningPanel({
 
       {/* Save success feedback */}
       {savedCount !== null && (
-        <div className="mx-3 mt-2 flex items-center justify-between rounded-md bg-green-500/10 px-3 py-2 text-xs text-green-400">
+        <div className="mx-3 mt-2 flex items-center justify-between rounded-md bg-green-500/10 px-3 py-2 text-ui-sm text-green-400">
           <span>
             Saved {savedCount} word{savedCount !== 1 ? "s" : ""} + knowledge atoms to &ldquo;
             {noteTitle}&rdquo;
@@ -82,7 +82,7 @@ export function LanguageLearningPanel({
 
       {/* Save error feedback */}
       {errorMessage && (
-        <div className="mx-3 mt-2 flex items-center justify-between rounded-md bg-red-500/10 px-3 py-2 text-xs text-red-400">
+        <div className="mx-3 mt-2 flex items-center justify-between rounded-md bg-red-500/10 px-3 py-2 text-ui-sm text-red-400">
           <span>Save failed: {errorMessage}</span>
           <button type="button" onClick={dismissError} className="text-red-300 hover:text-red-200">
             &times;
@@ -117,8 +117,8 @@ export function LanguageLearningPanel({
                 key={`${gp.pattern}-${gp.patternType ?? "generic"}`}
                 className="rounded-md border border-blue-500/20 bg-blue-500/5 p-2"
               >
-                <p className="text-xs font-mono text-blue-300">{gp.pattern}</p>
-                <p className="mt-1 text-xs text-muted">{gp.explanation}</p>
+                <p className="text-ui-sm font-mono text-blue-300">{gp.pattern}</p>
+                <p className="mt-1 text-ui-sm text-fg-secondary">{gp.explanation}</p>
                 {gp.patternType && (
                   <span className="mt-1 inline-block rounded-full bg-blue-500/15 px-1.5 py-0.5 text-[9px] text-blue-400">
                     {gp.patternType}
@@ -146,11 +146,11 @@ export function LanguageLearningPanel({
 
       {/* Footer: enter practice mode */}
       {result && (
-        <div className="border-t border-border px-3 py-2 mt-2">
+        <div className="border-t border-separator px-3 py-2 mt-2">
           <button
             type="button"
             onClick={onEnterPractice}
-            className="flex items-center justify-center gap-1.5 w-full rounded-md px-3 py-2 text-xs font-medium bg-brand/15 text-brand hover:bg-brand/25 transition-colors"
+            className="flex items-center justify-center gap-1.5 w-full rounded-md px-3 py-2 text-ui-sm font-medium bg-brand/15 text-brand hover:bg-brand/25 transition-colors"
           >
             Turn this into active practice
           </button>

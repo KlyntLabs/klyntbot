@@ -10,11 +10,11 @@ interface CardRendererProps {
 function BasicCard({ card, revealed }: { card: Flashcard; revealed: boolean }) {
   return (
     <div className="text-center space-y-6">
-      <div className="text-lg text-foreground whitespace-pre-wrap">{card.front}</div>
+      <div className="text-lg text-fg whitespace-pre-wrap">{card.front}</div>
       {revealed && (
         <div className="animate-[fade-in-up_0.25s_ease-out]">
           <div className="glass-divider mb-6" />
-          <div className="text-lg text-foreground whitespace-pre-wrap">{card.back}</div>
+          <div className="text-lg text-fg whitespace-pre-wrap">{card.back}</div>
         </div>
       )}
     </div>
@@ -32,13 +32,13 @@ function ClozeCard({ card, revealed }: { card: Flashcard; revealed: boolean }) {
 
   return (
     <div className="text-center space-y-6">
-      <div className="text-lg text-foreground whitespace-pre-wrap">
+      <div className="text-lg text-fg whitespace-pre-wrap">
         {revealed ? fullText : maskedText}
       </div>
       {revealed && card.back && (
         <div className="animate-[fade-in-up_0.25s_ease-out]">
           <div className="glass-divider mb-6" />
-          <p className="text-sm text-muted-foreground">{card.back}</p>
+          <p className="text-sm text-fg-secondary">{card.back}</p>
         </div>
       )}
     </div>
@@ -52,10 +52,10 @@ function VocabularyCard({ card, revealed }: { card: Flashcard; revealed: boolean
   return (
     <div className="text-center space-y-6">
       <div>
-        <p className="text-2xl font-semibold text-foreground">{vocab.word ?? card.front}</p>
-        {vocab.reading && <p className="text-sm text-muted-foreground mt-1">{vocab.reading}</p>}
+        <p className="text-2xl font-semibold text-fg">{vocab.word ?? card.front}</p>
+        {vocab.reading && <p className="text-sm text-fg-secondary mt-1">{vocab.reading}</p>}
         {vocab.partOfSpeech && (
-          <span className="inline-block mt-2 text-[11px] text-muted-foreground glass-badge px-2 py-0.5">
+          <span className="inline-block mt-2 text-ui-xs text-fg-secondary glass-badge px-2 py-0.5">
             {vocab.partOfSpeech}
           </span>
         )}
@@ -63,9 +63,9 @@ function VocabularyCard({ card, revealed }: { card: Flashcard; revealed: boolean
       {revealed && (
         <div className="animate-[fade-in-up_0.25s_ease-out] space-y-4">
           <div className="glass-divider" />
-          <p className="text-lg text-foreground">{vocab.meaning ?? card.back}</p>
+          <p className="text-lg text-fg">{vocab.meaning ?? card.back}</p>
           {vocab.exampleSentence && (
-            <p className="text-sm text-muted-foreground italic">{vocab.exampleSentence}</p>
+            <p className="text-sm text-fg-secondary italic">{vocab.exampleSentence}</p>
           )}
         </div>
       )}
@@ -79,14 +79,14 @@ function TypedCard({ card, revealed }: { card: Flashcard; revealed: boolean }) {
 
   return (
     <div className="text-center space-y-6">
-      <div className="text-lg text-foreground whitespace-pre-wrap">{card.front}</div>
+      <div className="text-lg text-fg whitespace-pre-wrap">{card.front}</div>
       <input
         type="text"
         value={typed}
         onChange={(e) => setTyped(e.target.value)}
         disabled={revealed}
         placeholder="Type your answer..."
-        className="glass-input w-full max-w-sm mx-auto px-3 py-2 text-sm text-foreground text-center"
+        className="glass-input w-full max-w-sm mx-auto px-3 py-2 text-sm text-fg text-center"
       />
       {revealed && (
         <div className="animate-[fade-in-up_0.25s_ease-out] space-y-2">
@@ -94,7 +94,7 @@ function TypedCard({ card, revealed }: { card: Flashcard; revealed: boolean }) {
           <p className={`text-sm font-medium ${isCorrect ? "text-emerald-400" : "text-red-400"}`}>
             {isCorrect ? "Correct!" : "Incorrect"}
           </p>
-          <p className="text-lg text-foreground">{card.back}</p>
+          <p className="text-lg text-fg">{card.back}</p>
         </div>
       )}
     </div>
@@ -104,8 +104,8 @@ function TypedCard({ card, revealed }: { card: Flashcard; revealed: boolean }) {
 function ImageOcclusionCard() {
   return (
     <div className="text-center py-8">
-      <ImageOff size={32} className="mx-auto text-muted-foreground mb-3" strokeWidth={1.5} />
-      <p className="text-sm text-muted-foreground">Image cards coming soon</p>
+      <ImageOff size={32} className="mx-auto text-fg-secondary mb-3" strokeWidth={1.5} />
+      <p className="text-sm text-fg-secondary">Image cards coming soon</p>
     </div>
   );
 }

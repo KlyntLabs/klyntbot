@@ -36,7 +36,7 @@ export function AnswerInput({ onSubmit, grading, disabled }: AnswerInputProps) {
         disabled={grading || disabled}
         placeholder="Type your answer..."
         rows={2}
-        className="glass-input w-full px-4 py-3 text-sm text-foreground resize-none disabled:opacity-50"
+        className="glass-input w-full px-4 py-3 text-sm text-fg resize-none disabled:opacity-50"
       />
       <button
         type="button"
@@ -46,7 +46,7 @@ export function AnswerInput({ onSubmit, grading, disabled }: AnswerInputProps) {
           }
         }}
         disabled={!answer.trim() || grading || disabled}
-        className="glass-button px-6 py-2 text-sm text-foreground disabled:opacity-50 flex items-center gap-2"
+        className="glass-button px-6 py-2 text-sm text-fg disabled:opacity-50 flex items-center gap-2"
       >
         {grading ? (
           <>
@@ -56,7 +56,7 @@ export function AnswerInput({ onSubmit, grading, disabled }: AnswerInputProps) {
         ) : (
           <>
             Submit
-            <span className="text-2xs text-muted-foreground">Enter</span>
+            <span className="text-ui-xs text-fg-secondary">Enter</span>
           </>
         )}
       </button>

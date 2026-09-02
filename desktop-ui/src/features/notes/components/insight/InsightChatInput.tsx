@@ -65,11 +65,11 @@ export function InsightChatInput({
 
   if (!expanded && !hasMessages) {
     return (
-      <div className="border-t border-border pt-3 mt-4">
+      <div className="border-t border-separator pt-3 mt-4">
         <button
           type="button"
           onClick={() => setExpanded(true)}
-          className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+          className="flex items-center gap-1.5 text-ui-xs text-fg-secondary hover:text-fg transition-colors"
         >
           <MessageCircle size={12} />
           Ask a follow-up question
@@ -79,7 +79,7 @@ export function InsightChatInput({
   }
 
   return (
-    <div className="border-t border-border pt-3 mt-4 space-y-3">
+    <div className="border-t border-separator pt-3 mt-4 space-y-3">
       {(hasMessages || isStreaming) && (
         <div className="space-y-2.5">
           {/* Persisted messages */}
@@ -102,7 +102,7 @@ export function InsightChatInput({
                   <div className={`text-[9px] font-medium mb-1 ${color.label}`}>
                     {pm.personaName}
                   </div>
-                  <div className="text-[11px] leading-relaxed text-muted-foreground">
+                  <div className="text-ui-xs leading-relaxed text-fg-secondary">
                     <MarkdownContent content={pm.content} />
                   </div>
                 </div>
@@ -111,15 +111,15 @@ export function InsightChatInput({
 
           {/* Streaming indicator */}
           {isStreaming && personaMessages.length === 0 && (
-            <div className="rounded-lg bg-card/50 px-3 py-2">
-              <div className="text-[11px] leading-relaxed text-muted-foreground">
+            <div className="rounded-lg bg-bg-elevated/50 px-3 py-2">
+              <div className="text-ui-xs leading-relaxed text-fg-secondary">
                 {streamingContent ? (
                   <>
                     <MarkdownContent content={streamingContent} />
                     <span className="inline-block w-1.5 h-3 bg-purple animate-pulse ml-0.5 align-text-bottom rounded-sm" />
                   </>
                 ) : (
-                  <span className="text-dim italic animate-pulse">
+                  <span className="text-fg-dim italic animate-pulse">
                     {statusPhase || (hasSquad ? "Panel is discussing..." : "Thinking...")}
                   </span>
                 )}
@@ -129,7 +129,7 @@ export function InsightChatInput({
 
           {/* Squad thinking indicator when persona messages are streaming */}
           {isStreaming && personaMessages.length > 0 && statusPhase && (
-            <div className="flex items-center gap-1.5 text-[9px] text-dim animate-pulse px-1">
+            <div className="flex items-center gap-1.5 text-[9px] text-fg-dim animate-pulse px-1">
               <Users size={9} />
               {statusPhase}
             </div>
@@ -137,7 +137,7 @@ export function InsightChatInput({
         </div>
       )}
 
-      {error && <div className="text-[11px] text-destructive">{error}</div>}
+      {error && <div className="text-ui-xs text-status-danger">{error}</div>}
 
       <div className="flex gap-1.5">
         <input
@@ -154,13 +154,13 @@ export function InsightChatInput({
           }}
           placeholder={placeholder}
           disabled={isStreaming}
-          className="flex-1 text-[11px] px-2.5 py-1.5 rounded-lg bg-input border border-border text-foreground placeholder:text-dim focus:outline-none focus:ring-1 focus:ring-purple/30"
+          className="flex-1 text-ui-xs px-2.5 py-1.5 rounded-lg bg-input border border-separator text-fg placeholder:text-fg-dim focus:outline-none focus:ring-1 focus:ring-purple/30"
         />
         <button
           type="button"
           onClick={() => send()}
           disabled={isStreaming || !input.trim()}
-          className="px-2 py-1.5 rounded-lg text-purple hover:bg-purple/10 transition-colors disabled:text-dim"
+          className="px-2 py-1.5 rounded-lg text-purple hover:bg-purple/10 transition-colors disabled:text-fg-dim"
         >
           <Send size={12} />
         </button>
@@ -188,15 +188,15 @@ function ChatBubble({
   const isPersona = !isUser && !!personaName;
   const color = isPersona && personaId ? getPersonaColor(personaId) : null;
 
-  const bgClass = isUser ? "bg-purple/8" : color ? color.bg : "bg-card/50";
-  const labelClass = isUser ? "text-purple/70" : color ? color.label : "text-muted-foreground/70";
+  const bgClass = isUser ? "bg-purple/8" : color ? color.bg : "bg-bg-elevated/50";
+  const labelClass = isUser ? "text-purple/70" : color ? color.label : "text-fg-secondary/70";
   const label = isUser ? "You" : personaName || speakerLabel;
 
   return (
     <div className={`rounded-lg px-3 py-2 ${bgClass}`}>
       <div className={`text-[9px] font-medium mb-1 ${labelClass}`}>{label}</div>
       <div
-        className={`text-[11px] leading-relaxed ${isUser ? "text-foreground" : "text-muted-foreground"}`}
+        className={`text-ui-xs leading-relaxed ${isUser ? "text-fg" : "text-fg-secondary"}`}
       >
         {isUser ? content : <MarkdownContent content={content} />}
       </div>

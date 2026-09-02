@@ -90,7 +90,7 @@ export function DistractionOverlay() {
   return (
     <div
       ref={contentRef}
-      className="w-full glass-floating overflow-hidden text-foreground"
+      className="w-full glass-floating overflow-hidden text-fg"
       style={{ animation: intervention ? "glass-appear 0.25s ease-out" : undefined }}
     >
       {intervention && (
@@ -101,14 +101,14 @@ export function DistractionOverlay() {
               <div className="flex items-center gap-2">
                 <span
                   className="w-1.5 h-1.5 rounded-full animate-pulse"
-                  style={{ background: "var(--destructive)" }}
+                  style={{ background: "var(--ds-status-danger)" }}
                 />
-                <span className="text-[11px] text-destructive font-medium uppercase tracking-wider">
+                <span className="text-ui-xs text-status-danger font-medium uppercase tracking-wider">
                   Focus active
                 </span>
               </div>
               {(loading || verdict) && (
-                <div className="text-2xs text-muted-foreground flex items-center gap-1.5">
+                <div className="text-ui-xs text-fg-secondary flex items-center gap-1.5">
                   {loading && (
                     <>
                       <ThinkingDots size="sm" />
@@ -120,8 +120,8 @@ export function DistractionOverlay() {
                       className={
                         verdict.classification === "educational" ||
                         verdict.classification === "work_research"
-                          ? "text-success"
-                          : "text-destructive"
+                          ? "text-status-success"
+                          : "text-status-danger"
                       }
                     >
                       {verdict.displayText}
@@ -134,9 +134,9 @@ export function DistractionOverlay() {
             {/* Content */}
             <div className="glass-divider" />
             <div className="flex flex-col gap-1">
-              <div className="text-[13px] font-medium text-foreground">{intervention.appName}</div>
+              <div className="text-ui font-medium text-fg">{intervention.appName}</div>
               {titleExcerpt && (
-                <div className="text-[11px] font-light text-muted-foreground truncate">
+                <div className="text-ui-xs font-light text-fg-secondary truncate">
                   {titleExcerpt}
                 </div>
               )}
@@ -147,10 +147,10 @@ export function DistractionOverlay() {
               <button
                 type="button"
                 onClick={handleDismiss}
-                className="flex-1 px-3 py-2 rounded-lg text-[11px] font-medium transition-all text-destructive"
+                className="flex-1 px-3 py-2 rounded-control text-ui-xs font-medium transition-all text-status-danger"
                 style={{
-                  background: "var(--glass-tint-destructive)",
-                  border: "1px solid rgba(244, 63, 94, 0.15)",
+                  background: "color-mix(in srgb, var(--ds-status-danger) 6%, transparent)",
+                  border: "1px solid color-mix(in srgb, var(--ds-status-danger) 15%, transparent)",
                 }}
               >
                 Back to work
@@ -158,14 +158,14 @@ export function DistractionOverlay() {
               <button
                 type="button"
                 onClick={handleAllowTemp}
-                className="flex-1 px-3 py-2 rounded-lg text-[11px] font-medium glass-button text-muted-foreground hover:text-foreground transition-colors"
+                className="flex-1 px-3 py-2 rounded-control text-ui-xs font-medium glass-button text-fg-secondary hover:text-fg transition-colors"
               >
                 5 min break
               </button>
               <button
                 type="button"
                 onClick={handleAllowSession}
-                className="flex-1 px-3 py-2 rounded-lg text-[11px] font-medium glass-button text-muted-foreground hover:text-foreground transition-colors"
+                className="flex-1 px-3 py-2 rounded-control text-ui-xs font-medium glass-button text-fg-secondary hover:text-fg transition-colors"
               >
                 It's work
               </button>

@@ -32,8 +32,8 @@ export function AmbientIndicator({ onClick }: AmbientIndicatorProps) {
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex items-center gap-1.5 text-2xs font-light text-dim
-        hover:text-muted-foreground transition-colors cursor-pointer"
+      className="inline-flex items-center gap-1.5 text-ui-xs font-light text-fg-dim
+        hover:text-fg-secondary transition-colors cursor-pointer"
     >
       <BrainHealthBadge compact />
       {text}

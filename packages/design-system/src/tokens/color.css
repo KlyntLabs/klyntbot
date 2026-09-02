@@ -1,0 +1,90 @@
+/* Color tokens — canonical --ds-*. Light is :root; dark is html[data-theme="dark"]. */
+
+:root {
+  /* App canvas (solid — Tauri window content, not OS wallpaper) */
+  --ds-bg: #f2f2f4;
+  --ds-bg-elevated: #ffffff;
+
+  /* Glass surfaces — slightly more opaque than klynt OS shell because
+     jdbot paints over a solid canvas, not a live wallpaper. */
+  --ds-glass-bg: rgba(255, 255, 255, 0.78);
+  --ds-glass-bg-strong: rgba(255, 255, 255, 0.92);
+  --ds-glass-bg-subtle: rgba(255, 255, 255, 0.7);
+  --ds-glass-border: rgba(0, 0, 0, 0.08);
+  --ds-glass-shadow: rgba(0, 0, 0, 0.12);
+
+  /* Foreground */
+  --ds-text: rgba(0, 0, 0, 0.85);
+  --ds-text-secondary: rgba(0, 0, 0, 0.52);
+  --ds-text-dim: rgba(0, 0, 0, 0.32);
+
+  /* Controls */
+  --ds-control-hover: rgba(0, 0, 0, 0.07);
+  --ds-control-active: rgba(0, 0, 0, 0.12);
+  --ds-accent: #0a7cff;
+  --ds-accent-hover: #0066e0;
+  --ds-highlight: #0066e0;
+  --ds-separator: rgba(0, 0, 0, 0.1);
+
+  /* Status */
+  --ds-status-success: #28c840;
+  --ds-status-danger: #ff453a;
+  --ds-status-warning: #ff9f0a;
+  --ds-status-info: #0a7cff;
+
+  /* Selection */
+  --ds-selection: rgba(10, 124, 255, 0.22);
+  --ds-selection-foreground: var(--ds-text);
+
+  /* Overlay scrims */
+  --ds-overlay: rgba(0, 0, 0, 0.25);
+  --ds-overlay-heavy: rgba(0, 0, 0, 0.45);
+
+  /* Scrollbar */
+  --ds-scrollbar-thumb: rgba(128, 128, 128, 0.45);
+
+  /* On-accent text */
+  --ds-accent-foreground: #ffffff;
+
+  /* HUD / floating windows (Tauri overlays) */
+  --ds-glass-floating: rgba(246, 246, 248, 0.88);
+  --ds-glass-floating-vibrancy: rgba(246, 246, 248, 0.45);
+  --ds-glass-dropdown: rgba(250, 250, 252, 0.9);
+  --ds-glass-badge: rgba(0, 0, 0, 0.06);
+  --ds-glass-badge-border: rgba(0, 0, 0, 0.08);
+  --ds-glass-context: rgba(246, 246, 248, 0.92);
+}
+
+html[data-theme="dark"] {
+  --ds-bg: #000000;
+  --ds-bg-elevated: #1c1c1e;
+
+  --ds-glass-bg: rgba(38, 38, 44, 0.6);
+  --ds-glass-bg-strong: rgba(44, 44, 50, 0.85);
+  --ds-glass-bg-subtle: rgba(52, 52, 60, 0.42);
+  --ds-glass-border: rgba(255, 255, 255, 0.16);
+  --ds-glass-shadow: rgba(0, 0, 0, 0.55);
+
+  --ds-text: rgba(255, 255, 255, 0.88);
+  --ds-text-secondary: rgba(255, 255, 255, 0.55);
+  --ds-text-dim: rgba(255, 255, 255, 0.32);
+
+  --ds-control-hover: rgba(255, 255, 255, 0.1);
+  --ds-control-active: rgba(255, 255, 255, 0.17);
+  --ds-separator: rgba(255, 255, 255, 0.12);
+
+  --ds-selection: rgba(10, 124, 255, 0.35);
+  --ds-selection-foreground: rgba(255, 255, 255, 0.95);
+
+  --ds-overlay: rgba(0, 0, 0, 0.45);
+  --ds-overlay-heavy: rgba(0, 0, 0, 0.65);
+
+  --ds-scrollbar-thumb: rgba(160, 160, 160, 0.45);
+
+  --ds-glass-floating: rgba(10, 10, 14, 0.82);
+  --ds-glass-floating-vibrancy: rgba(10, 10, 14, 0.45);
+  --ds-glass-dropdown: rgba(10, 10, 14, 0.75);
+  --ds-glass-badge: rgba(255, 255, 255, 0.06);
+  --ds-glass-badge-border: rgba(255, 255, 255, 0.08);
+  --ds-glass-context: rgba(22, 22, 24, 0.88);
+}

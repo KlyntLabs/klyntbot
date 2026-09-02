@@ -73,7 +73,7 @@ export function DonutChart({
               x={cx}
               y={cy - 5}
               textAnchor="middle"
-              className="fill-dim text-[9px]"
+              className="fill-fg-dim text-[9px]"
               style={{ fontWeight: 300 }}
             >
               {label}
@@ -84,7 +84,7 @@ export function DonutChart({
               x={cx}
               y={cy + 10}
               textAnchor="middle"
-              className="fill-primary text-[13px]"
+              className="fill-fg text-ui"
               style={{ fontWeight: 300 }}
             >
               {value}
@@ -99,7 +99,7 @@ export function DonutChart({
         {segments.map((seg) => (
           <div key={seg.name} className="flex items-center gap-1">
             <div className="size-1.5 rounded-full" style={{ backgroundColor: seg.color }} />
-            <span className="text-[9px] text-dim font-light">{seg.name}</span>
+            <span className="text-[9px] text-fg-dim font-light">{seg.name}</span>
           </div>
         ))}
       </div>

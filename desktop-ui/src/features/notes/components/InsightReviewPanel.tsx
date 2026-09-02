@@ -72,14 +72,14 @@ const TABS: { id: TabId; label: string }[] = [
 function statusDotClass(status: TabStatus): string {
   switch (status) {
     case "idle":
-      return "bg-muted-foreground/40 w-1.5 h-1.5 rounded-full";
+      return "bg-fg-secondary/40 w-1.5 h-1.5 rounded-full";
     case "loading":
     case "streaming":
       return "bg-purple w-1.5 h-1.5 rounded-full animate-pulse";
     case "done":
-      return "bg-success w-1.5 h-1.5 rounded-full";
+      return "bg-status-success w-1.5 h-1.5 rounded-full";
     case "error":
-      return "bg-destructive w-1.5 h-1.5 rounded-full";
+      return "bg-status-danger w-1.5 h-1.5 rounded-full";
   }
 }
 
@@ -193,9 +193,9 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center gap-2 px-3 py-2.5 border-b border-border shrink-0">
+      <div className="flex items-center gap-2 px-3 py-2.5 border-b border-separator shrink-0">
         <Brain size={14} className="text-purple shrink-0" />
-        <span className="text-xs font-medium text-foreground flex-1">Learn</span>
+        <span className="text-ui-sm font-medium text-fg flex-1">Learn</span>
         <InsightScopePopover value={scopeConfig} onChange={setScopeConfig} />
         <button
           type="button"
@@ -203,7 +203,7 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
           className={`p-1 rounded-md transition-colors ${
             showHistory
               ? "text-purple bg-purple/10"
-              : "text-muted-foreground hover:text-foreground hover:bg-accent"
+              : "text-fg-secondary hover:text-fg hover:bg-control-hover"
           }`}
           title="Version History"
         >
@@ -212,7 +212,7 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
         <button
           type="button"
           onClick={() => actions.close()}
-          className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+          className="p-1 rounded-md text-fg-secondary hover:text-fg hover:bg-control-hover transition-colors"
           aria-label="Close"
         >
           <X size={14} />
@@ -228,7 +228,7 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
       {state.changesSummary && <ChangesBanner summary={state.changesSummary} />}
 
       {/* Tab bar */}
-      <div className="flex border-b border-border shrink-0 overflow-x-auto">
+      <div className="flex border-b border-separator shrink-0 overflow-x-auto">
         {TABS.map((tab) => {
           const status = tabStatus(state, tab.id);
           const isActive = state.activeTab === tab.id;
@@ -237,10 +237,10 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
               key={tab.id}
               type="button"
               onClick={() => actions.switchTab(tab.id)}
-              className={`flex items-center gap-1.5 px-3 py-2 text-[11px] whitespace-nowrap transition-colors border-b-2 ${
+              className={`flex items-center gap-1.5 px-3 py-2 text-ui-xs whitespace-nowrap transition-colors border-b-2 ${
                 isActive
-                  ? "border-purple-400 text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
+                  ? "border-purple-400 text-fg"
+                  : "border-transparent text-fg-secondary hover:text-fg"
               }`}
             >
               <span className={statusDotClass(status)} />
@@ -252,12 +252,12 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
 
       {/* History panel (collapsible) */}
       {showHistory && (
-        <div className="border-b border-border shrink-0 max-h-[300px] overflow-y-auto">
+        <div className="border-b border-separator shrink-0 max-h-[300px] overflow-y-auto">
           {evolution.data && evolution.data.versions.length > 0 && (
-            <div className="p-3 border-b border-border">
+            <div className="p-3 border-b border-separator">
               <Suspense
                 fallback={
-                  <div className="flex items-center justify-center h-full text-muted text-sm">
+                  <div className="flex items-center justify-center h-full text-fg-secondary text-sm">
                     Loading...
                   </div>
                 }
@@ -294,13 +294,13 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
           <PracticeHistoryTab noteId={state.noteId} />
         ) : activeStatus === "idle" || activeStatus === "error" ? (
           <div className="flex flex-col items-center justify-center h-full gap-3">
-            <p className="text-[11px] text-dim">
+            <p className="text-ui-xs text-fg-dim">
               {activeStatus === "error" ? "Generation failed" : "No content generated yet"}
             </p>
             <button
               type="button"
               onClick={() => actions.regenerateTab(state.activeTab)}
-              className="flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-md bg-purple/20 text-purple hover:bg-purple/30 transition-colors"
+              className="flex items-center gap-1.5 text-ui-xs px-3 py-1.5 rounded-md bg-purple/20 text-purple hover:bg-purple/30 transition-colors"
             >
               <Sparkles size={12} />
               Generate {TABS.find((t) => t.id === state.activeTab)?.label}
@@ -352,12 +352,12 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
       </div>
 
       {/* Footer actions */}
-      <div className="flex items-center gap-1.5 px-3 py-2 border-t border-border shrink-0">
+      <div className="flex items-center gap-1.5 px-3 py-2 border-t border-separator shrink-0">
         <button
           type="button"
           onClick={handleInsertIntoNote}
           disabled={!hasActiveContent}
-          className="flex items-center gap-1 text-2xs px-2 py-1 rounded-md bg-accent text-muted-foreground hover:text-foreground hover:bg-accent/80 transition-colors disabled:text-dim disabled:cursor-not-allowed"
+          className="flex items-center gap-1 text-ui-xs px-2 py-1 rounded-md bg-control-hover text-fg-secondary hover:text-fg hover:bg-control-hover/80 transition-colors disabled:text-fg-dim disabled:cursor-not-allowed"
           title="Insert into note"
         >
           <FileInput size={10} />
@@ -367,7 +367,7 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
           type="button"
           onClick={handleCreateInsightNote}
           disabled={!hasActiveContent}
-          className="flex items-center gap-1 text-2xs px-2 py-1 rounded-md bg-accent text-muted-foreground hover:text-foreground hover:bg-accent/80 transition-colors disabled:text-dim disabled:cursor-not-allowed"
+          className="flex items-center gap-1 text-ui-xs px-2 py-1 rounded-md bg-control-hover text-fg-secondary hover:text-fg hover:bg-control-hover/80 transition-colors disabled:text-fg-dim disabled:cursor-not-allowed"
           title="Create note from insight"
         >
           <FilePlus size={10} />
@@ -380,7 +380,7 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
             <button
               type="button"
               onClick={() => actions.saveFlashcards(`insight-${Date.now()}`)}
-              className="flex items-center gap-1 text-2xs px-2 py-1 rounded-md bg-brand/20 text-brand hover:bg-brand/30 transition-colors"
+              className="flex items-center gap-1 text-ui-xs px-2 py-1 rounded-md bg-brand/20 text-brand hover:bg-brand/30 transition-colors"
               title="Save as flashcard deck"
             >
               <BookOpen size={10} />
@@ -391,7 +391,7 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
           <PopoverPrimitive.Trigger asChild>
             <button
               type="button"
-              className="flex items-center gap-1 text-2xs px-2 py-1 rounded-md bg-white/[0.04] text-muted-foreground hover:text-foreground hover:bg-white/[0.06]"
+              className="flex items-center gap-1 text-ui-xs px-2 py-1 rounded-md bg-white/[0.04] text-fg-secondary hover:text-fg hover:bg-white/[0.06]"
               title="Review due flashcards"
             >
               <RotateCcw size={10} />
@@ -405,7 +405,7 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
               sideOffset={12}
               collisionPadding={16}
               className={cn(
-                "z-50 w-[360px] max-h-[min(520px,80vh)] overflow-y-auto rounded-xl border border-border glass-panel p-0 text-foreground shadow-xl outline-none",
+                "z-50 w-[360px] max-h-[min(520px,80vh)] overflow-y-auto rounded-xl border border-separator glass-panel p-0 text-fg shadow-xl outline-none",
                 "data-[state=open]:animate-in data-[state=closed]:animate-out",
                 "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
                 "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
@@ -420,7 +420,7 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
           <button
             type="button"
             onClick={() => actions.regenerateTab(state.activeTab)}
-            className="flex items-center gap-1 text-2xs px-2 py-1 rounded-md bg-accent text-muted-foreground hover:text-foreground hover:bg-accent/80 transition-colors"
+            className="flex items-center gap-1 text-ui-xs px-2 py-1 rounded-md bg-control-hover text-fg-secondary hover:text-fg hover:bg-control-hover/80 transition-colors"
             title="Regenerate this tab"
           >
             <RefreshCw size={10} />
@@ -430,7 +430,7 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
           type="button"
           onClick={handleCopy}
           disabled={!hasActiveContent}
-          className="flex items-center gap-1 text-2xs px-2 py-1 rounded-md bg-accent text-muted-foreground hover:text-foreground hover:bg-accent/80 transition-colors disabled:text-dim disabled:cursor-not-allowed ml-auto"
+          className="flex items-center gap-1 text-ui-xs px-2 py-1 rounded-md bg-control-hover text-fg-secondary hover:text-fg hover:bg-control-hover/80 transition-colors disabled:text-fg-dim disabled:cursor-not-allowed ml-auto"
           title="Copy to clipboard"
         >
           <Copy size={10} />

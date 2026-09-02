@@ -19,18 +19,18 @@ function CollapsibleBox({ title, icon: Icon, children, defaultOpen = true }: Col
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center gap-2 px-3 py-2 rounded-t-[var(--radius-2xl)] bg-accent"
+        className="w-full flex items-center gap-2 px-3 py-2 rounded-t-[var(--radius-2xl)] bg-control-hover"
       >
-        <Icon className="size-3 text-muted-foreground" strokeWidth={1.5} />
-        <span className="flex-1 text-left text-[11px] font-medium text-muted-foreground">
+        <Icon className="size-3 text-fg-secondary" strokeWidth={1.5} />
+        <span className="flex-1 text-left text-ui-xs font-medium text-fg-secondary">
           {title}
         </span>
         <ChevronDown
-          className={`size-3 text-muted-foreground transition-transform ${open ? "rotate-0" : "-rotate-90"}`}
+          className={`size-3 text-fg-secondary transition-transform ${open ? "rotate-0" : "-rotate-90"}`}
           strokeWidth={1.5}
         />
       </button>
-      {open && <div className="px-3 py-2 space-y-1 text-2xs font-light">{children}</div>}
+      {open && <div className="px-3 py-2 space-y-1 text-ui-xs font-light">{children}</div>}
     </div>
   );
 }
@@ -57,17 +57,17 @@ export function FocusDebrief({ signals, tooltip, onClose }: FocusDebriefProps) {
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: debrief panel stops propagation to prevent orb tooltip dismiss
     <div
-      className="glass-panel rounded-xl shadow-xl w-72 animate-[glass-appear_0.2s_ease-out]"
+      className="glass-panel rounded-panel shadow-xl w-72 animate-[glass-appear_0.2s_ease-out]"
       onMouseDown={(e) => e.stopPropagation()}
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-3 py-2.5 border-b border-border">
-        <p className="text-xs font-medium text-foreground">Focus session ended</p>
+      <div className="flex items-center justify-between px-3 py-2.5 border-b border-separator">
+        <p className="text-ui-sm font-medium text-fg">Focus session ended</p>
         <button
           type="button"
           onClick={onClose}
           aria-label="Close debrief"
-          className="text-muted-foreground hover:text-foreground transition-colors"
+          className="text-fg-secondary hover:text-fg transition-colors"
         >
           <X className="size-3.5" strokeWidth={1.5} />
         </button>
@@ -75,7 +75,7 @@ export function FocusDebrief({ signals, tooltip, onClose }: FocusDebriefProps) {
 
       {/* Summary tooltip */}
       {tooltip && (
-        <p className="px-3 py-2 text-xs text-muted-foreground leading-relaxed border-b border-border">
+        <p className="px-3 py-2 text-ui-sm text-fg-secondary leading-relaxed border-b border-separator">
           {tooltip}
         </p>
       )}
@@ -83,10 +83,10 @@ export function FocusDebrief({ signals, tooltip, onClose }: FocusDebriefProps) {
       {/* Sections */}
       <div className="space-y-1 p-1.5">
         {hasMessages && (
-          <div className="overflow-hidden rounded-xl">
+          <div className="overflow-hidden rounded-panel">
             <CollapsibleBox title={`Messages held (${messageSignals.length})`} icon={MessageSquare}>
               {messageSignals.map((sig) => (
-                <div key={`msg-${sig.entityPair}`} className="text-muted-foreground leading-snug">
+                <div key={`msg-${sig.entityPair}`} className="text-fg-secondary leading-snug">
                   {sig.headline}
                 </div>
               ))}
@@ -95,10 +95,10 @@ export function FocusDebrief({ signals, tooltip, onClose }: FocusDebriefProps) {
         )}
 
         {hasBrain && (
-          <div className="overflow-hidden rounded-xl">
+          <div className="overflow-hidden rounded-panel">
             <CollapsibleBox title={`Brain activity (${brainSignals.length})`} icon={Brain}>
               {brainSignals.map((sig) => (
-                <div key={`brain-${sig.entityPair}`} className="text-muted-foreground leading-snug">
+                <div key={`brain-${sig.entityPair}`} className="text-fg-secondary leading-snug">
                   {sig.headline}
                 </div>
               ))}
@@ -107,10 +107,10 @@ export function FocusDebrief({ signals, tooltip, onClose }: FocusDebriefProps) {
         )}
 
         {hasCoaching && (
-          <div className="overflow-hidden rounded-xl">
+          <div className="overflow-hidden rounded-panel">
             <CollapsibleBox title={`Coaching (${coachingSignals.length})`} icon={Sparkles}>
               {coachingSignals.map((sig) => (
-                <div key={`coach-${sig.entityPair}`} className="text-muted-foreground leading-snug">
+                <div key={`coach-${sig.entityPair}`} className="text-fg-secondary leading-snug">
                   {sig.headline}
                 </div>
               ))}

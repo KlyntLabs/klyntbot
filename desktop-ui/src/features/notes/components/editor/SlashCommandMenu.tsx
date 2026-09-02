@@ -309,8 +309,8 @@ export function SlashMenu({ editor }: SlashMenuProps) {
             data-selected={isSelected ? "" : undefined}
             onClick={() => executeCommand(i)}
             onMouseEnter={() => setSelectedIndex(i)}
-            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left text-[13px] transition-colors ${
-              isSelected ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-card"
+            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left text-ui transition-colors ${
+              isSelected ? "bg-control-hover text-fg" : "text-fg-secondary hover:bg-bg-elevated"
             }`}
           >
             <span className="size-7 rounded-md flex items-center justify-center bg-brand/10 text-brand shrink-0">

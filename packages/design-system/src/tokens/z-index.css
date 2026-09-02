@@ -1,0 +1,11 @@
+/* Z-index bands — use the band; ad-hoc z-[N] is a defect. */
+
+:root {
+  --ds-z-base: 0;
+  --ds-z-raised: 1;
+  --ds-z-sticky: 10;
+  --ds-z-menu: 100;
+  --ds-z-overlay: 200;
+  --ds-z-modal: 300;
+  --ds-z-toast: 400;
+}

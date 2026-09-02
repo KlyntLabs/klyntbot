@@ -15,7 +15,7 @@ export function DateNavigator({ label, onPrev, onNext, className }: DateNavigato
         type="button"
         onClick={onPrev}
         aria-label="Previous period"
-        className="size-7 rounded-lg glass-button flex items-center justify-center text-muted-foreground hover:text-foreground"
+        className="size-7 rounded-control glass-button flex items-center justify-center text-fg-secondary hover:text-fg"
       >
         <ChevronLeft className="size-4" strokeWidth={1.5} />
       </button>
@@ -23,11 +23,11 @@ export function DateNavigator({ label, onPrev, onNext, className }: DateNavigato
         type="button"
         onClick={onNext}
         aria-label="Next period"
-        className="size-7 rounded-lg glass-button flex items-center justify-center text-muted-foreground hover:text-foreground"
+        className="size-7 rounded-control glass-button flex items-center justify-center text-fg-secondary hover:text-fg"
       >
         <ChevronRight className="size-4" strokeWidth={1.5} />
       </button>
-      <span className="text-[13px] font-medium text-foreground ml-1">{label}</span>
+      <span className="text-ui font-medium text-fg ml-1">{label}</span>
     </div>
   );
 }

@@ -60,28 +60,28 @@ export function AnnotationPopover({
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           {tags.map((tag) => (
-            <span key={tag} className="rounded-full bg-brand/15 px-2 py-0.5 text-2xs text-brand">
+            <span key={tag} className="rounded-full bg-brand/15 px-2 py-0.5 text-ui-xs text-brand">
               {tag}
             </span>
           ))}
         </div>
-        <span className="text-2xs text-muted">
+        <span className="text-ui-xs text-fg-secondary">
           {new Date(annotation.createdAt).toLocaleDateString()}
         </span>
       </div>
 
       {/* Quoted text */}
       {annotation.quotedText && (
-        <div className="mb-3 rounded-md border-l-2 border-brand/50 bg-surface-hover/50 px-3 py-2">
-          <p className="text-xs text-muted italic leading-relaxed">"{annotation.quotedText}"</p>
+        <div className="mb-3 rounded-md border-l-2 border-brand/50 bg-control-hover/50 px-3 py-2">
+          <p className="text-ui-sm text-fg-secondary italic leading-relaxed">"{annotation.quotedText}"</p>
         </div>
       )}
 
       {/* AI Suggestion */}
       {annotation.aiSuggestion && (
         <div className="mb-3 rounded-md bg-blue-500/10 px-3 py-2">
-          <p className="text-2xs font-medium text-blue-400 uppercase">AI Insight</p>
-          <p className="mt-1 text-xs text-primary">{annotation.aiSuggestion}</p>
+          <p className="text-ui-xs font-medium text-blue-400 uppercase">AI Insight</p>
+          <p className="mt-1 text-ui-sm text-brand">{annotation.aiSuggestion}</p>
         </div>
       )}
 
@@ -91,21 +91,21 @@ export function AnnotationPopover({
           <textarea
             value={content}
             onChange={(e) => setContent(e.target.value)}
-            className="w-full rounded-md bg-surface-base p-2 text-xs text-primary outline-none ring-1 ring-border focus:ring-brand"
+            className="w-full rounded-md bg-bg-elevated p-2 text-ui-sm text-brand outline-none ring-1 ring-separator focus:ring-fg-secondary/30"
             rows={3}
           />
           <div className="mt-1 flex justify-end gap-1">
             <button
               type="button"
               onClick={() => setEditing(false)}
-              className="rounded px-2 py-1 text-2xs text-muted hover:bg-surface-hover"
+              className="rounded px-2 py-1 text-ui-xs text-fg-secondary hover:bg-control-hover"
             >
               Cancel
             </button>
             <button
               type="button"
               onClick={handleSave}
-              className="rounded bg-brand/20 px-2 py-1 text-2xs text-brand hover:bg-brand/30"
+              className="rounded bg-brand/20 px-2 py-1 text-ui-xs text-brand hover:bg-brand/30"
             >
               Save
             </button>
@@ -113,12 +113,12 @@ export function AnnotationPopover({
         </div>
       ) : (
         annotation.content && (
-          <p className="mb-3 text-xs text-primary leading-relaxed">{annotation.content}</p>
+          <p className="mb-3 text-ui-sm text-brand leading-relaxed">{annotation.content}</p>
         )
       )}
 
       {/* Action buttons */}
-      <div className="flex items-center gap-1 border-t border-border pt-2">
+      <div className="flex items-center gap-1 border-t border-separator pt-2">
         <ActionButton
           onClick={() => onCreateFlashcard(annotation.quotedText ?? "", annotation.content)}
         >
@@ -150,7 +150,7 @@ function ActionButton({
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-md px-2 py-1 text-2xs text-muted hover:bg-surface-hover ${className}`}
+      className={`rounded-md px-2 py-1 text-ui-xs text-fg-secondary hover:bg-control-hover ${className}`}
     >
       {children}
     </button>

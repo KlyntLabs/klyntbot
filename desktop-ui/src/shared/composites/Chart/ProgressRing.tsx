@@ -15,7 +15,7 @@ export function ProgressRing({
   value,
   size = 110,
   strokeWidth = 7,
-  color = "var(--brand)",
+  color = "var(--ds-accent)",
   label,
   animated = true,
   className,
@@ -73,7 +73,7 @@ export function ProgressRing({
           <span className="text-[26px] font-light tabular-nums leading-none" style={{ color }}>
             {Math.round(value)}
           </span>
-          <span className="text-[9px] font-light text-dim mt-0.5">/100</span>
+          <span className="text-[9px] font-light text-fg-dim mt-0.5">/100</span>
         </div>
       </div>
       {label && (

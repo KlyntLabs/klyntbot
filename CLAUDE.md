@@ -47,11 +47,11 @@ cd desktop-ui && bun run test:watch # Vitest (watch mode)
 - `@services/*` → `src/services/*`
 - `@utils/*` → `src/utils/*`
 
-Always use these in imports, never relative `../../` paths. Note: there is **no** `@shared` or `@features` alias — those were the old UI's conventions.
+Always use these in imports, never relative `../../` paths. Path aliases include `@shared`, `@features`, `@app`.
 
-**Styling:** Hybrid Tailwind + plain CSS. **New components: use Tailwind** — wired via `@tailwindcss/vite` plugin in `vite.config.ts`. **Legacy styles** live in `src/styles/*.css` (imported through `src/styles/index.css`) with BEM-ish naming (e.g. `sidebar-chat__nav-item`). Design tokens are in `src/styles/ds-tokens.css`; themes in `src/styles/themes.{dark,light,dim,system}.css`. When adding a *new* legacy/shared CSS file (rare — prefer Tailwind), add an `@import` to `src/styles/index.css`.
+**Styling:** Tailwind CSS v4 + `@klyntbot/design-system`. Tokens live only in `packages/design-system/src/tokens/` (`--ds-*`). Map to utilities via `@theme inline` (`text-fg`, `bg-glass`, `rounded-panel`, `text-ui`, …). Themes: `light` | `dark` on `html[data-theme]`. Glass chrome uses DS recipes (`glass`, `liquid-glass`, `island`, `capsule`) — do not approximate with bare `backdrop-blur`. Import UI helpers from `@klyntbot/design-system` (barrel only). Contract: [`docs/standards/design-tokens.md`](./docs/standards/design-tokens.md). Domain CSS (`prose.css`, `editor.css`) may remain plain CSS but must reference tokens. Raw hex/rgb outside `tokens/` is a defect.
 
-**Typography tokens:** Never hardcode `font-size: Npx` in CSS. Use the scale in `src/styles/ds-tokens.css`: `--fs-2xs` (10.5px) / `--fs-xs` (11.5px) / `--fs-sm` (12.5px, default body — also exposed as `--fs-base`) / `--fs-md` (13.5px) / `--fs-lg` (15px) / `--fs-xl` (17px). Pick by role, not number — default text uses `var(--fs-base)`, secondary/labels step down to `--fs-xs`, headings step up to `--fs-lg`/`--fs-xl`. If no token fits (e.g. display headings ≥20px), add a new `--fs-*` to ds-tokens.css rather than hardcoding.
+**Typography tokens:** Never hardcode `font-size: Npx`. Use the DS scale: `text-ui-xs` (11) / `text-ui-sm` (12) / `text-ui` (13, chrome) / `text-body` (14, default) / `text-title-sm` (17) / `text-title` (20) / `text-title-lg` (22) / `text-display-sm` (26) / `text-display` (52). Prefer the utility; `var(--ds-text-*)` second. If no step fits, add a token in `packages/design-system/src/tokens/typography.css` and register it in `cn.ts`.
 
 **Tauri IPC:** Direct `invoke()` from `@/api/client` (which re-exports `@tauri-apps/api/core`). There is no `useQuery` / `useMutation` / `ipc()` wrapper — call `invoke()` from a `useEffect` and manage state with `useState`. For Tauri events, import `listen` from `@tauri-apps/api/event` directly, or use the per-event hubs in `src/services/events.ts`. Endpoint definitions live under `src/api/endpoints/`.
 

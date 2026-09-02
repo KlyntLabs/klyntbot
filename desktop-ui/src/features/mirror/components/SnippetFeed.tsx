@@ -14,11 +14,11 @@ export function SnippetFeed({ snippets }: SnippetFeedProps) {
 
   return (
     <div className="flex flex-col gap-3">
-      <h2 className="text-[13px] font-medium text-muted-foreground">Recent Insights</h2>
+      <h2 className="text-ui font-medium text-fg-secondary">Recent Insights</h2>
       {snippets.map((snippet) => (
         <div key={snippet.id} className="glass-panel rounded-xl p-4">
-          <p className="text-[12px] font-medium text-foreground mb-1">{snippet.headline}</p>
-          <p className="text-[11px] text-muted-foreground leading-relaxed">{snippet.body}</p>
+          <p className="text-ui-sm font-medium text-fg mb-1">{snippet.headline}</p>
+          <p className="text-ui-xs text-fg-secondary leading-relaxed">{snippet.body}</p>
         </div>
       ))}
     </div>

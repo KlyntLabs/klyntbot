@@ -10,9 +10,9 @@ function dotConfig(status: BrainGrowth["status"]) {
     case "needs_feedback":
       return { color: "bg-dim", pulse: false, label: "Waiting for feedback" };
     case "adapting":
-      return { color: "bg-warning", pulse: true, label: "Learning from your corrections" };
+      return { color: "bg-status-warning", pulse: true, label: "Learning from your corrections" };
     case "growing":
-      return { color: "bg-success", pulse: true, label: "Actively improving" };
+      return { color: "bg-status-success", pulse: true, label: "Actively improving" };
     default:
       return { color: "bg-dim", pulse: false, label: status };
   }
@@ -36,7 +36,7 @@ export function BrainHealthBadge({ compact = false }: BrainHealthBadgeProps) {
         )}
         <span className={`relative inline-flex h-2 w-2 rounded-full ${color}`} />
       </span>
-      {!compact && <span className="text-2xs font-light text-muted-foreground">{label}</span>}
+      {!compact && <span className="text-ui-xs font-light text-fg-secondary">{label}</span>}
     </span>
   );
 }

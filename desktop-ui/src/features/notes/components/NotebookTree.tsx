@@ -257,14 +257,14 @@ const TreeRow = memo(function TreeRow({
       onDragLeave={onDragLeave}
       onDrop={(e) => onDrop(e, item)}
       onDragEnd={onDragEnd}
-      className={`relative flex items-center gap-2 py-1.5 pr-2 rounded-lg text-xs font-light cursor-default select-none outline-none transition-all ${
+      className={`relative flex items-center gap-2 py-1.5 pr-2 rounded-lg text-ui-sm font-light cursor-default select-none outline-none transition-all ${
         isDragging ? "opacity-40" : ""
       } ${
         isDropTarget
           ? "bg-brand/[0.12] ring-1 ring-brand/40"
           : isSelected
-            ? "bg-muted text-foreground"
-            : "text-muted-foreground hover:bg-accent hover:text-foreground"
+            ? "bg-control-hover text-fg"
+            : "text-fg-secondary hover:bg-control-hover hover:text-fg"
       }`}
       style={{ paddingLeft: `${item.depth * INDENT + (item.depth > 0 ? 12 : 8)}px` }}
     >
@@ -306,7 +306,7 @@ const TreeRow = memo(function TreeRow({
       {/* Chevron for folders */}
       {isFolder && (
         <ChevronRight
-          className={`size-3 shrink-0 text-dim transition-transform duration-150 ${
+          className={`size-3 shrink-0 text-fg-dim transition-transform duration-150 ${
             item.isExpanded ? "rotate-90" : ""
           }`}
         />
@@ -316,7 +316,7 @@ const TreeRow = memo(function TreeRow({
       {item.icon && ICON_MAP[item.icon] ? (
         <ItemIcon
           name={item.icon}
-          className={`size-3.5 shrink-0 ${item.color ? "" : "text-muted-foreground"}`}
+          className={`size-3.5 shrink-0 ${item.color ? "" : "text-fg-secondary"}`}
           style={item.color ? { color: item.color } : undefined}
         />
       ) : item.icon?.startsWith("#") ? (
@@ -332,12 +332,12 @@ const TreeRow = memo(function TreeRow({
       ) : isFolder ? (
         item.isExpanded ? (
           <FolderOpen
-            className={`size-3.5 shrink-0 ${item.color ? "" : "text-muted-foreground"}`}
+            className={`size-3.5 shrink-0 ${item.color ? "" : "text-fg-secondary"}`}
             style={item.color ? { color: item.color } : undefined}
           />
         ) : (
           <FolderClosed
-            className={`size-3.5 shrink-0 ${item.color ? "" : "text-muted-foreground"}`}
+            className={`size-3.5 shrink-0 ${item.color ? "" : "text-fg-secondary"}`}
             style={item.color ? { color: item.color } : undefined}
           />
         )
@@ -345,7 +345,7 @@ const TreeRow = memo(function TreeRow({
         <Pin className="size-3 shrink-0 text-brand" />
       ) : (
         <FileText
-          className={`size-3.5 shrink-0 ${item.color ? "" : "text-muted-foreground"}`}
+          className={`size-3.5 shrink-0 ${item.color ? "" : "text-fg-secondary"}`}
           style={item.color ? { color: item.color } : undefined}
         />
       )}
@@ -360,7 +360,7 @@ const TreeRow = memo(function TreeRow({
             }
           }}
           defaultValue={item.title}
-          className="flex-1 min-w-0 text-xs bg-accent border border-brand/40 rounded-md px-1.5 py-0.5 text-foreground focus:outline-none"
+          className="flex-1 min-w-0 text-ui-sm bg-control-hover border border-separator rounded-md px-1.5 py-0.5 text-fg focus:outline-none"
           onBlur={(e) => onCommitRename(item, e.currentTarget.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter") e.currentTarget.blur();
@@ -373,7 +373,7 @@ const TreeRow = memo(function TreeRow({
       ) : (
         <span
           className={`truncate flex-1 ${isFolder ? "font-medium" : ""} ${
-            item.title === "Untitled" || item.title === "New Folder" ? "text-dim italic" : ""
+            item.title === "Untitled" || item.title === "New Folder" ? "text-fg-dim italic" : ""
           }`}
         >
           {item.title}
@@ -382,12 +382,12 @@ const TreeRow = memo(function TreeRow({
 
       {/* Note count for folders */}
       {isFolder && !isRenaming && item.noteCount != null && item.noteCount > 0 && (
-        <span className="text-2xs text-muted-foreground shrink-0">{item.noteCount}</span>
+        <span className="text-ui-xs text-fg-secondary shrink-0">{item.noteCount}</span>
       )}
 
       {/* Date badge for notes */}
       {isNote && item.updatedAt && !isRenaming && (
-        <span className="text-2xs text-muted-foreground shrink-0">
+        <span className="text-ui-xs text-fg-secondary shrink-0">
           {formatDate(item.updatedAt.slice(0, 10))}
         </span>
       )}
@@ -879,14 +879,14 @@ export function NotebookTree({
     <div className="flex flex-col min-h-0 flex-1" onContextMenu={handleBlankContextMenu}>
       {/* Header */}
       <div className="flex items-center justify-between px-4 pb-1 pt-3">
-        <span className="text-2xs uppercase tracking-wider text-muted-foreground font-medium">
+        <span className="text-ui-xs uppercase tracking-wider text-fg-secondary font-medium">
           Notebooks
         </span>
         <div className="flex items-center gap-0.5">
           <button
             type="button"
             onClick={() => onCreateNote()}
-            className="size-5 rounded-md flex items-center justify-center text-dim hover:text-foreground hover:bg-accent transition-all"
+            className="size-5 rounded-md flex items-center justify-center text-fg-dim hover:text-fg hover:bg-control-hover transition-all"
             aria-label="New note"
           >
             <Plus className="size-3.5" />
@@ -894,7 +894,7 @@ export function NotebookTree({
           <button
             type="button"
             onClick={() => onCreateNotebook()}
-            className="size-5 rounded-md flex items-center justify-center text-dim hover:text-foreground hover:bg-accent transition-all"
+            className="size-5 rounded-md flex items-center justify-center text-fg-dim hover:text-fg hover:bg-control-hover transition-all"
             aria-label="New notebook"
           >
             <FolderPlus className="size-3.5" />
@@ -942,7 +942,7 @@ export function NotebookTree({
         />
 
         {items.length === 0 && (
-          <div className="text-xs text-dim text-center py-6">No notes yet</div>
+          <div className="text-ui-sm text-fg-dim text-center py-6">No notes yet</div>
         )}
       </div>
 
@@ -1111,7 +1111,7 @@ function TreeContextMenu({
         label="Appearance"
         open={openSubmenu === "appearance"}
         onToggle={() => toggleSubmenu("appearance")}
-        panelClassName="absolute left-full top-0 ml-1 py-[5px] w-[280px] rounded-[10px] border border-border bg-[rgb(22,22,24)] shadow-xl animate-[menu-appear_100ms_ease-out]"
+        panelClassName="absolute left-full top-0 ml-1 py-[5px] w-[280px] rounded-[10px] border border-separator bg-[rgb(22,22,24)] shadow-xl animate-[menu-appear_100ms_ease-out]"
       >
         {/* Icon grid */}
         <div className="grid grid-cols-6 gap-0.5 px-1.5 py-1.5">
@@ -1133,8 +1133,8 @@ function TreeContextMenu({
                 }}
                 className={`size-[38px] rounded-md flex items-center justify-center transition-colors ${
                   isActive
-                    ? "bg-accent ring-1 ring-ring/20"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                    ? "bg-control-hover ring-1 ring-ring/20"
+                    : "text-fg-secondary hover:bg-control-hover hover:text-fg"
                 }`}
                 title={isActive ? `Remove ${name} icon` : name}
               >
@@ -1164,11 +1164,11 @@ function TreeContextMenu({
                 activeColor === color && color !== null
                   ? "ring-2 ring-primary/60 ring-offset-1 ring-offset-surface-lowest"
                   : ""
-              } ${!color ? "border-border bg-transparent" : "border-transparent"}`}
+              } ${!color ? "border-separator bg-transparent" : "border-transparent"}`}
               style={color ? { backgroundColor: color } : undefined}
               title={color ?? "Reset color"}
             >
-              {!color && <X className="size-2.5 text-dim mx-auto" />}
+              {!color && <X className="size-2.5 text-fg-dim mx-auto" />}
             </button>
           ))}
         </div>
@@ -1184,7 +1184,7 @@ function TreeContextMenu({
                 setPreviewColor(null);
                 onUpdate(entityId, { icon: null, color: null });
               }}
-              className="w-[calc(100%-10px)] mx-[5px] px-2.5 py-[5px] text-[13px] rounded-md text-muted-foreground hover:text-foreground text-left hover:bg-muted transition-colors"
+              className="w-[calc(100%-10px)] mx-[5px] px-2.5 py-[5px] text-ui rounded-md text-fg-secondary hover:text-fg text-left hover:bg-control-hover transition-colors"
             >
               Reset all
             </button>
@@ -1300,14 +1300,14 @@ function TreeContextMenu({
               onClose();
             }}
           >
-            <span className="text-dim italic">Unfiled</span>
+            <span className="text-fg-dim italic">Unfiled</span>
           </ContextMenuItem>
           {folders
             .filter((f) => f.id !== note.notebookId)
             .map((folder) => (
               <ContextMenuItem
                 key={folder.id}
-                icon={<FolderClosed className="size-3.5 text-dim" />}
+                icon={<FolderClosed className="size-3.5 text-fg-dim" />}
                 onClick={() => {
                   onMoveNote(note.id, folder.id);
                   onClose();

@@ -155,12 +155,12 @@ function PersonaList({
   return (
     <div>
       {!ttsInstructReady && (
-        <p className="text-[11px] text-muted-foreground mb-2">
+        <p className="text-ui-xs text-fg-secondary mb-2">
           Download the 1.7B CustomVoice model above to unlock voice personas.
         </p>
       )}
       <div
-        className={`rounded-lg border border-border/50 divide-y divide-border/30 ${!ttsInstructReady ? "opacity-50 pointer-events-none" : ""}`}
+        className={`rounded-lg border border-separator/50 divide-y divide-separator/30 ${!ttsInstructReady ? "opacity-50 pointer-events-none" : ""}`}
       >
         {personaKeys.map((key) => {
           const p = personas[key];
@@ -176,7 +176,7 @@ function PersonaList({
             <div
               key={key}
               className={`flex items-center gap-2 px-3 py-1.5 transition-colors ${
-                isActive ? "bg-brand/5" : "hover:bg-accent/40"
+                isActive ? "bg-brand/5" : "hover:bg-control-hover/40"
               }`}
             >
               <button
@@ -187,7 +187,7 @@ function PersonaList({
                 }}
                 className="flex-1 min-w-0 flex items-center gap-2 text-left"
               >
-                <span className="text-[12px] font-medium text-foreground truncate">
+                <span className="text-ui-sm font-medium text-fg truncate">
                   {PERSONA_LABELS[key] ?? key}
                 </span>
                 {isActive && (
@@ -198,7 +198,7 @@ function PersonaList({
                 {isCustom && (
                   <span className="text-[9px] text-purple-400/70 font-medium shrink-0">Custom</span>
                 )}
-                <span className="text-[10px] text-dim ml-auto shrink-0">{detail}</span>
+                <span className="text-[10px] text-fg-dim ml-auto shrink-0">{detail}</span>
               </button>
               <button
                 type="button"
@@ -212,7 +212,7 @@ function PersonaList({
                 className={`size-5 flex items-center justify-center rounded transition-colors shrink-0 ${
                   testing === key
                     ? "text-brand animate-pulse"
-                    : "text-muted-foreground hover:text-brand"
+                    : "text-fg-secondary hover:text-brand"
                 }`}
                 title="Preview voice"
               >
@@ -222,7 +222,7 @@ function PersonaList({
                 <button
                   type="button"
                   onClick={() => onDelete(key)}
-                  className="size-5 flex items-center justify-center text-muted-foreground hover:text-red-400 rounded transition-colors shrink-0"
+                  className="size-5 flex items-center justify-center text-fg-secondary hover:text-red-400 rounded transition-colors shrink-0"
                   title="Delete"
                 >
                   <Trash2 className="size-2.5" strokeWidth={1.5} />
@@ -237,11 +237,11 @@ function PersonaList({
       {showCreate ? (
         <div className="px-3 py-3 rounded-lg border border-purple-400/30 bg-purple-400/5 space-y-2.5">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-purple-300">New Custom Voice</span>
+            <span className="text-ui-sm font-medium text-purple-300">New Custom Voice</span>
             <button
               type="button"
               onClick={() => setShowCreate(false)}
-              className="size-5 flex items-center justify-center text-muted-foreground hover:text-foreground rounded transition-colors"
+              className="size-5 flex items-center justify-center text-fg-secondary hover:text-fg rounded transition-colors"
             >
               <X className="size-3.5" strokeWidth={1.5} />
             </button>
@@ -251,18 +251,18 @@ function PersonaList({
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             placeholder="Name (e.g. narrator)"
-            className="w-full px-2.5 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-purple-400/50 transition-colors placeholder:text-dim"
+            className="w-full px-2.5 py-1.5 text-ui-sm text-fg bg-control-hover border border-separator rounded-control focus:outline-none focus:border-fg-secondary/50 focus:ring-2 focus:ring-separator transition-colors placeholder:text-fg-dim"
           />
           <textarea
             value={newDesc}
             onChange={(e) => setNewDesc(e.target.value)}
             placeholder="Describe the voice (e.g. &quot;Calm female therapist, warm and empathetic, mid-30s&quot;)"
             rows={2}
-            className="w-full px-2.5 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-purple-400/50 transition-colors placeholder:text-dim resize-none"
+            className="w-full px-2.5 py-1.5 text-ui-sm text-fg bg-control-hover border border-separator rounded-control focus:outline-none focus:border-fg-secondary/50 focus:ring-2 focus:ring-separator transition-colors placeholder:text-fg-dim resize-none"
           />
           <div className="flex gap-2">
             <label className="flex-1">
-              <span className="block text-[10px] text-dim mb-0.5">Speed</span>
+              <span className="block text-[10px] text-fg-dim mb-0.5">Speed</span>
               <input
                 type="number"
                 value={newSpeed}
@@ -270,11 +270,11 @@ function PersonaList({
                 step="0.05"
                 min="0.5"
                 max="2.0"
-                className="w-full px-2.5 py-1 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-purple-400/50 transition-colors"
+                className="w-full px-2.5 py-1 text-ui-sm text-fg bg-control-hover border border-separator rounded-control focus:outline-none focus:border-fg-secondary/50 focus:ring-2 focus:ring-separator transition-colors"
               />
             </label>
             <label className="flex-1">
-              <span className="block text-[10px] text-dim mb-0.5">Temperature</span>
+              <span className="block text-[10px] text-fg-dim mb-0.5">Temperature</span>
               <input
                 type="number"
                 value={newTemp}
@@ -282,12 +282,12 @@ function PersonaList({
                 step="0.05"
                 min="0.1"
                 max="1.0"
-                className="w-full px-2.5 py-1 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-purple-400/50 transition-colors"
+                className="w-full px-2.5 py-1 text-ui-sm text-fg bg-control-hover border border-separator rounded-control focus:outline-none focus:border-fg-secondary/50 focus:ring-2 focus:ring-separator transition-colors"
               />
             </label>
           </div>
           {!ttsInstructReady && (
-            <p className="text-[10px] text-warning/70">
+            <p className="text-[10px] text-status-warning/70">
               The 1.7B CustomVoice model will be downloaded automatically when you save.
             </p>
           )}
@@ -295,7 +295,7 @@ function PersonaList({
             type="button"
             onClick={handleCreate}
             disabled={!newName.trim() || !newDesc.trim() || creating}
-            className="w-full py-1.5 text-xs font-medium rounded-md bg-purple-500/20 text-purple-300 hover:bg-purple-500/30 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className="w-full py-1.5 text-ui-sm font-medium rounded-md bg-purple-500/20 text-purple-300 hover:bg-purple-500/30 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             {creating ? "Creating..." : "Create Voice"}
           </button>
@@ -304,11 +304,11 @@ function PersonaList({
         <button
           type="button"
           onClick={() => setShowCreate(true)}
-          className="flex items-center gap-2 w-full px-3 py-2 rounded-lg border border-dashed border-border/50 text-muted-foreground hover:border-purple-400/30 hover:text-purple-300 transition-colors"
+          className="flex items-center gap-2 w-full px-3 py-2 rounded-lg border border-dashed border-separator/50 text-fg-secondary hover:border-purple-400/30 hover:text-purple-300 transition-colors"
         >
           <Plus className="size-3.5" strokeWidth={1.5} />
-          <span className="text-[11px]">Create custom voice</span>
-          <span className="text-[9px] text-dim ml-auto">Requires 1.7B model</span>
+          <span className="text-ui-xs">Create custom voice</span>
+          <span className="text-[9px] text-fg-dim ml-auto">Requires 1.7B model</span>
         </button>
       )}
     </div>
@@ -480,8 +480,8 @@ export function VoiceSettings() {
   return (
     <div>
       <div className="mb-8">
-        <h2 className="text-lg font-medium text-foreground">Voice</h2>
-        <p className="text-[13px] text-muted-foreground mt-1">
+        <h2 className="text-lg font-medium text-fg">Voice</h2>
+        <p className="text-ui text-fg-secondary mt-1">
           Audio devices, speech recognition, TTS, and voice models
         </p>
       </div>
@@ -491,7 +491,7 @@ export function VoiceSettings() {
         <SettingsCard title="Audio Devices">
           <div className="space-y-3">
             <label className="block">
-              <span className="block text-[11px] text-muted-foreground mb-1">Microphone</span>
+              <span className="block text-ui-xs text-fg-secondary mb-1">Microphone</span>
               <select
                 value={inputVal("selectedDevice", "")}
                 onChange={(e) =>
@@ -500,13 +500,13 @@ export function VoiceSettings() {
                     selectedDevice: e.target.value || null,
                   }))
                 }
-                className="w-full px-3 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+                className="w-full px-3 py-1.5 text-ui-sm text-fg bg-control-hover border border-separator rounded-control focus:outline-none focus:border-fg-secondary/50 focus:ring-2 focus:ring-separator transition-colors"
               >
-                <option value="" className="bg-popover">
+                <option value="" className="bg-glass-strong">
                   System default{devices.defaultInput ? ` (${devices.defaultInput})` : ""}
                 </option>
                 {devices.input.map((d) => (
-                  <option key={d} value={d} className="bg-popover">
+                  <option key={d} value={d} className="bg-glass-strong">
                     {d}
                   </option>
                 ))}
@@ -514,7 +514,7 @@ export function VoiceSettings() {
             </label>
 
             <label className="block">
-              <span className="block text-[11px] text-muted-foreground mb-1">Speaker</span>
+              <span className="block text-ui-xs text-fg-secondary mb-1">Speaker</span>
               <select
                 value={outputVal("selectedDevice", "")}
                 onChange={(e) =>
@@ -523,13 +523,13 @@ export function VoiceSettings() {
                     selectedDevice: e.target.value || null,
                   }))
                 }
-                className="w-full px-3 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+                className="w-full px-3 py-1.5 text-ui-sm text-fg bg-control-hover border border-separator rounded-control focus:outline-none focus:border-fg-secondary/50 focus:ring-2 focus:ring-separator transition-colors"
               >
-                <option value="" className="bg-popover">
+                <option value="" className="bg-glass-strong">
                   System default{devices.defaultOutput ? ` (${devices.defaultOutput})` : ""}
                 </option>
                 {devices.output.map((d) => (
-                  <option key={d} value={d} className="bg-popover">
+                  <option key={d} value={d} className="bg-glass-strong">
                     {d}
                   </option>
                 ))}
@@ -538,7 +538,7 @@ export function VoiceSettings() {
 
             {(hasInputChanges || hasOutputChanges) && (
               <>
-                <p className="text-[10px] text-dim">Device changes apply on next voice session.</p>
+                <p className="text-[10px] text-fg-dim">Device changes apply on next voice session.</p>
                 <SaveButton
                   onClick={async () => {
                     if (hasInputChanges) await saveInput();
@@ -556,7 +556,7 @@ export function VoiceSettings() {
           <div className="space-y-3">
             <div className="flex gap-3">
               <label className="flex-1">
-                <span className="block text-[11px] text-muted-foreground mb-1">
+                <span className="block text-ui-xs text-fg-secondary mb-1">
                   Silence threshold (seconds)
                 </span>
                 <input
@@ -571,11 +571,11 @@ export function VoiceSettings() {
                   step="0.1"
                   min="0.5"
                   max="5"
-                  className="w-full px-3 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+                  className="w-full px-3 py-1.5 text-ui-sm text-fg bg-control-hover border border-separator rounded-control focus:outline-none focus:border-fg-secondary/50 focus:ring-2 focus:ring-separator transition-colors"
                 />
               </label>
               <label className="flex-1">
-                <span className="block text-[11px] text-muted-foreground mb-1">
+                <span className="block text-ui-xs text-fg-secondary mb-1">
                   VAD sensitivity (0-1)
                 </span>
                 <input
@@ -590,15 +590,15 @@ export function VoiceSettings() {
                   step="0.05"
                   min="0"
                   max="1"
-                  className="w-full px-3 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+                  className="w-full px-3 py-1.5 text-ui-sm text-fg bg-control-hover border border-separator rounded-control focus:outline-none focus:border-fg-secondary/50 focus:ring-2 focus:ring-separator transition-colors"
                 />
               </label>
             </div>
 
             <div className="flex items-center justify-between">
               <div>
-                <span className="text-xs text-muted-foreground">Noise reduction</span>
-                <p className="text-[11px] text-dim">
+                <span className="text-ui-xs text-fg-secondary">Noise reduction</span>
+                <p className="text-ui-xs text-fg-dim">
                   RNNoise filter — helps in noisy environments. Disable for high-quality mics.
                 </p>
               </div>
@@ -610,8 +610,8 @@ export function VoiceSettings() {
 
             <div className="flex items-center justify-between">
               <div>
-                <span className="text-xs text-muted-foreground">Neural VAD</span>
-                <p className="text-[11px] text-dim">Use WebRTC VAD instead of RMS threshold</p>
+                <span className="text-ui-xs text-fg-secondary">Neural VAD</span>
+                <p className="text-ui-xs text-fg-dim">Use WebRTC VAD instead of RMS threshold</p>
               </div>
               <Toggle
                 checked={inputVal("useNeuralVad", false)}
@@ -620,16 +620,16 @@ export function VoiceSettings() {
             </div>
 
             <label className="block">
-              <span className="block text-[11px] text-muted-foreground mb-1">Privacy mode</span>
+              <span className="block text-ui-xs text-fg-secondary mb-1">Privacy mode</span>
               <select
                 value={inputVal("privacyMode", "standard")}
                 onChange={(e) =>
                   setInputEdits((prev) => ({ ...prev, privacyMode: e.target.value }))
                 }
-                className="w-full px-3 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+                className="w-full px-3 py-1.5 text-ui-sm text-fg bg-control-hover border border-separator rounded-control focus:outline-none focus:border-fg-secondary/50 focus:ring-2 focus:ring-separator transition-colors"
               >
                 {PRIVACY_MODES.map((m) => (
-                  <option key={m.value} value={m.value} className="bg-popover">
+                  <option key={m.value} value={m.value} className="bg-glass-strong">
                     {m.label} — {m.desc}
                   </option>
                 ))}
@@ -637,7 +637,7 @@ export function VoiceSettings() {
             </label>
 
             <div>
-              <span className="block text-[11px] text-muted-foreground mb-2">
+              <span className="block text-ui-xs text-fg-secondary mb-2">
                 Allowed languages
               </span>
               <div className="flex flex-wrap gap-2">
@@ -655,10 +655,10 @@ export function VoiceSettings() {
                             : [...selected, lang.code];
                           setInputEdits((prev) => ({ ...prev, allowedLanguages: next }));
                         }}
-                        className={`px-2.5 py-1 rounded-md text-[11px] font-medium border transition-colors ${
+                        className={`px-2.5 py-1 rounded-md text-ui-xs font-medium border transition-colors ${
                           isChecked
                             ? "border-brand/40 bg-brand/10 text-brand"
-                            : "border-border/50 bg-accent/30 text-muted-foreground hover:border-border hover:text-foreground"
+                            : "border-separator/50 bg-control-hover/30 text-fg-secondary hover:border-separator hover:text-fg"
                         }`}
                       >
                         {lang.label}
@@ -667,14 +667,14 @@ export function VoiceSettings() {
                   });
                 })()}
               </div>
-              <p className="text-[10px] text-dim mt-1.5">
+              <p className="text-[10px] text-fg-dim mt-1.5">
                 Restricts ASR to these languages. At least one must be selected.
               </p>
             </div>
 
             {hasInputChanges && (
               <>
-                <p className="text-2xs text-dim">Changes apply on next voice session</p>
+                <p className="text-ui-xs text-fg-dim">Changes apply on next voice session</p>
                 <SaveButton onClick={saveInput} saving={savingInput} />
               </>
             )}
@@ -686,8 +686,8 @@ export function VoiceSettings() {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <div>
-                <span className="text-xs text-muted-foreground">Enable TTS</span>
-                <p className="text-[11px] text-dim">Speak agent responses aloud</p>
+                <span className="text-ui-xs text-fg-secondary">Enable TTS</span>
+                <p className="text-ui-xs text-fg-dim">Speak agent responses aloud</p>
               </div>
               <Toggle
                 checked={outputVal("enabled", true)}
@@ -696,35 +696,35 @@ export function VoiceSettings() {
             </div>
 
             <label className="block">
-              <span className="block text-[11px] text-muted-foreground mb-1">TTS Engine</span>
+              <span className="block text-ui-xs text-fg-secondary mb-1">TTS Engine</span>
               <select
                 value={outputVal("ttsEngine", "qwen3")}
                 onChange={(e) => setOutputEdits((prev) => ({ ...prev, ttsEngine: e.target.value }))}
-                className="w-full px-3 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+                className="w-full px-3 py-1.5 text-ui-sm text-fg bg-control-hover border border-separator rounded-control focus:outline-none focus:border-fg-secondary/50 focus:ring-2 focus:ring-separator transition-colors"
               >
                 {models.ttsInstruct.downloaded && (
-                  <option value="qwen3" className="bg-popover">
+                  <option value="qwen3" className="bg-glass-strong">
                     {models.ttsInstruct.displayName} (voice personas)
                   </option>
                 )}
                 {models.tts.downloaded && (
-                  <option value="qwen3Base" className="bg-popover">
+                  <option value="qwen3Base" className="bg-glass-strong">
                     {models.tts.displayName} (single voice)
                   </option>
                 )}
                 {!models.tts.downloaded && !models.ttsInstruct.downloaded && (
-                  <option value="qwen3" className="bg-popover">
+                  <option value="qwen3" className="bg-glass-strong">
                     Qwen3-TTS — download a model below
                   </option>
                 )}
-                <option value="system" className="bg-popover">
+                <option value="system" className="bg-glass-strong">
                   System (macOS AVSpeech)
                 </option>
               </select>
             </label>
 
             <label className="block">
-              <span className="block text-[11px] text-muted-foreground mb-1">Speaking rate</span>
+              <span className="block text-ui-xs text-fg-secondary mb-1">Speaking rate</span>
               <div className="flex items-center gap-3">
                 <input
                   type="range"
@@ -740,7 +740,7 @@ export function VoiceSettings() {
                   step="0.05"
                   className="flex-1 accent-brand"
                 />
-                <span className="text-xs text-muted-foreground w-10 text-right">
+                <span className="text-ui-xs text-fg-secondary w-10 text-right">
                   {outputVal("speakingRate", 1.0).toFixed(2)}x
                 </span>
               </div>
@@ -748,8 +748,8 @@ export function VoiceSettings() {
 
             <div className="flex items-center justify-between">
               <div>
-                <span className="text-xs text-muted-foreground">Speak during focus</span>
-                <p className="text-[11px] text-dim">Allow TTS while user is typing</p>
+                <span className="text-ui-xs text-fg-secondary">Speak during focus</span>
+                <p className="text-ui-xs text-fg-dim">Allow TTS while user is typing</p>
               </div>
               <Toggle
                 checked={outputVal("speakDuringFocus", false)}
@@ -759,7 +759,7 @@ export function VoiceSettings() {
 
             {hasOutputChanges && (
               <>
-                <p className="text-2xs text-dim">Changes apply on next voice session</p>
+                <p className="text-ui-xs text-fg-dim">Changes apply on next voice session</p>
                 <SaveButton onClick={saveOutput} saving={savingOutput} />
               </>
             )}
@@ -770,17 +770,17 @@ export function VoiceSettings() {
         <SettingsCard title="AI Models">
           <div className="space-y-2">
             <div className="flex items-center gap-3 -mt-1 mb-2">
-              <p className="text-[11px] text-dim flex-1">
+              <p className="text-ui-xs text-fg-dim flex-1">
                 On-device models for speech recognition and synthesis. Downloaded from HuggingFace.
               </p>
               <div className="flex items-center gap-3 shrink-0">
                 <span
-                  className={`text-[10px] font-medium ${models.sttLoaded ? "text-green-400" : "text-muted-foreground"}`}
+                  className={`text-[10px] font-medium ${models.sttLoaded ? "text-green-400" : "text-fg-secondary"}`}
                 >
                   STT: {models.sttLoaded ? "Active" : "Off"}
                 </span>
                 <span
-                  className={`text-[10px] font-medium ${models.ttsLoaded ? "text-green-400" : "text-muted-foreground"}`}
+                  className={`text-[10px] font-medium ${models.ttsLoaded ? "text-green-400" : "text-fg-secondary"}`}
                 >
                   TTS: {models.ttsLoaded ? "Active" : "Off"}
                 </span>
@@ -803,17 +803,17 @@ export function VoiceSettings() {
               return (
                 <div
                   key={key}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-border/50 bg-accent/30"
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-separator/50 bg-control-hover/30"
                 >
                   <HardDrive
-                    className={`size-4 shrink-0 ${status.downloaded ? "text-green-400" : "text-muted-foreground"}`}
+                    className={`size-4 shrink-0 ${status.downloaded ? "text-green-400" : "text-fg-secondary"}`}
                     strokeWidth={1.5}
                   />
                   <div className="flex-1 min-w-0">
-                    <div className="text-xs font-medium text-foreground">{status.displayName}</div>
-                    <div className="text-[10px] text-dim">{desc}</div>
+                    <div className="text-ui-sm font-medium text-fg">{status.displayName}</div>
+                    <div className="text-[10px] text-fg-dim">{desc}</div>
                     {isDownloading && (
-                      <div className="mt-1.5 h-1 bg-accent rounded-full overflow-hidden">
+                      <div className="mt-1.5 h-1 bg-control-hover rounded-full overflow-hidden">
                         <div
                           className="h-full bg-brand rounded-full transition-all duration-300"
                           style={{ width: `${Math.round(progress * 100)}%` }}
@@ -829,7 +829,7 @@ export function VoiceSettings() {
                           type="button"
                           onClick={() => handleDelete(key)}
                           disabled={modelActing === key}
-                          className="size-7 flex items-center justify-center text-muted-foreground hover:text-red-400 rounded-md hover:bg-red-400/10 transition-colors"
+                          className="size-7 flex items-center justify-center text-fg-secondary hover:text-red-400 rounded-md hover:bg-red-400/10 transition-colors"
                           title="Delete model"
                         >
                           <Trash2 className="size-3.5" strokeWidth={1.5} />
@@ -844,7 +844,7 @@ export function VoiceSettings() {
                         type="button"
                         onClick={() => handleDownload(key)}
                         disabled={modelActing === key}
-                        className="size-7 flex items-center justify-center text-muted-foreground hover:text-brand rounded-md hover:bg-brand/10 transition-colors"
+                        className="size-7 flex items-center justify-center text-fg-secondary hover:text-brand rounded-md hover:bg-brand/10 transition-colors"
                         title="Download model"
                       >
                         <Download className="size-3.5" strokeWidth={1.5} />
@@ -872,7 +872,7 @@ export function VoiceSettings() {
                       : null;
               if (personasDisabledReason) {
                 return (
-                  <p className="text-[11px] text-muted-foreground">{personasDisabledReason}</p>
+                  <p className="text-ui-xs text-fg-secondary">{personasDisabledReason}</p>
                 );
               }
               return null;
@@ -939,7 +939,7 @@ export function VoiceSettings() {
           <div className="space-y-3">
             <div className="flex gap-3">
               <label className="flex-1">
-                <span className="block text-[11px] text-muted-foreground mb-1">
+                <span className="block text-ui-xs text-fg-secondary mb-1">
                   Warm session (minutes)
                 </span>
                 <input
@@ -953,11 +953,11 @@ export function VoiceSettings() {
                   }
                   min="1"
                   max="120"
-                  className="w-full px-3 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+                  className="w-full px-3 py-1.5 text-ui-sm text-fg bg-control-hover border border-separator rounded-control focus:outline-none focus:border-fg-secondary/50 focus:ring-2 focus:ring-separator transition-colors"
                 />
               </label>
               <label className="flex-1">
-                <span className="block text-[11px] text-muted-foreground mb-1">
+                <span className="block text-ui-xs text-fg-secondary mb-1">
                   Warm chat (minutes)
                 </span>
                 <input
@@ -971,13 +971,13 @@ export function VoiceSettings() {
                   }
                   min="1"
                   max="60"
-                  className="w-full px-3 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+                  className="w-full px-3 py-1.5 text-ui-sm text-fg bg-control-hover border border-separator rounded-control focus:outline-none focus:border-fg-secondary/50 focus:ring-2 focus:ring-separator transition-colors"
                 />
               </label>
             </div>
 
             <label className="block">
-              <span className="block text-[11px] text-muted-foreground mb-1">
+              <span className="block text-ui-xs text-fg-secondary mb-1">
                 Turn silence (seconds)
               </span>
               <input
@@ -992,17 +992,17 @@ export function VoiceSettings() {
                 step="0.1"
                 min="0.5"
                 max="5"
-                className="w-full px-3 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+                className="w-full px-3 py-1.5 text-ui-sm text-fg bg-control-hover border border-separator rounded-control focus:outline-none focus:border-fg-secondary/50 focus:ring-2 focus:ring-separator transition-colors"
               />
-              <p className="text-[10px] text-dim mt-1">
+              <p className="text-[10px] text-fg-dim mt-1">
                 Silence duration to end a voice conversation turn
               </p>
             </label>
 
             <div className="flex items-center justify-between">
               <div>
-                <span className="text-xs text-muted-foreground">Auto-resume</span>
-                <p className="text-[11px] text-dim">Resume listening after agent response</p>
+                <span className="text-ui-xs text-fg-secondary">Auto-resume</span>
+                <p className="text-ui-xs text-fg-dim">Resume listening after agent response</p>
               </div>
               <Toggle
                 checked={convVal("autoResume", true)}
@@ -1012,8 +1012,8 @@ export function VoiceSettings() {
 
             <div className="flex items-center justify-between">
               <div>
-                <span className="text-xs text-muted-foreground">Adaptive breath</span>
-                <p className="text-[11px] text-dim">Variable pause based on response length</p>
+                <span className="text-ui-xs text-fg-secondary">Adaptive breath</span>
+                <p className="text-ui-xs text-fg-dim">Variable pause based on response length</p>
               </div>
               <Toggle
                 checked={convVal("adaptiveBreath", true)}
@@ -1023,7 +1023,7 @@ export function VoiceSettings() {
 
             {hasConvChanges && (
               <>
-                <p className="text-2xs text-dim">Changes apply on next voice session</p>
+                <p className="text-ui-xs text-fg-dim">Changes apply on next voice session</p>
                 <SaveButton onClick={saveConv} saving={savingConv} />
               </>
             )}

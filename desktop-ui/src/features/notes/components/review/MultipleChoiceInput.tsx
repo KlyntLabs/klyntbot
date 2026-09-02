@@ -45,10 +45,10 @@ export function MultipleChoiceInput({
             onClick={() => handleSelect(option)}
             disabled={selected !== null}
             className={[
-              "flex items-start gap-2.5 w-full text-left px-3 py-2 rounded-lg border text-[11px] transition-colors",
+              "flex items-start gap-2.5 w-full text-left px-3 py-2 rounded-lg border text-ui-xs transition-colors",
               isSelected
-                ? "border-accent bg-accent/10 text-foreground"
-                : "border-border bg-white/[0.03] text-muted-foreground hover:bg-white/[0.06] hover:text-foreground",
+                ? "border-brand bg-brand/10 text-fg"
+                : "border-separator bg-white/[0.03] text-fg-secondary hover:bg-white/[0.06] hover:text-fg",
               selected !== null && !isSelected ? "opacity-50" : "",
             ]
               .filter(Boolean)
@@ -57,7 +57,7 @@ export function MultipleChoiceInput({
             <span
               className={[
                 "shrink-0 size-4 rounded text-[9px] font-semibold flex items-center justify-center",
-                isSelected ? "bg-accent text-white" : "bg-white/[0.08] text-dim",
+                isSelected ? "bg-control-hover text-white" : "bg-white/[0.08] text-fg-dim",
               ].join(" ")}
             >
               {label}

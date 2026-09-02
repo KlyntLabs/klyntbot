@@ -34,10 +34,10 @@ export function ContextsTab() {
             key={label}
             type="button"
             onClick={() => setStatusFilter(value as string | undefined)}
-            className={`px-2.5 py-1 rounded-lg text-[11px] font-light transition-colors ${
+            className={`px-2.5 py-1 rounded-lg text-ui-xs font-light transition-colors ${
               statusFilter === value
-                ? "glass-button-active text-foreground"
-                : "text-muted-foreground hover:text-foreground hover:bg-card"
+                ? "glass-button-active text-fg"
+                : "text-fg-secondary hover:text-fg hover:bg-bg-elevated"
             }`}
           >
             {label}

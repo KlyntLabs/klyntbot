@@ -56,7 +56,7 @@ export function IssueDetailView({ issueId, projectMap, areaMap }: IssueDetailVie
         <button
           type="button"
           onClick={toggleSidebar}
-          className="absolute top-3 right-3 p-1.5 rounded hover:bg-accent text-muted-foreground z-10"
+          className="absolute top-3 right-3 p-1.5 rounded hover:bg-control-hover text-fg-secondary z-10"
           aria-label="Show sidebar"
         >
           <PanelRight className="size-4" />

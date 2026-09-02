@@ -36,18 +36,18 @@ function CollapsibleBox({ title, icon: Icon, children, defaultOpen = true }: Col
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center gap-2 px-3 py-2 rounded-t-[var(--radius-2xl)] bg-accent"
+        className="w-full flex items-center gap-2 px-3 py-2 rounded-t-[var(--radius-2xl)] bg-control-hover"
       >
-        <Icon className="size-3 text-muted-foreground" strokeWidth={1.5} />
-        <span className="flex-1 text-left text-[11px] font-medium text-muted-foreground">
+        <Icon className="size-3 text-fg-secondary" strokeWidth={1.5} />
+        <span className="flex-1 text-left text-ui-xs font-medium text-fg-secondary">
           {title}
         </span>
         <ChevronDown
-          className={`size-3 text-muted-foreground transition-transform ${open ? "rotate-0" : "-rotate-90"}`}
+          className={`size-3 text-fg-secondary transition-transform ${open ? "rotate-0" : "-rotate-90"}`}
           strokeWidth={1.5}
         />
       </button>
-      {open && <div className="px-3 py-2 space-y-1 text-2xs font-light">{children}</div>}
+      {open && <div className="px-3 py-2 space-y-1 text-ui-xs font-light">{children}</div>}
     </div>
   );
 }
@@ -65,15 +65,15 @@ function Row({
 }) {
   return (
     <div
-      className={`flex items-center gap-1.5 ${active ? "text-muted-foreground" : "text-muted-foreground"}`}
+      className={`flex items-center gap-1.5 ${active ? "text-fg-secondary" : "text-fg-secondary"}`}
     >
       <Icon className={`size-3 shrink-0 ${active ? "text-brand" : ""}`} strokeWidth={1.5} />
-      <span className={active ? "text-foreground font-medium" : "text-muted-foreground"}>
+      <span className={active ? "text-fg font-medium" : "text-fg-secondary"}>
         {label}
       </span>
       {detail && (
         <span
-          className={`ml-auto ${active ? "text-brand text-[9px] font-medium uppercase" : "text-dim"}`}
+          className={`ml-auto ${active ? "text-brand text-[9px] font-medium uppercase" : "text-fg-dim"}`}
         >
           {detail}
         </span>
@@ -84,7 +84,7 @@ function Row({
 
 function AgentGroupLabel({ name }: { name: string }) {
   return (
-    <div className="pt-1 first:pt-0 text-dim text-[9px] font-medium uppercase tracking-wider">
+    <div className="pt-1 first:pt-0 text-fg-dim text-[9px] font-medium uppercase tracking-wider">
       {name}
     </div>
   );
@@ -93,21 +93,21 @@ function AgentGroupLabel({ name }: { name: string }) {
 /** Skills popup shown on hover over an agent name in the Agents section. */
 function AgentSkillsPopup({ skills }: { skills: { name: string; trigger: string }[] }) {
   return (
-    <div className="absolute left-0 top-full mt-1 z-50 w-48 rounded-xl p-2.5 space-y-0.5 text-2xs font-light bg-popover border border-border">
-      <div className="text-dim text-[9px] font-medium uppercase tracking-wider mb-1">Skills</div>
+    <div className="absolute left-0 top-full mt-1 z-50 w-48 rounded-xl p-2.5 space-y-0.5 text-ui-xs font-light bg-glass-strong border border-separator">
+      <div className="text-fg-dim text-[9px] font-medium uppercase tracking-wider mb-1">Skills</div>
       {skills.map((skill) => {
         const isActive = skill.trigger === "always" || skill.trigger === "activated";
         return (
           <div key={`sp-${skill.name}`} className="flex items-center gap-1.5">
             <Package
-              className={`size-2.5 shrink-0 ${isActive ? "text-brand" : "text-muted-foreground"}`}
+              className={`size-2.5 shrink-0 ${isActive ? "text-brand" : "text-fg-secondary"}`}
               strokeWidth={1.5}
             />
-            <span className={isActive ? "text-foreground font-medium" : "text-muted-foreground"}>
+            <span className={isActive ? "text-fg font-medium" : "text-fg-secondary"}>
               {skill.name}
             </span>
             <span
-              className={`ml-auto ${isActive ? "text-brand text-[9px] font-medium uppercase" : "text-dim"}`}
+              className={`ml-auto ${isActive ? "text-brand text-[9px] font-medium uppercase" : "text-fg-dim"}`}
             >
               {isActive ? "active" : skill.trigger}
             </span>
@@ -148,7 +148,7 @@ function AgentWithSkills({
       onMouseLeave={() => setHovered(false)}
     >
       <div
-        className={`flex items-center gap-1.5 ${isMain ? "text-muted-foreground" : "text-muted-foreground pl-3"}`}
+        className={`flex items-center gap-1.5 ${isMain ? "text-fg-secondary" : "text-fg-secondary pl-3"}`}
       >
         {isMain ? (
           <Bot className="size-3 shrink-0 text-brand" strokeWidth={1.5} />
@@ -156,11 +156,11 @@ function AgentWithSkills({
           <span className="text-[9px]">{statusIcon ?? "◇"}</span>
         )}
         <span
-          className={`text-muted-foreground ${isMain ? "font-medium" : ""} ${hasSkills ? "underline decoration-dotted decoration-border underline-offset-2 cursor-default" : ""}`}
+          className={`text-fg-secondary ${isMain ? "font-medium" : ""} ${hasSkills ? "underline decoration-dotted decoration-border underline-offset-2 cursor-default" : ""}`}
         >
           {name}
         </span>
-        {detail && <span className="ml-auto text-dim">{detail}</span>}
+        {detail && <span className="ml-auto text-fg-dim">{detail}</span>}
       </div>
       {hovered && hasSkills && skills && <AgentSkillsPopup skills={skills} />}
     </fieldset>
@@ -247,7 +247,7 @@ export function TransparencyPanel({ transparency }: TransparencyPanelProps) {
                   ))}
               </>
             ) : (
-              <span className="text-dim">none</span>
+              <span className="text-fg-dim">none</span>
             )}
           </CollapsibleBox>
         </div>
@@ -276,7 +276,7 @@ export function TransparencyPanel({ transparency }: TransparencyPanelProps) {
                   />
                 ))}
             {toolTokensTotal && toolTokensTotal > 0 && (
-              <div className="pt-1 mt-1 border-t border-border flex justify-between text-dim">
+              <div className="pt-1 mt-1 border-t border-separator flex justify-between text-fg-dim">
                 <span>Total I/O (est.)</span>
                 <span>~{formatTokens(toolTokensTotal)}</span>
               </div>
@@ -311,31 +311,31 @@ export function TransparencyPanel({ transparency }: TransparencyPanelProps) {
                 stage.status === "ran"
                   ? "text-brand"
                   : stage.status === "failed"
-                    ? "text-destructive"
-                    : "text-dim";
+                    ? "text-status-danger"
+                    : "text-fg-dim";
               return (
                 <div
                   key={`enh-${stage.name}`}
-                  className="flex items-center gap-1.5 text-muted-foreground"
+                  className="flex items-center gap-1.5 text-fg-secondary"
                   title={stage.statusDetail ?? stage.outputSummary}
                 >
                   <StatusIcon className={`size-3 shrink-0 ${iconColor}`} strokeWidth={1.5} />
                   <span
                     className={
                       stage.status === "ran"
-                        ? "text-foreground font-medium"
-                        : "text-muted-foreground"
+                        ? "text-fg font-medium"
+                        : "text-fg-secondary"
                     }
                   >
                     {stage.name}
                   </span>
-                  <span className="ml-auto text-dim">
+                  <span className="ml-auto text-fg-dim">
                     {stage.status === "ran" ? formatDuration(stage.latencyMs) : stage.status}
                   </span>
                 </div>
               );
             })}
-            <div className="pt-1 mt-1 border-t border-border flex justify-between text-dim">
+            <div className="pt-1 mt-1 border-t border-separator flex justify-between text-fg-dim">
               <span>Total</span>
               <span>
                 {formatDuration(enhancement.totalLatencyMs)} · {enhancement.totalLlmCalls} LLM
@@ -381,7 +381,7 @@ export function TransparencyPanel({ transparency }: TransparencyPanelProps) {
                 />
               ))
             ) : (
-              <span className="text-dim">none</span>
+              <span className="text-fg-dim">none</span>
             )}
           </CollapsibleBox>
         </div>

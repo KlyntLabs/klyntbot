@@ -21,15 +21,15 @@ export function TreePathBreadcrumb({ treePaths }: TreePathBreadcrumbProps) {
           key={`${ref.noteId}-${ref.nodeId}`}
           type="button"
           onClick={() => navigateToSection(ref.noteId, ref.nodeId)}
-          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-surface-raised/50
-            text-[10px] text-muted hover:text-foreground transition-colors cursor-pointer
-            border border-border/30 hover:border-border/60"
+          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-glass-subtle/50
+            text-[10px] text-fg-secondary hover:text-fg transition-colors cursor-pointer
+            border border-separator/30 hover:border-separator/60"
           title={`${ref.noteName} — ${Math.round(ref.similarity * 100)}% match`}
         >
           <span className="shrink-0">📄</span>
           {ref.path.map((segment, i) => (
             <span key={segment.nodeId} className="inline-flex items-center gap-1">
-              {i > 0 && <span className="text-dim">›</span>}
+              {i > 0 && <span className="text-fg-dim">›</span>}
               <span>{segment.title}</span>
             </span>
           ))}

@@ -12,7 +12,7 @@ export function PersonaMessageList({ personaMessages, compact }: PersonaMessageL
   return (
     <div className={compact ? "space-y-1 px-2 py-1" : "glass-card rounded-xl p-3 space-y-1"}>
       {!compact && (
-        <div className="text-[9px] text-dim uppercase tracking-wider mb-1">
+        <div className="text-[9px] text-fg-dim uppercase tracking-wider mb-1">
           Individual Perspectives
         </div>
       )}

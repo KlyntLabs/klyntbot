@@ -19,10 +19,10 @@ export function ToastContainer({ toasts, onDismiss }: Props) {
           key={toast.id}
           role="alert"
           className={cn(
-            "flex items-start gap-2 px-4 py-3 rounded-lg shadow-lg border text-sm animate-[slideIn_0.2s_ease-out]",
+            "flex items-start gap-2 px-4 py-3 rounded-panel shadow-lg border text-ui animate-[slideIn_0.2s_ease-out]",
             toast.variant === "error"
-              ? "bg-red-950/90 border-red-800/50 text-red-200"
-              : "bg-emerald-950/90 border-emerald-800/50 text-emerald-200",
+              ? "bg-status-danger/90 border-status-danger/50 text-brand-foreground"
+              : "bg-status-success/90 border-status-success/50 text-brand-foreground",
           )}
         >
           <span className="flex-1">{toast.message}</span>

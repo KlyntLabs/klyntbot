@@ -33,7 +33,7 @@ export default function AllIssues({ tasksData }: AllIssuesProps) {
       return <SearchIssues issues={issues} />;
     }
     return (
-      <div className="px-6 py-8 text-center text-sm text-muted-foreground">
+      <div className="px-6 py-8 text-center text-sm text-fg-secondary">
         Search results will appear here
       </div>
     );

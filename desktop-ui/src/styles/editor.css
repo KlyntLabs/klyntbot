@@ -18,10 +18,10 @@
   padding: 0.75rem 2rem;
   outline: none;
   flex: 1;
-  color: var(--color-foreground);
+  color: var(--ds-text);
   font-size: 0.9375rem;
   line-height: 1.75;
-  caret-color: var(--brand);
+  caret-color: var(--ds-accent);
 }
 
 .editor-content > *:first-child {
@@ -33,14 +33,14 @@
   font-size: 1.75rem;
   font-weight: 700;
   margin: 1.5rem 0 0.75rem;
-  color: var(--color-foreground);
+  color: var(--ds-text);
   letter-spacing: -0.025em;
   padding-bottom: 0.5rem;
   border-bottom: 2px solid transparent;
   border-image: linear-gradient(
       90deg,
-      var(--color-brand) 0%,
-      rgba(167, 139, 250, 0.6) 40%,
+      var(--ds-accent) 0%,
+      color-mix(in srgb, var(--ds-purple) 60%, transparent) 40%,
       transparent 80%
     )
     1;
@@ -50,9 +50,9 @@
   font-size: 1.375rem;
   font-weight: 600;
   margin: 1.25rem 0 0.5rem;
-  color: var(--color-foreground);
+  color: var(--ds-text);
   letter-spacing: -0.02em;
-  background: linear-gradient(135deg, var(--color-foreground) 0%, var(--color-info) 100%);
+  background: linear-gradient(135deg, var(--ds-text) 0%, var(--ds-status-info) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -62,9 +62,9 @@
   font-size: 1.125rem;
   font-weight: 600;
   margin: 1rem 0 0.5rem;
-  color: var(--color-foreground);
+  color: var(--ds-text);
   letter-spacing: -0.015em;
-  background: linear-gradient(135deg, var(--color-foreground) 0%, var(--color-purple) 100%);
+  background: linear-gradient(135deg, var(--ds-text) 0%, var(--ds-purple) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -73,11 +73,11 @@
 /* Strong & emphasis */
 .editor-content strong {
   font-weight: 700;
-  color: var(--color-foreground);
+  color: var(--ds-text);
 }
 
 .editor-content em {
-  color: var(--color-muted-foreground);
+  color: var(--ds-text-secondary);
   font-style: italic;
 }
 
@@ -111,7 +111,7 @@
 }
 
 .editor-content li::marker {
-  color: color-mix(in srgb, var(--brand) 50%, var(--color-muted-foreground));
+  color: color-mix(in srgb, var(--ds-accent) 50%, var(--ds-text-secondary));
 }
 
 /* Task list */
@@ -138,7 +138,7 @@
   appearance: none;
   width: 14px;
   height: 14px;
-  border: 1.5px solid rgba(255, 255, 255, 0.18);
+  border: 1.5px solid var(--ds-glass-border);
   border-radius: 50%;
   background: transparent;
   cursor: pointer;
@@ -148,12 +148,12 @@
 }
 
 .editor-content ul[data-type="taskList"] li label input[type="checkbox"]:hover {
-  border-color: color-mix(in srgb, var(--brand) 60%, transparent);
+  border-color: color-mix(in srgb, var(--ds-accent) 60%, transparent);
 }
 
 .editor-content ul[data-type="taskList"] li label input[type="checkbox"]:checked {
-  background: var(--brand);
-  border-color: var(--brand);
+  background: var(--ds-accent);
+  border-color: var(--ds-accent);
   border-radius: 50%;
 }
 
@@ -164,7 +164,7 @@
   top: 1px;
   width: 4px;
   height: 7px;
-  border: solid white;
+  border: solid var(--ds-accent-foreground);
   border-width: 0 1.5px 1.5px 0;
   transform: rotate(45deg);
 }
@@ -172,28 +172,32 @@
 .editor-content ul[data-type="taskList"] li[data-checked="true"] > div > p {
   text-decoration: line-through;
   opacity: 0.5;
-  color: var(--color-muted-foreground);
+  color: var(--ds-text-secondary);
 }
 
 /* Blockquote */
 .editor-content blockquote {
-  border-left: 3px solid var(--color-brand);
+  border-left: 3px solid var(--ds-accent);
   margin: 0.75rem 0;
-  color: var(--color-muted-foreground);
-  background: linear-gradient(135deg, rgba(249, 115, 22, 0.06) 0%, rgba(249, 115, 22, 0.02) 100%);
+  color: var(--ds-text-secondary);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--ds-accent) 6%, transparent) 0%,
+    color-mix(in srgb, var(--ds-accent) 2%, transparent) 100%
+  );
   border-radius: 0 0.625rem 0.625rem 0;
   padding: 0.75rem 1.125rem;
 }
 
 /* Code */
 .editor-content code {
-  background: color-mix(in srgb, var(--brand) 8%, rgba(255, 255, 255, 0.06));
-  border: 1px solid color-mix(in srgb, var(--brand) 12%, transparent);
+  background: color-mix(in srgb, var(--ds-accent) 8%, var(--ds-code-bg));
+  border: 1px solid color-mix(in srgb, var(--ds-accent) 12%, transparent);
   border-radius: 5px;
   padding: 0.1rem 0.4rem;
   font-size: 0.84em;
   font-family: var(--font-mono, ui-monospace, monospace);
-  color: var(--color-brand-hover);
+  color: var(--ds-accent-hover);
 }
 
 /* Code block wrapper (custom NodeView) */
@@ -203,8 +207,8 @@
 }
 
 .editor-content .code-block-wrapper pre {
-  background: rgba(0, 0, 0, 0.4);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--ds-overlay);
+  border: 1px solid var(--ds-glass-badge-border);
   border-radius: 0 0 0.75rem 0.75rem;
   padding: 1rem 1.25rem;
   margin: 0;
@@ -222,7 +226,7 @@
   background: linear-gradient(
     90deg,
     transparent,
-    color-mix(in srgb, var(--brand) 20%, transparent),
+    color-mix(in srgb, var(--ds-accent) 20%, transparent),
     transparent
   );
 }
@@ -234,7 +238,7 @@
   border-radius: 0;
   font-size: 0.8125rem;
   line-height: 1.6;
-  color: var(--color-foreground);
+  color: var(--ds-text);
 }
 
 .code-block-header {
@@ -242,8 +246,8 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.375rem 0.5rem 0.375rem 0.75rem;
-  background: rgba(0, 0, 0, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--ds-overlay-heavy);
+  border: 1px solid var(--ds-glass-badge-border);
   border-bottom: none;
   border-radius: 0.75rem 0.75rem 0 0;
   user-select: none;
@@ -260,7 +264,7 @@
   outline: none;
   font-size: 0.75rem;
   font-family: var(--font-mono, ui-monospace, monospace);
-  color: var(--color-muted-foreground);
+  color: var(--ds-text-secondary);
   cursor: pointer;
   padding: 0.125rem 0.25rem;
   border-radius: 0.25rem;
@@ -271,18 +275,18 @@
 }
 
 .code-block-lang-select:hover {
-  color: var(--color-foreground);
-  background: rgba(255, 255, 255, 0.06);
+  color: var(--ds-text);
+  background: var(--ds-control-hover);
 }
 
 .code-block-lang-select:focus {
-  color: var(--color-foreground);
-  background: rgba(255, 255, 255, 0.08);
+  color: var(--ds-text);
+  background: var(--ds-control-active);
 }
 
 .code-block-lang-select option {
-  background: var(--color-surface-base, #1a1a2e);
-  color: var(--color-foreground);
+  background: var(--ds-bg-elevated);
+  color: var(--ds-text);
 }
 
 .code-block-actions {
@@ -297,7 +301,7 @@
   gap: 0.25rem;
   padding: 0.25rem 0.5rem;
   font-size: 0.6875rem;
-  color: var(--color-muted-foreground);
+  color: var(--ds-text-secondary);
   border-radius: 0.375rem;
   cursor: pointer;
   transition:
@@ -309,14 +313,14 @@
 }
 
 .code-block-btn:hover {
-  color: var(--color-foreground);
-  background: rgba(255, 255, 255, 0.06);
+  color: var(--ds-text);
+  background: var(--ds-control-hover);
 }
 
 /* Fallback for code blocks not using the custom NodeView (e.g., prose) */
 .editor-content pre:not(.code-block-wrapper pre) {
-  background: rgba(0, 0, 0, 0.4);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--ds-overlay);
+  border: 1px solid var(--ds-glass-badge-border);
   border-radius: 0.75rem;
   padding: 1rem 1.25rem;
   margin: 0.75rem 0;
@@ -334,7 +338,7 @@
   background: linear-gradient(
     90deg,
     transparent,
-    color-mix(in srgb, var(--brand) 20%, transparent),
+    color-mix(in srgb, var(--ds-accent) 20%, transparent),
     transparent
   );
 }
@@ -346,7 +350,7 @@
   border-radius: 0;
   font-size: 0.8125rem;
   line-height: 1.6;
-  color: var(--color-foreground);
+  color: var(--ds-text);
 }
 
 /* Table */
@@ -356,28 +360,28 @@
   margin: 0.75rem 0;
   border-radius: 0.625rem;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--ds-glass-badge-border);
 }
 
 .editor-content th,
 .editor-content td {
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--ds-separator);
   padding: 0.5rem 0.75rem;
   text-align: left;
   font-size: 0.875rem;
 }
 
 .editor-content th {
-  background: color-mix(in srgb, var(--brand) 6%, rgba(255, 255, 255, 0.03));
+  background: color-mix(in srgb, var(--ds-accent) 6%, var(--ds-glass-badge));
   font-weight: 600;
   font-size: 0.8125rem;
   text-transform: uppercase;
   letter-spacing: 0.03em;
-  color: var(--color-brand-hover);
+  color: var(--ds-accent-hover);
 }
 
 .editor-content tr:hover td {
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--ds-control-hover);
 }
 
 /* Horizontal rule */
@@ -387,8 +391,8 @@
   background: linear-gradient(
     90deg,
     transparent 0%,
-    color-mix(in srgb, var(--brand) 25%, rgba(255, 255, 255, 0.08)) 30%,
-    color-mix(in srgb, var(--brand) 25%, rgba(255, 255, 255, 0.08)) 70%,
+    color-mix(in srgb, var(--ds-accent) 25%, var(--ds-glass-badge-border)) 30%,
+    color-mix(in srgb, var(--ds-accent) 25%, var(--ds-glass-badge-border)) 70%,
     transparent 100%
   );
   margin: 2rem 0;
@@ -396,9 +400,9 @@
 
 /* Links */
 .editor-link {
-  color: var(--color-brand);
+  color: var(--ds-accent);
   text-decoration: underline;
-  text-decoration-color: color-mix(in srgb, var(--color-brand) 40%, transparent);
+  text-decoration-color: color-mix(in srgb, var(--ds-accent) 40%, transparent);
   text-underline-offset: 3px;
   cursor: pointer;
   transition:
@@ -407,8 +411,8 @@
 }
 
 .editor-link:hover {
-  color: var(--color-brand-hover);
-  text-decoration-color: var(--color-brand-hover);
+  color: var(--ds-accent-hover);
+  text-decoration-color: var(--ds-accent-hover);
 }
 
 /* Images */
@@ -417,25 +421,29 @@
   height: auto;
   border-radius: 0.75rem;
   margin: 0.75rem 0;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--ds-glass-badge-border);
   transition:
     border-color 0.2s ease,
     box-shadow 0.2s ease;
 }
 
 .editor-image:hover {
-  border-color: color-mix(in srgb, var(--brand) 30%, transparent);
+  border-color: color-mix(in srgb, var(--ds-accent) 30%, transparent);
   box-shadow:
-    0 4px 20px rgba(0, 0, 0, 0.3),
-    0 0 0 1px color-mix(in srgb, var(--brand) 15%, transparent);
+    var(--ds-shadow-tooltip),
+    0 0 0 1px color-mix(in srgb, var(--ds-accent) 15%, transparent);
 }
 
 /* Highlight */
 .editor-content mark {
-  background: linear-gradient(135deg, rgba(249, 115, 22, 0.3) 0%, rgba(251, 146, 60, 0.2) 100%);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--ds-status-warning) 30%, transparent) 0%,
+    color-mix(in srgb, var(--ds-status-warning) 20%, transparent) 100%
+  );
   border-radius: 3px;
   padding: 1px 4px;
-  color: var(--color-foreground);
+  color: var(--ds-text);
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
 }
@@ -444,7 +452,7 @@
 .editor-content p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
   float: left;
-  color: var(--color-muted-foreground);
+  color: var(--ds-text-secondary);
   pointer-events: none;
   height: 0;
 }
@@ -452,17 +460,17 @@
 .editor-content [data-placeholder]::before {
   content: attr(data-placeholder);
   float: left;
-  color: var(--color-muted-foreground);
+  color: var(--ds-text-secondary);
   pointer-events: none;
   height: 0;
 }
 
 /* Wiki Links */
 .wiki-link {
-  color: var(--color-info);
+  color: var(--ds-status-info);
   text-decoration: underline;
   text-decoration-style: dotted;
-  text-decoration-color: color-mix(in srgb, var(--color-info) 40%, transparent);
+  text-decoration-color: color-mix(in srgb, var(--ds-status-info) 40%, transparent);
   text-underline-offset: 3px;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -470,20 +478,20 @@
 
 .wiki-link:hover {
   text-decoration-style: solid;
-  text-decoration-color: var(--color-info);
-  color: color-mix(in srgb, var(--color-info) 80%, var(--color-foreground));
+  text-decoration-color: var(--ds-status-info);
+  color: color-mix(in srgb, var(--ds-status-info) 80%, var(--ds-text));
 }
 
 /* Unresolved wiki link — note doesn't exist */
 .wiki-link--unresolved {
-  color: var(--color-muted-foreground);
-  text-decoration-color: rgba(255, 255, 255, 0.12);
+  color: var(--ds-text-secondary);
+  text-decoration-color: var(--ds-separator);
   text-decoration-style: dotted;
   opacity: 0.6;
 }
 
 .wiki-link--unresolved:hover {
-  color: var(--color-muted-foreground);
+  color: var(--ds-text-secondary);
   opacity: 0.8;
 }
 
@@ -501,15 +509,15 @@
 }
 
 .entity-mention--task {
-  background: color-mix(in srgb, var(--color-brand) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--color-brand) 18%, transparent);
-  color: var(--color-brand);
+  background: color-mix(in srgb, var(--ds-accent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ds-accent) 18%, transparent);
+  color: var(--ds-accent);
 }
 
 .entity-mention--project {
-  background: color-mix(in srgb, var(--color-info) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--color-info) 18%, transparent);
-  color: var(--color-info);
+  background: color-mix(in srgb, var(--ds-status-info) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ds-status-info) 18%, transparent);
+  color: var(--ds-status-info);
 }
 
 .entity-mention:hover {
@@ -518,11 +526,11 @@
 
 /* Unresolved entity mentions — entity doesn't exist */
 .entity-mention--unresolved {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.08);
-  color: var(--color-muted-foreground);
+  background: var(--ds-glass-badge);
+  border-color: var(--ds-glass-badge-border);
+  color: var(--ds-text-secondary);
   text-decoration: line-through;
-  text-decoration-color: rgba(255, 255, 255, 0.15);
+  text-decoration-color: var(--ds-separator);
   opacity: 0.7;
 }
 
@@ -536,8 +544,12 @@
   text-align: center;
   margin: 1rem 0;
   padding: 1.25rem;
-  background: linear-gradient(135deg, rgba(167, 139, 250, 0.04) 0%, rgba(96, 165, 250, 0.04) 100%);
-  border: 1px solid rgba(167, 139, 250, 0.1);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--ds-purple) 4%, transparent) 0%,
+    color-mix(in srgb, var(--ds-status-info) 4%, transparent) 100%
+  );
+  border: 1px solid color-mix(in srgb, var(--ds-purple) 10%, transparent);
   border-radius: 0.75rem;
   overflow-x: auto;
 }
@@ -545,20 +557,20 @@
 .math-inline {
   padding: 0 3px;
   vertical-align: baseline;
-  color: var(--color-purple);
+  color: var(--ds-purple);
 }
 
 /* ── Vim Mode ────────────────────────────────────────────────────────── */
 
 /* Block cursor */
 .vim-block-cursor {
-  background: color-mix(in srgb, var(--brand) 50%, transparent);
+  background: color-mix(in srgb, var(--ds-accent) 50%, transparent);
 }
 
 .vim-block-cursor--eol {
   display: inline-block;
   width: 0.6em;
-  background: color-mix(in srgb, var(--brand) 50%, transparent);
+  background: color-mix(in srgb, var(--ds-accent) 50%, transparent);
 }
 
 /* Hide native caret in vim normal/visual mode */
@@ -570,7 +582,7 @@
 
 /* Restore caret in insert mode */
 .vim-insert .editor-content {
-  caret-color: var(--brand);
+  caret-color: var(--ds-accent);
 }
 
 /* ── Syntax highlighting tokens ──────────────────────────────────────
@@ -579,69 +591,69 @@
 
 .editor-content .hljs-comment,
 .editor-content .hljs-quote {
-  color: var(--color-muted-foreground);
+  color: var(--ds-text-secondary);
   font-style: italic;
 }
 
 .editor-content .hljs-keyword,
 .editor-content .hljs-selector-tag {
-  color: var(--color-purple);
+  color: var(--ds-purple);
   font-weight: 500;
 }
 
 .editor-content .hljs-type {
-  color: var(--color-info);
+  color: var(--ds-status-info);
   font-weight: 500;
 }
 
 .editor-content .hljs-string,
 .editor-content .hljs-addition {
-  color: var(--color-success);
+  color: var(--ds-status-success);
 }
 
 .editor-content .hljs-number,
 .editor-content .hljs-literal,
 .editor-content .hljs-symbol,
 .editor-content .hljs-bullet {
-  color: var(--color-brand);
+  color: var(--ds-accent);
 }
 
 .editor-content .hljs-title,
 .editor-content .hljs-section {
-  color: var(--color-info);
+  color: var(--ds-status-info);
   font-weight: 600;
 }
 
 .editor-content .hljs-built_in {
-  color: var(--color-info);
+  color: var(--ds-status-info);
 }
 
 .editor-content .hljs-attr,
 .editor-content .hljs-attribute {
-  color: var(--color-brand-hover);
+  color: var(--ds-accent-hover);
 }
 
 .editor-content .hljs-name,
 .editor-content .hljs-tag {
-  color: var(--color-destructive);
+  color: var(--ds-status-danger);
 }
 
 .editor-content .hljs-variable,
 .editor-content .hljs-template-variable {
-  color: var(--color-foreground);
+  color: var(--ds-text);
 }
 
 .editor-content .hljs-regexp,
 .editor-content .hljs-link {
-  color: var(--color-brand);
+  color: var(--ds-accent);
 }
 
 .editor-content .hljs-deletion {
-  color: var(--color-destructive);
+  color: var(--ds-status-danger);
 }
 
 .editor-content .hljs-meta {
-  color: var(--color-muted-foreground);
+  color: var(--ds-text-secondary);
 }
 
 .editor-content .hljs-emphasis {
@@ -653,52 +665,52 @@
 }
 
 .editor-content .hljs-params {
-  color: var(--color-foreground);
+  color: var(--ds-text);
 }
 
 .editor-content .hljs-property {
-  color: var(--color-brand-hover);
+  color: var(--ds-accent-hover);
 }
 
 .editor-content .hljs-function {
-  color: var(--color-info);
+  color: var(--ds-status-info);
 }
 
 /* Search highlights */
 .vim-search-match {
-  background: rgba(249, 115, 22, 0.25);
+  background: color-mix(in srgb, var(--ds-status-warning) 25%, transparent);
   border-radius: 2px;
-  box-shadow: 0 0 0 1px rgba(249, 115, 22, 0.3);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--ds-status-warning) 30%, transparent);
 }
 
 /* Annotation highlights */
 .annotation-highlight {
-  background: rgba(255, 140, 50, 0.15);
-  border-bottom: 2px solid rgba(255, 140, 50, 0.5);
+  background: color-mix(in srgb, var(--ds-status-warning) 15%, transparent);
+  border-bottom: 2px solid color-mix(in srgb, var(--ds-status-warning) 50%, transparent);
   cursor: pointer;
   transition: background 0.15s ease;
 }
 
 .annotation-highlight:hover {
-  background: rgba(255, 140, 50, 0.25);
+  background: color-mix(in srgb, var(--ds-status-warning) 25%, transparent);
 }
 
 .annotation-highlight[data-pending="true"] {
-  background: rgba(255, 140, 50, 0.08);
-  border-bottom: 2px dashed rgba(255, 140, 50, 0.3);
+  background: color-mix(in srgb, var(--ds-status-warning) 8%, transparent);
+  border-bottom: 2px dashed color-mix(in srgb, var(--ds-status-warning) 30%, transparent);
   cursor: default;
 }
 
 /* AI highlight — ephemeral decorations for tree RAG matches */
 .ai-highlight {
-  background: color-mix(in srgb, var(--brand) 12%, transparent);
+  background: color-mix(in srgb, var(--ds-accent) 12%, transparent);
   border-radius: 2px;
   transition: background 0.3s ease;
   position: relative;
 }
 
 .ai-highlight:hover {
-  background: color-mix(in srgb, var(--brand) 22%, transparent);
+  background: color-mix(in srgb, var(--ds-accent) 22%, transparent);
 }
 
 .ai-highlight:hover::after {
@@ -712,10 +724,10 @@
   font-size: 10px;
   font-weight: 500;
   white-space: nowrap;
-  color: var(--color-foreground);
-  background: var(--surface-raised);
-  border: 1px solid var(--glass-border);
-  box-shadow: var(--shadow-tooltip);
+  color: var(--ds-text);
+  background: var(--ds-bg-elevated);
+  border: 1px solid var(--ds-glass-border);
+  box-shadow: var(--ds-shadow-tooltip);
   pointer-events: none;
   z-index: 50;
 }
@@ -740,10 +752,10 @@
 .editor-content-compact {
   padding: 0.1rem 0.25rem;
   outline: none;
-  color: var(--color-foreground);
+  color: var(--ds-text);
   font-size: 0.6875rem;
   line-height: 1.45;
-  caret-color: var(--brand);
+  caret-color: var(--ds-accent);
 }
 
 .editor-content-compact > *:first-child {
@@ -760,7 +772,7 @@
   font-size: 0.75rem;
   font-weight: 600;
   margin: 0.2rem 0 0.1rem;
-  color: var(--color-foreground);
+  color: var(--ds-text);
 }
 
 .editor-content-compact ul {
@@ -780,7 +792,7 @@
 }
 
 .editor-content-compact li::marker {
-  color: color-mix(in srgb, var(--brand) 50%, var(--color-muted-foreground));
+  color: color-mix(in srgb, var(--ds-accent) 50%, var(--ds-text-secondary));
 }
 
 .editor-content-compact strong {
@@ -788,28 +800,28 @@
 }
 
 .editor-content-compact em {
-  color: var(--color-muted-foreground);
+  color: var(--ds-text-secondary);
   font-style: italic;
 }
 
 .editor-content-compact blockquote {
-  border-left: 2px solid var(--border);
+  border-left: 2px solid var(--ds-separator);
   padding-left: 0.4rem;
   margin: 0.1rem 0;
-  color: var(--color-muted-foreground);
+  color: var(--ds-text-secondary);
 }
 
 .editor-content-compact code {
   font-size: 0.625rem;
   padding: 0.05rem 0.2rem;
   border-radius: 3px;
-  background: var(--surface-hover);
+  background: var(--ds-control-hover);
 }
 
 .editor-content-compact .is-editor-empty:first-child::before {
   content: attr(data-placeholder);
   float: left;
-  color: var(--color-muted-foreground);
+  color: var(--ds-text-secondary);
   opacity: 0.4;
   pointer-events: none;
   height: 0;

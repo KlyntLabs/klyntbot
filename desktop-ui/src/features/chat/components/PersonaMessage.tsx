@@ -18,10 +18,10 @@ export function PersonaMessage({
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-baseline gap-1.5 mb-1">
-          <span className="text-[11px] font-medium text-foreground">{personaName}</span>
-          {personaRole && <span className="text-[9px] text-dim">{personaRole}</span>}
+          <span className="text-ui-xs font-medium text-fg">{personaName}</span>
+          {personaRole && <span className="text-[9px] text-fg-dim">{personaRole}</span>}
         </div>
-        <div className="text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap">
+        <div className="text-ui-sm text-fg-secondary leading-relaxed whitespace-pre-wrap">
           {content}
         </div>
       </div>

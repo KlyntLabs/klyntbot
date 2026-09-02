@@ -1,0 +1,50 @@
+/* Glass / surface recipes as Tailwind @utility.
+   Prefer these over ad-hoc backdrop-blur-* (which drop saturate). */
+
+@utility glass {
+  background: var(--ds-glass-bg);
+  backdrop-filter: var(--ds-blur);
+  -webkit-backdrop-filter: var(--ds-blur);
+  border: 1px solid var(--ds-glass-border);
+  box-shadow: var(--ds-elevation-glass);
+}
+
+@utility glass-strong {
+  background: var(--ds-glass-bg-strong);
+  backdrop-filter: var(--ds-blur-strong);
+  -webkit-backdrop-filter: var(--ds-blur-strong);
+  border: 1px solid var(--ds-glass-border);
+  box-shadow: var(--ds-elevation-glass-strong);
+}
+
+/* Floating menus / dropdowns / HUD panels over app content */
+@utility liquid-glass {
+  background: var(--ds-glass-bg);
+  backdrop-filter: var(--ds-blur-strong);
+  -webkit-backdrop-filter: var(--ds-blur-strong);
+  border: 1px solid var(--ds-glass-border);
+  box-shadow: var(--ds-elevation-window);
+  color: var(--ds-text);
+}
+
+/* In-window pane — no second backdrop-filter (perf + clarity) */
+@utility island {
+  background: var(--ds-glass-bg-subtle);
+  border: 1px solid var(--ds-separator);
+  border-radius: var(--ds-radius-menu);
+  box-shadow: var(--ds-elevation-island);
+  min-height: 0;
+}
+
+/* Compact control cluster chrome */
+@utility capsule {
+  background: var(--ds-glass-bg-strong);
+  border: 1px solid var(--ds-separator);
+  border-radius: var(--ds-radius-control);
+  box-shadow: var(--ds-elevation-island);
+}
+
+@utility glass-blur {
+  backdrop-filter: var(--ds-blur);
+  -webkit-backdrop-filter: var(--ds-blur);
+}

@@ -63,8 +63,8 @@ export function RatingButtons({ onRate, suggestedRating }: RatingButtonsProps) {
                 : "border-white/[0.08] hover:border-white/15 bg-white/[0.03] hover:bg-white/[0.06]"
             }`}
           >
-            <span className={`text-[13px] font-medium ${r.color}`}>{r.label}</span>
-            <span className="text-[10px] text-dim tabular-nums">
+            <span className={`text-ui font-medium ${r.color}`}>{r.label}</span>
+            <span className="text-[10px] text-fg-dim tabular-nums">
               {isSuggested ? `${r.key} · suggested` : r.key}
             </span>
           </button>

@@ -18,7 +18,7 @@ const GRADE_COLORS: Record<string, string> = {
 
 function gradeColor(grade: string): string {
   const letter = grade.charAt(0).toUpperCase();
-  return GRADE_COLORS[letter] ?? "text-muted";
+  return GRADE_COLORS[letter] ?? "text-fg-secondary";
 }
 
 export function PracticeSection({ sourceText, sourceLang, targetLang }: PracticeSectionProps) {
@@ -39,14 +39,14 @@ export function PracticeSection({ sourceText, sourceLang, targetLang }: Practice
     <div className="space-y-3">
       {/* Input area */}
       <div>
-        <div className="text-2xs text-muted-foreground uppercase tracking-wider mb-1">
+        <div className="text-ui-xs text-fg-secondary uppercase tracking-wider mb-1">
           Your Translation
         </div>
         <textarea
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="Write your translation here..."
-          className="w-full rounded-md border border-border bg-surface-hover/50 px-3 py-2 text-sm text-primary placeholder:text-dim resize-none focus:border-brand focus:outline-none"
+          className="w-full rounded-md border border-separator bg-control-hover/50 px-3 py-2 text-sm text-brand placeholder:text-fg-dim resize-none focus:border-fg-secondary/40 focus:outline-none"
           rows={3}
           disabled={evaluating}
         />
@@ -55,7 +55,7 @@ export function PracticeSection({ sourceText, sourceLang, targetLang }: Practice
             type="button"
             onClick={handleSubmit}
             disabled={evaluating || !input.trim()}
-            className="rounded-md bg-brand px-3 py-1.5 text-xs font-semibold text-black hover:bg-brand/90 disabled:opacity-50"
+            className="rounded-md bg-brand px-3 py-1.5 text-ui-sm font-semibold text-black hover:bg-brand/90 disabled:opacity-50"
           >
             {evaluating ? "Evaluating..." : "Check Translation"}
           </button>
@@ -63,7 +63,7 @@ export function PracticeSection({ sourceText, sourceLang, targetLang }: Practice
             <button
               type="button"
               onClick={handleReset}
-              className="rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground hover:bg-surface-hover"
+              className="rounded-md border border-separator px-3 py-1.5 text-ui-sm text-fg-secondary hover:bg-control-hover"
             >
               Try Again
             </button>
@@ -71,7 +71,7 @@ export function PracticeSection({ sourceText, sourceLang, targetLang }: Practice
         </div>
       </div>
 
-      {error && <div className="text-xs text-red-400">{error}</div>}
+      {error && <div className="text-ui-sm text-red-400">{error}</div>}
 
       {/* Evaluation results (Hybrid C format) */}
       {evaluation && <EvaluationResults evaluation={evaluation} />}
@@ -87,7 +87,7 @@ function EvaluationResults({ evaluation }: { evaluation: TranslationEvalResponse
   return (
     <div className="space-y-3">
       {/* Letter grades bar */}
-      <div className="flex gap-2 rounded-md bg-surface-hover p-2">
+      <div className="flex gap-2 rounded-md bg-control-hover p-2">
         <GradeCell label="Meaning" grade={grades.meaning} />
         <GradeCell label="Grammar" grade={grades.grammar} />
         <GradeCell label="Natural" grade={grades.naturalness} />
@@ -98,11 +98,11 @@ function EvaluationResults({ evaluation }: { evaluation: TranslationEvalResponse
       {corrections.length > 0 && (
         <div className="space-y-0.5">
           {corrections.map((c) => (
-            <div key={`${c.original}-${c.suggested}`} className="border-b border-border/50 py-1.5">
+            <div key={`${c.original}-${c.suggested}`} className="border-b border-separator/50 py-1.5">
               <div className="flex items-center justify-between">
-                <div className="text-xs">
+                <div className="text-ui-sm">
                   <span className="text-red-400">✗</span>{" "}
-                  <span className="text-muted line-through">{c.original}</span> →{" "}
+                  <span className="text-fg-secondary line-through">{c.original}</span> →{" "}
                   <span className="text-green-400">{c.suggested}</span>
                 </div>
                 <button
@@ -115,13 +115,13 @@ function EvaluationResults({ evaluation }: { evaluation: TranslationEvalResponse
                       return next;
                     })
                   }
-                  className="text-2xs text-muted-foreground hover:text-primary"
+                  className="text-ui-xs text-fg-secondary hover:text-brand"
                 >
                   {expandedSet.has(i) ? "▾ Hide" : "▸ Why?"}
                 </button>
               </div>
               {expandedSet.has(i) && (
-                <div className="mt-1 ml-4 border-l-2 border-blue-500/30 pl-2 text-[11px] text-muted">
+                <div className="mt-1 ml-4 border-l-2 border-blue-500/30 pl-2 text-ui-xs text-fg-secondary">
                   {c.explanation}
                 </div>
               )}
@@ -131,11 +131,11 @@ function EvaluationResults({ evaluation }: { evaluation: TranslationEvalResponse
       )}
 
       {/* Model translation */}
-      <div className="rounded-md bg-surface-hover/50 border border-border/50 p-2">
-        <div className="text-2xs text-muted-foreground uppercase tracking-wider mb-1">
+      <div className="rounded-md bg-control-hover/50 border border-separator/50 p-2">
+        <div className="text-ui-xs text-fg-secondary uppercase tracking-wider mb-1">
           Model Translation
         </div>
-        <p className="text-xs text-primary">{modelTranslation}</p>
+        <p className="text-ui-sm text-brand">{modelTranslation}</p>
       </div>
     </div>
   );
@@ -145,7 +145,7 @@ function GradeCell({ label, grade }: { label: string; grade: string }) {
   return (
     <div className="flex-1 text-center">
       <div className={`text-lg font-bold ${gradeColor(grade)}`}>{grade}</div>
-      <div className="text-[9px] text-muted-foreground">{label}</div>
+      <div className="text-[9px] text-fg-secondary">{label}</div>
     </div>
   );
 }

@@ -9,7 +9,7 @@ export function CollapsedInteraction({ content }: CollapsedInteractionProps) {
     <div className="flex justify-start">
       <div className="flex items-center gap-2 px-4 py-2 glass-card rounded-xl">
         <MessageSquareMore className="size-3.5 text-brand shrink-0" strokeWidth={1.5} />
-        <span className="text-xs font-light text-muted-foreground">{content}</span>
+        <span className="text-ui-sm font-light text-fg-secondary">{content}</span>
       </div>
     </div>
   );

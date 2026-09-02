@@ -12,8 +12,8 @@ export function FormSection({ title, description, className, children }: FormSec
   return (
     <div className={cn("space-y-4", className)}>
       <div>
-        <h3 className="text-sm font-medium text-foreground">{title}</h3>
-        {description && <p className="text-xs text-muted-foreground mt-0.5">{description}</p>}
+        <h3 className="text-ui font-medium text-fg">{title}</h3>
+        {description && <p className="text-ui-sm text-fg-secondary mt-0.5">{description}</p>}
       </div>
       <div className="space-y-3">{children}</div>
     </div>

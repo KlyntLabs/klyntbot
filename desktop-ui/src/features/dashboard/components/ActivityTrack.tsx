@@ -226,14 +226,14 @@ export function ActivityTrack({
           >
             {/* Quality badge — top-right pill */}
             {matched?.qualityScore != null && height > 24 && (
-              <span className="absolute top-0.5 right-0.5 text-[7px] font-bold text-foregroundbg-overlay rounded-full px-1 leading-tight">
+              <span className="absolute top-0.5 right-0.5 text-[7px] font-bold text-fg bg-overlay rounded-full px-1 leading-tight">
                 {Math.round(matched.qualityScore)}
               </span>
             )}
 
             {/* Session title (LLM-generated or app name) */}
             {height > 18 && (
-              <span className="text-[9px] text-foregroundfont-medium px-1 truncate block leading-tight mt-0.5">
+              <span className="text-[9px] text-fg font-medium px-1 truncate block leading-tight mt-0.5">
                 {session.label}
               </span>
             )}

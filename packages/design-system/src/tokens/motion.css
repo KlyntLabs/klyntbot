@@ -1,0 +1,11 @@
+/* Motion — durations and easings. */
+
+:root {
+  --ds-duration-instant: 100ms;
+  --ds-duration-fast: 140ms;
+  --ds-duration-normal: 200ms;
+  --ds-duration-moderate: 300ms;
+  --ds-ease-standard: ease;
+  --ds-ease-out: ease-out;
+  --ds-ease-in-out: ease-in-out;
+}

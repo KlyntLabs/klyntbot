@@ -92,11 +92,11 @@ function Gauge({
             strokeLinecap="round"
           />
         </svg>
-        <span className="absolute inset-0 flex items-center justify-center text-[11px] text-muted-foreground font-mono">
+        <span className="absolute inset-0 flex items-center justify-center text-ui-xs text-fg-secondary font-mono">
           {pct}%
         </span>
       </div>
-      <span className="text-2xs text-muted-foreground text-center leading-tight">{label}</span>
+      <span className="text-ui-xs text-fg-secondary text-center leading-tight">{label}</span>
     </div>
   );
 }
@@ -221,24 +221,24 @@ export function CoachingOverviewPage() {
       <MorningBriefing />
 
       {/* ── 1. User Situation ──────────────────────────── */}
-      <div className="glass-card rounded-xl p-5">
-        <h2 className="text-[13px] font-medium text-muted-foreground mb-3">User Situation</h2>
+      <div className="island p-5">
+        <h2 className="text-ui font-medium text-fg-secondary mb-3">User Situation</h2>
         <div className="flex items-start gap-4">
           <Gauge label="Energy" value={situation.energyLevel} />
           <Gauge label="Focus" value={situation.focusState} />
-          <Gauge label="Deadline" value={situation.deadlinePressure} color="text-destructive" />
+          <Gauge label="Deadline" value={situation.deadlinePressure} color="text-status-danger" />
           <Gauge label="Distraction" value={situation.distractionRisk} color="text-brand" />
-          <Gauge label="Receptivity" value={situation.coachingReceptivity} color="text-success" />
-          <div className="flex flex-col gap-1 ml-4 text-[11px]">
-            <span className="text-muted-foreground">
+          <Gauge label="Receptivity" value={situation.coachingReceptivity} color="text-status-success" />
+          <div className="flex flex-col gap-1 ml-4 text-ui-xs">
+            <span className="text-fg-secondary">
               Hours active:{" "}
               <span className="tabular-nums">{situation.hoursActiveToday.toFixed(1)}h</span>
             </span>
-            <span className="text-muted-foreground">
+            <span className="text-fg-secondary">
               Since break:{" "}
               <span className="tabular-nums">{situation.minsSinceBreak.toFixed(0)}min</span>
             </span>
-            <span className="text-muted-foreground">
+            <span className="text-fg-secondary">
               Context switches:{" "}
               <span className="tabular-nums">{situation.recentContextSwitches}</span>
             </span>
@@ -251,28 +251,28 @@ export function CoachingOverviewPage() {
 
       {/* ── 2. Active Interventions ────────────────────── */}
       {interventions.length > 0 && (
-        <div className="glass-card rounded-xl p-5">
-          <h2 className="text-[13px] font-medium text-muted-foreground mb-3">
+        <div className="island p-5">
+          <h2 className="text-ui font-medium text-fg-secondary mb-3">
             Active Interventions ({interventions.length})
           </h2>
           <div className="flex flex-col gap-2">
             {interventions.map((iv) => (
-              <div key={iv.id} className="p-3 rounded-lg bg-accent/30 border border-brand/30">
+              <div key={iv.id} className="p-3 rounded-panel bg-control-hover/30 border border-brand/30">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="text-2xs px-1.5 py-0.5 bg-brand/20 text-brand rounded font-medium">
+                      <span className="text-ui-xs px-1.5 py-0.5 bg-brand/20 text-brand rounded font-medium">
                         {iv.interventionType}
                       </span>
-                      <span className="text-2xs text-muted-foreground">{iv.triggerName}</span>
+                      <span className="text-ui-xs text-fg-secondary">{iv.triggerName}</span>
                     </div>
-                    <p className="text-xs text-muted-foreground leading-relaxed">{iv.message}</p>
+                    <p className="text-ui-sm text-fg-secondary leading-relaxed">{iv.message}</p>
                   </div>
                   <div className="flex gap-1 shrink-0">
                     <button
                       type="button"
                       onClick={() => handleFeedback(iv.id, "helpful")}
-                      className="p-1.5 rounded hover:bg-success/20 text-muted-foreground hover:text-success transition-colors"
+                      className="p-1.5 rounded hover:bg-status-success/20 text-fg-secondary hover:text-status-success transition-colors"
                       title="Helpful"
                     >
                       <Check className="size-3.5" />
@@ -280,7 +280,7 @@ export function CoachingOverviewPage() {
                     <button
                       type="button"
                       onClick={() => handleFeedback(iv.id, "dismissed")}
-                      className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                      className="p-1.5 rounded hover:bg-control-hover text-fg-secondary hover:text-fg transition-colors"
                       title="Dismiss"
                     >
                       <X className="size-3.5" />
@@ -288,7 +288,7 @@ export function CoachingOverviewPage() {
                     <button
                       type="button"
                       onClick={() => handleFeedback(iv.id, "stop")}
-                      className="p-1.5 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors"
+                      className="p-1.5 rounded hover:bg-status-danger/20 text-fg-secondary hover:text-status-danger transition-colors"
                       title="Stop suggesting"
                     >
                       <XCircle className="size-3.5" />
@@ -306,26 +306,26 @@ export function CoachingOverviewPage() {
         {/* Left column */}
         <div className="flex flex-col gap-4">
           {/* Signal Accumulator */}
-          <div className="glass-card rounded-xl p-5">
+          <div className="island p-5">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-[13px] font-medium text-muted-foreground">Signal Accumulator</h2>
+              <h2 className="text-ui font-medium text-fg-secondary">Signal Accumulator</h2>
               <button
                 type="button"
                 onClick={handleClearSignals}
-                className="text-2xs text-muted-foreground hover:text-foreground flex items-center gap-1"
+                className="text-ui-xs text-fg-secondary hover:text-fg flex items-center gap-1"
               >
                 <Trash2 className="size-3" /> Clear
               </button>
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-ui-sm text-fg-secondary">
               {signals.windowSize} signals in 30min window
             </p>
             {signals.triggers.length > 0 && (
               <div className="mt-2 flex flex-col gap-1">
                 {signals.triggers.map((t) => (
-                  <div key={t.name} className="flex items-center justify-between text-[11px]">
-                    <span className="text-muted-foreground">{t.name}</span>
-                    <span className="text-muted-foreground tabular-nums">
+                  <div key={t.name} className="flex items-center justify-between text-ui-xs">
+                    <span className="text-fg-secondary">{t.name}</span>
+                    <span className="text-fg-secondary tabular-nums">
                       {t.cooldownRemainingSecs > 0
                         ? `${t.cooldownRemainingSecs}s cooldown`
                         : "ready"}
@@ -337,14 +337,14 @@ export function CoachingOverviewPage() {
           </div>
 
           {/* Detected Patterns preview */}
-          <div className="glass-card rounded-xl p-5">
+          <div className="island p-5">
             <div className="flex items-baseline justify-between mb-3">
-              <h2 className="text-[13px] font-medium text-muted-foreground">Detected Patterns</h2>
+              <h2 className="text-ui font-medium text-fg-secondary">Detected Patterns</h2>
               {patterns.length > 0 && (
                 <button
                   type="button"
                   onClick={() => navigate("/coaching/patterns")}
-                  className="text-2xs text-primary hover:underline"
+                  className="text-ui-xs text-brand hover:underline"
                 >
                   View all
                 </button>
@@ -355,22 +355,22 @@ export function CoachingOverviewPage() {
                 {patterns.slice(0, 4).map((p) => (
                   <div
                     key={p.name}
-                    className="flex items-center gap-3 rounded-lg bg-accent/30 px-3 py-2"
+                    className="flex items-center gap-3 rounded-panel bg-control-hover/30 px-3 py-2"
                   >
-                    <span className="text-[11px] font-medium text-foreground w-44 shrink-0 truncate">
+                    <span className="text-ui-xs font-medium text-fg w-44 shrink-0 truncate">
                       {p.name}
                     </span>
-                    <span className="text-2xs text-muted-foreground flex-1 truncate">
+                    <span className="text-ui-xs text-fg-secondary flex-1 truncate">
                       {p.description}
                     </span>
-                    <span className="text-2xs text-dim tabular-nums shrink-0">
+                    <span className="text-ui-xs text-fg-dim tabular-nums shrink-0">
                       {Math.round(p.confidence * 100)}%
                     </span>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-ui-xs text-fg-secondary">
                 No patterns detected yet. Patterns emerge as the coaching system observes your work
                 habits over time.
               </p>
@@ -381,18 +381,18 @@ export function CoachingOverviewPage() {
         {/* Right column */}
         <div className="flex flex-col gap-4">
           {/* Intervention Router */}
-          <div className="glass-card rounded-xl p-5">
-            <h2 className="text-[13px] font-medium text-muted-foreground mb-3">
+          <div className="island p-5">
+            <h2 className="text-ui font-medium text-fg-secondary mb-3">
               Intervention Router
             </h2>
-            <div className="flex gap-4 text-xs">
-              <span className="text-muted-foreground">
+            <div className="flex gap-4 text-ui-sm">
+              <span className="text-fg-secondary">
                 Hourly:{" "}
                 <span className="tabular-nums">
                   {router.hourlyCount}/{router.hourlyLimit}
                 </span>
               </span>
-              <span className="text-muted-foreground">
+              <span className="text-fg-secondary">
                 Daily:{" "}
                 <span className="tabular-nums">
                   {router.dailyCount}/{router.dailyLimit}
@@ -402,45 +402,45 @@ export function CoachingOverviewPage() {
           </div>
 
           {/* Strategy Feedback */}
-          <div className="glass-card rounded-xl p-5">
+          <div className="island p-5">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-[13px] font-medium text-muted-foreground">Strategy Feedback</h2>
+              <h2 className="text-ui font-medium text-fg-secondary">Strategy Feedback</h2>
               <button
                 type="button"
                 onClick={handleResetDismissals}
-                className="text-2xs text-muted-foreground hover:text-foreground flex items-center gap-1"
+                className="text-ui-xs text-fg-secondary hover:text-fg flex items-center gap-1"
               >
                 <RefreshCw className="size-3" /> Reset All
               </button>
             </div>
-            <div className="rounded-lg overflow-hidden">
-              <table className="w-full text-xs">
+            <div className="rounded-panel overflow-hidden">
+              <table className="w-full text-ui-sm">
                 <thead>
-                  <tr className="border-b border-border-subtle">
-                    <th className="text-left p-2 text-muted-foreground font-normal">Trigger</th>
-                    <th className="text-left p-2 text-muted-foreground font-normal">Type</th>
-                    <th className="text-left p-2 text-muted-foreground font-normal">Used</th>
-                    <th className="text-left p-2 text-muted-foreground font-normal">Accept</th>
-                    <th className="text-left p-2 text-muted-foreground font-normal">Effect</th>
+                  <tr className="border-b border-separator">
+                    <th className="text-left p-2 text-fg-secondary font-normal">Trigger</th>
+                    <th className="text-left p-2 text-fg-secondary font-normal">Type</th>
+                    <th className="text-left p-2 text-fg-secondary font-normal">Used</th>
+                    <th className="text-left p-2 text-fg-secondary font-normal">Accept</th>
+                    <th className="text-left p-2 text-fg-secondary font-normal">Effect</th>
                   </tr>
                 </thead>
                 <tbody>
                   {feedback.map((s) => (
-                    <tr key={s.strategyType} className="border-b border-border-subtle">
-                      <td className="p-2 text-muted-foreground">{s.strategyType}</td>
-                      <td className="p-2 text-muted-foreground">{s.domain}</td>
-                      <td className="p-2 text-muted-foreground tabular-nums">{s.timesUsed}</td>
-                      <td className="p-2 text-muted-foreground tabular-nums">
+                    <tr key={s.strategyType} className="border-b border-separator">
+                      <td className="p-2 text-fg-secondary">{s.strategyType}</td>
+                      <td className="p-2 text-fg-secondary">{s.domain}</td>
+                      <td className="p-2 text-fg-secondary tabular-nums">{s.timesUsed}</td>
+                      <td className="p-2 text-fg-secondary tabular-nums">
                         {(s.acceptanceRate * 100).toFixed(0)}%
                       </td>
-                      <td className="p-2 text-muted-foreground tabular-nums">
+                      <td className="p-2 text-fg-secondary tabular-nums">
                         {(s.effectiveness * 100).toFixed(0)}%
                       </td>
                     </tr>
                   ))}
                   {feedback.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="p-4 text-center text-muted-foreground">
+                      <td colSpan={5} className="p-4 text-center text-fg-secondary">
                         No feedback data
                       </td>
                     </tr>
@@ -451,16 +451,16 @@ export function CoachingOverviewPage() {
           </div>
 
           {/* Recent Interventions preview */}
-          <div className="glass-card rounded-xl p-5">
+          <div className="island p-5">
             <div className="flex items-baseline justify-between mb-3">
-              <h2 className="text-[13px] font-medium text-muted-foreground">
+              <h2 className="text-ui font-medium text-fg-secondary">
                 Recent Interventions
               </h2>
               {history.length > 0 && (
                 <button
                   type="button"
                   onClick={() => navigate("/coaching/history")}
-                  className="text-2xs text-primary hover:underline"
+                  className="text-ui-xs text-brand hover:underline"
                 >
                   View all
                 </button>
@@ -470,16 +470,16 @@ export function CoachingOverviewPage() {
               <div className="flex flex-col gap-2">
                 {history.map((h) => (
                   <div key={h.id} className="flex items-center gap-3 py-1.5">
-                    <span className="text-2xs text-dim tabular-nums w-14 shrink-0">
+                    <span className="text-ui-xs text-fg-dim tabular-nums w-14 shrink-0">
                       {formatTime(h.deliveredAt)}
                     </span>
-                    <p className="text-[11px] text-foreground truncate flex-1">{h.message}</p>
+                    <p className="text-ui-xs text-fg truncate flex-1">{h.message}</p>
                     <FeedbackBadge feedback={h.feedback} />
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-ui-xs text-fg-secondary">
                 No coaching interventions yet. The system will start offering suggestions as it
                 learns your patterns.
               </p>

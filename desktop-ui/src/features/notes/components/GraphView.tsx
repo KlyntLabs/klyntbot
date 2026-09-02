@@ -728,9 +728,9 @@ export function GraphView({
 
   if (notes.length === 0) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center gap-2 text-muted-foreground">
+      <div className="flex-1 flex flex-col items-center justify-center gap-2 text-fg-secondary">
         <p className="text-sm font-medium">Your knowledge graph will appear here</p>
-        <p className="text-xs text-dim">Create your first note to get started</p>
+        <p className="text-ui-sm text-fg-dim">Create your first note to get started</p>
       </div>
     );
   }
@@ -759,7 +759,7 @@ export function GraphView({
       />
 
       <div
-        className="flex-1 relative min-h-0 bg-background"
+        className="flex-1 relative min-h-0 bg-bg"
         style={{
           backgroundImage: "radial-gradient(circle, var(--border) 0.5px, transparent 0.5px)",
           backgroundSize: "20px 20px",
@@ -774,7 +774,7 @@ export function GraphView({
             {cacheReady && (
               <Suspense
                 fallback={
-                  <div className="absolute inset-0 flex items-center justify-center text-muted-foreground text-sm">
+                  <div className="absolute inset-0 flex items-center justify-center text-fg-secondary text-sm">
                     Loading graph...
                   </div>
                 }
@@ -823,7 +823,7 @@ export function GraphView({
           >
             <Suspense
               fallback={
-                <div className="absolute inset-0 flex items-center justify-center text-muted-foreground text-sm">
+                <div className="absolute inset-0 flex items-center justify-center text-fg-secondary text-sm">
                   Loading 3D view...
                 </div>
               }
@@ -864,7 +864,7 @@ export function GraphView({
 
         {/* Loading overlay while cache check completes */}
         {!cacheReady && (
-          <div className="absolute inset-0 flex items-center justify-center text-muted-foreground text-sm z-20">
+          <div className="absolute inset-0 flex items-center justify-center text-fg-secondary text-sm z-20">
             Loading graph...
           </div>
         )}
@@ -901,7 +901,7 @@ export function GraphView({
               type="button"
               onClick={() => setSettingsOpen(!settingsOpen)}
               className={`size-7 glass-button flex items-center justify-center transition-colors ${
-                settingsOpen ? "text-brand" : "text-muted-foreground hover:text-foreground"
+                settingsOpen ? "text-brand" : "text-fg-secondary hover:text-fg"
               }`}
               aria-label="Graph settings"
             >
@@ -922,7 +922,7 @@ export function GraphView({
           <button
             type="button"
             onClick={forceGraph.zoomIn}
-            className="size-7 glass-button flex items-center justify-center text-muted-foreground hover:text-foreground"
+            className="size-7 glass-button flex items-center justify-center text-fg-secondary hover:text-fg"
             aria-label="Zoom in"
           >
             <Plus size={14} />
@@ -930,7 +930,7 @@ export function GraphView({
           <button
             type="button"
             onClick={forceGraph.zoomOut}
-            className="size-7 glass-button flex items-center justify-center text-muted-foreground hover:text-foreground"
+            className="size-7 glass-button flex items-center justify-center text-fg-secondary hover:text-fg"
             aria-label="Zoom out"
           >
             <Minus size={14} />
@@ -938,7 +938,7 @@ export function GraphView({
           <button
             type="button"
             onClick={forceGraph.fitToScreen}
-            className="size-7 glass-button flex items-center justify-center text-muted-foreground hover:text-foreground"
+            className="size-7 glass-button flex items-center justify-center text-fg-secondary hover:text-fg"
             aria-label="Fit to screen"
           >
             <Maximize2 size={14} />
@@ -946,7 +946,7 @@ export function GraphView({
           <button
             type="button"
             onClick={handleRelayout}
-            className="size-7 glass-button flex items-center justify-center text-muted-foreground hover:text-foreground"
+            className="size-7 glass-button flex items-center justify-center text-fg-secondary hover:text-fg"
             aria-label="Re-layout"
           >
             <RotateCcw size={14} />
@@ -984,14 +984,14 @@ export function GraphView({
             className="absolute top-4 left-1/2 -translate-x-1/2 z-30
               glass-panel rounded-lg px-4 py-2.5 flex items-center gap-3 shadow-xl"
           >
-            <span className="text-xs text-foreground">
+            <span className="text-ui-sm text-fg">
               Moved <span className="font-medium">{dragMergeToast.nodeLabel}</span> to{" "}
               <span className="font-medium">{dragMergeToast.targetCommunityName}</span>.
             </span>
             <button
               type="button"
               onClick={handleUndoDragMerge}
-              className="text-xs font-medium text-brand hover:text-brand/80 transition-colors"
+              className="text-ui-sm font-medium text-brand hover:text-brand/80 transition-colors"
             >
               Undo
             </button>
@@ -1014,28 +1014,28 @@ export function GraphView({
               <button
                 type="button"
                 onClick={() => setSelectedCommunity(null)}
-                className="text-muted hover:text-foreground text-xs"
+                className="text-fg-secondary hover:text-fg text-ui-sm"
               >
                 ✕
               </button>
             </div>
             {selectedCommunity.representativePaths.length > 0 && (
               <div className="space-y-1">
-                <div className="text-xs font-medium text-muted">Paths</div>
+                <div className="text-ui-sm font-medium text-fg-secondary">Paths</div>
                 {selectedCommunity.representativePaths.map((p) => (
-                  <div key={p} className="text-xs truncate text-foreground/80">
+                  <div key={p} className="text-ui-sm truncate text-fg/80">
                     {p}
                   </div>
                 ))}
               </div>
             )}
             {selectedCommunity.topEntities.length > 0 && (
-              <div className="text-xs">
-                <span className="font-medium text-muted">Entities: </span>
+              <div className="text-ui-sm">
+                <span className="font-medium text-fg-secondary">Entities: </span>
                 {selectedCommunity.topEntities.join(", ")}
               </div>
             )}
-            <div className="text-xs text-muted">{selectedCommunity.members.length} members</div>
+            <div className="text-ui-sm text-fg-secondary">{selectedCommunity.members.length} members</div>
           </div>
         )}
       </div>
@@ -1074,11 +1074,11 @@ function FabricNodePanel({ node, onClose }: { node: ForceNode; onClose: () => vo
             : "section";
 
   return (
-    <div className="absolute right-0 top-12 bottom-0 w-[280px] z-20 glass-panel border-l border-border/30 overflow-y-auto">
+    <div className="absolute right-0 top-12 bottom-0 w-[280px] z-20 glass-panel border-l border-separator/30 overflow-y-auto">
       <div className="p-4">
         <div className="flex items-center justify-between mb-3">
           <span
-            className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-2xs font-medium"
+            className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-ui-xs font-medium"
             style={{ backgroundColor: `${node.color}20`, color: node.color }}
           >
             {typeIcon === "diamond" && "◆ "}
@@ -1091,52 +1091,52 @@ function FabricNodePanel({ node, onClose }: { node: ForceNode; onClose: () => vo
           <button
             type="button"
             onClick={onClose}
-            className="text-muted-foreground hover:text-foreground text-xs"
+            className="text-fg-secondary hover:text-fg text-ui-sm"
           >
             ✕
           </button>
         </div>
 
-        <h3 className="text-sm font-semibold text-foreground mb-2">{node.label}</h3>
+        <h3 className="text-sm font-semibold text-fg mb-2">{node.label}</h3>
 
         {node.bodyPreview && (
-          <p className="text-xs text-muted-foreground leading-relaxed mb-3">{node.bodyPreview}</p>
+          <p className="text-ui-sm text-fg-secondary leading-relaxed mb-3">{node.bodyPreview}</p>
         )}
 
-        <div className="space-y-1.5 text-2xs text-muted-foreground">
+        <div className="space-y-1.5 text-ui-xs text-fg-secondary">
           {node.nodeType === "entity" && (
             <>
               <div>
-                Connections: <span className="text-foreground">{node.linkCount}</span>
+                Connections: <span className="text-fg">{node.linkCount}</span>
               </div>
               <div>
-                Type: <span className="text-foreground">{node.tags[0] || "concept"}</span>
+                Type: <span className="text-fg">{node.tags[0] || "concept"}</span>
               </div>
             </>
           )}
           {node.nodeType === "tree_section" && (
             <div>
-              Level: <span className="text-foreground">{node.size > 12 ? "Section" : "Text"}</span>
+              Level: <span className="text-fg">{node.size > 12 ? "Section" : "Text"}</span>
             </div>
           )}
           {node.nodeType === "topic" && (
             <>
               <div>
-                Facts: <span className="text-foreground">{node.linkCount}</span>
+                Facts: <span className="text-fg">{node.linkCount}</span>
               </div>
               <div>
-                Domain: <span className="text-foreground">{node.tags[0] || "general"}</span>
+                Domain: <span className="text-fg">{node.tags[0] || "general"}</span>
               </div>
             </>
           )}
           {node.nodeType === "fact" && (
             <div>
-              Source: <span className="text-foreground">{node.tags[0] || "unknown"}</span>
+              Source: <span className="text-fg">{node.tags[0] || "unknown"}</span>
             </div>
           )}
           {node.nodeType === "rule" && (
             <div>
-              Signals: <span className="text-foreground">{node.linkCount}</span>
+              Signals: <span className="text-fg">{node.linkCount}</span>
             </div>
           )}
         </div>

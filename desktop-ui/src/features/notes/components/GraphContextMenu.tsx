@@ -79,21 +79,21 @@ export function GraphContextMenu({ node, position, onAction, onClose }: GraphCon
       className="fixed z-50 glass-panel rounded-lg py-1 min-w-[180px] shadow-xl"
       style={{ left: x, top: y }}
     >
-      <div className="px-2.5 py-1.5 text-2xs text-dim truncate border-b border-border-subtle mb-1">
+      <div className="px-2.5 py-1.5 text-ui-xs text-fg-dim truncate border-b border-separator mb-1">
         {node.label}
       </div>
       {items.map((item) => (
         <button
           key={item.action}
           type="button"
-          className="flex items-center gap-2 w-full px-2.5 py-1.5 text-xs text-foreground
-            hover:bg-surface-raised/50 transition-colors text-left"
+          className="flex items-center gap-2 w-full px-2.5 py-1.5 text-ui-sm text-fg
+            hover:bg-glass-subtle/50 transition-colors text-left"
           onClick={() => {
             onAction(item.action, node);
             onClose();
           }}
         >
-          <span className="text-muted-foreground">{item.icon}</span>
+          <span className="text-fg-secondary">{item.icon}</span>
           {item.label}
         </button>
       ))}

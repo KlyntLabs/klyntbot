@@ -42,7 +42,7 @@ function ConversationPicker({
   if (loading || selecting) {
     return (
       <div className="glass-card p-4 text-center">
-        <p className="text-xs text-muted-foreground">
+        <p className="text-ui-sm text-fg-secondary">
           {selecting ? "Loading conversation..." : "Loading conversations..."}
         </p>
       </div>
@@ -52,11 +52,11 @@ function ConversationPicker({
   if (sessions.length === 0) {
     return (
       <div className="glass-card p-4 space-y-2">
-        <p className="text-xs text-muted-foreground">No recent conversations found.</p>
+        <p className="text-ui-sm text-fg-secondary">No recent conversations found.</p>
         <button
           type="button"
           onClick={onCancel}
-          className="text-xs text-muted-foreground hover:text-foreground"
+          className="text-ui-sm text-fg-secondary hover:text-fg"
         >
           Back
         </button>
@@ -66,22 +66,22 @@ function ConversationPicker({
 
   return (
     <div className="glass-card p-4 space-y-2">
-      <p className="text-xs text-muted-foreground mb-2">Select a conversation:</p>
+      <p className="text-ui-sm text-fg-secondary mb-2">Select a conversation:</p>
       {sessions.map((s) => (
         <button
           key={s.sessionKey}
           type="button"
           onClick={() => handleSelect(s.sessionKey)}
-          className="w-full text-left px-3 py-2 rounded-lg hover:bg-accent transition-colors"
+          className="w-full text-left px-3 py-2 rounded-lg hover:bg-control-hover transition-colors"
         >
-          <p className="text-sm font-medium text-foreground truncate">{s.title}</p>
-          <p className="text-[11px] text-muted-foreground truncate mt-0.5">{s.preview}</p>
+          <p className="text-sm font-medium text-fg truncate">{s.title}</p>
+          <p className="text-ui-xs text-fg-secondary truncate mt-0.5">{s.preview}</p>
         </button>
       ))}
       <button
         type="button"
         onClick={onCancel}
-        className="text-xs text-muted-foreground hover:text-foreground mt-1"
+        className="text-ui-sm text-fg-secondary hover:text-fg mt-1"
       >
         Cancel
       </button>
@@ -115,7 +115,7 @@ export function QuickGenerate({
     return (
       <div className="glass-card p-4 flex items-center justify-center gap-2">
         <ThinkingDots size="sm" />
-        <span className="text-sm text-muted-foreground">Generating cards</span>
+        <span className="text-sm text-fg-secondary">Generating cards</span>
       </div>
     );
   }
@@ -123,7 +123,7 @@ export function QuickGenerate({
   if (mode === "note") {
     return (
       <div className="glass-card p-4">
-        <p className="text-xs text-muted-foreground mb-2">Select a note to generate from:</p>
+        <p className="text-ui-sm text-fg-secondary mb-2">Select a note to generate from:</p>
         <NotePicker
           onSelect={(note) => {
             setMode(null);
@@ -138,19 +138,19 @@ export function QuickGenerate({
   if (mode === "clipboard") {
     return (
       <div className="glass-card p-4 space-y-2">
-        <p className="text-xs text-muted-foreground">Paste text to generate flashcards:</p>
+        <p className="text-ui-sm text-fg-secondary">Paste text to generate flashcards:</p>
         <textarea
           value={clipboardText}
           onChange={(e) => setClipboardText(e.target.value)}
           placeholder="Paste content here..."
-          className="w-full bg-muted/50 rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-dim resize-none"
+          className="w-full bg-control-hover/50 rounded-lg px-3 py-2 text-sm text-fg placeholder:text-fg-dim resize-none"
           rows={4}
         />
         <div className="flex items-center justify-between">
           <button
             type="button"
             onClick={() => setMode(null)}
-            className="text-xs text-muted-foreground hover:text-foreground"
+            className="text-ui-sm text-fg-secondary hover:text-fg"
           >
             Cancel
           </button>
@@ -163,7 +163,7 @@ export function QuickGenerate({
               }
             }}
             disabled={!clipboardText.trim()}
-            className="glass-button px-3 py-1.5 text-xs text-foreground disabled:opacity-40"
+            className="glass-button px-3 py-1.5 text-ui-sm text-fg disabled:opacity-40"
           >
             Generate
           </button>
@@ -180,12 +180,12 @@ export function QuickGenerate({
 
   return (
     <div className="glass-card p-4 text-left">
-      <p className="text-sm font-medium text-foreground mb-3">Quick Generate</p>
+      <p className="text-sm font-medium text-fg mb-3">Quick Generate</p>
       <div className="space-y-1.5">
         <button
           type="button"
           onClick={() => setMode("note")}
-          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-accent transition-colors text-left"
+          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-fg-secondary hover:text-fg hover:bg-control-hover transition-colors text-left"
         >
           <FileText size={14} strokeWidth={1.5} />
           From note...
@@ -193,7 +193,7 @@ export function QuickGenerate({
         <button
           type="button"
           onClick={() => setMode("clipboard")}
-          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-accent transition-colors text-left"
+          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-fg-secondary hover:text-fg hover:bg-control-hover transition-colors text-left"
         >
           <Clipboard size={14} strokeWidth={1.5} />
           From clipboard...
@@ -201,7 +201,7 @@ export function QuickGenerate({
         <button
           type="button"
           onClick={() => setMode("conversations")}
-          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-accent transition-colors text-left"
+          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-fg-secondary hover:text-fg hover:bg-control-hover transition-colors text-left"
         >
           <MessageSquare size={14} strokeWidth={1.5} />
           From recent conversations...

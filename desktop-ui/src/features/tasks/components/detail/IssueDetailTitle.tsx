@@ -45,7 +45,7 @@ export function IssueDetailTitle({ title, onUpdate }: IssueDetailTitleProps) {
       onBlur={handleBlur}
       onKeyDown={handleKeyDown}
       rows={1}
-      className="w-full text-2xl font-semibold text-foreground bg-transparent border-none outline-none resize-none mb-4 p-0 leading-tight placeholder:text-muted-foreground"
+      className="w-full text-2xl font-semibold text-fg bg-transparent border-none outline-none resize-none mb-4 p-0 leading-tight placeholder:text-fg-secondary"
       placeholder="Task title"
     />
   );

@@ -48,14 +48,14 @@ export function KeyResultCreateForm({
   return (
     <form
       onSubmit={handleSubmit}
-      className="ml-4 p-3 rounded-lg border border-dashed border-border bg-accent/30 space-y-2"
+      className="ml-4 p-3 rounded-lg border border-dashed border-separator bg-control-hover/30 space-y-2"
     >
       <input
         type="text"
         placeholder="Key Result title..."
         value={title}
         onChange={(e) => setTitle(e.target.value)}
-        className="w-full px-2.5 py-1.5 text-xs bg-transparent border border-border rounded text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-brand"
+        className="w-full px-2.5 py-1.5 text-ui-sm bg-transparent border border-separator rounded text-fg placeholder:text-fg-secondary focus:outline-none focus:ring-1 focus:ring-fg-secondary/30"
       />
 
       <div className="flex items-center gap-2">
@@ -64,19 +64,19 @@ export function KeyResultCreateForm({
           placeholder="Target"
           value={targetValue}
           onChange={(e) => setTargetValue(e.target.value)}
-          className="w-20 px-2 py-1.5 text-xs bg-transparent border border-border rounded text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-brand"
+          className="w-20 px-2 py-1.5 text-ui-sm bg-transparent border border-separator rounded text-fg placeholder:text-fg-secondary focus:outline-none focus:ring-1 focus:ring-fg-secondary/30"
         />
         <input
           type="text"
           placeholder="Unit (e.g. %)"
           value={unit}
           onChange={(e) => setUnit(e.target.value)}
-          className="w-24 px-2 py-1.5 text-xs bg-transparent border border-border rounded text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-brand"
+          className="w-24 px-2 py-1.5 text-ui-sm bg-transparent border border-separator rounded text-fg placeholder:text-fg-secondary focus:outline-none focus:ring-1 focus:ring-fg-secondary/30"
         />
         <select
           value={trackingMode}
           onChange={(e) => setTrackingMode(e.target.value)}
-          className="px-2 py-1.5 text-xs bg-transparent border border-border rounded text-foreground focus:outline-none focus:ring-1 focus:ring-brand"
+          className="px-2 py-1.5 text-ui-sm bg-transparent border border-separator rounded text-fg focus:outline-none focus:ring-1 focus:ring-fg-secondary/30"
         >
           <option value="manual">Manual</option>
           <option value="task_count">Task Count</option>
@@ -88,14 +88,14 @@ export function KeyResultCreateForm({
         <button
           type="submit"
           disabled={!title.trim() || loading}
-          className="px-3 py-1.5 text-[11px] font-medium rounded bg-brand text-white hover:bg-brand/90 disabled:opacity-50 transition-colors"
+          className="px-3 py-1.5 text-ui-xs font-medium rounded bg-brand text-white hover:bg-brand/90 disabled:opacity-50 transition-colors"
         >
           {loading ? "Creating..." : "Add KR"}
         </button>
         <button
           type="button"
           onClick={onCancel}
-          className="px-3 py-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+          className="px-3 py-1.5 text-ui-xs text-fg-secondary hover:text-fg transition-colors"
         >
           Cancel
         </button>

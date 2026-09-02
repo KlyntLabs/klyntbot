@@ -25,10 +25,10 @@ export function InsightEvolutionChart({ versions }: Props) {
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between px-1">
-        <span className="text-[11px] font-medium text-muted-foreground">Learning Progress</span>
+        <span className="text-ui-xs font-medium text-fg-secondary">Learning Progress</span>
         <div className="flex items-center gap-3">
           {LEGEND.map((item) => (
-            <span key={item.label} className="flex items-center gap-1 text-[9px] text-dim">
+            <span key={item.label} className="flex items-center gap-1 text-[9px] text-fg-dim">
               <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: item.color }} />
               {item.label}
             </span>
@@ -39,13 +39,13 @@ export function InsightEvolutionChart({ versions }: Props) {
         <AreaChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: -20 }}>
           <XAxis
             dataKey="version"
-            tick={{ fill: "var(--text-dim)", fontSize: 10 }}
+            tick={{ fill: "var(--ds-text-dim)", fontSize: 10 }}
             axisLine={false}
             tickLine={false}
           />
           <YAxis
             domain={[0, 100]}
-            tick={{ fill: "var(--text-dim)", fontSize: 10 }}
+            tick={{ fill: "var(--ds-text-dim)", fontSize: 10 }}
             axisLine={false}
             tickLine={false}
             width={28}
@@ -64,16 +64,16 @@ export function InsightEvolutionChart({ versions }: Props) {
           <Area
             type="monotone"
             dataKey="overall"
-            stroke="var(--brand)"
-            fill="var(--brand)"
+            stroke="var(--ds-accent)"
+            fill="var(--ds-accent)"
             fillOpacity={0.15}
             strokeWidth={2}
-            dot={{ r: 3, fill: "var(--brand)" }}
+            dot={{ r: 3, fill: "var(--ds-accent)" }}
           />
           <Area
             type="monotone"
             dataKey="flashcard"
-            stroke="var(--success)"
+            stroke="var(--ds-status-success)"
             fill="none"
             strokeWidth={1}
             strokeDasharray="4 2"
@@ -100,7 +100,7 @@ export function InsightEvolutionChart({ versions }: Props) {
         </AreaChart>
       </ResponsiveContainer>
       {versions.length > 0 && (
-        <p className="text-2xs text-dim italic px-1">
+        <p className="text-ui-xs text-fg-dim italic px-1">
           Latest: {versions[versions.length - 1]?.changeNote}
         </p>
       )}
@@ -109,8 +109,8 @@ export function InsightEvolutionChart({ versions }: Props) {
 }
 
 const LEGEND = [
-  { label: "Overall", color: "var(--brand)" },
-  { label: "Flashcards", color: "var(--success)" },
+  { label: "Overall", color: "var(--ds-accent)" },
+  { label: "Flashcards", color: "var(--ds-status-success)" },
   { label: "Gap Closure", color: "var(--chart-2)" },
   { label: "Stability", color: "var(--purple)" },
 ];

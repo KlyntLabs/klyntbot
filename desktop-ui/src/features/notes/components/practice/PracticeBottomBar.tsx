@@ -75,7 +75,7 @@ function InputBar({
     <div className="flex flex-col gap-1">
       {loading ? (
         <div className="flex items-center gap-2 p-3">
-          <span className="text-xs text-muted">Evaluating</span>
+          <span className="text-ui-sm text-fg-secondary">Evaluating</span>
           <ThinkingDots size="sm" />
         </div>
       ) : (
@@ -86,10 +86,10 @@ function InputBar({
           onKeyDown={handleKeyDown}
           placeholder="Type your translation..."
           rows={2}
-          className="bg-transparent p-3 text-sm text-primary resize-none placeholder:text-dim focus:outline-none"
+          className="bg-transparent p-3 text-sm text-brand resize-none placeholder:text-fg-dim focus:outline-none"
         />
       )}
-      {error && <p className="text-red-400 text-xs">{error}</p>}
+      {error && <p className="text-red-400 text-ui-sm">{error}</p>}
     </div>
   );
 }
@@ -168,11 +168,11 @@ function EvalBar({
       {corrections.length > 0 && (
         <div className="flex flex-col gap-1">
           {corrections.map((c) => (
-            <div key={`correction-${c.original}-${c.suggested}`} className="text-xs">
+            <div key={`correction-${c.original}-${c.suggested}`} className="text-ui-sm">
               <span className="text-red-400 line-through">{c.original}</span>
-              <span className="text-muted mx-1">&rarr;</span>
+              <span className="text-fg-secondary mx-1">&rarr;</span>
               <span className="text-green-400">{c.suggested}</span>
-              <span className="text-muted text-xs ml-2">{c.explanation}</span>
+              <span className="text-fg-secondary text-ui-sm ml-2">{c.explanation}</span>
             </div>
           ))}
         </div>
@@ -183,7 +183,7 @@ function EvalBar({
         <button
           type="button"
           onClick={() => setModelExpanded((prev) => !prev)}
-          className="text-muted text-xs text-left hover:text-primary transition-colors"
+          className="text-fg-secondary text-ui-sm text-left hover:text-brand transition-colors"
         >
           {modelExpanded ? `Model: ${modelTranslation}` : "Show model translation..."}
         </button>
@@ -193,18 +193,18 @@ function EvalBar({
       <p className="text-brand italic text-sm">{encouragement}</p>
 
       {/* Row 5: Improvement hint */}
-      {improvementHint && <p className="text-muted text-xs">{improvementHint}</p>}
+      {improvementHint && <p className="text-fg-secondary text-ui-sm">{improvementHint}</p>}
 
       {/* Row 6: Coaching nudge */}
       {coachingNudge && (
-        <p className="text-amber-400 text-xs bg-amber-500/10 rounded-md px-2 py-1">
+        <p className="text-amber-400 text-ui-sm bg-amber-500/10 rounded-md px-2 py-1">
           {coachingNudge}
         </p>
       )}
 
       {/* Row 7: Confidence tap */}
       <div className="flex items-center gap-2">
-        <span className="text-muted text-xs">Confidence:</span>
+        <span className="text-fg-secondary text-ui-sm">Confidence:</span>
         <ConfidenceTap value={confidence} onChange={setConfidence} />
       </div>
 
@@ -213,7 +213,7 @@ function EvalBar({
         <button
           type="button"
           onClick={onEdit}
-          className="border border-border text-muted hover:text-primary rounded-lg px-4 py-2 text-sm"
+          className="border border-separator text-fg-secondary hover:text-brand rounded-lg px-4 py-2 text-sm"
         >
           Edit my translation
         </button>
@@ -256,7 +256,7 @@ export function PracticeBottomBar({
   };
 
   return (
-    <div className="border-t border-border px-4 py-2 shrink-0">
+    <div className="border-t border-separator px-4 py-2 shrink-0">
       {state === "input" ? (
         <InputBar
           currentSegmentText={currentSegmentText}

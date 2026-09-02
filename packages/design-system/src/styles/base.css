@@ -1,0 +1,54 @@
+/* App base — chat/productivity safe (selection enabled; no global cursor:default). */
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+    margin: 0;
+  }
+
+  body {
+    font-family: var(--ds-font-sans);
+    font-size: var(--ds-text-body);
+    line-height: var(--ds-text-body-lh);
+    font-weight: var(--ds-font-weight-normal);
+    -webkit-font-smoothing: antialiased;
+    color: var(--ds-text);
+    background: var(--ds-bg);
+  }
+
+  ::selection {
+    background: var(--ds-selection);
+    color: var(--ds-selection-foreground);
+  }
+
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--ds-scrollbar-thumb);
+    border-radius: var(--ds-radius-sm);
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  /* Focus ring floor — neutral by default; brand reserved for CTAs */
+  :focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--ds-text) 28%, transparent);
+    outline-offset: 2px;
+  }
+
+  /* Form controls: keep chrome gray/black, not brand blue */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):focus-visible,
+  textarea:focus-visible,
+  select:focus-visible {
+    outline: none;
+    border-color: color-mix(in srgb, var(--ds-text-secondary) 55%, transparent);
+    box-shadow: 0 0 0 2px var(--ds-separator);
+  }
+}

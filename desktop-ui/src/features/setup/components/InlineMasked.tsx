@@ -39,12 +39,12 @@ export function InlineMasked({
         onKeyDown={handleKeyDown}
         placeholder="paste your key"
         disabled={disabled}
-        className="inline-block border-b-2 border-accent bg-transparent text-accent font-semibold outline-none min-w-[200px] placeholder:text-muted-foreground/50 disabled:opacity-50 transition-colors"
+        className="inline-block bg-control-hover border border-separator text-fg font-semibold outline-none min-w-[200px] px-2 py-0.5 rounded-control placeholder:text-fg-secondary/50 focus:border-fg-secondary/50 focus:ring-2 focus:ring-separator disabled:opacity-50 transition-colors"
       />
       <button
         type="button"
         onClick={() => setShow(!show)}
-        className="text-muted-foreground hover:text-foreground transition-colors"
+        className="text-fg-secondary hover:text-fg transition-colors"
       >
         {show ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
       </button>

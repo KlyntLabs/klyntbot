@@ -110,11 +110,11 @@ export function ActionMenu() {
         onKeyDown={() => {}}
       >
         {/* Header */}
-        <div className="px-4 py-2.5 border-b border-border">
-          <div className="text-xs text-muted-foreground uppercase tracking-wider mb-0.5">
+        <div className="px-4 py-2.5 border-b border-separator">
+          <div className="text-ui-sm text-fg-secondary uppercase tracking-wider mb-0.5">
             Actions
           </div>
-          <div className="text-sm text-foreground truncate">{item.title}</div>
+          <div className="text-sm text-fg truncate">{item.title}</div>
         </div>
 
         {/* Action list */}
@@ -124,24 +124,24 @@ export function ActionMenu() {
               key={action.label}
               type="button"
               className={`w-full flex items-center gap-3 px-4 py-2 text-left transition-colors duration-100 ${
-                index === focusedIndex ? "bg-muted" : "hover:bg-muted/50"
+                index === focusedIndex ? "bg-control-hover" : "hover:bg-control-hover/50"
               }`}
               onClick={() => executeAction(index)}
               onMouseEnter={() => setFocusedIndex(index)}
             >
-              <span className="text-xs text-muted-foreground w-4 text-center shrink-0">
+              <span className="text-ui-sm text-fg-secondary w-4 text-center shrink-0">
                 {index + 1}
               </span>
-              <span className="text-sm text-foreground flex-1">{action.label}</span>
+              <span className="text-sm text-fg flex-1">{action.label}</span>
               {action.shortcut && (
-                <span className="text-2xs text-muted-foreground">{action.shortcut}</span>
+                <span className="text-ui-xs text-fg-secondary">{action.shortcut}</span>
               )}
             </button>
           ))}
         </div>
 
         {/* Footer hint */}
-        <div className="px-4 py-1.5 border-t border-border text-2xs text-muted-foreground">
+        <div className="px-4 py-1.5 border-t border-separator text-ui-xs text-fg-secondary">
           1-9 quick select &middot; &uarr;&darr; navigate &middot; Esc close
         </div>
       </div>

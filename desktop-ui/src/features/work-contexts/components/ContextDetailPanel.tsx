@@ -23,7 +23,7 @@ const RESOURCE_ICONS: Record<string, typeof FileText> = {
 
 function ResourceIcon({ type }: { type: string }) {
   const Icon = RESOURCE_ICONS[type] ?? FileText;
-  return <Icon className="size-3.5 text-muted-foreground shrink-0" strokeWidth={1.5} />;
+  return <Icon className="size-3.5 text-fg-secondary shrink-0" strokeWidth={1.5} />;
 }
 
 export function ContextDetailPanel({ open, onClose, detail }: ContextDetailPanelProps) {
@@ -59,7 +59,7 @@ export function ContextDetailPanel({ open, onClose, detail }: ContextDetailPanel
   return (
     <SlidePanel open={open} onClose={onClose} title="Context Detail" width={460}>
       {!ctx ? (
-        <p className="text-[13px] text-muted-foreground">No context selected</p>
+        <p className="text-ui text-fg-secondary">No context selected</p>
       ) : (
         <div className="flex flex-col gap-5">
           {/* Header */}
@@ -72,29 +72,29 @@ export function ContextDetailPanel({ open, onClose, detail }: ContextDetailPanel
                   onChange={(e) => setTitleDraft(e.target.value)}
                   onBlur={handleRename}
                   onKeyDown={(e) => e.key === "Enter" && handleRename()}
-                  className="w-full px-2 py-1 text-sm font-medium bg-accent border border-border rounded-lg text-foreground"
+                  className="w-full px-2 py-1 text-sm font-medium bg-control-hover border border-separator rounded-lg text-fg"
                 />
               ) : (
                 <button
                   type="button"
-                  className="text-sm font-medium text-foreground hover:text-brand transition-colors flex items-center gap-1.5"
+                  className="text-sm font-medium text-fg hover:text-brand transition-colors flex items-center gap-1.5"
                   onClick={() => {
                     setTitleDraft(ctx.title);
                     setEditingTitle(true);
                   }}
                 >
                   {ctx.title}
-                  <Edit3 className="size-3 text-muted-foreground" />
+                  <Edit3 className="size-3 text-fg-secondary" />
                 </button>
               )}
-              <p className="text-[11px] text-muted-foreground mt-0.5">
+              <p className="text-ui-xs text-fg-secondary mt-0.5">
                 {ctx.contextType} · {ctx.status}
               </p>
             </div>
             <button
               type="button"
               onClick={handleResume}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand/20 text-brand text-xs font-medium hover:bg-brand/30 transition-colors shrink-0"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand/20 text-brand text-ui-sm font-medium hover:bg-brand/30 transition-colors shrink-0"
             >
               <Play className="size-3" />
               Resume
@@ -131,11 +131,11 @@ export function ContextDetailPanel({ open, onClose, detail }: ContextDetailPanel
           )}
 
           {/* Actions */}
-          <div className="flex items-center gap-2 pt-2 border-t border-border">
+          <div className="flex items-center gap-2 pt-2 border-t border-separator">
             <button
               type="button"
               onClick={handleArchive}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-ui-sm text-fg-secondary hover:text-fg hover:bg-control-hover transition-colors"
             >
               <Archive className="size-3.5" />
               Archive
@@ -149,9 +149,9 @@ export function ContextDetailPanel({ open, onClose, detail }: ContextDetailPanel
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="bg-card rounded-lg p-2.5 text-center">
-      <p className="text-sm font-medium text-foreground">{value}</p>
-      <p className="text-2xs text-muted-foreground mt-0.5">{label}</p>
+    <div className="bg-bg-elevated rounded-lg p-2.5 text-center">
+      <p className="text-sm font-medium text-fg">{value}</p>
+      <p className="text-ui-xs text-fg-secondary mt-0.5">{label}</p>
     </div>
   );
 }
@@ -159,7 +159,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <h4 className="text-xs font-medium text-muted-foreground mb-2">{title}</h4>
+      <h4 className="text-ui-sm font-medium text-fg-secondary mb-2">{title}</h4>
       {children}
     </div>
   );
@@ -167,25 +167,25 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 function ResourceRow({ resource }: { resource: WorkResource }) {
   return (
-    <div className="flex items-center gap-2 text-xs text-muted-foreground py-1 px-1.5 rounded hover:bg-card">
+    <div className="flex items-center gap-2 text-ui-sm text-fg-secondary py-1 px-1.5 rounded hover:bg-bg-elevated">
       <ResourceIcon type={resource.resourceType} />
       <span className="truncate flex-1">{resource.resourceName}</span>
-      <span className="text-2xs text-muted-foreground shrink-0">{resource.accessCount}×</span>
+      <span className="text-ui-xs text-fg-secondary shrink-0">{resource.accessCount}×</span>
     </div>
   );
 }
 
 function EventRow({ event }: { event: ActivityEvent }) {
   return (
-    <div className="flex items-center gap-2 text-[11px] py-1 px-1.5 rounded hover:bg-card">
-      <span className="text-muted-foreground shrink-0 w-12 text-right">
+    <div className="flex items-center gap-2 text-ui-xs py-1 px-1.5 rounded hover:bg-bg-elevated">
+      <span className="text-fg-secondary shrink-0 w-12 text-right">
         {formatTime(event.timestamp)}
       </span>
-      <span className="text-muted-foreground">{event.action}</span>
+      <span className="text-fg-secondary">{event.action}</span>
       {event.resourceName && (
-        <span className="text-muted-foreground truncate flex-1">{event.resourceName}</span>
+        <span className="text-fg-secondary truncate flex-1">{event.resourceName}</span>
       )}
-      {event.appName && <span className="text-dim text-2xs shrink-0">{event.appName}</span>}
+      {event.appName && <span className="text-fg-dim text-ui-xs shrink-0">{event.appName}</span>}
     </div>
   );
 }

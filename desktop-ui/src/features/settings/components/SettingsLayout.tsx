@@ -46,19 +46,19 @@ export function SettingsLayout({ children }: SettingsLayoutProps) {
     <ToastContextProvider value={{ show: toast.show }}>
       <ToastContainer toasts={toast.toasts} onDismiss={toast.dismiss} />
 
-      {/* Settings sidebar — floating glass panel */}
-      <div className="w-56 glass-sidebar flex flex-col py-3">
+      {/* Settings sidebar — island pane */}
+      <div className="w-56 island flex flex-col py-3">
         <button
           type="button"
           onClick={() => navigate("/")}
-          className="flex items-center gap-2 px-4 py-1.5 text-[13px] text-muted-foreground hover:text-foreground transition-colors mb-3"
+          className="flex items-center gap-2 px-4 py-1.5 text-ui text-fg-secondary hover:text-fg transition-colors mb-3"
         >
           <ArrowLeft className="size-3.5" />
           Back to app
         </button>
 
         <div className="px-3 mb-2">
-          <span className="text-[11px] font-medium text-dim uppercase tracking-wider px-1">
+          <span className="text-ui-xs font-medium text-fg-dim uppercase tracking-wider px-1">
             Settings
           </span>
         </div>
@@ -72,10 +72,10 @@ export function SettingsLayout({ children }: SettingsLayoutProps) {
                 type="button"
                 key={section.path}
                 onClick={() => navigate(section.path)}
-                className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-[13px] font-light transition-all duration-200 text-left ${
+                className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-row text-ui font-light transition-all duration-200 text-left ${
                   isActive
-                    ? "glass-button-active text-foreground"
-                    : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                    ? "bg-control-active text-fg"
+                    : "text-fg-secondary hover:bg-control-hover hover:text-fg"
                 }`}
               >
                 <Icon className="size-4 flex-shrink-0" strokeWidth={1.5} />
@@ -86,8 +86,8 @@ export function SettingsLayout({ children }: SettingsLayoutProps) {
         </nav>
       </div>
 
-      {/* Content area — no glass wrapper */}
-      <div className="flex-1 overflow-y-auto">
+      {/* Content area */}
+      <div className="flex-1 overflow-y-auto island">
         <div className="max-w-3xl mx-auto p-8">{children}</div>
       </div>
     </ToastContextProvider>

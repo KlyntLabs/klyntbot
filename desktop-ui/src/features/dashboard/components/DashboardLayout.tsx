@@ -151,7 +151,7 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
       {/* Top bar */}
       <div className="glass-card px-4 py-2 flex items-center gap-4">
         {/* Date label */}
-        <span className="text-sm font-medium text-foreground whitespace-nowrap">
+        <span className="text-sm font-medium text-fg whitespace-nowrap">
           {formatDateDisplay(mode, dateParam)}
         </span>
 
@@ -159,17 +159,17 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
         <FocusTrayIndicator />
 
         {/* View switcher pill group */}
-        <div className="flex items-center rounded-full bg-accent p-0.5">
+        <div className="flex items-center rounded-full bg-control-hover p-0.5">
           {views.map((v) => (
             <button
               key={v.key}
               type="button"
               onClick={() => navigateToView(v.key)}
               className={cn(
-                "px-3.5 py-1 rounded-full text-xs font-medium transition-all",
+                "px-3.5 py-1 rounded-full text-ui-sm font-medium transition-all",
                 mode === v.key
-                  ? "bg-muted text-foreground"
-                  : "text-muted-foreground hover:text-foreground",
+                  ? "bg-control-hover text-fg"
+                  : "text-fg-secondary hover:text-fg",
               )}
             >
               {v.label}
@@ -186,8 +186,8 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
           aria-haspopup="dialog"
           aria-expanded={layersOpen}
           className={cn(
-            "p-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors",
-            layersOpen && "bg-muted text-foreground",
+            "p-1.5 rounded-full text-fg-secondary hover:text-fg hover:bg-control-hover transition-colors",
+            layersOpen && "bg-control-hover text-fg",
           )}
           title="Toggle layers"
         >
@@ -197,11 +197,11 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
         <CalendarSync />
 
         {/* Nav pill group */}
-        <div className="flex items-center rounded-full bg-accent p-0.5 ml-auto">
+        <div className="flex items-center rounded-full bg-control-hover p-0.5 ml-auto">
           <button
             type="button"
             onClick={() => navigateBy(-1)}
-            className="p-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            className="p-1.5 rounded-full text-fg-secondary hover:text-fg hover:bg-control-hover transition-colors"
           >
             <ChevronLeft className="size-4" />
           </button>
@@ -212,8 +212,8 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
             aria-haspopup="dialog"
             aria-expanded={calOpen}
             className={cn(
-              "p-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors",
-              calOpen && "bg-muted text-foreground",
+              "p-1.5 rounded-full text-fg-secondary hover:text-fg hover:bg-control-hover transition-colors",
+              calOpen && "bg-control-hover text-fg",
             )}
             title="Pick date"
           >
@@ -222,7 +222,7 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
           <button
             type="button"
             onClick={() => navigateBy(1)}
-            className="p-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            className="p-1.5 rounded-full text-fg-secondary hover:text-fg hover:bg-control-hover transition-colors"
           >
             <ChevronRight className="size-4" />
           </button>
@@ -233,8 +233,8 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
           type="button"
           onClick={toggleSidebar}
           className={cn(
-            "p-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors",
-            sidebarOpen && "bg-muted text-foreground",
+            "p-1.5 rounded-full text-fg-secondary hover:text-fg hover:bg-control-hover transition-colors",
+            sidebarOpen && "bg-control-hover text-fg",
           )}
           title={sidebarOpen ? "Hide summary" : "Show summary"}
         >
@@ -253,7 +253,7 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
             {LAYERS.map((layer) => (
               <label
                 key={layer.key}
-                className="flex items-center gap-2 px-3 py-1.5 text-xs cursor-pointer rounded-lg transition-colors text-muted-foreground hover:bg-accent"
+                className="flex items-center gap-2 px-3 py-1.5 text-ui-sm cursor-pointer rounded-lg transition-colors text-fg-secondary hover:bg-control-hover"
               >
                 <input
                   type="checkbox"
@@ -268,7 +268,7 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
             <button
               type="button"
               onClick={reset}
-              className="w-full text-left mt-1 px-3 py-1.5 text-[11px] text-muted-foreground hover:text-foreground rounded-lg hover:bg-accent transition-colors"
+              className="w-full text-left mt-1 px-3 py-1.5 text-ui-xs text-fg-secondary hover:text-fg rounded-lg hover:bg-control-hover transition-colors"
             >
               Reset to defaults
             </button>

@@ -29,9 +29,9 @@ function Slider({
 
   return (
     <div className="flex items-center gap-3 h-7">
-      <span className="text-[11px] text-muted-foreground w-[90px] shrink-0">{label}</span>
+      <span className="text-ui-xs text-fg-secondary w-[90px] shrink-0">{label}</span>
       <div className="flex-1 relative flex items-center h-5">
-        <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-[4px] rounded-full bg-muted overflow-hidden">
+        <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-[4px] rounded-full bg-control-hover overflow-hidden">
           <div className="h-full rounded-full bg-brand/50" style={{ width: `${pct}%` }} />
         </div>
         <input
@@ -42,10 +42,10 @@ function Slider({
           value={value}
           onChange={(e) => onChange(Number(e.target.value))}
           style={{ WebkitAppearance: "none", appearance: "none", background: "transparent" }}
-          className="relative z-10 w-full h-5 cursor-pointer outline-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:bg-brand [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-background"
+          className="relative z-10 w-full h-5 cursor-pointer outline-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:bg-brand [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-bg"
         />
       </div>
-      <span className="text-2xs text-muted-foreground tabular-nums w-[36px] text-right shrink-0">
+      <span className="text-ui-xs text-fg-secondary tabular-nums w-[36px] text-right shrink-0">
         {value}
         {unit}
       </span>
@@ -64,18 +64,18 @@ function Toggle({
 }) {
   return (
     <div className="flex items-center gap-3 h-7">
-      <span className="text-[11px] text-muted-foreground flex-1">{label}</span>
+      <span className="text-ui-xs text-fg-secondary flex-1">{label}</span>
       <button
         type="button"
         role="switch"
         aria-checked={checked}
         onClick={() => onChange(!checked)}
         className={`relative w-[34px] h-[18px] rounded-full transition-colors shrink-0 ${
-          checked ? "bg-brand" : "bg-muted"
+          checked ? "bg-brand" : "bg-control-hover"
         }`}
       >
         <span
-          className={`absolute top-[3px] size-3 rounded-full bg-background transition-all ${
+          className={`absolute top-[3px] size-3 rounded-full bg-bg transition-all ${
             checked ? "left-[19px]" : "left-[3px]"
           }`}
         />
@@ -105,14 +105,14 @@ export function GraphSettingsPopover({
   return (
     <div className="w-[280px]">
       <div className="flex items-center justify-between mb-2">
-        <span className="text-2xs font-semibold text-muted-foreground uppercase tracking-wider">
+        <span className="text-ui-xs font-semibold text-fg-secondary uppercase tracking-wider">
           Settings
         </span>
         {!isDefault && (
           <button
             type="button"
             onClick={onReset}
-            className="flex items-center gap-1 text-2xs text-muted-foreground hover:text-foreground transition-colors"
+            className="flex items-center gap-1 text-ui-xs text-fg-secondary hover:text-fg transition-colors"
           >
             <RotateCcw size={9} />
             Reset
@@ -183,7 +183,7 @@ export function GraphSettingsPopover({
         />
       </div>
 
-      <div className="mt-2 pt-2 border-t border-border-subtle space-y-0.5">
+      <div className="mt-2 pt-2 border-t border-separator space-y-0.5">
         <Toggle
           label="Show Arrows"
           checked={settings.showArrows}
@@ -208,19 +208,19 @@ export function GraphSettingsPopover({
         )}
       </div>
 
-      <div className="mt-2 pt-2 border-t border-border-subtle">
+      <div className="mt-2 pt-2 border-t border-separator">
         <div className="flex items-center gap-3 h-7">
-          <span className="text-[11px] text-muted-foreground w-[90px] shrink-0">Reveal Speed</span>
-          <div className="flex items-center gap-0.5 bg-muted rounded-lg p-0.5">
+          <span className="text-ui-xs text-fg-secondary w-[90px] shrink-0">Reveal Speed</span>
+          <div className="flex items-center gap-0.5 bg-control-hover rounded-lg p-0.5">
             {REVEAL_OPTIONS.map((opt) => (
               <button
                 key={opt.value}
                 type="button"
                 onClick={() => onChange({ revealSpeed: opt.value })}
-                className={`px-2 py-0.5 text-2xs rounded-md transition-all ${
+                className={`px-2 py-0.5 text-ui-xs rounded-md transition-all ${
                   settings.revealSpeed === opt.value
                     ? "bg-brand/20 text-brand font-medium"
-                    : "text-muted-foreground hover:text-foreground"
+                    : "text-fg-secondary hover:text-fg"
                 }`}
               >
                 {opt.label}

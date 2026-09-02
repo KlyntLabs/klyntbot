@@ -115,17 +115,17 @@ export function NoteFinder({ isOpen, onClose, onSelectNote, notes }: NoteFinderP
       {/* Modal — glass-floating like launcher/tray */}
       <div className="glass-floating w-[900px] max-w-[92vw] h-[600px] max-h-[75vh] overflow-hidden flex flex-col">
         {/* Search input */}
-        <div className="flex items-center gap-2.5 px-4 py-2.5 border-b border-border">
-          <Search className="size-4 text-muted-foreground shrink-0" />
+        <div className="flex items-center gap-2.5 px-4 py-2.5 border-b border-separator">
+          <Search className="size-4 text-fg-secondary shrink-0" />
           <input
             ref={inputRef}
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search notes..."
-            className="flex-1 bg-transparent text-[13px] text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
+            className="flex-1 bg-transparent text-ui text-fg placeholder:text-fg-secondary/50 focus:outline-none"
           />
-          <span className="text-2xs text-muted-foreground shrink-0">
+          <span className="text-ui-xs text-fg-secondary shrink-0">
             {results.length}/{notes.length}
           </span>
         </div>
@@ -133,9 +133,9 @@ export function NoteFinder({ isOpen, onClose, onSelectNote, notes }: NoteFinderP
         {/* Two-pane */}
         <div className="flex flex-1 min-h-0">
           {/* Left: compact results list */}
-          <div ref={listRef} className="w-[38%] border-r border-border-subtle overflow-y-auto">
+          <div ref={listRef} className="w-[38%] border-r border-separator overflow-y-auto">
             {results.length === 0 ? (
-              <div className="text-[11px] text-muted-foreground text-center py-8">No matches</div>
+              <div className="text-ui-xs text-fg-secondary text-center py-8">No matches</div>
             ) : (
               results.map((note, i) => (
                 <button
@@ -148,13 +148,13 @@ export function NoteFinder({ isOpen, onClose, onSelectNote, notes }: NoteFinderP
                   onMouseEnter={() => setSelectedIndex(i)}
                   className={`w-full flex items-center gap-2 px-3 py-1.5 text-left transition-colors ${
                     i === selectedIndex
-                      ? "bg-muted text-foreground"
-                      : "text-muted-foreground hover:bg-card"
+                      ? "bg-control-hover text-fg"
+                      : "text-fg-secondary hover:bg-bg-elevated"
                   }`}
                 >
-                  <FileText className="size-3 shrink-0 text-muted-foreground/60" />
-                  <span className="truncate text-[11px] flex-1">{note.title}</span>
-                  <span className="text-[9px] text-muted-foreground/40 shrink-0">
+                  <FileText className="size-3 shrink-0 text-fg-secondary/60" />
+                  <span className="truncate text-ui-xs flex-1">{note.title}</span>
+                  <span className="text-[9px] text-fg-secondary/40 shrink-0">
                     {note.updatedAt ? formatDate(note.updatedAt.slice(0, 10)) : ""}
                   </span>
                 </button>
@@ -166,7 +166,7 @@ export function NoteFinder({ isOpen, onClose, onSelectNote, notes }: NoteFinderP
           <div className="w-[62%] overflow-y-auto px-5 py-4">
             {selectedNote ? (
               <>
-                <div className="text-xs font-medium text-foreground/90 mb-1">
+                <div className="text-ui-sm font-medium text-fg/90 mb-1">
                   {selectedNote.title}
                 </div>
                 {selectedNote.tags.length > 0 && (
@@ -174,36 +174,36 @@ export function NoteFinder({ isOpen, onClose, onSelectNote, notes }: NoteFinderP
                     {selectedNote.tags.map((tag) => (
                       <span
                         key={tag}
-                        className="text-[9px] px-1.5 py-0.5 rounded-full bg-accent text-muted-foreground"
+                        className="text-[9px] px-1.5 py-0.5 rounded-full bg-control-hover text-fg-secondary"
                       >
                         {tag}
                       </span>
                     ))}
                   </div>
                 )}
-                <div className="text-[11px] text-muted-foreground/80 leading-relaxed whitespace-pre-wrap">
+                <div className="text-ui-xs text-fg-secondary/80 leading-relaxed whitespace-pre-wrap">
                   No preview available
                 </div>
               </>
             ) : (
-              <div className="text-[11px] text-muted-foreground text-center py-8">No preview</div>
+              <div className="text-ui-xs text-fg-secondary text-center py-8">No preview</div>
             )}
           </div>
         </div>
 
         {/* Footer */}
-        <div className="flex items-center gap-4 px-4 py-1.5 border-t border-border-subtle text-[9px] text-muted-foreground/50">
+        <div className="flex items-center gap-4 px-4 py-1.5 border-t border-separator text-[9px] text-fg-secondary/50">
           <span>
-            <kbd className="px-1 py-0.5 rounded bg-accent text-[8px]">↑↓</kbd> navigate
+            <kbd className="px-1 py-0.5 rounded bg-control-hover text-[8px]">↑↓</kbd> navigate
           </span>
           <span>
-            <kbd className="px-1 py-0.5 rounded bg-accent text-[8px]">Enter</kbd> open
+            <kbd className="px-1 py-0.5 rounded bg-control-hover text-[8px]">Enter</kbd> open
           </span>
           <span>
-            <kbd className="px-1 py-0.5 rounded bg-accent text-[8px]">Esc</kbd> close
+            <kbd className="px-1 py-0.5 rounded bg-control-hover text-[8px]">Esc</kbd> close
           </span>
           <span>
-            <kbd className="px-1 py-0.5 rounded bg-accent text-[8px]">^J/K</kbd> vim
+            <kbd className="px-1 py-0.5 rounded bg-control-hover text-[8px]">^J/K</kbd> vim
           </span>
         </div>
       </div>

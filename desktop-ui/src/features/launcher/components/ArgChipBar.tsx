@@ -43,7 +43,7 @@ export function ArgChipBar({ specs, onSubmit, onCancel }: Props) {
               else focusAt(i - 1);
             }
           }}
-          className="bg-surface-base text-fg px-2 py-1 rounded border border-border min-w-[100px]"
+          className="bg-bg-elevated text-fg px-2 py-1 rounded border border-separator min-w-[100px]"
         />
       ))}
     </div>

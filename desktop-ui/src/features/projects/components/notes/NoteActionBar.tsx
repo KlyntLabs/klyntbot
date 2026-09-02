@@ -77,12 +77,12 @@ export function NoteActionBar({ noteId, noteTitle, onInsightGenerated }: NoteAct
   }, [noteId]);
 
   return (
-    <div className="flex items-center gap-2 px-4 py-2 border-t border-border">
+    <div className="flex items-center gap-2 px-4 py-2 border-t border-separator">
       <button
         type="button"
         onClick={handleGenerateInsight}
         disabled={generatingInsight}
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand text-white text-xs font-medium hover:bg-brand/90 transition-colors disabled:opacity-50"
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand text-white text-ui-sm font-medium hover:bg-brand/90 transition-colors disabled:opacity-50"
       >
         <Sparkles className="size-3.5" />
         {generatingInsight ? "Generating..." : "Generate Insight"}
@@ -92,16 +92,16 @@ export function NoteActionBar({ noteId, noteTitle, onInsightGenerated }: NoteAct
         <button
           type="button"
           onClick={() => setShowKrPicker((prev) => !prev)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-separator text-ui-sm text-fg-secondary hover:text-fg hover:bg-control-hover transition-colors"
         >
           <Target className="size-3.5" />
           Link to KR
         </button>
 
         {showKrPicker && (
-          <div className="glass-panel absolute bottom-full mb-1 left-0 w-64 max-h-60 overflow-y-auto rounded-lg border border-border shadow-lg z-50">
+          <div className="glass-panel absolute bottom-full mb-1 left-0 w-64 max-h-60 overflow-y-auto rounded-lg border border-separator shadow-lg z-50">
             {allKrs.length === 0 ? (
-              <p className="px-3 py-2 text-[11px] text-muted-foreground">
+              <p className="px-3 py-2 text-ui-xs text-fg-secondary">
                 No key results found. Create objectives with KRs in the OKR tab.
               </p>
             ) : (
@@ -110,7 +110,7 @@ export function NoteActionBar({ noteId, noteTitle, onInsightGenerated }: NoteAct
                   .filter((o) => (o.keyResults ?? []).length > 0)
                   .map((o) => (
                     <div key={o.id}>
-                      <p className="px-3 pt-2 pb-1 text-2xs text-muted-foreground uppercase tracking-wider truncate">
+                      <p className="px-3 pt-2 pb-1 text-ui-xs text-fg-secondary uppercase tracking-wider truncate">
                         {o.title}
                       </p>
                       {(o.keyResults ?? []).map((kr) => (
@@ -118,7 +118,7 @@ export function NoteActionBar({ noteId, noteTitle, onInsightGenerated }: NoteAct
                           key={kr.id}
                           type="button"
                           onClick={() => handleLinkToKR(kr.id)}
-                          className="w-full text-left px-3 py-1.5 text-[11px] text-foreground hover:bg-accent transition-colors truncate"
+                          className="w-full text-left px-3 py-1.5 text-ui-xs text-fg hover:bg-control-hover transition-colors truncate"
                         >
                           {kr.title}
                         </button>
@@ -134,7 +134,7 @@ export function NoteActionBar({ noteId, noteTitle, onInsightGenerated }: NoteAct
       <button
         type="button"
         onClick={handleCreateTask}
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-separator text-ui-sm text-fg-secondary hover:text-fg hover:bg-control-hover transition-colors"
       >
         <ListTodo className="size-3.5" />
         Create Task
@@ -143,7 +143,7 @@ export function NoteActionBar({ noteId, noteTitle, onInsightGenerated }: NoteAct
       <button
         type="button"
         onClick={handleFlashcards}
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-separator text-ui-sm text-fg-secondary hover:text-fg hover:bg-control-hover transition-colors"
       >
         <BookMarked className="size-3.5" />
         Flashcards

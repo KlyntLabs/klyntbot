@@ -57,8 +57,8 @@ export function CreateIssueModal({ onCreateTask, areas }: CreateIssueModalProps)
         <div className="space-y-4 py-2">
           {/* Title */}
           <div className="space-y-2">
-            <label htmlFor="issue-title" className="text-sm font-medium text-foreground">
-              Title <span className="text-destructive">*</span>
+            <label htmlFor="issue-title" className="text-sm font-medium text-fg">
+              Title <span className="text-status-danger">*</span>
             </label>
             <input
               id="issue-title"
@@ -66,24 +66,24 @@ export function CreateIssueModal({ onCreateTask, areas }: CreateIssueModalProps)
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Issue title"
-              className="w-full px-3 py-2 text-sm rounded-md border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-brand"
+              className="w-full px-3 py-2 text-sm rounded-md border border-separator bg-bg text-fg placeholder:text-fg-secondary focus:outline-none focus:ring-2 focus:ring-fg-secondary/30"
               autoFocus
             />
           </div>
 
           {/* Status */}
           <div className="space-y-2">
-            <span className="text-sm font-medium text-foreground">Status</span>
+            <span className="text-sm font-medium text-fg">Status</span>
             <div className="flex flex-wrap gap-1.5">
               {statuses.map((s) => (
                 <button
                   key={s.id}
                   type="button"
                   onClick={() => setSelectedStatus(s)}
-                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs border transition-colors ${
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-ui-sm border transition-colors ${
                     selectedStatus?.id === s.id
-                      ? "border-primary bg-primary/10 text-foreground"
-                      : "border-border text-muted-foreground hover:bg-accent"
+                      ? "border-brand bg-brand/10 text-fg"
+                      : "border-separator text-fg-secondary hover:bg-control-hover"
                   }`}
                 >
                   <span className="flex items-center">{renderStatusIcon(s)}</span>
@@ -95,7 +95,7 @@ export function CreateIssueModal({ onCreateTask, areas }: CreateIssueModalProps)
 
           {/* Priority */}
           <div className="space-y-2">
-            <span className="text-sm font-medium text-foreground">Priority</span>
+            <span className="text-sm font-medium text-fg">Priority</span>
             <div className="flex flex-wrap gap-1.5">
               {priorities.map((p) => {
                 const Icon = p.icon;
@@ -104,10 +104,10 @@ export function CreateIssueModal({ onCreateTask, areas }: CreateIssueModalProps)
                     key={p.id}
                     type="button"
                     onClick={() => setSelectedPriority(p)}
-                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs border transition-colors ${
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-ui-sm border transition-colors ${
                       selectedPriority?.id === p.id
-                        ? "border-primary bg-primary/10 text-foreground"
-                        : "border-border text-muted-foreground hover:bg-accent"
+                        ? "border-brand bg-brand/10 text-fg"
+                        : "border-separator text-fg-secondary hover:bg-control-hover"
                     }`}
                   >
                     <Icon className="size-3.5" />

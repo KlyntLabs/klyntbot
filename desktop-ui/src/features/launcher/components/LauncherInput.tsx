@@ -40,14 +40,14 @@ export function LauncherInput() {
   }, []);
 
   return (
-    <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
+    <div className="flex items-center gap-3 px-4 py-3 border-b border-separator">
       {isSearching ? (
         <div className="size-5 shrink-0 flex items-center justify-center">
           <ThinkingDots size="sm" />
         </div>
       ) : (
         <svg
-          className="size-5 text-muted-foreground shrink-0"
+          className="size-5 text-fg-secondary shrink-0"
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -69,7 +69,7 @@ export function LauncherInput() {
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         placeholder="Search apps, tasks, notes, or ask AI..."
-        className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none"
+        className="flex-1 bg-transparent text-sm text-fg placeholder:text-fg-secondary outline-none"
         spellCheck={false}
         autoComplete="off"
       />
@@ -77,7 +77,7 @@ export function LauncherInput() {
         <button
           type="button"
           onClick={() => setQuery("")}
-          className="text-muted-foreground hover:text-foreground text-xs"
+          className="text-fg-secondary hover:text-fg text-ui-sm"
         >
           ESC
         </button>

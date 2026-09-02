@@ -22,25 +22,25 @@ export function HealthScoreCard() {
       onClick={() => navigate(`/project/${project?.id ?? ""}/okr`)}
       className="glass-card rounded-xl p-5 text-left transition-colors hover:border-brand/30"
     >
-      <p className="text-2xs text-muted-foreground uppercase tracking-wider mb-3">Health Score</p>
+      <p className="text-ui-xs text-fg-secondary uppercase tracking-wider mb-3">Health Score</p>
       <div className="flex items-center gap-4">
         <ProgressRing progress={health.score} size="lg" gradient />
         <div className="flex flex-col gap-1">
-          <span className="text-2xl font-bold text-foreground">{health.score}%</span>
+          <span className="text-2xl font-bold text-fg">{health.score}%</span>
           <span
-            className="text-[11px] font-medium"
+            className="text-ui-xs font-medium"
             style={{
               color:
                 health.color === "green"
-                  ? "var(--success)"
+                  ? "var(--ds-status-success)"
                   : health.color === "yellow"
                     ? "var(--warning)"
-                    : "var(--destructive)",
+                    : "var(--ds-status-danger)",
             }}
           >
             {STATUS_TEXT[health.color] ?? "Unknown"}
           </span>
-          <span className="text-[11px] text-muted-foreground">
+          <span className="text-ui-xs text-fg-secondary">
             {allKrs.length} key result{allKrs.length !== 1 ? "s" : ""} tracked
           </span>
         </div>

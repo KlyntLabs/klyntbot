@@ -10,7 +10,7 @@ import { useNavigate } from "react-router";
 //
 // Persistent ambient signal indicator. Sits in the AppShell and surfaces
 // brain events (memory connections, focus signals) as visual states with
-// glass-panel tooltips on hover.
+// liquid-glass tooltips on hover.
 
 export function BrainOrb() {
   const { current, badgeCount, isPulsing, isFocusDeferred, badgeSignals, acknowledge, clearBadge } =
@@ -133,14 +133,14 @@ export function BrainOrb() {
 
   let orbClasses = orbBase;
   if (isPulsing) {
-    orbClasses = `${orbBase} bg-warning animate-[orb-pulse_600ms_ease-out]`;
+    orbClasses = `${orbBase} bg-status-warning animate-[orb-pulse_600ms_ease-out]`;
   } else if (isFocusDeferred) {
-    orbClasses = `${orbBase} bg-muted-foreground/30 animate-[orb-breathe_3s_ease-in-out_infinite]`;
+    orbClasses = `${orbBase} bg-fg-secondary/30 animate-[orb-breathe_3s_ease-in-out_infinite]`;
   } else if (hasRecentSignals && badgeCount === 0) {
     // Slow, slightly brighter breathing — signals arrived recently but orb is now idle
-    orbClasses = `${orbBase} bg-muted-foreground/50 animate-[orb-breathe_8s_ease-in-out_infinite]`;
+    orbClasses = `${orbBase} bg-fg-secondary/50 animate-[orb-breathe_8s_ease-in-out_infinite]`;
   } else {
-    orbClasses = `${orbBase} bg-muted-foreground/20`;
+    orbClasses = `${orbBase} bg-fg-secondary/20`;
   }
 
   return (
@@ -161,7 +161,7 @@ export function BrainOrb() {
         {isFocusDeferred && (
           <Shield
             size={8}
-            className="absolute inset-0 m-auto text-muted-foreground/50"
+            className="absolute inset-0 m-auto text-fg-secondary/50"
             strokeWidth={2.5}
           />
         )}
@@ -171,7 +171,7 @@ export function BrainOrb() {
       {badgeCount > 0 && (
         <span
           className="absolute -top-1.5 -right-1.5 flex items-center justify-center
-            w-3.5 h-3.5 rounded-full bg-warning text-warning-foreground text-[8px] font-bold
+            w-3.5 h-3.5 rounded-full bg-status-warning text-brand-foreground text-[8px] font-bold
             leading-none select-none"
         >
           {badgeCount > 9 ? "9+" : badgeCount}
@@ -198,16 +198,16 @@ export function BrainOrb() {
         // biome-ignore lint/a11y/noStaticElementInteractions: guided tooltip needs hover to stay open
         <div
           className="absolute top-full left-1/2 -translate-x-1/2 mt-2 z-50
-            glass-panel rounded-xl w-80 p-4 space-y-3 shadow-xl
+            liquid-glass rounded-panel w-80 p-4 space-y-3 shadow-xl
             animate-[fade-in_0.2s_ease-out]"
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
         >
-          <p className="text-sm text-foreground">
+          <p className="text-ui text-fg">
             Hey — I'm your second brain's heartbeat. I only light up when I've connected something
             worth your attention.
           </p>
-          <p className="text-xs text-muted-foreground">{current.tooltip}</p>
+          <p className="text-ui-sm text-fg-secondary">{current.tooltip}</p>
           <div className="flex gap-2">
             <button
               type="button"
@@ -215,7 +215,7 @@ export function BrainOrb() {
                 markComplete("orb_awakening");
                 if (current.detailRoute) navigate(current.detailRoute);
               }}
-              className="text-xs px-3 py-1.5 rounded-md bg-amber-500 text-white hover:bg-amber-400"
+              className="text-ui-sm px-3 py-1.5 rounded-control bg-status-warning text-brand-foreground hover:bg-status-warning/90"
             >
               Show me →
             </button>
@@ -225,7 +225,7 @@ export function BrainOrb() {
                 markComplete("orb_awakening");
                 setTooltipVisible(false);
               }}
-              className="text-xs px-3 py-1.5 rounded-md bg-accent text-foreground hover:bg-accent/80"
+              className="text-ui-sm px-3 py-1.5 rounded-control bg-control-hover text-fg hover:bg-control-hover/80"
             >
               Got it — keep whispering
             </button>
@@ -235,17 +235,17 @@ export function BrainOrb() {
         // biome-ignore lint/a11y/noStaticElementInteractions: tooltip needs hover to stay open
         <div
           className="absolute top-full left-1/2 -translate-x-1/2 mt-2 z-50
-            glass-panel rounded-xl p-3 max-w-[320px] w-max shadow-xl
+            liquid-glass rounded-panel p-3 max-w-[320px] w-max shadow-xl
             animate-[fade-in_0.2s_ease-out]"
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
         >
-          <p className="text-xs text-foreground leading-relaxed">{current.tooltip}</p>
+          <p className="text-ui-sm text-fg leading-relaxed">{current.tooltip}</p>
           {current.detailRoute && (
             <button
               type="button"
               onClick={handleDetailRouteClick}
-              className="mt-2 text-xs text-warning hover:text-warning/80 transition-colors font-medium"
+              className="mt-2 text-ui-sm text-status-warning hover:text-status-warning/80 transition-colors font-medium"
             >
               See more →
             </button>
@@ -258,29 +258,29 @@ export function BrainOrb() {
         // biome-ignore lint/a11y/noStaticElementInteractions: tooltip needs hover to stay open
         <div
           className="absolute top-full left-1/2 -translate-x-1/2 mt-2 z-50
-            glass-panel rounded-xl p-3 max-w-[320px] w-max shadow-xl
+            liquid-glass rounded-panel p-3 max-w-[320px] w-max shadow-xl
             animate-[fade-in_0.2s_ease-out]"
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
         >
-          <p className="text-xs text-muted-foreground mb-2">
+          <p className="text-ui-sm text-fg-secondary mb-2">
             {badgeCount} new {badgeCount === 1 ? "connection" : "connections"}
           </p>
           <ul className="space-y-1">
             {badgeSignals.slice(0, 5).map((sig, i) => (
               // biome-ignore lint/suspicious/noArrayIndexKey: badge signals are ephemeral display-only list
-              <li key={i} className="text-xs text-foreground leading-snug">
+              <li key={i} className="text-ui-sm text-fg leading-snug">
                 {sig.headline}
               </li>
             ))}
             {badgeSignals.length > 5 && (
-              <li className="text-xs text-muted-foreground">+{badgeSignals.length - 5} more</li>
+              <li className="text-ui-sm text-fg-secondary">+{badgeSignals.length - 5} more</li>
             )}
           </ul>
           <button
             type="button"
             onClick={handleSeeAllClick}
-            className="mt-2 text-xs text-warning hover:text-warning/80 transition-colors font-medium"
+            className="mt-2 text-ui-sm text-status-warning hover:text-status-warning/80 transition-colors font-medium"
           >
             See all →
           </button>

@@ -28,7 +28,7 @@ export function LinkedTasksList({ keyResultId }: LinkedTasksListProps) {
 
   if (linkedTasks.length === 0) {
     return (
-      <div className="ml-10 px-3 py-2 text-[11px] text-muted-foreground italic">
+      <div className="ml-10 px-3 py-2 text-ui-xs text-fg-secondary italic">
         No linked tasks. Use "Link to KR" on a task to connect it.
       </div>
     );
@@ -39,21 +39,21 @@ export function LinkedTasksList({ keyResultId }: LinkedTasksListProps) {
       {linkedTasks.map((task) => (
         <div
           key={task.id}
-          className="flex items-center gap-2 px-3 py-1.5 hover:bg-accent/30 rounded transition-colors"
+          className="flex items-center gap-2 px-3 py-1.5 hover:bg-control-hover/30 rounded transition-colors"
         >
           <button type="button" onClick={() => handleToggle(task)} className="flex-shrink-0">
             {task.completed ? (
               <CheckCircle2 className="size-3.5 text-brand" />
             ) : (
-              <Circle className="size-3.5 text-muted-foreground" />
+              <Circle className="size-3.5 text-fg-secondary" />
             )}
           </button>
           <span
-            className={`text-[11px] truncate ${task.completed ? "line-through text-muted-foreground" : "text-foreground"}`}
+            className={`text-ui-xs truncate ${task.completed ? "line-through text-fg-secondary" : "text-fg"}`}
           >
             {task.title}
           </span>
-          <span className="ml-auto text-2xs text-muted-foreground">{task.status}</span>
+          <span className="ml-auto text-ui-xs text-fg-secondary">{task.status}</span>
         </div>
       ))}
     </div>

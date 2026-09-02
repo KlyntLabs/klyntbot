@@ -40,11 +40,11 @@ export function PracticeSourcePanel({
 
         if (isCurrent) {
           className +=
-            " bg-brand/10 border-l-2 border-brand pl-2 rounded-r text-primary font-medium";
+            " bg-brand/10 border-l-2 border-brand pl-2 rounded-r text-brand font-medium";
         } else if (isCompleted) {
           className += " opacity-40 line-through pl-3";
         } else {
-          className += " text-muted pl-3";
+          className += " text-fg-secondary pl-3";
         }
 
         return (

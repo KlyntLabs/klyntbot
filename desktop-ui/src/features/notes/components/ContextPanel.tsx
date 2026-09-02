@@ -58,9 +58,9 @@ function scrollToHeading(_text: string, index: number) {
 }
 
 const TOC_STYLES: Record<number, { size: string; weight: string; opacity: string }> = {
-  1: { size: "text-[11px]", weight: "font-medium", opacity: "opacity-90" },
+  1: { size: "text-ui-xs", weight: "font-medium", opacity: "opacity-90" },
   2: { size: "text-[10.5px]", weight: "font-normal", opacity: "opacity-70" },
-  3: { size: "text-2xs", weight: "font-normal", opacity: "opacity-55" },
+  3: { size: "text-ui-xs", weight: "font-normal", opacity: "opacity-55" },
 };
 
 function TableOfContents({ bodyHtml }: { bodyHtml?: string | null }) {
@@ -74,10 +74,10 @@ function TableOfContents({ bodyHtml }: { bodyHtml?: string | null }) {
 
   return (
     <div>
-      <div className="text-2xs font-medium text-dim uppercase tracking-wider mb-2">
+      <div className="text-ui-xs font-medium text-fg-dim uppercase tracking-wider mb-2">
         Table of Contents
       </div>
-      <nav className="relative border-l border-border-subtle ml-1">
+      <nav className="relative border-l border-separator ml-1">
         {headings.map((h) => {
           const style = TOC_STYLES[h.level] || TOC_STYLES[3];
           const depth = h.level - minLevel;
@@ -86,7 +86,7 @@ function TableOfContents({ bodyHtml }: { bodyHtml?: string | null }) {
               key={`${h.index}-${h.text}`}
               type="button"
               onClick={() => scrollToHeading(h.text, h.index)}
-              className={`group flex items-center gap-1.5 w-full text-left ${style.size} ${style.weight} text-muted-foreground truncate py-[3px] pr-1 transition-all duration-150 hover:text-foreground hover:bg-white/[0.03] rounded-r-md`}
+              className={`group flex items-center gap-1.5 w-full text-left ${style.size} ${style.weight} text-fg-secondary truncate py-[3px] pr-1 transition-all duration-150 hover:text-fg hover:bg-white/[0.03] rounded-r-md`}
               style={{ paddingLeft: `${8 + depth * 10}px` }}
               title={h.text}
             >
@@ -117,11 +117,11 @@ function MoreSection({ note }: { note: Note }) {
   }, [note.body]);
 
   return (
-    <div className="border-b border-border">
+    <div className="border-b border-separator">
       <button
         type="button"
         onClick={() => setCollapsed(!collapsed)}
-        className="w-full flex items-center gap-1.5 px-3 py-2 text-2xs font-medium uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
+        className="w-full flex items-center gap-1.5 px-3 py-2 text-ui-xs font-medium uppercase tracking-wider text-fg-secondary hover:text-fg transition-colors"
       >
         {collapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
         <span>More</span>
@@ -133,22 +133,22 @@ function MoreSection({ note }: { note: Note }) {
           <TableOfContents bodyHtml={note.bodyHtml} />
 
           {/* Note Metadata */}
-          <div className="border-t border-border-subtle pt-2">
-            <div className="text-2xs font-medium text-dim uppercase tracking-wider mb-1.5">
+          <div className="border-t border-separator pt-2">
+            <div className="text-ui-xs font-medium text-fg-dim uppercase tracking-wider mb-1.5">
               Metadata
             </div>
             <div className="space-y-1">
-              <div className="flex justify-between text-2xs">
-                <span className="text-dim">Created</span>
-                <span className="text-muted-foreground">{formatRelativeTime(note.createdAt)}</span>
+              <div className="flex justify-between text-ui-xs">
+                <span className="text-fg-dim">Created</span>
+                <span className="text-fg-secondary">{formatRelativeTime(note.createdAt)}</span>
               </div>
-              <div className="flex justify-between text-2xs">
-                <span className="text-dim">Updated</span>
-                <span className="text-muted-foreground">{formatRelativeTime(note.updatedAt)}</span>
+              <div className="flex justify-between text-ui-xs">
+                <span className="text-fg-dim">Updated</span>
+                <span className="text-fg-secondary">{formatRelativeTime(note.updatedAt)}</span>
               </div>
-              <div className="flex justify-between text-2xs">
-                <span className="text-dim">Words</span>
-                <span className="text-muted-foreground">{wordCount.toLocaleString()}</span>
+              <div className="flex justify-between text-ui-xs">
+                <span className="text-fg-dim">Words</span>
+                <span className="text-fg-secondary">{wordCount.toLocaleString()}</span>
               </div>
             </div>
           </div>
@@ -166,20 +166,20 @@ function NotePreview({ note, onSelectNote }: { note: Note; onSelectNote: (id: st
       <button
         type="button"
         onClick={() => onSelectNote(note.id)}
-        className="flex items-center gap-1.5 text-[11px] text-brand hover:text-foreground transition-colors"
+        className="flex items-center gap-1.5 text-ui-xs text-brand hover:text-fg transition-colors"
       >
         <ExternalLink size={11} />
         Open in editor
       </button>
 
-      <h2 className="text-[15px] font-medium text-foreground">{note.title}</h2>
+      <h2 className="text-[15px] font-medium text-fg">{note.title}</h2>
 
       {note.tags.length > 0 && (
         <div className="flex gap-1 flex-wrap">
           {note.tags.map((tag) => (
             <span
               key={tag}
-              className="text-2xs px-1.5 py-0.5 rounded"
+              className="text-ui-xs px-1.5 py-0.5 rounded"
               style={{
                 color: tagColor(tag),
                 backgroundColor: tagBgColor(tag),
@@ -192,7 +192,7 @@ function NotePreview({ note, onSelectNote }: { note: Note; onSelectNote: (id: st
       )}
 
       {note.body && (
-        <div className="text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap line-clamp-[20]">
+        <div className="text-ui-sm text-fg-secondary leading-relaxed whitespace-pre-wrap line-clamp-[20]">
           {note.body}
         </div>
       )}

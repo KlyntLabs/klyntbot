@@ -59,7 +59,7 @@ function TreeNodeRow({ node, depth }: TreeNodeRowProps) {
   return (
     <div>
       <div
-        className="flex items-center gap-1 py-0.5 text-xs text-muted-foreground hover:text-foreground
+        className="flex items-center gap-1 py-0.5 text-ui-sm text-fg-secondary hover:text-fg
           transition-colors"
         style={{ paddingLeft: `${depth * 12}px` }}
       >
@@ -67,7 +67,7 @@ function TreeNodeRow({ node, depth }: TreeNodeRowProps) {
           <button
             type="button"
             onClick={() => setExpanded((v) => !v)}
-            className="shrink-0 w-3.5 text-[10px] text-dim hover:text-muted-foreground
+            className="shrink-0 w-3.5 text-[10px] text-fg-dim hover:text-fg-secondary
               cursor-pointer select-none"
           >
             {expanded ? "▼" : "▶"}
@@ -80,7 +80,7 @@ function TreeNodeRow({ node, depth }: TreeNodeRowProps) {
           {node.matched ? (
             <span className="text-brand">●</span>
           ) : (
-            <span className="text-dim">○</span>
+            <span className="text-fg-dim">○</span>
           )}
         </span>
 
@@ -114,8 +114,8 @@ export function StructureTreeView({ treePaths }: StructureTreeViewProps) {
   const tree = buildTree(treePaths);
 
   return (
-    <div className="rounded-lg border border-border/50 bg-surface-base/50 p-2 mt-3">
-      <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-1.5">
+    <div className="rounded-lg border border-separator/50 bg-bg-elevated/50 p-2 mt-3">
+      <p className="text-[10px] font-medium text-fg-secondary uppercase tracking-wider mb-1.5">
         Matched structure
       </p>
       {tree.map((node) => (

@@ -49,9 +49,9 @@ export function PermissionsCard() {
   };
 
   return (
-    <div className="bg-card rounded-lg border border-border p-4">
-      <h3 className="text-[13px] font-medium text-muted-foreground mb-1">macOS Permissions</h3>
-      <p className="text-[11px] text-dim mb-4">
+    <div className="island rounded-lg p-4">
+      <h3 className="text-ui font-medium text-fg-secondary mb-1">macOS Permissions</h3>
+      <p className="text-ui-xs text-fg-dim mb-4">
         These permissions are required for productivity tracking and smart distraction detection.
       </p>
 
@@ -62,19 +62,19 @@ export function PermissionsCard() {
           const denied = status === false;
 
           return (
-            <div key={p.label} className="flex items-start gap-3 p-3 rounded-lg bg-accent">
+            <div key={p.label} className="flex items-start gap-3 p-3 rounded-lg bg-control-hover">
               {/* Status icon */}
               <div className="flex-shrink-0 mt-0.5">
                 {granted ? (
                   <div
                     className="size-5 rounded-full flex items-center justify-center"
                     style={{
-                      background: "color-mix(in srgb, var(--success) 15%, transparent)",
+                      background: "color-mix(in srgb, var(--ds-status-success) 15%, transparent)",
                     }}
                   >
                     <Check
                       className="size-3"
-                      style={{ color: "var(--success)" }}
+                      style={{ color: "var(--ds-status-success)" }}
                       strokeWidth={2.5}
                     />
                   </div>
@@ -82,32 +82,32 @@ export function PermissionsCard() {
                   <div
                     className="size-5 rounded-full flex items-center justify-center"
                     style={{
-                      background: "color-mix(in srgb, var(--destructive) 15%, transparent)",
+                      background: "color-mix(in srgb, var(--ds-status-danger) 15%, transparent)",
                     }}
                   >
                     <X
                       className="size-3"
-                      style={{ color: "var(--destructive)" }}
+                      style={{ color: "var(--ds-status-danger)" }}
                       strokeWidth={2.5}
                     />
                   </div>
                 ) : (
-                  <div className="size-5 rounded-full bg-muted" />
+                  <div className="size-5 rounded-full bg-control-hover" />
                 )}
               </div>
 
               {/* Info */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="text-[13px] font-medium text-foreground">{p.label}</span>
-                  {granted && <span className="text-2xs text-success">Granted</span>}
+                  <span className="text-ui font-medium text-fg">{p.label}</span>
+                  {granted && <span className="text-ui-xs text-status-success">Granted</span>}
                   {denied && (
-                    <span className="text-2xs" style={{ color: "var(--destructive)" }}>
+                    <span className="text-ui-xs" style={{ color: "var(--ds-status-danger)" }}>
                       Not granted
                     </span>
                   )}
                 </div>
-                <p className="text-[11px] text-dim mt-0.5 leading-relaxed">{p.description}</p>
+                <p className="text-ui-xs text-fg-dim mt-0.5 leading-relaxed">{p.description}</p>
               </div>
 
               {/* Action */}
@@ -115,7 +115,7 @@ export function PermissionsCard() {
                 <button
                   type="button"
                   onClick={() => handleOpen(p)}
-                  className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors bg-brand/10 text-brand hover:bg-brand/20"
+                  className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-md text-ui-sm font-medium transition-colors bg-brand/10 text-brand hover:bg-brand/20"
                 >
                   <ExternalLink className="size-3" />
                   Open Settings
@@ -125,7 +125,7 @@ export function PermissionsCard() {
                 <button
                   type="button"
                   onClick={() => handleOpen(p)}
-                  className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs text-dim hover:text-muted-foreground transition-colors"
+                  className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-md text-ui-xs text-fg-dim hover:text-fg-secondary transition-colors"
                 >
                   <ExternalLink className="size-3" />
                   Open
@@ -139,22 +139,22 @@ export function PermissionsCard() {
       {/* Warning if any permission is denied */}
       {Object.values(statuses).some((s) => s === false) && (
         <div
-          className="mt-3 flex items-start gap-2 p-3 rounded-lg text-xs"
+          className="mt-3 flex items-start gap-2 p-3 rounded-lg text-ui-sm"
           style={{
-            background: "color-mix(in srgb, var(--destructive) 5%, transparent)",
-            border: "1px solid color-mix(in srgb, var(--destructive) 15%, transparent)",
+            background: "color-mix(in srgb, var(--ds-status-danger) 5%, transparent)",
+            border: "1px solid color-mix(in srgb, var(--ds-status-danger) 15%, transparent)",
           }}
         >
           <ShieldAlert
             className="size-4 flex-shrink-0 mt-0.5"
-            style={{ color: "var(--destructive)" }}
+            style={{ color: "var(--ds-status-danger)" }}
             strokeWidth={1.5}
           />
           <div>
-            <span className="font-medium" style={{ color: "var(--destructive)" }}>
+            <span className="font-medium" style={{ color: "var(--ds-status-danger)" }}>
               Permissions needed.
             </span>{" "}
-            <span className="text-muted-foreground">
+            <span className="text-fg-secondary">
               After granting permissions in System Settings, you may need to restart Klynt for
               changes to take effect.
             </span>

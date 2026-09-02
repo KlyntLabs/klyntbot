@@ -51,15 +51,15 @@ export function FocusOnboarding({ open, onClose, onInstalled }: Props) {
         {step === "install" ? (
           <>
             <h2 className="text-sm font-semibold text-fg mb-2">Set up DND timers</h2>
-            <p className="text-xs text-muted-foreground mb-4">
+            <p className="text-ui-xs text-fg-secondary mb-4">
               To use DND timers, klyntbot needs to install two macOS Shortcuts — one to turn DND on
               and one to turn it off.
             </p>
-            {error && <p className="text-xs text-destructive mb-3">{error}</p>}
+            {error && <p className="text-ui-sm text-status-danger mb-3">{error}</p>}
             <div className="flex gap-2 justify-end">
               <button
                 type="button"
-                className="px-3 py-1.5 text-xs text-muted-foreground hover:text-fg transition-colors"
+                className="px-3 py-1.5 text-ui-xs text-fg-secondary hover:text-fg transition-colors"
                 onClick={onClose}
                 disabled={busy}
               >
@@ -67,7 +67,7 @@ export function FocusOnboarding({ open, onClose, onInstalled }: Props) {
               </button>
               <button
                 type="button"
-                className="px-3 py-1.5 text-xs rounded bg-accent text-fg hover:bg-accent/80 transition-colors disabled:opacity-50"
+                className="px-3 py-1.5 text-ui-sm rounded bg-control-hover text-fg hover:bg-control-hover/80 transition-colors disabled:opacity-50"
                 onClick={handleInstall}
                 disabled={busy}
               >
@@ -78,15 +78,15 @@ export function FocusOnboarding({ open, onClose, onInstalled }: Props) {
         ) : (
           <>
             <h2 className="text-sm font-semibold text-fg mb-2">Add both shortcuts</h2>
-            <p className="text-xs text-muted-foreground mb-4">
+            <p className="text-ui-xs text-fg-secondary mb-4">
               Shortcuts.app has opened two files. Tap{" "}
               <strong className="text-fg">Add Shortcut</strong> in each dialog, then click Done.
             </p>
-            {error && <p className="text-xs text-destructive mb-3">{error}</p>}
+            {error && <p className="text-ui-sm text-status-danger mb-3">{error}</p>}
             <div className="flex gap-2 justify-end">
               <button
                 type="button"
-                className="px-3 py-1.5 text-xs text-muted-foreground hover:text-fg transition-colors"
+                className="px-3 py-1.5 text-ui-xs text-fg-secondary hover:text-fg transition-colors"
                 onClick={onClose}
                 disabled={busy}
               >
@@ -94,7 +94,7 @@ export function FocusOnboarding({ open, onClose, onInstalled }: Props) {
               </button>
               <button
                 type="button"
-                className="px-3 py-1.5 text-xs rounded bg-accent text-fg hover:bg-accent/80 transition-colors disabled:opacity-50"
+                className="px-3 py-1.5 text-ui-sm rounded bg-control-hover text-fg hover:bg-control-hover/80 transition-colors disabled:opacity-50"
                 onClick={handleDone}
                 disabled={busy}
               >

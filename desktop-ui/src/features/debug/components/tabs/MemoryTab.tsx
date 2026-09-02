@@ -77,9 +77,9 @@ const DOMAINS = ["identity", "energy", "work", "finance", "learning", "preferenc
 
 const domainColors: Record<string, string> = {
   identity: "bg-purple/20 text-purple",
-  energy: "bg-warning/20 text-warning",
-  work: "bg-info/20 text-info",
-  finance: "bg-success/20 text-success",
+  energy: "bg-status-warning/20 text-status-warning",
+  work: "bg-status-info/20 text-status-info",
+  finance: "bg-status-success/20 text-status-success",
   learning: "bg-brand/20 text-brand",
   preferences: "bg-purple/20 text-purple",
 };
@@ -166,28 +166,28 @@ export function MemoryTab() {
 
       {/* UserModel Summary Cards */}
       <div>
-        <h2 className="text-[13px] font-medium text-muted-foreground mb-3">User Model</h2>
+        <h2 className="text-ui font-medium text-fg-secondary mb-3">User Model</h2>
         <div className="grid grid-cols-3 gap-3">
           {domainCards.map(({ domain, count, preview }) => (
             <button
               key={domain}
               type="button"
               onClick={() => setDomainFilter(domainFilter === domain ? null : domain)}
-              className={`text-left p-3 rounded-lg border transition-all ${
+              className={`text-left p-3 rounded-panel border transition-all ${
                 domainFilter === domain
                   ? "border-brand/50 bg-brand/10"
-                  : "border-border bg-card hover:bg-accent"
+                  : "border-separator bg-bg-elevated hover:bg-control-hover"
               }`}
             >
               <div className="flex items-center justify-between mb-1">
-                <span className={`text-[11px] px-1.5 py-0.5 rounded ${domainColors[domain]}`}>
+                <span className={`text-ui-xs px-1.5 py-0.5 rounded ${domainColors[domain]}`}>
                   {domain}
                 </span>
-                <span className="text-[11px] text-muted-foreground">{count} facts</span>
+                <span className="text-ui-xs text-fg-secondary">{count} facts</span>
               </div>
               <div className="space-y-0.5 mt-2">
                 {preview.slice(0, 2).map((p) => (
-                  <p key={p} className="text-[11px] text-muted-foreground truncate">
+                  <p key={p} className="text-ui-xs text-fg-secondary truncate">
                     {p}
                   </p>
                 ))}
@@ -200,68 +200,68 @@ export function MemoryTab() {
       {/* Semantic Facts Table */}
       <div>
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-[13px] font-medium text-muted-foreground">
+          <h2 className="text-ui font-medium text-fg-secondary">
             Semantic Facts{" "}
-            {domainFilter && <span className="text-muted-foreground">({domainFilter})</span>}
+            {domainFilter && <span className="text-fg-secondary">({domainFilter})</span>}
           </h2>
           <button
             type="button"
-            className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground"
+            className="flex items-center gap-1 text-ui-xs text-fg-secondary hover:text-fg"
           >
             <Plus className="size-3" /> Add Fact
           </button>
         </div>
-        <div className="bg-card rounded-lg border border-border overflow-hidden">
-          <table className="w-full text-xs">
+        <div className="bg-bg-elevated rounded-panel border border-separator overflow-hidden">
+          <table className="w-full text-ui-sm">
             <thead>
-              <tr className="border-b border-border-subtle">
-                <th className="text-left p-2 text-muted-foreground font-normal">Domain</th>
-                <th className="text-left p-2 text-muted-foreground font-normal">Subject</th>
-                <th className="text-left p-2 text-muted-foreground font-normal">Predicate</th>
-                <th className="text-left p-2 text-muted-foreground font-normal">Object</th>
-                <th className="text-left p-2 text-muted-foreground font-normal">Conf</th>
-                <th className="text-left p-2 text-muted-foreground font-normal">Stab</th>
-                <th className="text-left p-2 text-muted-foreground font-normal">Retr</th>
-                <th className="text-left p-2 text-muted-foreground font-normal">Accessed</th>
-                <th className="text-left p-2 text-muted-foreground font-normal" />
+              <tr className="border-b border-separator">
+                <th className="text-left p-2 text-fg-secondary font-normal">Domain</th>
+                <th className="text-left p-2 text-fg-secondary font-normal">Subject</th>
+                <th className="text-left p-2 text-fg-secondary font-normal">Predicate</th>
+                <th className="text-left p-2 text-fg-secondary font-normal">Object</th>
+                <th className="text-left p-2 text-fg-secondary font-normal">Conf</th>
+                <th className="text-left p-2 text-fg-secondary font-normal">Stab</th>
+                <th className="text-left p-2 text-fg-secondary font-normal">Retr</th>
+                <th className="text-left p-2 text-fg-secondary font-normal">Accessed</th>
+                <th className="text-left p-2 text-fg-secondary font-normal" />
               </tr>
             </thead>
             <tbody>
               {facts.map((f) => (
                 <tr
                   key={f.id}
-                  className={`border-b border-border-subtle hover:bg-card ${
+                  className={`border-b border-separator hover:bg-control-hover ${
                     f.retrievability < 0.3 ? "opacity-40" : ""
                   }`}
                 >
                   <td className="p-2">
                     <span
-                      className={`text-2xs px-1 py-0.5 rounded ${domainColors[f.domain] ?? "text-muted-foreground"}`}
+                      className={`text-ui-xs px-1 py-0.5 rounded ${domainColors[f.domain] ?? "text-fg-secondary"}`}
                     >
                       {f.domain}
                     </span>
                   </td>
-                  <td className="p-2 text-muted-foreground">{f.subject}</td>
-                  <td className="p-2 text-muted-foreground">{f.predicate}</td>
-                  <td className="p-2 text-foreground">{f.object}</td>
+                  <td className="p-2 text-fg-secondary">{f.subject}</td>
+                  <td className="p-2 text-fg-secondary">{f.predicate}</td>
+                  <td className="p-2 text-fg">{f.object}</td>
                   <td className="p-2">
-                    <div className="w-12 bg-muted rounded-full h-1.5">
+                    <div className="w-12 bg-control-hover rounded-full h-1.5">
                       <div
                         className="bg-brand h-1.5 rounded-full"
                         style={{ width: `${f.confidence * 100}%` }}
                       />
                     </div>
                   </td>
-                  <td className="p-2 text-muted-foreground">{f.stability.toFixed(1)}</td>
-                  <td className="p-2 text-muted-foreground">
+                  <td className="p-2 text-fg-secondary">{f.stability.toFixed(1)}</td>
+                  <td className="p-2 text-fg-secondary">
                     {(f.retrievability * 100).toFixed(0)}%
                   </td>
-                  <td className="p-2 text-muted-foreground">{f.accessCount}x</td>
+                  <td className="p-2 text-fg-secondary">{f.accessCount}x</td>
                   <td className="p-2">
                     <button
                       type="button"
                       onClick={() => handleDeleteFact(f.id)}
-                      className="text-muted-foreground hover:text-destructive"
+                      className="text-fg-secondary hover:text-status-danger"
                     >
                       <Trash2 className="size-3" />
                     </button>
@@ -270,7 +270,7 @@ export function MemoryTab() {
               ))}
               {facts.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="p-4 text-center text-muted-foreground">
+                  <td colSpan={9} className="p-4 text-center text-fg-secondary">
                     No facts found
                   </td>
                 </tr>
@@ -282,63 +282,63 @@ export function MemoryTab() {
 
       {/* Episodic Memories */}
       <div>
-        <h2 className="text-[13px] font-medium text-muted-foreground mb-3">Episodic Memories</h2>
+        <h2 className="text-ui font-medium text-fg-secondary mb-3">Episodic Memories</h2>
         <div className="space-y-2">
           {episodic.map((m) => (
-            <div key={m.id} className="p-3 bg-card rounded-lg border border-border">
+            <div key={m.id} className="p-3 bg-bg-elevated rounded-panel border border-separator">
               <div className="flex items-center gap-2 mb-1">
                 <span
-                  className={`text-2xs px-1 py-0.5 rounded ${domainColors[m.domain] ?? "text-muted-foreground"}`}
+                  className={`text-ui-xs px-1 py-0.5 rounded ${domainColors[m.domain] ?? "text-fg-secondary"}`}
                 >
                   {m.domain}
                 </span>
-                <span className="text-2xs text-muted-foreground">{m.occurredAt}</span>
-                <span className="text-2xs text-muted-foreground">
+                <span className="text-ui-xs text-fg-secondary">{m.occurredAt}</span>
+                <span className="text-ui-xs text-fg-secondary">
                   imp: {m.importance.toFixed(2)}
                 </span>
               </div>
-              <p className="text-xs text-muted-foreground">{m.summary || m.content}</p>
+              <p className="text-ui-sm text-fg-secondary">{m.summary || m.content}</p>
               {m.summary && m.summary !== m.content && (
-                <p className="text-[11px] text-muted-foreground/60 mt-1">{m.content}</p>
+                <p className="text-ui-xs text-fg-secondary/60 mt-1">{m.content}</p>
               )}
             </div>
           ))}
           {episodic.length === 0 && (
-            <p className="text-xs text-muted-foreground">No episodic memories</p>
+            <p className="text-ui-sm text-fg-secondary">No episodic memories</p>
           )}
         </div>
       </div>
 
       {/* Procedural Rules */}
       <div>
-        <h2 className="text-[13px] font-medium text-muted-foreground mb-3">Procedural Rules</h2>
-        <div className="bg-card rounded-lg border border-border overflow-hidden">
-          <table className="w-full text-xs">
+        <h2 className="text-ui font-medium text-fg-secondary mb-3">Procedural Rules</h2>
+        <div className="bg-bg-elevated rounded-panel border border-separator overflow-hidden">
+          <table className="w-full text-ui-sm">
             <thead>
-              <tr className="border-b border-border-subtle">
-                <th className="text-left p-2 text-muted-foreground font-normal">Domain</th>
-                <th className="text-left p-2 text-muted-foreground font-normal">Rule</th>
-                <th className="text-left p-2 text-muted-foreground font-normal">Conf</th>
-                <th className="text-left p-2 text-muted-foreground font-normal">Signals</th>
-                <th className="text-left p-2 text-muted-foreground font-normal">Active</th>
+              <tr className="border-b border-separator">
+                <th className="text-left p-2 text-fg-secondary font-normal">Domain</th>
+                <th className="text-left p-2 text-fg-secondary font-normal">Rule</th>
+                <th className="text-left p-2 text-fg-secondary font-normal">Conf</th>
+                <th className="text-left p-2 text-fg-secondary font-normal">Signals</th>
+                <th className="text-left p-2 text-fg-secondary font-normal">Active</th>
                 <th className="p-2" />
               </tr>
             </thead>
             <tbody>
               {rules.map((r) => (
-                <tr key={r.id} className="border-b border-border-subtle">
+                <tr key={r.id} className="border-b border-separator">
                   <td className="p-2">
                     <span
-                      className={`text-2xs px-1 py-0.5 rounded ${domainColors[r.domain] ?? "text-muted-foreground"}`}
+                      className={`text-ui-xs px-1 py-0.5 rounded ${domainColors[r.domain] ?? "text-fg-secondary"}`}
                     >
                       {r.domain}
                     </span>
                   </td>
-                  <td className="p-2 text-muted-foreground">{r.ruleText}</td>
-                  <td className="p-2 text-muted-foreground">{r.confidence.toFixed(2)}</td>
-                  <td className="p-2 text-muted-foreground">{r.signalCount}</td>
+                  <td className="p-2 text-fg-secondary">{r.ruleText}</td>
+                  <td className="p-2 text-fg-secondary">{r.confidence.toFixed(2)}</td>
+                  <td className="p-2 text-fg-secondary">{r.signalCount}</td>
                   <td className="p-2">
-                    <span className={`text-2xs ${r.active ? "text-success" : "text-destructive"}`}>
+                    <span className={`text-ui-xs ${r.active ? "text-status-success" : "text-status-danger"}`}>
                       {r.active ? "ON" : "OFF"}
                     </span>
                   </td>
@@ -346,7 +346,7 @@ export function MemoryTab() {
                     {r.active && (
                       <button
                         type="button"
-                        className="text-2xs text-destructive/60 hover:text-destructive"
+                        className="text-ui-xs text-status-danger/60 hover:text-status-danger"
                         onClick={async () => {
                           await deactivateRule({ id: r.id } as never);
                           invalidateQueries("cognitive_");
@@ -360,7 +360,7 @@ export function MemoryTab() {
               ))}
               {rules.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="p-4 text-center text-muted-foreground">
+                  <td colSpan={6} className="p-4 text-center text-fg-secondary">
                     No rules
                   </td>
                 </tr>
@@ -371,25 +371,25 @@ export function MemoryTab() {
       </div>
 
       {/* Stats Bar */}
-      <div className="flex items-center gap-4 p-3 bg-card rounded-lg border border-border">
-        <span className="text-[11px] text-muted-foreground">
-          Active: <span className="text-muted-foreground">{stats.activeFacts}</span>
+      <div className="flex items-center gap-4 p-3 bg-bg-elevated rounded-panel border border-separator">
+        <span className="text-ui-xs text-fg-secondary">
+          Active: <span className="text-fg-secondary">{stats.activeFacts}</span>
         </span>
-        <span className="text-[11px] text-muted-foreground">
-          Archived: <span className="text-muted-foreground">{stats.archivedFacts}</span>
+        <span className="text-ui-xs text-fg-secondary">
+          Archived: <span className="text-fg-secondary">{stats.archivedFacts}</span>
         </span>
-        <span className="text-[11px] text-muted-foreground">
-          Episodic: <span className="text-muted-foreground">{stats.episodicCount}</span>
+        <span className="text-ui-xs text-fg-secondary">
+          Episodic: <span className="text-fg-secondary">{stats.episodicCount}</span>
         </span>
-        <span className="text-[11px] text-muted-foreground">
-          Rules: <span className="text-muted-foreground">{stats.rulesCount}</span>
+        <span className="text-ui-xs text-fg-secondary">
+          Rules: <span className="text-fg-secondary">{stats.rulesCount}</span>
         </span>
         <div className="flex-1" />
         <button
           type="button"
           onClick={handleReflection}
           disabled={reflecting}
-          className="flex items-center gap-1 text-[11px] text-brand hover:text-brand/80 disabled:opacity-50"
+          className="flex items-center gap-1 text-ui-xs text-brand hover:text-brand/80 disabled:opacity-50"
         >
           <Play className="size-3" />
           {reflecting ? "Reflecting..." : "Run Reflection"}
@@ -398,7 +398,7 @@ export function MemoryTab() {
           type="button"
           onClick={handleCompact}
           disabled={compacting}
-          className="flex items-center gap-1 text-[11px] text-brand hover:text-brand/80 disabled:opacity-50"
+          className="flex items-center gap-1 text-ui-xs text-brand hover:text-brand/80 disabled:opacity-50"
         >
           <Play className="size-3" />
           {compacting ? "Running..." : "Run Compaction"}

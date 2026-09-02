@@ -29,17 +29,17 @@ export function MetaRulesSection({
 
   return (
     <div className="flex flex-col gap-3">
-      <h2 className="text-[13px] font-medium text-muted-foreground flex items-center gap-1.5">
+      <h2 className="text-ui font-medium text-fg-secondary flex items-center gap-1.5">
         <Sparkles className="size-3.5" />
         Rules About How I Think
       </h2>
 
       {pendingRules.map((rule) => (
-        <div key={rule.id} className="glass-card rounded-xl p-4 border border-accent/20">
-          <p className="text-[12px] text-foreground mb-1">
+        <div key={rule.id} className="glass-card rounded-xl p-4 border border-brand/20">
+          <p className="text-ui-sm text-fg mb-1">
             I think I should: &ldquo;{rule.triggerCondition}&rdquo;
           </p>
-          <p className="text-[11px] text-muted-foreground mb-3">Sound good?</p>
+          <p className="text-ui-xs text-fg-secondary mb-3">Sound good?</p>
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -47,7 +47,7 @@ export function MetaRulesSection({
                 await approve({ ruleId: rule.id });
                 onRuleAction?.();
               }}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-md text-2xs text-success bg-success/10 hover:bg-success/20 transition-colors"
+              className="flex items-center gap-1 px-2.5 py-1 rounded-md text-ui-xs text-status-success bg-status-success/10 hover:bg-status-success/20 transition-colors"
             >
               <Check className="size-3" />
               Approve
@@ -58,7 +58,7 @@ export function MetaRulesSection({
                 await dismiss({ ruleId: rule.id });
                 onRuleAction?.();
               }}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-md text-2xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+              className="flex items-center gap-1 px-2.5 py-1 rounded-md text-ui-xs text-fg-secondary hover:text-status-danger hover:bg-status-danger/10 transition-colors"
             >
               <X className="size-3" />
               Dismiss
@@ -70,13 +70,13 @@ export function MetaRulesSection({
       {activeRules.map((rule) => (
         <div key={rule.id} className="glass-card rounded-xl p-4 opacity-80">
           <div className="flex items-center justify-between">
-            <p className="text-[11px] text-foreground">{rule.triggerCondition}</p>
-            <span className="text-2xs text-success px-1.5 py-0.5 rounded bg-success/10">
+            <p className="text-ui-xs text-fg">{rule.triggerCondition}</p>
+            <span className="text-ui-xs text-status-success px-1.5 py-0.5 rounded bg-status-success/10">
               active
             </span>
           </div>
           {rule.signalCount > 0 && (
-            <p className="text-2xs text-dim mt-1">Triggered {rule.signalCount} times</p>
+            <p className="text-ui-xs text-fg-dim mt-1">Triggered {rule.signalCount} times</p>
           )}
         </div>
       ))}

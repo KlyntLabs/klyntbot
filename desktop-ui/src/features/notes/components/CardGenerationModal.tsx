@@ -40,7 +40,7 @@ function CardPreviewRow({
       ? "bg-purple/10 text-purple"
       : card.cardType === "vocabulary"
         ? "bg-blue-400/10 text-blue-400"
-        : "bg-muted text-muted-foreground";
+        : "bg-control-hover text-fg-secondary";
 
   return (
     <div className={`glass-card p-3 transition-all ${isApproved ? "opacity-100" : "opacity-40"}`}>
@@ -49,7 +49,7 @@ function CardPreviewRow({
           type="button"
           onClick={onToggle}
           className={`mt-0.5 size-5 rounded flex items-center justify-center flex-shrink-0 transition-colors ${
-            isApproved ? "bg-brand text-white" : "bg-muted text-muted-foreground hover:bg-accent"
+            isApproved ? "bg-brand text-white" : "bg-control-hover text-fg-secondary hover:bg-control-hover"
           }`}
         >
           {isApproved && <Check size={12} />}
@@ -57,43 +57,43 @@ function CardPreviewRow({
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <span className={`text-2xs px-1.5 py-0.5 rounded-md ${typeBg}`}>{typeLabel}</span>
+            <span className={`text-ui-xs px-1.5 py-0.5 rounded-md ${typeBg}`}>{typeLabel}</span>
             {card.tags.length > 0 && (
-              <span className="text-2xs text-muted-foreground">{card.tags.join(", ")}</span>
+              <span className="text-ui-xs text-fg-secondary">{card.tags.join(", ")}</span>
             )}
             <button
               type="button"
               onClick={() => setExpanded(!expanded)}
-              className="ml-auto text-muted-foreground hover:text-foreground"
+              className="ml-auto text-fg-secondary hover:text-fg"
             >
               {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
             </button>
           </div>
 
-          <p className="text-sm text-foreground leading-snug">{card.front}</p>
+          <p className="text-sm text-fg leading-snug">{card.front}</p>
 
           {expanded && (
             <div className="mt-2 space-y-2">
               <label className="block">
-                <span className="text-2xs text-muted-foreground block mb-0.5">Front</span>
+                <span className="text-ui-xs text-fg-secondary block mb-0.5">Front</span>
                 <textarea
                   value={card.front}
                   onChange={(e) => onEdit("front", e.target.value)}
-                  className="w-full bg-muted/50 rounded-md px-2 py-1.5 text-sm text-foreground resize-none"
+                  className="w-full bg-control-hover/50 rounded-md px-2 py-1.5 text-sm text-fg resize-none"
                   rows={2}
                 />
               </label>
               <label className="block">
-                <span className="text-2xs text-muted-foreground block mb-0.5">Back</span>
+                <span className="text-ui-xs text-fg-secondary block mb-0.5">Back</span>
                 <textarea
                   value={card.back}
                   onChange={(e) => onEdit("back", e.target.value)}
-                  className="w-full bg-muted/50 rounded-md px-2 py-1.5 text-sm text-foreground resize-none"
+                  className="w-full bg-control-hover/50 rounded-md px-2 py-1.5 text-sm text-fg resize-none"
                   rows={2}
                 />
               </label>
               {card.sourceContext && (
-                <p className="text-[11px] text-muted-foreground italic">
+                <p className="text-ui-xs text-fg-secondary italic">
                   Source: {card.sourceContext}
                 </p>
               )}
@@ -101,7 +101,7 @@ function CardPreviewRow({
           )}
 
           {!expanded && (
-            <p className="text-xs text-muted-foreground mt-0.5 truncate">{card.back}</p>
+            <p className="text-ui-sm text-fg-secondary mt-0.5 truncate">{card.back}</p>
           )}
         </div>
       </div>
@@ -156,15 +156,15 @@ export function CardGenerationModal({
       />
 
       <div className="relative glass-panel rounded-2xl w-full max-w-lg max-h-[80vh] flex flex-col mx-4">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-separator">
           <div className="flex items-center gap-2">
             <Sparkles size={18} className="text-brand" strokeWidth={1.5} />
-            <h2 className="text-sm font-semibold text-foreground">Generate Flashcards</h2>
+            <h2 className="text-sm font-semibold text-fg">Generate Flashcards</h2>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="text-muted-foreground hover:text-foreground transition-colors"
+            className="text-fg-secondary hover:text-fg transition-colors"
           >
             <X size={16} />
           </button>
@@ -174,7 +174,7 @@ export function CardGenerationModal({
           {generating && (
             <div className="flex flex-col items-center justify-center py-12 gap-3">
               <ThinkingDots />
-              <p className="text-sm text-muted-foreground">Generating cards</p>
+              <p className="text-sm text-fg-secondary">Generating cards</p>
             </div>
           )}
 
@@ -197,27 +197,27 @@ export function CardGenerationModal({
         </div>
 
         {!generating && previews.length > 0 && (
-          <div className="px-5 py-4 border-t border-border space-y-3">
+          <div className="px-5 py-4 border-t border-separator space-y-3">
             <label className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground whitespace-nowrap">Deck:</span>
+              <span className="text-ui-sm text-fg-secondary whitespace-nowrap">Deck:</span>
               <input
                 type="text"
                 value={deck}
                 onChange={(e) => setDeck(e.target.value)}
                 placeholder="Enter deck name..."
-                className="flex-1 bg-muted/50 rounded-lg px-3 py-1.5 text-sm text-foreground placeholder:text-dim"
+                className="flex-1 bg-control-hover/50 rounded-lg px-3 py-1.5 text-sm text-fg placeholder:text-fg-dim"
               />
             </label>
 
             <div className="flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">
+              <span className="text-ui-sm text-fg-secondary">
                 {approvedCount} of {previews.length} cards selected
               </span>
               <button
                 type="button"
                 onClick={() => onSave(noteId, deck)}
                 disabled={approvedCount === 0 || !deck.trim() || saving}
-                className="glass-button px-4 py-2 text-sm text-foreground disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
+                className="glass-button px-4 py-2 text-sm text-fg disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
               >
                 {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
                 Save {approvedCount} Card{approvedCount !== 1 ? "s" : ""}

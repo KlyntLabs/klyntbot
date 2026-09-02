@@ -49,20 +49,20 @@ function SkeletonRows<T>({
     <>
       {Array.from({ length: count }, (_, i) => (
         // biome-ignore lint/suspicious/noArrayIndexKey: skeleton rows are static placeholders that never reorder
-        <tr key={`skeleton-${i}`} className="border-b border-border-subtle">
+        <tr key={`skeleton-${i}`} className="border-b border-separator">
           {expandable && (
             <td className="px-3 py-2.5 w-8">
-              <div className="size-3 rounded animate-pulse bg-muted" />
+              <div className="size-3 rounded animate-pulse bg-control-hover" />
             </td>
           )}
           {hasPrefix && (
             <td className="px-2 py-2.5 w-10">
-              <div className="w-7 h-4 rounded-full animate-pulse bg-muted" />
+              <div className="w-7 h-4 rounded-full animate-pulse bg-control-hover" />
             </td>
           )}
           {columns.map((col) => (
             <td key={col.key} className={cn("px-5 py-2.5", col.width)}>
-              <div className="h-4 rounded animate-pulse bg-muted" />
+              <div className="h-4 rounded animate-pulse bg-control-hover" />
             </td>
           ))}
         </tr>
@@ -95,7 +95,7 @@ export function DataTable<T>({
     <div className={cn("overflow-hidden", className)}>
       <table className="w-full border-collapse">
         <thead>
-          <tr className="border-b border-border-subtle text-[11px] text-muted-foreground font-light text-left bg-card">
+          <tr className="border-b border-separator text-ui-xs text-fg-secondary font-light text-left bg-bg-elevated">
             {expandable && <th className="px-3 py-2.5 w-8 font-light" />}
             {renderRowPrefix && <th className="px-2 py-2.5 w-10 font-light" />}
             {columns.map((col) => (
@@ -194,18 +194,18 @@ function DataTableRow<T>({
         onClick={isInteractive ? handleClick : undefined}
         onKeyDown={isInteractive ? (e) => e.key === "Enter" && handleClick() : undefined}
         className={cn(
-          "transition-colors border-b border-border-subtle last:border-b-0 whitespace-nowrap",
-          isInteractive && "hover:bg-accent cursor-pointer",
-          !isInteractive && "hover:bg-card",
+          "transition-colors border-b border-separator last:border-b-0 whitespace-nowrap",
+          isInteractive && "hover:bg-control-hover cursor-pointer",
+          !isInteractive && "hover:bg-bg-elevated",
           rowClassName?.(item),
         )}
       >
         {expandable && (
           <td className="px-3 py-2.5 w-8">
             {isExpanded ? (
-              <ChevronDown size={14} className="text-dim" strokeWidth={1.5} />
+              <ChevronDown size={14} className="text-fg-dim" strokeWidth={1.5} />
             ) : (
-              <ChevronRight size={14} className="text-dim" strokeWidth={1.5} />
+              <ChevronRight size={14} className="text-fg-dim" strokeWidth={1.5} />
             )}
           </td>
         )}
@@ -233,7 +233,7 @@ function DataTableRow<T>({
         ))}
       </tr>
       {isExpanded && renderExpanded && (
-        <tr className="border-b border-border-subtle">
+        <tr className="border-b border-separator">
           <td colSpan={totalCols} className="p-0">
             {renderExpanded(item)}
           </td>

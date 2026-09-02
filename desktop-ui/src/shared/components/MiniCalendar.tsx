@@ -116,10 +116,10 @@ export function MiniCalendar({
               key={s.label}
               onClick={() => onSelect(s.iso)}
               className={cn(
-                "px-2 py-0.5 text-[11px] rounded-lg transition-all",
+                "px-2 py-0.5 text-ui-xs rounded-control transition-all",
                 value === s.iso
                   ? "glass-button-active text-brand"
-                  : "glass-button text-muted-foreground",
+                  : "glass-button text-fg-secondary",
               )}
             >
               {s.label}
@@ -134,18 +134,18 @@ export function MiniCalendar({
           type="button"
           onClick={prevMonth}
           aria-label="Previous month"
-          className="size-6 flex items-center justify-center glass-button rounded-lg text-muted-foreground hover:text-foreground transition-colors"
+          className="size-6 flex items-center justify-center glass-button rounded-control text-fg-secondary hover:text-fg transition-colors"
         >
           <ChevronLeft className="size-3.5" strokeWidth={1.5} />
         </button>
-        <span className="text-xs font-medium text-muted-foreground">
+        <span className="text-ui-sm font-medium text-fg-secondary">
           {LONG_MONTHS[viewMonth]} {viewYear}
         </span>
         <button
           type="button"
           onClick={nextMonth}
           aria-label="Next month"
-          className="size-6 flex items-center justify-center glass-button rounded-lg text-muted-foreground hover:text-foreground transition-colors"
+          className="size-6 flex items-center justify-center glass-button rounded-control text-fg-secondary hover:text-fg transition-colors"
         >
           <ChevronRight className="size-3.5" strokeWidth={1.5} />
         </button>
@@ -156,7 +156,7 @@ export function MiniCalendar({
         {WEEKDAYS.map((d) => (
           <div
             key={d}
-            className="h-6 flex items-center justify-center text-2xs font-medium text-muted-foreground"
+            className="h-6 flex items-center justify-center text-2xs font-medium text-fg-secondary"
           >
             {d}
           </div>
@@ -178,14 +178,14 @@ export function MiniCalendar({
               onClick={() => onSelect(iso)}
               aria-label={`${d.getDate()} ${LONG_MONTHS[d.getMonth()]} ${d.getFullYear()}`}
               className={cn(
-                "h-8 w-full flex items-center justify-center text-[11px] font-medium rounded-lg border transition-all",
+                "h-8 w-full flex items-center justify-center text-ui-xs font-medium rounded-control border transition-all",
                 isSelected
-                  ? "bg-brand text-white border-brand/40"
+                  ? "bg-brand text-brand-foreground border-brand/40"
                   : isToday
-                    ? "bg-muted text-brand border-brand/30"
+                    ? "bg-control-hover text-brand border-brand/30"
                     : isCurrentMonth
-                      ? "bg-card text-muted-foreground border-border-subtle hover:bg-muted hover:border-border"
-                      : "text-muted-foreground/30 border-transparent hover:bg-accent",
+                      ? "bg-bg-elevated text-fg-secondary border-separator hover:bg-control-hover hover:border-separator"
+                      : "text-fg-secondary/30 border-transparent hover:bg-control-hover",
               )}
             >
               {d.getDate()}
@@ -199,7 +199,7 @@ export function MiniCalendar({
         <button
           type="button"
           onClick={onClear}
-          className="w-full text-left mt-1.5 px-2 py-1 text-[11px] text-destructive rounded-lg hover:bg-muted transition-colors"
+          className="w-full text-left mt-1.5 px-2 py-1 text-ui-xs text-status-danger rounded-control hover:bg-control-hover transition-colors"
         >
           Clear date
         </button>

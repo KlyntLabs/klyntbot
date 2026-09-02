@@ -41,7 +41,7 @@ function TopicBar({ topic }: { topic: TopicStat }) {
   const pct = Math.round(topic.avgRetention * 100);
   return (
     <div className="flex items-center gap-2">
-      <span className="text-2xs text-muted-foreground w-24 truncate shrink-0">{topic.name}</span>
+      <span className="text-ui-xs text-fg-secondary w-24 truncate shrink-0">{topic.name}</span>
       <div className="flex-1 h-1.5 rounded-full bg-white/5 overflow-hidden">
         <div
           className={`h-full rounded-full transition-all duration-500 ${retentionBarColor(topic.avgRetention)}`}
@@ -49,7 +49,7 @@ function TopicBar({ topic }: { topic: TopicStat }) {
         />
       </div>
       <span
-        className={`text-2xs font-medium tabular-nums w-8 text-right shrink-0 ${retentionTextColor(topic.avgRetention)}`}
+        className={`text-ui-xs font-medium tabular-nums w-8 text-right shrink-0 ${retentionTextColor(topic.avgRetention)}`}
       >
         {pct}%
       </span>
@@ -70,12 +70,12 @@ export function MorningBriefing() {
 
   if (isEmpty) {
     return (
-      <div className="glass-card rounded-xl p-5">
+      <div className="island p-5">
         <div className="flex items-center gap-2 mb-2">
-          <Brain size={16} className="text-muted-foreground" strokeWidth={1.5} />
-          <h2 className="text-[13px] font-medium text-muted-foreground">Knowledge Health</h2>
+          <Brain size={16} className="text-fg-secondary" strokeWidth={1.5} />
+          <h2 className="text-ui font-medium text-fg-secondary">Knowledge Health</h2>
         </div>
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-ui-xs text-fg-secondary">
           No learning activity yet. Start reviewing flashcards or accept knowledge atoms from your
           notes to track retention here.
         </p>
@@ -84,16 +84,16 @@ export function MorningBriefing() {
   }
 
   return (
-    <div className="glass-card rounded-xl p-5">
+    <div className="island p-5">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <Brain size={16} className="text-brand" strokeWidth={1.5} />
-          <h2 className="text-[13px] font-medium text-muted-foreground">Knowledge Health</h2>
+          <h2 className="text-ui font-medium text-fg-secondary">Knowledge Health</h2>
         </div>
         {summary.streakDays > 0 && (
           <div className="flex items-center gap-1">
             <Flame size={14} className="text-amber-400" strokeWidth={1.5} />
-            <span className="text-xs font-medium text-amber-400 tabular-nums">
+            <span className="text-ui-sm font-medium text-amber-400 tabular-nums">
               {summary.streakDays}-day streak
             </span>
           </div>
@@ -104,18 +104,18 @@ export function MorningBriefing() {
       <div className="flex items-center gap-4 mb-4">
         <div className="flex items-center gap-1.5">
           <BookOpen size={12} className="text-brand" strokeWidth={1.5} />
-          <span className="text-[11px] text-muted-foreground">
-            <span className="font-medium text-foreground tabular-nums">{summary.dueCards}</span> due
+          <span className="text-ui-xs text-fg-secondary">
+            <span className="font-medium text-fg tabular-nums">{summary.dueCards}</span> due
           </span>
         </div>
-        <div className="text-[11px] text-muted-foreground">
-          <span className="font-medium text-foreground tabular-nums">
+        <div className="text-ui-xs text-fg-secondary">
+          <span className="font-medium text-fg tabular-nums">
             {summary.atomsReviewedThisWeek}
           </span>{" "}
           reviewed this week
         </div>
-        <div className="text-[11px] text-muted-foreground">
-          <span className="font-medium text-foreground tabular-nums">
+        <div className="text-ui-xs text-fg-secondary">
+          <span className="font-medium text-fg tabular-nums">
             {summary.atomsCreatedThisWeek}
           </span>{" "}
           created this week
@@ -127,7 +127,7 @@ export function MorningBriefing() {
         {/* Fading atoms */}
         {summary.fadingAtoms.length > 0 && (
           <div>
-            <h3 className="text-2xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
+            <h3 className="text-ui-xs font-medium text-fg-secondary uppercase tracking-wider mb-2">
               Fading Atoms
             </h3>
             <div className="flex flex-col gap-1">
@@ -144,11 +144,11 @@ export function MorningBriefing() {
                       }
                     }}
                   >
-                    <span className="text-[11px] text-foreground truncate flex-1">
+                    <span className="text-ui-xs text-fg truncate flex-1">
                       {atom.subject}
                     </span>
                     <span
-                      className={`text-2xs font-medium tabular-nums shrink-0 ${retentionTextColor(atom.retentionPct)}`}
+                      className={`text-ui-xs font-medium tabular-nums shrink-0 ${retentionTextColor(atom.retentionPct)}`}
                     >
                       {pct}%
                     </span>
@@ -163,7 +163,7 @@ export function MorningBriefing() {
         <div className="flex flex-col gap-3">
           {summary.strongestTopic && (
             <div>
-              <h3 className="text-2xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5">
+              <h3 className="text-ui-xs font-medium text-fg-secondary uppercase tracking-wider mb-1.5">
                 Strongest
               </h3>
               <TopicBar topic={summary.strongestTopic} />
@@ -171,7 +171,7 @@ export function MorningBriefing() {
           )}
           {summary.weakestTopic && (
             <div>
-              <h3 className="text-2xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5">
+              <h3 className="text-ui-xs font-medium text-fg-secondary uppercase tracking-wider mb-1.5">
                 Weakest
               </h3>
               <TopicBar topic={summary.weakestTopic} />
@@ -181,11 +181,11 @@ export function MorningBriefing() {
       </div>
 
       {/* Action buttons */}
-      <div className="flex items-center gap-2 mt-4 pt-3 border-t border-border/30">
+      <div className="flex items-center gap-2 mt-4 pt-3 border-t border-separator/30">
         <button
           type="button"
           onClick={() => navigate("/learn")}
-          className="glass-button px-3 py-1.5 text-[11px] text-foreground inline-flex items-center gap-1.5"
+          className="glass-button px-3 py-1.5 text-ui-xs text-fg inline-flex items-center gap-1.5"
         >
           <BookOpen size={12} strokeWidth={1.5} />
           Start Review
@@ -193,7 +193,7 @@ export function MorningBriefing() {
         <button
           type="button"
           onClick={() => navigate("/learn/knowledge")}
-          className="glass-button px-3 py-1.5 text-[11px] text-foreground inline-flex items-center gap-1.5"
+          className="glass-button px-3 py-1.5 text-ui-xs text-fg inline-flex items-center gap-1.5"
         >
           <Activity size={12} strokeWidth={1.5} />
           See Health

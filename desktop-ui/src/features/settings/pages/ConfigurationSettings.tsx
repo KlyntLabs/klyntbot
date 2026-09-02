@@ -199,8 +199,8 @@ export function ConfigurationSettings() {
   return (
     <div>
       <div className="mb-8">
-        <h2 className="text-lg font-medium text-foreground">Configuration</h2>
-        <p className="text-[13px] text-muted-foreground mt-1">
+        <h2 className="text-lg font-medium text-fg">Configuration</h2>
+        <p className="text-ui text-fg-secondary mt-1">
           Channels, tools, and gateway settings
         </p>
       </div>
@@ -215,12 +215,12 @@ export function ConfigurationSettings() {
               const hasEdits = Object.keys(channelEdits[ch.key] ?? {}).length > 0;
 
               return (
-                <div key={ch.key} className="bg-card rounded-lg border border-border-subtle">
+                <div key={ch.key} className="island rounded-lg">
                   <div className="flex items-center gap-2 p-3">
                     <button
                       type="button"
                       onClick={() => setExpanded(isExpanded ? null : ch.key)}
-                      className="text-muted-foreground hover:text-foreground transition-colors"
+                      className="text-fg-secondary hover:text-fg transition-colors"
                     >
                       {isExpanded ? (
                         <ChevronDown className="size-3.5" />
@@ -228,7 +228,7 @@ export function ConfigurationSettings() {
                         <ChevronRight className="size-3.5" />
                       )}
                     </button>
-                    <span className="flex-1 text-[13px] font-medium text-muted-foreground">
+                    <span className="flex-1 text-ui font-medium text-fg-secondary">
                       {ch.label}
                     </span>
                     <Toggle
@@ -238,10 +238,10 @@ export function ConfigurationSettings() {
                   </div>
 
                   {isExpanded && (
-                    <div className="px-3 pb-3 space-y-2 border-t border-border-subtle pt-2">
+                    <div className="px-3 pb-3 space-y-2 border-t border-separator pt-2">
                       {ch.fields.map((field) => (
                         <div key={field.key}>
-                          <span className="block text-[11px] text-muted-foreground mb-1">
+                          <span className="block text-ui-xs text-fg-secondary mb-1">
                             {field.label}
                           </span>
                           {field.secret ? (
@@ -256,7 +256,7 @@ export function ConfigurationSettings() {
                               value={String(getChannelValue(ch.key, field.key) || "")}
                               onChange={(e) => setChannelEdit(ch.key, field.key, e.target.value)}
                               placeholder={field.placeholder}
-                              className="w-full px-3 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
+                              className="w-full px-3 py-1.5 text-ui-sm text-fg bg-control-hover border border-separator rounded-control focus:outline-none focus:border-fg-secondary/50 focus:ring-2 focus:ring-separator transition-colors placeholder:text-fg-dim"
                             />
                           )}
                         </div>
@@ -282,8 +282,8 @@ export function ConfigurationSettings() {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <div>
-                <span className="text-xs text-muted-foreground">Restrict to workspace</span>
-                <p className="text-[11px] text-dim">
+                <span className="text-ui-xs text-fg-secondary">Restrict to workspace</span>
+                <p className="text-ui-xs text-fg-dim">
                   Limit file operations to the workspace directory
                 </p>
               </div>
@@ -295,8 +295,8 @@ export function ConfigurationSettings() {
 
             <div className="flex items-center justify-between">
               <div>
-                <span className="text-xs text-muted-foreground">Browser automation</span>
-                <p className="text-[11px] text-dim">Enable the browser tool for web automation</p>
+                <span className="text-ui-xs text-fg-secondary">Browser automation</span>
+                <p className="text-ui-xs text-fg-dim">Enable the browser tool for web automation</p>
               </div>
               <Toggle
                 checked={(getToolValue("browser.enabled") as boolean) || false}
@@ -305,7 +305,7 @@ export function ConfigurationSettings() {
             </div>
 
             <label className="block">
-              <span className="block text-[11px] text-muted-foreground mb-1">
+              <span className="block text-ui-xs text-fg-secondary mb-1">
                 Browser trust level
               </span>
               <select
@@ -313,22 +313,22 @@ export function ConfigurationSettings() {
                 onChange={(e) =>
                   setToolEdits((prev) => ({ ...prev, "browser.trustLevel": e.target.value }))
                 }
-                className="w-full px-3 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+                className="w-full px-3 py-1.5 text-ui-sm text-fg bg-control-hover border border-separator rounded-control focus:outline-none focus:border-fg-secondary/50 focus:ring-2 focus:ring-separator transition-colors"
               >
-                <option value="strict" className="bg-popover">
+                <option value="strict" className="bg-glass-strong">
                   Strict — confirm every write
                 </option>
-                <option value="autonomous" className="bg-popover">
+                <option value="autonomous" className="bg-glass-strong">
                   Autonomous — confirm dangerous only
                 </option>
-                <option value="full" className="bg-popover">
+                <option value="full" className="bg-glass-strong">
                   Full — no confirmations
                 </option>
               </select>
             </label>
 
             <div>
-              <span className="block text-[11px] text-muted-foreground mb-1">
+              <span className="block text-ui-xs text-fg-secondary mb-1">
                 Brave Search API key
               </span>
               <SecretInput
@@ -347,18 +347,18 @@ export function ConfigurationSettings() {
           <div className="space-y-3">
             <div className="flex gap-3">
               <label className="flex-1">
-                <span className="block text-[11px] text-muted-foreground mb-1">Host</span>
+                <span className="block text-ui-xs text-fg-secondary mb-1">Host</span>
                 <input
                   type="text"
                   value={String(
                     "host" in gatewayEdits ? gatewayEdits.host : (gateway.host ?? "127.0.0.1"),
                   )}
                   onChange={(e) => setGatewayEdits((prev) => ({ ...prev, host: e.target.value }))}
-                  className="w-full px-3 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
+                  className="w-full px-3 py-1.5 text-ui-sm text-fg bg-control-hover border border-separator rounded-control focus:outline-none focus:border-fg-secondary/50 focus:ring-2 focus:ring-separator transition-colors placeholder:text-fg-dim"
                 />
               </label>
               <label className="w-28">
-                <span className="block text-[11px] text-muted-foreground mb-1">Port</span>
+                <span className="block text-ui-xs text-fg-secondary mb-1">Port</span>
                 <input
                   type="number"
                   value={
@@ -370,7 +370,7 @@ export function ConfigurationSettings() {
                       port: Number.parseInt(e.target.value, 10) || 0,
                     }))
                   }
-                  className="w-full px-3 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+                  className="w-full px-3 py-1.5 text-ui-sm text-fg bg-control-hover border border-separator rounded-control focus:outline-none focus:border-fg-secondary/50 focus:ring-2 focus:ring-separator transition-colors"
                 />
               </label>
             </div>

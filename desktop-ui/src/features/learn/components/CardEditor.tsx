@@ -61,31 +61,31 @@ export function CardEditor({ card, onSaved, onCancel }: CardEditorProps) {
     <div className="w-full max-w-lg space-y-4">
       <div className="glass-card p-6 space-y-4">
         <label className="block">
-          <span className="block text-[11px] text-muted-foreground mb-1">Front</span>
+          <span className="block text-ui-xs text-fg-secondary mb-1">Front</span>
           <textarea
             ref={frontRef}
             value={front}
             onChange={(e) => setFront(e.target.value)}
             rows={3}
-            className="glass-input w-full px-3 py-2 text-sm text-foreground resize-none"
+            className="glass-input w-full px-3 py-2 text-sm text-fg resize-none"
           />
         </label>
         <label className="block">
-          <span className="block text-[11px] text-muted-foreground mb-1">Back</span>
+          <span className="block text-ui-xs text-fg-secondary mb-1">Back</span>
           <textarea
             value={back}
             onChange={(e) => setBack(e.target.value)}
             rows={3}
-            className="glass-input w-full px-3 py-2 text-sm text-foreground resize-none"
+            className="glass-input w-full px-3 py-2 text-sm text-fg resize-none"
           />
         </label>
         <label className="block">
-          <span className="block text-[11px] text-muted-foreground mb-1">Deck</span>
+          <span className="block text-ui-xs text-fg-secondary mb-1">Deck</span>
           <input
             type="text"
             value={deck}
             onChange={(e) => setDeck(e.target.value)}
-            className="glass-input w-full px-3 py-1.5 text-sm text-foreground"
+            className="glass-input w-full px-3 py-1.5 text-sm text-fg"
           />
         </label>
       </div>
@@ -93,21 +93,21 @@ export function CardEditor({ card, onSaved, onCancel }: CardEditorProps) {
         <button
           type="button"
           onClick={onCancel}
-          className="glass-button px-3 py-1.5 text-sm text-muted-foreground flex items-center gap-1"
+          className="glass-button px-3 py-1.5 text-sm text-fg-secondary flex items-center gap-1"
         >
           <X size={14} strokeWidth={1.5} />
           Cancel
-          <span className="text-2xs text-muted-foreground ml-1">Esc</span>
+          <span className="text-ui-xs text-fg-secondary ml-1">Esc</span>
         </button>
         <button
           type="button"
           onClick={handleSave}
           disabled={!front.trim() || saving}
-          className="glass-button px-4 py-1.5 text-sm text-foreground flex items-center gap-1 disabled:opacity-40"
+          className="glass-button px-4 py-1.5 text-sm text-fg flex items-center gap-1 disabled:opacity-40"
         >
           <Check size={14} strokeWidth={1.5} />
           {saving ? "Saving..." : "Save"}
-          <span className="text-2xs text-muted-foreground ml-1">{"\u2318"}↩</span>
+          <span className="text-ui-xs text-fg-secondary ml-1">{"\u2318"}↩</span>
         </button>
       </div>
     </div>

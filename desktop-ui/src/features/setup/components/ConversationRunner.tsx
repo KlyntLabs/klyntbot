@@ -31,7 +31,7 @@ function StepDots({
             // biome-ignore lint/suspicious/noArrayIndexKey: static step indicator dots from Array.from
             key={`step-${i}`}
             className={`rounded-full transition-all duration-300 ${
-              isActive ? "w-6 h-2 bg-brand" : isDone ? "size-2 bg-brand/60" : "size-2 bg-muted"
+              isActive ? "w-6 h-2 bg-brand" : isDone ? "size-2 bg-brand/60" : "size-2 bg-control-hover"
             }`}
           />
         );
@@ -61,11 +61,11 @@ function CompletedNode({
 
   if (isEditing) {
     return (
-      <div className="py-3 px-4 rounded-xl bg-accent border border-border">
-        <div className="text-lg text-foreground leading-relaxed">
-          <span className="text-muted-foreground">{before}</span>
+      <div className="py-3 px-4 rounded-xl bg-control-hover border border-separator">
+        <div className="text-lg text-fg leading-relaxed">
+          <span className="text-fg-secondary">{before}</span>
           {renderInput(node, value, onResubmit, true)}
-          <span className="text-muted-foreground">{after}</span>
+          <span className="text-fg-secondary">{after}</span>
         </div>
       </div>
     );
@@ -76,13 +76,13 @@ function CompletedNode({
     <button
       type="button"
       onClick={onClickEdit}
-      className="w-full text-left py-2 px-4 rounded-xl hover:bg-accent transition-colors group"
+      className="w-full text-left py-2 px-4 rounded-xl hover:bg-control-hover transition-colors group"
     >
-      <span className="text-[15px] text-muted-foreground">{before}</span>
-      <span className="text-[15px] font-semibold text-foreground group-hover:text-brand transition-colors">
+      <span className="text-[15px] text-fg-secondary">{before}</span>
+      <span className="text-[15px] font-semibold text-fg group-hover:text-brand transition-colors">
         {displayValue}
       </span>
-      <span className="text-[15px] text-muted-foreground">{after}</span>
+      <span className="text-[15px] text-fg-secondary">{after}</span>
     </button>
   );
 }
@@ -244,7 +244,7 @@ export function ConversationRunner() {
             <span className="text-2xl font-bold text-brand">K</span>
           </div>
           {!isComplete && (
-            <h1 className="text-2xl font-semibold text-foreground tracking-tight">
+            <h1 className="text-2xl font-semibold text-fg tracking-tight">
               {activeIndex === 0 && !Object.keys(transcript).length
                 ? "Welcome to Klynt"
                 : "Setting up"}
@@ -255,7 +255,7 @@ export function ConversationRunner() {
         {/* Glass card container */}
         <div
           ref={containerRef}
-          className="glass-card rounded-2xl border border-border p-8"
+          className="glass-card rounded-2xl border border-separator p-8"
           style={{ animation: "glass-appear 0.3s ease-out" }}
         >
           {/* Completed nodes (compact list) */}
@@ -284,13 +284,13 @@ export function ConversationRunner() {
 
           {/* Divider between completed and active */}
           {activeIndex > 0 && !isComplete && activeNode?.inputType !== "complex" && (
-            <div className="my-4 border-t border-border-subtle" />
+            <div className="my-4 border-t border-separator" />
           )}
 
           {/* Active node — larger, prominent */}
           {activeNode && !isComplete && activeNode.inputType !== "complex" && (
             <div className="py-2" style={{ animation: "fade-in-up 0.3s ease-out" }}>
-              <div className="text-xl text-foreground leading-relaxed">
+              <div className="text-xl text-fg leading-relaxed">
                 <TypewriterText
                   text={activeNode.prompt}
                   onComplete={setAnimationComplete}
@@ -303,14 +303,14 @@ export function ConversationRunner() {
 
           {/* Error */}
           {error && (
-            <div className="mt-3 px-3 py-2 rounded-lg bg-destructive/10 border border-destructive/20">
-              <p className="text-sm text-destructive">{error}</p>
+            <div className="mt-3 px-3 py-2 rounded-lg bg-status-danger/10 border border-status-danger/20">
+              <p className="text-sm text-status-danger">{error}</p>
             </div>
           )}
 
           {/* Saving */}
           {isSaving && (
-            <div className="mt-3 flex items-center gap-2 text-muted-foreground">
+            <div className="mt-3 flex items-center gap-2 text-fg-secondary">
               <ThinkingDots size="sm" />
               <span className="text-sm">Saving...</span>
             </div>
@@ -319,9 +319,9 @@ export function ConversationRunner() {
           {/* Complete state */}
           {isComplete && (
             <div className="text-center py-6" style={{ animation: "fade-in-up 0.4s ease-out" }}>
-              <div className="size-16 mx-auto mb-5 rounded-full bg-success/10 border border-success/20 flex items-center justify-center">
+              <div className="size-16 mx-auto mb-5 rounded-full bg-status-success/10 border border-status-success/20 flex items-center justify-center">
                 <svg
-                  className="size-8 text-success"
+                  className="size-8 text-status-success"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -332,8 +332,8 @@ export function ConversationRunner() {
                   <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                 </svg>
               </div>
-              <h2 className="text-2xl font-semibold text-foreground mb-2">You're all set!</h2>
-              <p className="text-muted-foreground text-base mb-6">
+              <h2 className="text-2xl font-semibold text-fg mb-2">You're all set!</h2>
+              <p className="text-fg-secondary text-base mb-6">
                 Klynt is ready to help you stay productive.
               </p>
               <button
@@ -360,7 +360,7 @@ export function ConversationRunner() {
 
         {/* Progress percentage */}
         {!isComplete && (
-          <p className="text-center text-xs text-dim mt-3">
+          <p className="text-center text-ui-sm text-fg-dim mt-3">
             Step {Math.min(activeIndex + 1, visibleNodes.length)} of {visibleNodes.length}
           </p>
         )}

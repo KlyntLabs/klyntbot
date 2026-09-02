@@ -71,14 +71,14 @@ export function ObjectiveCard({ objective, onEdit }: ObjectiveCardProps) {
   );
 
   return (
-    <div className="glass-card rounded-lg border border-border">
+    <div className="glass-card rounded-lg border border-separator">
       {/* Objective header */}
       <div className="flex items-center gap-3 px-4 py-3">
         {/* Expand/collapse */}
         <button
           type="button"
           onClick={() => toggleObjective(objective.id)}
-          className="text-muted-foreground hover:text-foreground transition-colors"
+          className="text-fg-secondary hover:text-fg transition-colors"
         >
           {expanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
         </button>
@@ -88,22 +88,22 @@ export function ObjectiveCard({ objective, onEdit }: ObjectiveCardProps) {
 
         {/* Title + metadata */}
         <div className="flex-1 min-w-0">
-          <h3 className="text-sm font-medium text-foreground truncate">{objective.title}</h3>
+          <h3 className="text-sm font-medium text-fg truncate">{objective.title}</h3>
           <div className="flex items-center gap-2 mt-0.5">
-            <span className="text-2xs text-muted-foreground">
+            <span className="text-ui-xs text-fg-secondary">
               {krs.length} Key Result{krs.length !== 1 ? "s" : ""}
             </span>
           </div>
         </div>
 
         {/* Status badge */}
-        <span className={`text-2xs px-2 py-0.5 rounded-full font-medium ${status.color}`}>
+        <span className={`text-ui-xs px-2 py-0.5 rounded-full font-medium ${status.color}`}>
           {status.label}
         </span>
 
         {/* AI Confidence badge */}
         <span
-          className="text-2xs px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-400 font-medium cursor-help"
+          className="text-ui-xs px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-400 font-medium cursor-help"
           title={`AI Confidence: ${confidence}% — based on KR velocity and progress`}
         >
           AI {confidence}%
@@ -112,7 +112,7 @@ export function ObjectiveCard({ objective, onEdit }: ObjectiveCardProps) {
         {/* "Suggest next KR" placeholder */}
         <button
           type="button"
-          className="text-2xs px-2 py-1 rounded bg-accent text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+          className="text-ui-xs px-2 py-1 rounded bg-control-hover text-fg-secondary hover:text-fg transition-colors flex items-center gap-1"
           title="Ask AI to suggest next Key Result (coming soon)"
         >
           <Sparkles className="size-3" />
@@ -124,26 +124,26 @@ export function ObjectiveCard({ objective, onEdit }: ObjectiveCardProps) {
           <button
             type="button"
             onClick={() => setMenuOpen(!menuOpen)}
-            className="text-muted-foreground hover:text-foreground transition-colors"
+            className="text-fg-secondary hover:text-fg transition-colors"
           >
             <MoreHorizontal className="size-4" />
           </button>
           {menuOpen && (
-            <div className="absolute right-0 top-full mt-1 z-20 glass-panel rounded-lg py-1 min-w-[140px] bg-card border border-border shadow-lg">
+            <div className="absolute right-0 top-full mt-1 z-20 glass-panel rounded-lg py-1 min-w-[140px] bg-bg-elevated border border-separator shadow-lg">
               <button
                 type="button"
                 onClick={() => {
                   setMenuOpen(false);
                   onEdit(objective);
                 }}
-                className="w-full px-3 py-1.5 text-left text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors flex items-center gap-2"
+                className="w-full px-3 py-1.5 text-left text-ui-sm text-fg-secondary hover:text-fg hover:bg-control-hover transition-colors flex items-center gap-2"
               >
                 <Pencil className="size-3" /> Edit
               </button>
               <button
                 type="button"
                 onClick={handleDelete}
-                className="w-full px-3 py-1.5 text-left text-xs text-red-400 hover:text-red-300 hover:bg-accent transition-colors flex items-center gap-2"
+                className="w-full px-3 py-1.5 text-left text-ui-sm text-red-400 hover:text-red-300 hover:bg-control-hover transition-colors flex items-center gap-2"
               >
                 <Trash2 className="size-3" /> Delete
               </button>
@@ -179,7 +179,7 @@ export function ObjectiveCard({ objective, onEdit }: ObjectiveCardProps) {
             <button
               type="button"
               onClick={() => setShowKrForm(true)}
-              className="flex items-center gap-1.5 ml-4 px-3 py-1.5 text-[11px] text-muted-foreground hover:text-foreground hover:bg-accent rounded transition-colors"
+              className="flex items-center gap-1.5 ml-4 px-3 py-1.5 text-ui-xs text-fg-secondary hover:text-fg hover:bg-control-hover rounded transition-colors"
             >
               <Plus className="size-3" /> Add Key Result
             </button>

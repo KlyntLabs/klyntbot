@@ -35,8 +35,8 @@ export function Tooltip({ content, side = "top", children, className }: TooltipP
           id={tooltipId}
           role="tooltip"
           className={cn(
-            "absolute whitespace-nowrap px-2 py-1 text-xs rounded-md",
-            "bg-muted text-muted-foreground border border-border",
+            "absolute whitespace-nowrap px-2 py-1 text-ui-sm rounded-control",
+            "bg-control-hover text-fg-secondary border border-separator",
             "pointer-events-none animate-in fade-in-50 duration-100",
             "z-50 shadow-lg",
             sideClasses[side],

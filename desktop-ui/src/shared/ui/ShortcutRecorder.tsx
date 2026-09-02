@@ -135,12 +135,12 @@ export function ShortcutRecorder({ value, defaultValue, onChange, error }: Short
           ref={btnRef}
           type="button"
           onClick={() => setRecording(true)}
-          className={`flex-1 px-3 py-1.5 text-[13px] text-left rounded-lg border transition-all ${
+          className={`flex-1 px-3 py-1.5 text-ui text-left rounded-control border transition-all ${
             recording
-              ? "border-brand bg-accent animate-pulse text-brand"
+              ? "border-brand bg-control-hover animate-pulse text-brand"
               : error
-                ? "border-red-500/50 bg-accent text-foreground"
-                : "border-border bg-accent text-foreground hover:border-brand/30"
+                ? "border-status-danger/50 bg-control-hover text-fg"
+                : "border-separator bg-control-hover text-fg hover:border-brand/30"
           }`}
         >
           {recording ? "Press shortcut..." : displayShortcut(value)}
@@ -150,13 +150,13 @@ export function ShortcutRecorder({ value, defaultValue, onChange, error }: Short
             type="button"
             onClick={() => onChange(defaultValue)}
             title="Reset to default"
-            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+            className="p-1.5 rounded-control text-fg-secondary hover:text-fg hover:bg-control-hover transition-colors"
           >
             <RotateCcw className="size-3.5" />
           </button>
         )}
       </div>
-      {error && <p className="text-[11px] text-red-400">{error}</p>}
+      {error && <p className="text-ui-xs text-status-danger">{error}</p>}
     </div>
   );
 }

@@ -52,13 +52,13 @@ export function PersonaCard({
           {icon}
         </span>
         <div className="min-w-0">
-          <div className="text-xs font-medium text-foreground truncate">{name}</div>
-          <div className="text-2xs text-dim">{role}</div>
+          <div className="text-ui-sm font-medium text-fg truncate">{name}</div>
+          <div className="text-ui-xs text-fg-dim">{role}</div>
         </div>
       </div>
 
       {/* Analysis content */}
-      <div className="text-xs text-muted-foreground leading-relaxed">
+      <div className="text-ui-sm text-fg-secondary leading-relaxed">
         <MarkdownContent content={content} />
       </div>
 
@@ -68,7 +68,7 @@ export function PersonaCard({
           <button
             type="button"
             onClick={() => setShowChat((p) => !p)}
-            className="flex items-center gap-1 text-2xs text-purple hover:text-purple/80 transition-colors"
+            className="flex items-center gap-1 text-ui-xs text-purple hover:text-purple/80 transition-colors"
           >
             <MessageCircle size={10} />
             {showChat ? "Hide chat" : "Ask this persona"}

@@ -61,8 +61,8 @@ export function AskAIPopup({
       style={{ top: position.top, left: position.left }}
     >
       {/* Selected text preview */}
-      <div className="px-3 pt-3 pb-2 border-b border-border/50">
-        <p className="text-[11px] text-muted-foreground line-clamp-2">{selectedText}</p>
+      <div className="px-3 pt-3 pb-2 border-b border-separator/50">
+        <p className="text-ui-xs text-fg-secondary line-clamp-2">{selectedText}</p>
       </div>
 
       {/* Input area */}
@@ -77,7 +77,7 @@ export function AskAIPopup({
               if (e.key === "Enter") handleSubmit();
             }}
             placeholder="Ask about this text..."
-            className="flex-1 bg-transparent text-sm text-primary placeholder:text-muted outline-none"
+            className="flex-1 bg-transparent text-sm text-brand placeholder:text-fg-secondary outline-none"
             disabled={loading}
           />
           {loading ? (
@@ -87,7 +87,7 @@ export function AskAIPopup({
               type="button"
               onClick={handleSubmit}
               disabled={!prompt.trim()}
-              className="p-1 rounded text-muted hover:text-primary transition-colors disabled:opacity-30"
+              className="p-1 rounded text-fg-secondary hover:text-brand transition-colors disabled:opacity-30"
             >
               <Send size={14} />
             </button>
@@ -98,7 +98,7 @@ export function AskAIPopup({
       {/* Response area */}
       {response && (
         <div className="p-3 max-h-[200px] overflow-auto">
-          <p className="text-sm text-primary leading-relaxed whitespace-pre-wrap">{response}</p>
+          <p className="text-sm text-brand leading-relaxed whitespace-pre-wrap">{response}</p>
         </div>
       )}
     </div>,

@@ -87,12 +87,12 @@ export function CalendarTrack({
             aria-label={`${event.title}, ${formatHumanDuration(durationSecs)}`}
           >
             {height > 16 && (
-              <span className="text-[9px] text-muted-foreground font-medium px-1.5 truncate block leading-tight mt-0.5">
+              <span className="text-[9px] text-fg-secondary font-medium px-1.5 truncate block leading-tight mt-0.5">
                 {event.title}
               </span>
             )}
             {height > 30 && (
-              <span className="text-[8px] text-muted-foreground px-1.5 truncate block">
+              <span className="text-[8px] text-fg-secondary px-1.5 truncate block">
                 {formatHumanDuration(durationSecs)}
                 {event.location ? ` · ${event.location}` : ""}
               </span>

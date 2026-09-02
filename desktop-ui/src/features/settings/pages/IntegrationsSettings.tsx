@@ -64,8 +64,8 @@ export function IntegrationsSettings() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h2 className="text-lg font-medium text-foreground">Integrations</h2>
-      <p className="text-[13px] text-muted-foreground -mt-4">
+      <h2 className="text-lg font-medium text-fg">Integrations</h2>
+      <p className="text-ui text-fg-secondary -mt-4">
         Configure external capture sources to enrich your activity timeline.
       </p>
 
@@ -74,18 +74,18 @@ export function IntegrationsSettings() {
         <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Terminal className="size-4 text-muted-foreground" strokeWidth={1.5} />
-              <span className="text-[13px] text-muted-foreground">
+              <Terminal className="size-4 text-fg-secondary" strokeWidth={1.5} />
+              <span className="text-ui text-fg-secondary">
                 {hookStatus?.installed ? "Installed" : "Not installed"}
               </span>
-              {hookStatus?.installed && <span className="size-2 rounded-full bg-success" />}
+              {hookStatus?.installed && <span className="size-2 rounded-full bg-status-success" />}
             </div>
             {hookStatus?.installed ? (
               <button
                 type="button"
                 onClick={handleUninstall}
                 disabled={installing}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-ui-sm rounded-lg text-fg-secondary hover:text-fg hover:bg-control-hover transition-colors"
               >
                 <X className="size-3" />
                 Uninstall
@@ -95,14 +95,14 @@ export function IntegrationsSettings() {
                 type="button"
                 onClick={handleInstall}
                 disabled={installing}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg bg-brand/20 text-brand hover:bg-brand/30 transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-ui-sm rounded-lg bg-brand/20 text-brand hover:bg-brand/30 transition-colors"
               >
                 Install
               </button>
             )}
           </div>
           {hookStatus && (
-            <div className="text-[11px] text-muted-foreground">
+            <div className="text-ui-xs text-fg-secondary">
               Shell: {hookStatus.shell} · RC file: {hookStatus.rcFile}
             </div>
           )}
@@ -113,32 +113,32 @@ export function IntegrationsSettings() {
       <SettingsCard title="Ingestion API">
         <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between">
-            <span className="text-[13px] text-muted-foreground">Endpoint</span>
-            <code className="text-xs text-muted-foreground bg-accent px-2 py-0.5 rounded">
+            <span className="text-ui text-fg-secondary">Endpoint</span>
+            <code className="text-ui-xs text-fg-secondary bg-control-hover px-2 py-0.5 rounded">
               http://127.0.0.1:3456/api/v1/ingest
             </code>
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-[13px] text-muted-foreground">Auth Token</span>
+            <span className="text-ui text-fg-secondary">Auth Token</span>
             <div className="flex items-center gap-2">
-              <code className="text-xs text-muted-foreground bg-accent px-2 py-0.5 rounded max-w-[200px] truncate">
+              <code className="text-ui-xs text-fg-secondary bg-control-hover px-2 py-0.5 rounded max-w-[200px] truncate">
                 {tokenVisible ? (token ?? "—") : "••••••••••••"}
               </code>
               <button
                 type="button"
                 onClick={() => setTokenVisible(!tokenVisible)}
-                className="text-[11px] text-muted-foreground hover:text-foreground"
+                className="text-ui-xs text-fg-secondary hover:text-fg"
               >
                 {tokenVisible ? "Hide" : "Show"}
               </button>
               <button
                 type="button"
                 onClick={handleCopyToken}
-                className="text-muted-foreground hover:text-foreground"
+                className="text-fg-secondary hover:text-fg"
                 title="Copy token"
               >
                 {copied ? (
-                  <Check className="size-3.5 text-success" />
+                  <Check className="size-3.5 text-status-success" />
                 ) : (
                   <Copy className="size-3.5" />
                 )}
@@ -146,7 +146,7 @@ export function IntegrationsSettings() {
               <button
                 type="button"
                 onClick={handleRegenerateToken}
-                className="text-muted-foreground hover:text-foreground"
+                className="text-fg-secondary hover:text-fg"
                 title="Regenerate token"
               >
                 <RefreshCw className="size-3.5" />
@@ -162,11 +162,11 @@ export function IntegrationsSettings() {
           <SettingsCard title="Event Sources (Last 24h)">
             <div className="flex flex-col gap-1.5">
               {Object.entries(captureStatus.eventCountLast24h).map(([source, count]) => (
-                <div key={source} className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground capitalize">
+                <div key={source} className="flex items-center justify-between text-ui-sm">
+                  <span className="text-fg-secondary capitalize">
                     {source.replace(/_/g, " ")}
                   </span>
-                  <span className="text-muted-foreground tabular-nums">{count}</span>
+                  <span className="text-fg-secondary tabular-nums">{count}</span>
                 </div>
               ))}
             </div>
@@ -175,7 +175,7 @@ export function IntegrationsSettings() {
 
       {/* Browser Extension placeholder */}
       <SettingsCard title="Browser Extension">
-        <p className="text-xs text-muted-foreground">
+        <p className="text-ui-xs text-fg-secondary">
           Chrome extension coming soon. In the meantime, external plugins can send events to the
           ingestion API endpoint above.
         </p>

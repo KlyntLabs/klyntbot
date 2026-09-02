@@ -11,14 +11,14 @@ interface CustomServerCardProps {
 
 export function CustomServerCard({ server, onToggle, onRemove, onEdit }: CustomServerCardProps) {
   return (
-    <div className="flex items-center justify-between py-3 px-4 bg-card rounded-lg border border-border">
+    <div className="flex items-center justify-between py-3 px-4 island rounded-lg">
       <div className="flex items-center gap-3 min-w-0">
-        <div className="size-8 rounded-md bg-muted flex items-center justify-center text-muted-foreground flex-shrink-0">
+        <div className="size-8 rounded-md bg-control-hover flex items-center justify-center text-fg-secondary flex-shrink-0">
           <McpServerIcon name={server.name} className="size-4" />
         </div>
         <div className="min-w-0">
-          <div className="text-[13px] font-medium text-foreground truncate">{server.name}</div>
-          <div className="text-[11px] text-dim">
+          <div className="text-ui font-medium text-fg truncate">{server.name}</div>
+          <div className="text-ui-xs text-fg-dim">
             {server.transport === "stdio" ? server.command : server.url}
           </div>
         </div>
@@ -26,8 +26,8 @@ export function CustomServerCard({ server, onToggle, onRemove, onEdit }: CustomS
 
       <div className="flex items-center gap-1.5 flex-shrink-0">
         <span
-          className={`text-[11px] px-1.5 py-0.5 rounded ${
-            server.transport === "stdio" ? "bg-purple/10 text-purple" : "bg-info/10 text-info"
+          className={`text-ui-xs px-1.5 py-0.5 rounded ${
+            server.transport === "stdio" ? "bg-purple/10 text-purple" : "bg-status-info/10 text-status-info"
           }`}
         >
           {server.transport}
@@ -36,7 +36,7 @@ export function CustomServerCard({ server, onToggle, onRemove, onEdit }: CustomS
           type="button"
           onClick={() => onToggle(server.name, !server.enabled)}
           className={`size-7 rounded-md flex items-center justify-center transition-colors ${
-            server.enabled ? "text-success hover:bg-accent" : "text-dim hover:bg-accent"
+            server.enabled ? "text-status-success hover:bg-control-hover" : "text-fg-dim hover:bg-control-hover"
           }`}
           aria-label={server.enabled ? "Disable" : "Enable"}
         >
@@ -45,7 +45,7 @@ export function CustomServerCard({ server, onToggle, onRemove, onEdit }: CustomS
         <button
           type="button"
           onClick={() => onEdit(server)}
-          className="size-7 rounded-md flex items-center justify-center text-muted-foreground hover:text-muted-foreground hover:bg-accent transition-colors"
+          className="size-7 rounded-md flex items-center justify-center text-fg-secondary hover:text-fg-secondary hover:bg-control-hover transition-colors"
           aria-label="Edit"
         >
           <Settings2 className="size-3.5" strokeWidth={1.5} />
@@ -53,7 +53,7 @@ export function CustomServerCard({ server, onToggle, onRemove, onEdit }: CustomS
         <button
           type="button"
           onClick={() => onRemove(server.name)}
-          className="size-7 rounded-md flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-accent transition-colors"
+          className="size-7 rounded-md flex items-center justify-center text-fg-secondary hover:text-status-danger hover:bg-control-hover transition-colors"
           aria-label="Remove"
         >
           <Trash2 className="size-3.5" strokeWidth={1.5} />
@@ -93,17 +93,17 @@ export function RecommendedServerCard({
   const isConnected = installed && hasOAuth && oauthConnected;
 
   return (
-    <div className="flex items-center justify-between py-3 px-4 bg-card rounded-lg border border-border">
+    <div className="flex items-center justify-between py-3 px-4 island rounded-lg">
       <div className="flex items-center gap-3 min-w-0">
-        <div className="size-8 rounded-md bg-muted flex items-center justify-center text-muted-foreground flex-shrink-0">
+        <div className="size-8 rounded-md bg-control-hover flex items-center justify-center text-fg-secondary flex-shrink-0">
           <McpServerIcon name={server.name} className="size-4" />
         </div>
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
-            <span className="text-[13px] font-medium text-foreground">{server.name}</span>
-            <span className="text-[11px] text-dim">by {server.author}</span>
+            <span className="text-ui font-medium text-fg">{server.name}</span>
+            <span className="text-ui-xs text-fg-dim">by {server.author}</span>
           </div>
-          <div className="text-[11px] text-muted-foreground truncate">{server.description}</div>
+          <div className="text-ui-xs text-fg-secondary truncate">{server.description}</div>
         </div>
       </div>
 
@@ -113,7 +113,7 @@ export function RecommendedServerCard({
           <button
             type="button"
             onClick={() => onInstall(server)}
-            className="text-xs px-3 py-1 rounded-md border border-brand/30 text-brand bg-brand/5 hover:bg-brand/10 transition-colors"
+            className="text-ui-sm px-3 py-1 rounded-md border border-brand/30 text-brand bg-brand/5 hover:bg-brand/10 transition-colors"
           >
             Install
           </button>
@@ -126,7 +126,7 @@ export function RecommendedServerCard({
                 type="button"
                 onClick={() => onOAuthConnect?.(server)}
                 disabled={oauthLoading}
-                className="text-xs px-3 py-1 rounded-md border border-brand/30 text-brand bg-brand/5 hover:bg-brand/10 transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                className="text-ui-sm px-3 py-1 rounded-md border border-brand/30 text-brand bg-brand/5 hover:bg-brand/10 transition-colors disabled:opacity-50 flex items-center gap-1.5"
               >
                 {oauthLoading ? (
                   <>
@@ -144,7 +144,7 @@ export function RecommendedServerCard({
               <button
                 type="button"
                 onClick={() => onOAuthDisconnect?.(server.name)}
-                className="text-xs px-3 py-1 rounded-md border border-success/30 text-success bg-success/5 hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 transition-colors flex items-center gap-1"
+                className="text-ui-sm px-3 py-1 rounded-md border border-status-success/30 text-status-success bg-status-success/5 hover:bg-status-danger/10 hover:text-status-danger hover:border-status-danger/30 transition-colors flex items-center gap-1"
                 title="Click to disconnect"
               >
                 <Check className="size-3" />
@@ -157,10 +157,10 @@ export function RecommendedServerCard({
               <button
                 type="button"
                 onClick={() => onToggle?.(server.name, !enabled)}
-                className={`text-xs px-3 py-1 rounded-md border transition-colors ${
+                className={`text-ui-sm px-3 py-1 rounded-md border transition-colors ${
                   enabled
-                    ? "border-success/30 text-success bg-success/5 hover:bg-success/10"
-                    : "border-border text-dim bg-accent hover:bg-muted"
+                    ? "border-status-success/30 text-status-success bg-status-success/5 hover:bg-status-success/10"
+                    : "border-separator text-fg-dim bg-control-hover hover:bg-control-hover"
                 }`}
               >
                 {enabled ? "Enabled" : "Disabled"}
@@ -171,7 +171,7 @@ export function RecommendedServerCard({
             <button
               type="button"
               onClick={() => onEdit?.(server)}
-              className="size-7 rounded-md flex items-center justify-center text-muted-foreground hover:text-muted-foreground hover:bg-accent transition-colors"
+              className="size-7 rounded-md flex items-center justify-center text-fg-secondary hover:text-fg-secondary hover:bg-control-hover transition-colors"
               aria-label="Configure"
             >
               <Settings2 className="size-3.5" strokeWidth={1.5} />
@@ -183,7 +183,7 @@ export function RecommendedServerCard({
                 type="button"
                 onClick={() => onToggle?.(server.name, !enabled)}
                 className={`size-7 rounded-md flex items-center justify-center transition-colors ${
-                  enabled ? "text-success hover:bg-accent" : "text-dim hover:bg-accent"
+                  enabled ? "text-status-success hover:bg-control-hover" : "text-fg-dim hover:bg-control-hover"
                 }`}
                 aria-label={enabled ? "Disable" : "Enable"}
               >

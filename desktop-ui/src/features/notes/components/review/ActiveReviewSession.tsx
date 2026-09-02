@@ -158,7 +158,7 @@ export function ActiveReviewSession({ layout: _layout, onClose }: ActiveReviewSe
   if (phase === "idle") {
     return (
       <div className="flex flex-col items-center justify-center gap-3 py-8">
-        <p className="text-[11px] text-dim">Loading decks…</p>
+        <p className="text-ui-xs text-fg-dim">Loading decks…</p>
       </div>
     );
   }
@@ -171,15 +171,15 @@ export function ActiveReviewSession({ layout: _layout, onClose }: ActiveReviewSe
     if (dueDecks.length === 0) {
       return (
         <div className="flex flex-col items-center justify-center gap-3 py-8">
-          <BookOpen size={24} className="text-accent" />
-          <p className="text-xs text-foreground font-medium">No cards due for review</p>
-          <p className="text-2xs text-dim">
+          <BookOpen size={24} className="text-brand" />
+          <p className="text-ui-sm text-fg font-medium">No cards due for review</p>
+          <p className="text-ui-xs text-fg-dim">
             {decks.length} {decks.length === 1 ? "deck" : "decks"} saved, all caught up!
           </p>
           <button
             type="button"
             onClick={onClose}
-            className="text-2xs px-3 py-1 rounded-md bg-white/[0.06] text-muted-foreground hover:text-foreground"
+            className="text-ui-xs px-3 py-1 rounded-md bg-white/[0.06] text-fg-secondary hover:text-fg"
           >
             Done
           </button>
@@ -190,15 +190,15 @@ export function ActiveReviewSession({ layout: _layout, onClose }: ActiveReviewSe
     return (
       <div className="flex flex-col gap-3 p-3">
         <div className="flex items-center gap-2">
-          <span className="text-[11px] text-foreground font-medium">Choose a deck to review</span>
+          <span className="text-ui-xs text-fg font-medium">Choose a deck to review</span>
           <div className="flex-1" />
-          <button type="button" onClick={handleExit} className="p-1 text-dim hover:text-foreground">
+          <button type="button" onClick={handleExit} className="p-1 text-fg-dim hover:text-fg">
             <X size={12} />
           </button>
         </div>
 
         {error && (
-          <p className="text-2xs text-red-400 bg-red-500/10 rounded-md px-2 py-1">{error}</p>
+          <p className="text-ui-xs text-red-400 bg-red-500/10 rounded-md px-2 py-1">{error}</p>
         )}
 
         <div className="space-y-1.5">
@@ -209,9 +209,9 @@ export function ActiveReviewSession({ layout: _layout, onClose }: ActiveReviewSe
               onClick={() => startReview(d.name)}
               className="w-full flex items-center gap-2 p-2 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] text-left"
             >
-              <BookOpen size={12} className="text-muted-foreground shrink-0" />
-              <span className="text-[11px] text-foreground truncate flex-1">{d.name}</span>
-              <span className="text-2xs text-dim shrink-0">
+              <BookOpen size={12} className="text-fg-secondary shrink-0" />
+              <span className="text-ui-xs text-fg truncate flex-1">{d.name}</span>
+              <span className="text-ui-xs text-fg-dim shrink-0">
                 {d.dueCount}/{d.cardCount} due
               </span>
             </button>
@@ -261,7 +261,7 @@ export function ActiveReviewSession({ layout: _layout, onClose }: ActiveReviewSe
       />
 
       {/* Error */}
-      {error && <p className="text-2xs text-red-400 bg-red-500/10 rounded-md px-2 py-1">{error}</p>}
+      {error && <p className="text-ui-xs text-red-400 bg-red-500/10 rounded-md px-2 py-1">{error}</p>}
 
       {/* Card */}
       <ReviewCard
@@ -287,7 +287,7 @@ export function ActiveReviewSession({ layout: _layout, onClose }: ActiveReviewSe
         <button
           type="button"
           onClick={skipCard}
-          className="shrink-0 text-[9px] text-dim hover:text-foreground"
+          className="shrink-0 text-[9px] text-fg-dim hover:text-fg"
         >
           Skip
         </button>

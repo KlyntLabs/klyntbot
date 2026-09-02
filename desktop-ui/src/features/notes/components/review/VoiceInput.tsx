@@ -33,9 +33,9 @@ export function VoiceInput({ onSubmit }: VoiceInputProps) {
 
   if (!SpeechRecognitionClass) {
     return (
-      <div className="flex items-center justify-center gap-2 rounded-lg bg-white/[0.03] border border-border px-3 py-3">
-        <Mic size={12} className="text-dim shrink-0" />
-        <span className="text-2xs text-dim">Voice input is not supported in this browser.</span>
+      <div className="flex items-center justify-center gap-2 rounded-lg bg-white/[0.03] border border-separator px-3 py-3">
+        <Mic size={12} className="text-fg-dim shrink-0" />
+        <span className="text-ui-xs text-fg-dim">Voice input is not supported in this browser.</span>
       </div>
     );
   }
@@ -99,11 +99,11 @@ export function VoiceInput({ onSubmit }: VoiceInputProps) {
   return (
     <div className="flex flex-col gap-2">
       {/* Transcript area */}
-      <div className="min-h-[60px] rounded-lg bg-white/[0.04] border border-border px-3 py-2 text-xs text-foreground">
+      <div className="min-h-[60px] rounded-lg bg-white/[0.04] border border-separator px-3 py-2 text-ui-sm text-fg">
         {transcript ? (
           <p className="whitespace-pre-wrap">{transcript}</p>
         ) : (
-          <p className="text-dim">
+          <p className="text-fg-dim">
             {recordingState === "recording" ? "Listening…" : "Press the mic to start recording"}
           </p>
         )}
@@ -115,7 +115,7 @@ export function VoiceInput({ onSubmit }: VoiceInputProps) {
           <button
             type="button"
             onClick={startRecording}
-            className="flex items-center gap-1.5 text-2xs px-3 py-1.5 rounded-full bg-white/[0.06] text-muted-foreground hover:bg-white/[0.10] hover:text-foreground"
+            className="flex items-center gap-1.5 text-ui-xs px-3 py-1.5 rounded-full bg-white/[0.06] text-fg-secondary hover:bg-white/[0.10] hover:text-fg"
           >
             <Mic size={11} />
             Record
@@ -126,7 +126,7 @@ export function VoiceInput({ onSubmit }: VoiceInputProps) {
           <button
             type="button"
             onClick={stopRecording}
-            className="flex items-center gap-1.5 text-2xs px-3 py-1.5 rounded-full bg-red-500/20 text-red-400 hover:bg-red-500/30 animate-pulse"
+            className="flex items-center gap-1.5 text-ui-xs px-3 py-1.5 rounded-full bg-red-500/20 text-red-400 hover:bg-red-500/30 animate-pulse"
           >
             <Square size={11} />
             Stop
@@ -139,14 +139,14 @@ export function VoiceInput({ onSubmit }: VoiceInputProps) {
               type="button"
               onClick={handleSubmit}
               disabled={!transcript.trim()}
-              className="flex-1 text-2xs px-3 py-1.5 rounded-md bg-accent/20 text-accent hover:bg-accent/30 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="flex-1 text-ui-xs px-3 py-1.5 rounded-md bg-brand/20 text-brand hover:bg-brand/30 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Submit
             </button>
             <button
               type="button"
               onClick={handleReset}
-              className="text-2xs px-2 py-1.5 rounded-md bg-white/[0.06] text-dim hover:text-foreground"
+              className="text-ui-xs px-2 py-1.5 rounded-md bg-white/[0.06] text-fg-dim hover:text-fg"
             >
               Retry
             </button>
@@ -157,7 +157,7 @@ export function VoiceInput({ onSubmit }: VoiceInputProps) {
           <button
             type="button"
             onClick={handleSubmit}
-            className="ml-auto text-2xs px-3 py-1.5 rounded-md bg-accent/20 text-accent hover:bg-accent/30"
+            className="ml-auto text-ui-xs px-3 py-1.5 rounded-md bg-brand/20 text-brand hover:bg-brand/30"
           >
             Submit
           </button>

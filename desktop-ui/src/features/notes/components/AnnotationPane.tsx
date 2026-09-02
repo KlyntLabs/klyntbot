@@ -65,15 +65,15 @@ export function AnnotationPane({
   return (
     <div ref={containerRef} className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-border shrink-0">
+      <div className="flex items-center justify-between px-4 py-2 border-b border-separator shrink-0">
         <div className="flex items-center gap-2">
           <StickyNote size={14} className="text-purple" strokeWidth={1.5} />
-          <span className="text-sm font-medium text-primary">Notes & Annotations</span>
+          <span className="text-sm font-medium text-brand">Notes & Annotations</span>
         </div>
         <button
           type="button"
           onClick={onClose}
-          className="p-1 rounded text-muted-foreground hover:text-primary transition-colors"
+          className="p-1 rounded text-fg-secondary hover:text-brand transition-colors"
         >
           <X size={14} strokeWidth={1.5} />
         </button>
@@ -91,7 +91,7 @@ export function AnnotationPane({
       {annotationsExpanded && (
         // biome-ignore lint/a11y/noStaticElementInteractions: resize handle
         <div
-          className="h-1.5 shrink-0 cursor-row-resize group flex items-center justify-center hover:bg-purple/10 transition-colors border-t border-border"
+          className="h-1.5 shrink-0 cursor-row-resize group flex items-center justify-center hover:bg-purple/10 transition-colors border-t border-separator"
           onPointerDown={(e) => {
             e.preventDefault();
             const container = containerRef.current;
@@ -115,7 +115,7 @@ export function AnnotationPane({
         >
           <GripHorizontal
             size={10}
-            className="text-muted-foreground/30 group-hover:text-muted-foreground/60"
+            className="text-fg-secondary/30 group-hover:text-fg-secondary/60"
           />
         </div>
       )}
@@ -128,7 +128,7 @@ export function AnnotationPane({
         <button
           type="button"
           onClick={() => setAnnotationsExpanded((prev) => !prev)}
-          className="w-full flex items-center gap-1.5 px-3 py-1.5 text-2xs text-muted-foreground uppercase tracking-wider hover:bg-surface-hover transition-colors shrink-0"
+          className="w-full flex items-center gap-1.5 px-3 py-1.5 text-ui-xs text-fg-secondary uppercase tracking-wider hover:bg-control-hover transition-colors shrink-0"
         >
           {annotationsExpanded ? (
             <ChevronDown size={10} strokeWidth={1.5} />

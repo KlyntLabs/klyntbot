@@ -31,7 +31,7 @@ export function BrainTimeline() {
 
   return (
     <div className="flex flex-col gap-3">
-      <h2 className="text-[13px] font-medium text-muted-foreground flex items-center gap-1.5">
+      <h2 className="text-ui font-medium text-fg-secondary flex items-center gap-1.5">
         <GitBranch className="size-3.5" />
         Brain Versions
       </h2>
@@ -45,43 +45,43 @@ export function BrainTimeline() {
             className={`relative flex gap-3 pb-4 ${v.reverted ? "opacity-40" : ""}`}
           >
             <div
-              className={`relative z-10 mt-1.5 size-2 rounded-full shrink-0 ${v.reverted ? "bg-muted-foreground" : "bg-accent"}`}
+              className={`relative z-10 mt-1.5 size-2 rounded-full shrink-0 ${v.reverted ? "bg-fg-secondary" : "bg-brand"}`}
               style={{ marginLeft: "7px" }}
             />
 
             <div className="glass-card rounded-xl p-3 flex-1">
               <div className="flex items-center justify-between">
                 <div>
-                  <span className="text-[12px] font-medium text-foreground">
+                  <span className="text-ui-sm font-medium text-fg">
                     Version {v.version}
                   </span>
                   {v.reverted && (
-                    <span className="text-2xs text-muted-foreground ml-2">(reverted)</span>
+                    <span className="text-ui-xs text-fg-secondary ml-2">(reverted)</span>
                   )}
                 </div>
-                <span className="text-2xs text-dim">
+                <span className="text-ui-xs text-fg-dim">
                   {new Date(v.promotedAt).toLocaleDateString()}
                 </span>
               </div>
-              <p className="text-[11px] text-muted-foreground mt-0.5">{v.reason}</p>
+              <p className="text-ui-xs text-fg-secondary mt-0.5">{v.reason}</p>
 
               {!v.reverted &&
                 v.version !== versions[0]?.version &&
                 (confirmVersion === v.version ? (
                   <div className="flex items-center gap-2 mt-2">
-                    <span className="text-2xs text-muted-foreground">Revert to this version?</span>
+                    <span className="text-ui-xs text-fg-secondary">Revert to this version?</span>
                     <button
                       type="button"
                       onClick={() => handleRevert(v.version)}
                       disabled={loading}
-                      className="text-2xs text-accent hover:text-accent/80 transition-colors"
+                      className="text-ui-xs text-brand hover:text-brand/80 transition-colors"
                     >
                       Confirm
                     </button>
                     <button
                       type="button"
                       onClick={() => setConfirmVersion(null)}
-                      className="text-2xs text-muted-foreground"
+                      className="text-ui-xs text-fg-secondary"
                     >
                       Cancel
                     </button>
@@ -90,7 +90,7 @@ export function BrainTimeline() {
                   <button
                     type="button"
                     onClick={() => setConfirmVersion(v.version)}
-                    className="flex items-center gap-1 mt-2 text-2xs text-muted-foreground hover:text-accent transition-colors"
+                    className="flex items-center gap-1 mt-2 text-ui-xs text-fg-secondary hover:text-brand transition-colors"
                   >
                     <RotateCcw className="size-3" />
                     Revert to this version

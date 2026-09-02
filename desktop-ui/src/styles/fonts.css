@@ -1,11 +1,5 @@
 /*
  * SF Pro is the native macOS system font — loaded via -apple-system / BlinkMacSystemFont.
- * No remote font loading needed for Tauri desktop on macOS.
- *
- * The font stack in theme.css:
- *   "SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont,
- *   system-ui, "Helvetica Neue", sans-serif
- *
- * This ensures the Tahoe-native look on macOS while falling back
- * to the platform system font on other operating systems.
+ * No remote font loading. Stack is owned by @klyntbot/design-system tokens/typography.css
+ * (--ds-font-sans / --ds-font-mono).
  */

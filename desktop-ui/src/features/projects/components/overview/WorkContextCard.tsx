@@ -26,25 +26,25 @@ export function WorkContextCard() {
 
   return (
     <div className="glass-card rounded-xl p-5">
-      <p className="text-2xs text-muted-foreground uppercase tracking-wider mb-3">Work Context</p>
+      <p className="text-ui-xs text-fg-secondary uppercase tracking-wider mb-3">Work Context</p>
 
       {ctx ? (
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-2">
             <div
               className="size-2 rounded-full flex-shrink-0"
-              style={{ backgroundColor: ctx.color ?? "var(--brand)" }}
+              style={{ backgroundColor: ctx.color ?? "var(--ds-accent)" }}
             />
-            <span className="text-sm font-medium text-foreground truncate">{ctx.title}</span>
+            <span className="text-sm font-medium text-fg truncate">{ctx.title}</span>
           </div>
-          <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+          <div className="flex items-center gap-3 text-ui-xs text-fg-secondary">
             <span>{formatHumanDuration(ctx.durationMins * 60)}</span>
             <span className="w-px h-3 bg-border" />
             <span>{Math.round(intel?.productivityScore ?? 0)}% productive</span>
           </div>
         </div>
       ) : (
-        <p className="text-[11px] text-muted-foreground">No active session</p>
+        <p className="text-ui-xs text-fg-secondary">No active session</p>
       )}
     </div>
   );

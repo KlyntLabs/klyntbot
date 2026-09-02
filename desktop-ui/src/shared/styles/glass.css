@@ -1,207 +1,150 @@
-/* ── GLASS MATERIAL UTILITIES ──────────────────────────────────────────
-   Tahoe-inspired glassmorphism utility classes. These are theme-agnostic
-   structure definitions that use CSS custom properties from theme files.
-   Each utility supports all themes via variable substitution. */
+/* Product glass class names — values from --ds-* via compat aliases.
+   Prefer DS recipes (`glass`, `liquid-glass`, `island`, `capsule`) in new code.
+   This file keeps legacy class names working during Wave 2–4 migration. */
 
 @layer utilities {
-  /* ─────────────────────────────────────────────────────────────────
-     Primary glass — dropdowns, popovers, dialogs
-     ───────────────────────────────────────────────────────────────── */
   .glass-panel {
-    @apply backdrop-blur-[24px] backdrop-saturate-[1.6];
-    background: var(--surface-glass);
-    border: 1px solid var(--glass-border);
-    border-radius: var(--radius-xl);
-    box-shadow: var(--glass-shadow);
+    background: var(--ds-glass-bg);
+    backdrop-filter: var(--ds-blur);
+    -webkit-backdrop-filter: var(--ds-blur);
+    border: 1px solid var(--ds-glass-border);
+    border-radius: var(--ds-radius-card);
+    box-shadow: var(--ds-elevation-glass);
     padding: var(--glass-padding);
   }
 
-  /* ─────────────────────────────────────────────────────────────────
-     Sidebar glass — standalone rounded panel
-     ───────────────────────────────────────────────────────────────── */
   .glass-sidebar {
-    background: var(--surface-glass-sidebar);
-    border: 1px solid var(--glass-border);
-    border-radius: var(--radius-xl);
+    background: var(--ds-glass-bg-subtle);
+    border: 1px solid var(--ds-glass-border);
+    border-radius: var(--ds-radius-card);
   }
 
-  /* ─────────────────────────────────────────────────────────────────
-     Toolbar glass — standalone rounded bar
-     ───────────────────────────────────────────────────────────────── */
   .glass-toolbar {
-    @apply backdrop-blur-[20px] backdrop-saturate-150;
-    background: var(--surface-glass-toolbar);
-    border: 1px solid var(--glass-border);
-    border-radius: var(--radius-xl);
+    background: var(--ds-glass-bg);
+    backdrop-filter: var(--ds-blur);
+    -webkit-backdrop-filter: var(--ds-blur);
+    border: 1px solid var(--ds-glass-border);
+    border-radius: var(--ds-radius-card);
   }
 
-  /* ─────────────────────────────────────────────────────────────────
-     Input glass — subtle translucency for form elements
-     ───────────────────────────────────────────────────────────────── */
   .glass-input {
-    @apply backdrop-blur-[16px] backdrop-saturate-[1.3];
-    background: var(--surface-glass-subtle);
-    border: 1px solid var(--glass-border);
-    border-radius: var(--radius-xl);
+    background: var(--ds-glass-bg-subtle);
+    backdrop-filter: blur(16px) saturate(1.3);
+    -webkit-backdrop-filter: blur(16px) saturate(1.3);
+    border: 1px solid var(--ds-glass-border);
+    border-radius: var(--ds-radius-card);
     transition:
-      background 0.2s ease,
-      border-color 0.2s ease,
-      box-shadow 0.2s ease;
+      background var(--ds-duration-normal) var(--ds-ease-standard),
+      border-color var(--ds-duration-normal) var(--ds-ease-standard),
+      box-shadow var(--ds-duration-normal) var(--ds-ease-standard);
   }
 
   .glass-input:focus-within {
-    background: var(--surface-glass-subtle-hover);
-    border-color: var(--glass-border-strong);
+    background: var(--ds-control-hover);
+    border-color: color-mix(in srgb, var(--ds-text-secondary) 55%, transparent);
+    box-shadow: 0 0 0 2px var(--ds-separator);
   }
 
-  /* ─────────────────────────────────────────────────────────────────
-     Button glass — interactive glass element
-     ───────────────────────────────────────────────────────────────── */
   .glass-button {
-    background: var(--surface-glass-subtle);
-    border: 1px solid var(--glass-border);
-    border-radius: var(--radius-lg);
-    transition: all 0.2s ease;
+    background: var(--ds-glass-bg-subtle);
+    border: 1px solid var(--ds-glass-border);
+    border-radius: var(--ds-radius-lg);
+    transition: all var(--ds-duration-normal) var(--ds-ease-standard);
   }
 
   .glass-button:hover {
-    background: var(--surface-glass-subtle-hover);
-    border-color: var(--glass-border);
+    background: var(--ds-control-hover);
   }
 
   .glass-button:active,
   .glass-button-active {
-    background: var(--surface-glass-elevated);
-    border-color: var(--glass-border-strong);
+    background: var(--ds-glass-bg-strong);
+    border-color: var(--ds-glass-border);
   }
 
-  /* ─────────────────────────────────────────────────────────────────
-     Floating glass — popover windows (launcher, tray) over desktop.
-     Dark frosted glass that matches the main app's theme.
-     ───────────────────────────────────────────────────────────────── */
   .glass-floating {
-    @apply backdrop-blur-[24px] backdrop-saturate-[1.8];
-    background: var(--surface-glass-floating);
-    border: 1px solid var(--glass-border);
-    border-radius: var(--radius-xl);
-    box-shadow: none;
+    background: var(--ds-glass-floating);
+    backdrop-filter: var(--ds-blur);
+    -webkit-backdrop-filter: var(--ds-blur);
+    border: 1px solid var(--ds-glass-border);
+    border-radius: var(--ds-radius-card);
     padding: var(--glass-padding);
   }
 
-  /* When native vibrancy handles the blur (Tauri + macOS), disable the
-     CSS backdrop-filter (it flickers on transparent webview windows) and
-     lighten the overlay so the native material shows through. */
   :root[data-vibrancy] .glass-floating {
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
-    background: var(--surface-glass-floating-vibrancy);
+    background: var(--ds-glass-floating-vibrancy);
   }
 
-  /* ─────────────────────────────────────────────────────────────────
-     Dropdown glass — in-app floating menus / popovers.
-     More translucent than glass-floating so backdrop-blur is visible
-     over the app's own dark content (unlike native windows which blur
-     the desktop).
-     ───────────────────────────────────────────────────────────────── */
   .glass-dropdown {
-    @apply backdrop-blur-[24px] backdrop-saturate-[1.8];
-    background: var(--surface-glass-dropdown);
-    border: 1px solid var(--glass-border);
-    border-radius: var(--radius-xl);
-    box-shadow:
-      0 8px 32px rgba(0, 0, 0, 0.5),
-      inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    background: var(--ds-glass-dropdown);
+    backdrop-filter: var(--ds-blur);
+    -webkit-backdrop-filter: var(--ds-blur);
+    border: 1px solid var(--ds-glass-border);
+    border-radius: var(--ds-radius-card);
+    box-shadow: var(--ds-elevation-window);
     padding: var(--glass-padding);
   }
 
-  /* ─────────────────────────────────────────────────────────────────
-     Card glass — content cards with subtle depth
-     ───────────────────────────────────────────────────────────────── */
   .glass-card {
-    background: var(--surface-glass-card);
-    border: 1px solid var(--glass-border-card);
-    border-radius: var(--radius-xl);
+    background: var(--ds-glass-bg-subtle);
+    border: 1px solid var(--ds-separator);
+    border-radius: var(--ds-radius-card);
   }
 
-  /* ─────────────────────────────────────────────────────────────────
-     Message bubble glass — chat bubbles
-     ───────────────────────────────────────────────────────────────── */
   .glass-bubble {
-    background: var(--surface-glass-bubble);
-    border: 1px solid var(--glass-border-bubble);
-    border-radius: var(--radius-2xl);
+    background: var(--ds-glass-bg-subtle);
+    border: 1px solid var(--ds-separator);
+    border-radius: var(--ds-radius-lg);
   }
 
-  /* ─────────────────────────────────────────────────────────────────
-     User message bubble — dark gray glass
-     ───────────────────────────────────────────────────────────────── */
   .glass-bubble-user {
-    background: var(--surface-glass-bubble-user);
-    border: 1px solid var(--glass-border-bubble-user);
-    border-radius: var(--radius-2xl);
+    background: var(--ds-glass-bg);
+    border: 1px solid var(--ds-separator);
+    border-radius: var(--ds-radius-lg);
   }
 
-  /* ─────────────────────────────────────────────────────────────────
-     Context menu — macOS-native dark frosted glass
-     ───────────────────────────────────────────────────────────────── */
   .context-menu {
-    @apply backdrop-blur-[24px] backdrop-saturate-[1.8];
-    background: rgba(22, 22, 24, 0.88);
-    border: 1px solid var(--glass-border-strong);
-    border-radius: 10px;
-    box-shadow:
-      0 8px 40px rgba(0, 0, 0, 0.55),
-      0 2px 8px rgba(0, 0, 0, 0.3),
-      inset 0 0.5px 0 rgba(255, 255, 255, 0.06);
+    background: var(--ds-glass-context);
+    backdrop-filter: var(--ds-blur);
+    -webkit-backdrop-filter: var(--ds-blur);
+    border: 1px solid var(--ds-glass-border);
+    border-radius: var(--ds-radius-menu);
+    box-shadow: var(--ds-elevation-window);
   }
 
-  /* ─────────────────────────────────────────────────────────────────
-     Badge glass — small pill elements
-     ───────────────────────────────────────────────────────────────── */
   .glass-badge {
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: var(--radius-pill);
+    background: var(--ds-glass-badge);
+    border: 1px solid var(--ds-glass-badge-border);
+    border-radius: var(--ds-radius-full);
   }
 
-  /* ─────────────────────────────────────────────────────────────────
-     Divider glass — horizontal separator
-     ───────────────────────────────────────────────────────────────── */
   .glass-divider {
     height: 1px;
     background: linear-gradient(
       90deg,
       transparent 0%,
-      rgba(255, 255, 255, 0.08) 20%,
-      rgba(255, 255, 255, 0.08) 80%,
+      var(--ds-separator) 20%,
+      var(--ds-separator) 80%,
       transparent 100%
     );
   }
 
-  /* ─────────────────────────────────────────────────────────────────
-     Utility — Tabular numbers for data display
-     ───────────────────────────────────────────────────────────────── */
   .tabular-nums {
     font-variant-numeric: tabular-nums;
   }
 
-  /* ─────────────────────────────────────────────────────────────────
-     Performance optimization — Kill expensive backdrop-filter during
-     panel resize for smooth drag interaction
-     ───────────────────────────────────────────────────────────────── */
   .resizing .glass-panel,
   .resizing .glass-input {
-    @apply backdrop-blur-none backdrop-saturate-100;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
   }
 
   .resizing * {
     pointer-events: none;
   }
 
-  /* ─────────────────────────────────────────────────────────────────
-     Accessibility — disable all backdrop-filter for users who prefer
-     reduced motion. Saves significant GPU compositing work.
-     ───────────────────────────────────────────────────────────────── */
   @media (prefers-reduced-motion: reduce) {
     .glass-panel,
     .glass-toolbar,
@@ -214,107 +157,81 @@
     }
   }
 
-  /* ─────────────────────────────────────────────────────────────────
-     Note card — interactive card with hover lift
-     ───────────────────────────────────────────────────────────────── */
   .note-card {
-    border-radius: var(--radius-lg);
+    border-radius: var(--ds-radius-lg);
     transition:
-      background 0.18s ease,
-      transform 0.18s ease,
-      box-shadow 0.18s ease;
+      background var(--ds-duration-fast) var(--ds-ease-standard),
+      transform var(--ds-duration-fast) var(--ds-ease-standard),
+      box-shadow var(--ds-duration-fast) var(--ds-ease-standard);
   }
 
   .note-card:hover {
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--ds-control-hover);
     transform: translateY(-1px);
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+    box-shadow: var(--ds-elevation-island);
   }
 
   .note-card-active {
-    background: rgba(255, 255, 255, 0.07);
+    background: var(--ds-control-active);
     box-shadow:
-      inset 3px 0 0 0 var(--brand),
-      0 2px 12px rgba(0, 0, 0, 0.12);
+      inset 3px 0 0 0 var(--ds-accent),
+      var(--ds-elevation-island);
   }
 
-  /* ─────────────────────────────────────────────────────────────────
-     Tag pill — colored glass badge for tags
-     ───────────────────────────────────────────────────────────────── */
   .tag-pill {
     display: inline-flex;
     align-items: center;
     gap: 2px;
-    font-size: 10px;
+    font-size: var(--ds-text-ui-xs);
     padding: 1px 8px;
-    border-radius: var(--radius-pill);
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    color: var(--text-muted);
+    border-radius: var(--ds-radius-full);
+    background: var(--ds-glass-badge);
+    border: 1px solid var(--ds-glass-badge-border);
+    color: var(--ds-text-secondary);
     transition:
-      background 0.15s ease,
-      color 0.15s ease;
+      background var(--ds-duration-fast) var(--ds-ease-standard),
+      color var(--ds-duration-fast) var(--ds-ease-standard);
   }
 
   .tag-pill:hover {
-    background: rgba(255, 255, 255, 0.1);
-    color: var(--text-secondary);
+    background: var(--ds-control-hover);
+    color: var(--ds-text);
   }
 
   .tag-pill-active {
-    background: color-mix(in srgb, var(--brand) 18%, transparent);
-    border-color: color-mix(in srgb, var(--brand) 25%, transparent);
-    color: var(--brand);
+    background: color-mix(in srgb, var(--ds-accent) 18%, transparent);
+    border-color: color-mix(in srgb, var(--ds-accent) 25%, transparent);
+    color: var(--ds-accent);
   }
 
-  /* ─────────────────────────────────────────────────────────────────
-     Version timeline dot — timeline progress indicator
-     ───────────────────────────────────────────────────────────────── */
   .version-dot {
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background: rgba(255, 255, 255, 0.12);
-    border: 1.5px solid rgba(255, 255, 255, 0.2);
-    transition: all 0.15s ease;
+    background: var(--ds-control-hover);
+    border: 1.5px solid var(--ds-separator);
+    transition: all var(--ds-duration-fast) var(--ds-ease-standard);
     flex-shrink: 0;
   }
 
   .version-dot-active {
-    background: var(--brand);
-    border-color: var(--brand);
-    box-shadow: 0 0 8px color-mix(in srgb, var(--brand) 40%, transparent);
+    background: var(--ds-accent);
+    border-color: var(--ds-accent);
+    box-shadow: 0 0 8px color-mix(in srgb, var(--ds-accent) 40%, transparent);
   }
 
-  /* ─────────────────────────────────────────────────────────────────
-     Version timeline line — timeline connector
-     ───────────────────────────────────────────────────────────────── */
   .version-line {
     width: 1.5px;
     flex-shrink: 0;
-    background: linear-gradient(
-      180deg,
-      rgba(255, 255, 255, 0.1) 0%,
-      rgba(255, 255, 255, 0.04) 100%
-    );
+    background: linear-gradient(180deg, var(--ds-separator) 0%, transparent 100%);
   }
 
-  /* ─────────────────────────────────────────────────────────────────
-     GPU layer containment — prevent children from promoting to
-     separate compositing layers. Reduces IOAccelerator texture memory.
-     ───────────────────────────────────────────────────────────────── */
   .glass-sidebar,
   .glass-panel,
   .glass-card {
     contain: paint;
   }
 
-  /* ─────────────────────────────────────────────────────────────────
-     Content virtualization — skip rendering off-screen items in
-     scrollable lists. WebKit skips layout, paint, and GPU layer
-     creation for hidden items. contain-intrinsic-size prevents
-     scrollbar jitter by reserving estimated height.
-     ───────────────────────────────────────────────────────────────── */
   .glass-bubble,
   .glass-bubble-user {
     content-visibility: auto;

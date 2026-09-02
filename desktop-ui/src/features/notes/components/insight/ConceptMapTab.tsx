@@ -20,8 +20,8 @@ interface ConceptMapTabProps {
 function SkeletonLoader() {
   return (
     <div className="space-y-4 animate-pulse">
-      <div className="h-40 bg-card rounded-lg" />
-      <div className="h-3 bg-card rounded w-1/2 mx-auto" />
+      <div className="h-40 bg-bg-elevated rounded-lg" />
+      <div className="h-3 bg-bg-elevated rounded w-1/2 mx-auto" />
     </div>
   );
 }
@@ -30,7 +30,7 @@ function TextOutline({ text }: { text: string }) {
   // Render as a simple indented text outline
   const lines = text.split("\n").filter(Boolean);
   return (
-    <div className="space-y-1 font-mono text-[11px] text-muted-foreground">
+    <div className="space-y-1 font-mono text-ui-xs text-fg-secondary">
       {lines.map((line, i) => (
         // biome-ignore lint/suspicious/noArrayIndexKey: static derived list with no reordering
         <div key={i} className="whitespace-pre-wrap">
@@ -55,7 +55,7 @@ function CopyButton({
     <button
       type="button"
       onClick={onCopy}
-      className="flex items-center gap-1.5 text-2xs text-muted-foreground hover:text-foreground transition-colors"
+      className="flex items-center gap-1.5 text-ui-xs text-fg-secondary hover:text-fg transition-colors"
     >
       <ClipboardCopy size={10} />
       {copied ? "Copied!" : "Copy Mermaid code"}
@@ -90,7 +90,7 @@ export function ConceptMapTab({
 
   if (status === "idle") {
     return (
-      <p className="text-[11px] text-dim italic">Start an insight review to see the concept map</p>
+      <p className="text-ui-xs text-fg-dim italic">Start an insight review to see the concept map</p>
     );
   }
 
@@ -100,7 +100,7 @@ export function ConceptMapTab({
 
   if (status === "error") {
     return (
-      <p className="text-[11px] text-destructive">
+      <p className="text-ui-xs text-status-danger">
         Failed to generate concept map. Try regenerating.
       </p>
     );
@@ -129,10 +129,10 @@ export function ConceptMapTab({
     return (
       <div>
         <div className="space-y-3">
-          <div className="rounded-lg bg-card border border-border p-4">
+          <div className="island p-4">
             <Suspense
               fallback={
-                <div className="flex items-center justify-center h-full text-muted text-sm">
+                <div className="flex items-center justify-center h-full text-fg-secondary text-sm">
                   Loading...
                 </div>
               }
@@ -149,5 +149,5 @@ export function ConceptMapTab({
     );
   }
 
-  return <p className="text-[11px] text-dim italic">No concept map data</p>;
+  return <p className="text-ui-xs text-fg-dim italic">No concept map data</p>;
 }

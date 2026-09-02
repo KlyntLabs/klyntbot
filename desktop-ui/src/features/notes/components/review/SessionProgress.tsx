@@ -17,23 +17,23 @@ export function SessionProgress({ remaining, total, avgScore, onExit }: SessionP
       {/* Thin progress bar */}
       <div className="h-0.5 rounded-full bg-white/[0.06] overflow-hidden">
         <div
-          className="h-full bg-accent/60 rounded-full transition-[width] duration-300 origin-left"
+          className="h-full bg-control-hover/60 rounded-full transition-[width] duration-300 origin-left"
           style={{ width: `${progressPct}%` }}
         />
       </div>
 
       {/* Stats row */}
       <div className="flex items-center gap-2">
-        <span className="text-[9px] text-dim flex-1">
+        <span className="text-[9px] text-fg-dim flex-1">
           {remaining} remaining
           {scoreDisplay && (
-            <span className="ml-1.5 text-muted-foreground">· avg {scoreDisplay}</span>
+            <span className="ml-1.5 text-fg-secondary">· avg {scoreDisplay}</span>
           )}
         </span>
         <button
           type="button"
           onClick={onExit}
-          className="p-0.5 text-dim hover:text-foreground"
+          className="p-0.5 text-fg-dim hover:text-fg"
           aria-label="Exit review"
         >
           <X size={10} />

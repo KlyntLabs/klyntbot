@@ -58,8 +58,8 @@ export function ContextDayView({ date, isToday }: ContextDayViewProps) {
       <div className="flex-1 glass-card overflow-hidden flex flex-col">
         <div ref={scrollRef} className="flex-1 overflow-y-auto">
           {/* Header */}
-          <div className="sticky top-0 z-20 border-b border-border bg-popover px-4 py-1.5">
-            <span className="text-[11px] text-muted-foreground font-medium">Work Contexts</span>
+          <div className="sticky top-0 z-20 border-b border-separator bg-glass-strong px-4 py-1.5">
+            <span className="text-ui-xs text-fg-secondary font-medium">Work Contexts</span>
           </div>
 
           <div className="relative" style={{ height: totalHeight }}>
@@ -71,12 +71,12 @@ export function ContextDayView({ date, isToday }: ContextDayViewProps) {
                 style={{ top: h * hourHeight }}
               >
                 <div
-                  className="text-2xs text-muted-foreground text-right pr-2 select-none"
+                  className="text-ui-xs text-fg-secondary text-right pr-2 select-none"
                   style={{ width: HOUR_GUTTER }}
                 >
                   {h === 0 ? "" : formatHour(h)}
                 </div>
-                <div className="flex-1 border-t border-border" />
+                <div className="flex-1 border-t border-separator" />
               </div>
             ))}
 

@@ -93,7 +93,7 @@ export function EditorContextMenu({
         >
           {hadSelection && (
             <>
-              <ContextMenu.Label className="px-2 py-1 text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+              <ContextMenu.Label className="px-2 py-1 text-ui-xs font-medium text-fg-secondary uppercase tracking-wide">
                 Selection
               </ContextMenu.Label>
               <MenuItem onClick={onAnnotate} shortcut="⌥A">
@@ -122,7 +122,7 @@ export function EditorContextMenu({
             </>
           )}
 
-          <ContextMenu.Label className="px-2 py-1 text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+          <ContextMenu.Label className="px-2 py-1 text-ui-xs font-medium text-fg-secondary uppercase tracking-wide">
             AI Actions
           </ContextMenu.Label>
           <MenuItem
@@ -149,10 +149,10 @@ function MenuItem({
   return (
     <ContextMenu.Item
       onClick={onClick}
-      className="flex items-center justify-between rounded-md px-2 py-1.5 text-xs text-primary outline-none select-none data-[highlighted]:bg-surface-hover"
+      className="flex items-center justify-between rounded-md px-2 py-1.5 text-ui-sm text-brand outline-none select-none data-[highlighted]:bg-control-hover"
     >
       <span>{children}</span>
-      {shortcut && <span className="ml-4 text-muted text-2xs">{shortcut}</span>}
+      {shortcut && <span className="ml-4 text-fg-secondary text-ui-xs">{shortcut}</span>}
     </ContextMenu.Item>
   );
 }

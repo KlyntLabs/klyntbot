@@ -47,16 +47,16 @@ export function WordsSection({ words, onSaveWords, saving, saved }: WordsSection
       : `Save ${selected.size} word${selected.size !== 1 ? "s" : ""}`;
 
   const buttonClass = saving
-    ? "rounded-md bg-brand/50 px-2.5 py-1 text-2xs font-semibold text-black cursor-wait"
+    ? "rounded-md bg-brand/50 px-2.5 py-1 text-ui-xs font-semibold text-black cursor-wait"
     : saved
-      ? "rounded-md bg-green-500 px-2.5 py-1 text-2xs font-semibold text-black"
-      : "rounded-md bg-brand px-2.5 py-1 text-2xs font-semibold text-black hover:bg-brand/90 active:scale-95 transition-all";
+      ? "rounded-md bg-green-500 px-2.5 py-1 text-ui-xs font-semibold text-black"
+      : "rounded-md bg-brand px-2.5 py-1 text-ui-xs font-semibold text-black hover:bg-brand/90 active:scale-95 transition-all";
 
   return (
-    <div className="border-b border-border px-3 py-3">
+    <div className="border-b border-separator px-3 py-3">
       {/* Header */}
       <div className="flex items-center justify-between mb-1.5">
-        <span className="text-2xs text-muted-foreground uppercase tracking-wider">
+        <span className="text-ui-xs text-fg-secondary uppercase tracking-wider">
           Words ({words.length})
         </span>
         <div className="flex items-center gap-1.5">
@@ -64,7 +64,7 @@ export function WordsSection({ words, onSaveWords, saving, saved }: WordsSection
             <button
               type="button"
               onClick={selected.size === words.length ? deselectAll : selectAll}
-              className="text-2xs text-muted-foreground hover:text-primary transition-colors"
+              className="text-ui-xs text-fg-secondary hover:text-brand transition-colors"
             >
               {selected.size === words.length ? "Deselect all" : "Select all"}
             </button>
@@ -115,13 +115,13 @@ function WordRow({
       onClick={onToggle}
       disabled={disabled}
       className={`flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left transition-colors disabled:opacity-50 ${
-        isSelected ? "bg-brand/8 ring-1 ring-brand/20" : "hover:bg-surface-hover"
+        isSelected ? "bg-brand/8 ring-1 ring-brand/20" : "hover:bg-control-hover"
       }`}
     >
       <div className="flex items-center gap-2 min-w-0">
         <div
           className={`h-3.5 w-3.5 shrink-0 rounded border transition-colors flex items-center justify-center ${
-            isSelected ? "bg-brand border-brand" : "border-border"
+            isSelected ? "bg-brand border-brand" : "border-separator"
           }`}
         >
           {isSelected && (
@@ -137,8 +137,8 @@ function WordRow({
             </svg>
           )}
         </div>
-        <span className="text-xs text-primary font-medium truncate">{word.word}</span>
-        {word.reading && <span className="text-2xs text-muted shrink-0">{word.reading}</span>}
+        <span className="text-ui-sm text-brand font-medium truncate">{word.word}</span>
+        {word.reading && <span className="text-ui-xs text-fg-secondary shrink-0">{word.reading}</span>}
         {word.isNew && <span className="text-[9px] text-brand font-medium shrink-0">new</span>}
       </div>
       <div className="flex items-center gap-2 shrink-0 ml-2">
@@ -147,7 +147,7 @@ function WordRow({
             {word.proficiencyLevel}
           </span>
         )}
-        <span className="text-xs text-muted">{word.meaning}</span>
+        <span className="text-ui-sm text-fg-secondary">{word.meaning}</span>
       </div>
     </button>
   );

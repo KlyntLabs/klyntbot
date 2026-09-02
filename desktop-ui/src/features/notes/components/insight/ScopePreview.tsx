@@ -138,12 +138,12 @@ export function ScopePreview({
   const hasContent = graphNodes.length > 1;
 
   return (
-    <div className="border-b border-border">
+    <div className="border-b border-separator">
       {/* Header */}
-      <div className="flex items-center gap-1.5 px-3 pt-2 pb-1 text-2xs text-muted-foreground">
+      <div className="flex items-center gap-1.5 px-3 pt-2 pb-1 text-ui-xs text-fg-secondary">
         <Icon size={10} className="shrink-0" />
         <span className="font-medium">{scope.label} scope</span>
-        <span className="text-dim">
+        <span className="text-fg-dim">
           {loading ? "..." : `${notes.length} note${notes.length !== 1 ? "s" : ""}`}
         </span>
       </div>
@@ -152,7 +152,7 @@ export function ScopePreview({
       {hasContent ? (
         <ScopeGraph nodes={graphNodes} links={graphLinks} />
       ) : !loading && notes.length === 0 ? (
-        <div className="px-3 pb-1.5 text-[9px] text-dim">
+        <div className="px-3 pb-1.5 text-[9px] text-fg-dim">
           {scopeConfig.scopeType === "semantic"
             ? "No similar notes found — try Linked or Notebook scope"
             : "No related notes found"}
@@ -161,7 +161,7 @@ export function ScopePreview({
 
       {/* Context summary bar */}
       {!loading && (
-        <div className="flex items-center gap-2.5 px-3 py-1.5 text-[9px] text-dim">
+        <div className="flex items-center gap-2.5 px-3 py-1.5 text-[9px] text-fg-dim">
           <span className="flex items-center gap-1">
             <FileText size={8} />
             {summary.totalNotes} notes &middot; ~{summary.totalWords.toLocaleString()} words

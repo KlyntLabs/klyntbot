@@ -80,7 +80,7 @@ export const NoteTags = forwardRef<NoteTagsHandle, NoteTagsProps>(function NoteT
           onBlur={handleAdd}
           onKeyDown={handleKeyDown}
           placeholder="tag..."
-          className="text-[11px] bg-transparent border-b border-brand/30 text-foreground outline-none w-16 py-0.5"
+          className="text-ui-xs bg-transparent border-b border-brand/30 text-fg outline-none w-16 py-0.5"
         />
       )}
     </div>

@@ -30,26 +30,26 @@ export function FocusActiveChip({ endsAt, onDone }: Props) {
 
   return (
     <div className="flex items-center gap-2 p-2">
-      <span className="text-xs text-muted-foreground shrink-0">
+      <span className="text-ui-sm text-fg-secondary shrink-0">
         DND on — {formatRemaining(endsAt)} left
       </span>
       <button
         type="button"
-        className="px-2 py-1 rounded bg-surface-base border border-border text-xs text-fg hover:bg-muted transition-colors"
+        className="px-2 py-1 rounded bg-bg-elevated border border-separator text-ui-sm text-fg hover:bg-control-hover transition-colors"
         onClick={() => handleExtend(30 * 60_000)}
       >
         +30m
       </button>
       <button
         type="button"
-        className="px-2 py-1 rounded bg-surface-base border border-border text-xs text-fg hover:bg-muted transition-colors"
+        className="px-2 py-1 rounded bg-bg-elevated border border-separator text-ui-sm text-fg hover:bg-control-hover transition-colors"
         onClick={() => handleExtend(2 * 3_600_000)}
       >
         +2h
       </button>
       <button
         type="button"
-        className="px-2 py-1 rounded bg-surface-base border border-border text-xs text-destructive hover:bg-muted transition-colors"
+        className="px-2 py-1 rounded bg-bg-elevated border border-separator text-ui-sm text-status-danger hover:bg-control-hover transition-colors"
         onClick={handleTurnOff}
       >
         Turn off

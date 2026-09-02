@@ -45,8 +45,8 @@ function ProjectTasksInner({ projectId }: { projectId: string }) {
         <div className="h-full">
           {projectIssues.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">
-              <p className="text-sm text-muted-foreground mb-3">No tasks in this project yet.</p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-sm text-fg-secondary mb-3">No tasks in this project yet.</p>
+              <p className="text-ui-sm text-fg-secondary">
                 Use the + button below to create your first task.
               </p>
             </div>

@@ -99,12 +99,12 @@ export function PracticeSessionComplete({
       {/* "I did this" moment */}
       {!showScores && (
         <div className="w-full max-w-2xl space-y-6">
-          <p className="text-center text-muted-foreground text-sm animate-fade-in">
+          <p className="text-center text-fg-secondary text-sm animate-fade-in">
             You translated this.
           </p>
           <div className="space-y-3 animate-fade-in">
             {results.map((r) => (
-              <p key={r.index} className="text-sm leading-relaxed text-primary">
+              <p key={r.index} className="text-sm leading-relaxed text-brand">
                 {r.finalTranslation}
               </p>
             ))}
@@ -118,7 +118,7 @@ export function PracticeSessionComplete({
           {/* Overall score */}
           <div className="text-center space-y-1">
             <p className="text-4xl font-bold text-brand">{overallPercent}%</p>
-            <p className="text-muted-foreground text-sm">
+            <p className="text-fg-secondary text-sm">
               {results.length}/{totalSegments} units &middot; {durationMins} minute
               {durationMins !== 1 ? "s" : ""}
             </p>
@@ -134,7 +134,7 @@ export function PracticeSessionComplete({
                   className={`flex flex-col items-center gap-1 rounded-lg border px-3 py-2 ${gradeBgClass(grade)}`}
                 >
                   <span className={`text-lg font-bold ${gradeColorClass(grade)}`}>{grade}</span>
-                  <span className="text-xs text-muted-foreground">{DIMENSION_LABELS[dim]}</span>
+                  <span className="text-ui-sm text-fg-secondary">{DIMENSION_LABELS[dim]}</span>
                 </div>
               );
             })}
@@ -146,7 +146,7 @@ export function PracticeSessionComplete({
               <p className="text-sm font-medium text-yellow-300/90">
                 {weakUnitDetails.length} unit{weakUnitDetails.length !== 1 ? "s" : ""} need review
               </p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-ui-sm text-fg-secondary">
                 {weakUnitDetails.map((u) => `#${u.index + 1} (${u.weakestDimension})`).join(", ")}
               </p>
             </div>
@@ -157,15 +157,15 @@ export function PracticeSessionComplete({
             <button
               type="button"
               onClick={() => setShowTranslation((v) => !v)}
-              className="w-full px-4 py-2 rounded-lg border border-border text-sm text-foreground hover:bg-white/5 transition-colors"
+              className="w-full px-4 py-2 rounded-lg border border-separator text-sm text-fg hover:bg-white/5 transition-colors"
             >
               {showTranslation ? "Hide My Full Translation" : "View My Full Translation"}
             </button>
 
             {showTranslation && (
-              <div className="rounded-lg border border-border bg-surface/50 p-4 space-y-2 animate-fade-in">
+              <div className="rounded-lg border border-separator bg-surface/50 p-4 space-y-2 animate-fade-in">
                 {results.map((r) => (
-                  <p key={r.index} className="text-sm leading-relaxed text-primary">
+                  <p key={r.index} className="text-sm leading-relaxed text-brand">
                     {r.finalTranslation}
                   </p>
                 ))}
@@ -185,7 +185,7 @@ export function PracticeSessionComplete({
             <button
               type="button"
               onClick={onSaveAsNote}
-              className="w-full px-4 py-2 rounded-lg border border-border text-sm text-foreground hover:bg-white/5 transition-colors"
+              className="w-full px-4 py-2 rounded-lg border border-separator text-sm text-fg hover:bg-white/5 transition-colors"
             >
               Save as new note
             </button>
@@ -193,7 +193,7 @@ export function PracticeSessionComplete({
             <button
               type="button"
               onClick={onExit}
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors pt-1"
+              className="text-sm text-fg-secondary hover:text-fg transition-colors pt-1"
             >
               Close
             </button>

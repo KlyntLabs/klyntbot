@@ -99,9 +99,9 @@ function AtomRow({ atom }: { atom: AtomResponse }) {
   return (
     <div className="flex items-center gap-3 py-1.5">
       <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
-      <span className="text-[12px] text-foreground truncate flex-1 min-w-0">{atom.subject}</span>
-      <span className="text-[9px] text-dim uppercase tracking-wider shrink-0">{atom.atomType}</span>
-      <span className="text-[11px] tabular-nums shrink-0 w-8 text-right" style={{ color }}>
+      <span className="text-ui-sm text-fg truncate flex-1 min-w-0">{atom.subject}</span>
+      <span className="text-[9px] text-fg-dim uppercase tracking-wider shrink-0">{atom.atomType}</span>
+      <span className="text-ui-xs tabular-nums shrink-0 w-8 text-right" style={{ color }}>
         {pct}%
       </span>
     </div>
@@ -147,10 +147,10 @@ function TopicRow({ topic, isOnlyChild }: { topic: TopicHealth; isOnlyChild: boo
         <ChevronRight
           size={12}
           strokeWidth={1.5}
-          className={`text-dim transition-transform duration-150 shrink-0 ${expanded ? "rotate-90" : ""}`}
+          className={`text-fg-dim transition-transform duration-150 shrink-0 ${expanded ? "rotate-90" : ""}`}
         />
-        <span className="text-[12px] text-foreground truncate flex-1 min-w-0">{displayName}</span>
-        <span className="text-[10px] text-dim tabular-nums shrink-0">{topic.atomCount}</span>
+        <span className="text-ui-sm text-fg truncate flex-1 min-w-0">{displayName}</span>
+        <span className="text-[10px] text-fg-dim tabular-nums shrink-0">{topic.atomCount}</span>
         <RetentionBar value={topic.avgRetention} />
       </button>
 
@@ -159,7 +159,7 @@ function TopicRow({ topic, isOnlyChild }: { topic: TopicHealth; isOnlyChild: boo
           {loading ? (
             <div className="flex items-center gap-2 py-2 px-3">
               <div className="w-3 h-3 border border-dim border-t-foreground rounded-full animate-spin" />
-              <span className="text-[11px] text-dim">Loading…</span>
+              <span className="text-ui-xs text-fg-dim">Loading…</span>
             </div>
           ) : atoms && atoms.length > 0 ? (
             <div className="border-l border-white/[0.06] pl-3 divide-y divide-white/[0.03]">
@@ -168,7 +168,7 @@ function TopicRow({ topic, isOnlyChild }: { topic: TopicHealth; isOnlyChild: boo
               ))}
             </div>
           ) : (
-            <p className="text-[11px] text-dim px-3 py-2">No atoms</p>
+            <p className="text-ui-xs text-fg-dim px-3 py-2">No atoms</p>
           )}
         </div>
       )}
@@ -197,18 +197,18 @@ function GroupCard({ group }: { group: TopicGroup }) {
             style={{ backgroundColor: color, opacity: 0.6 }}
           />
           <div className="flex-1 min-w-0">
-            <div className="text-[13px] font-medium text-foreground truncate">{group.label}</div>
+            <div className="text-ui font-medium text-fg truncate">{group.label}</div>
             <div className="flex items-center gap-1.5 mt-0.5">
-              <span className="text-[10px] text-dim tabular-nums">{group.totalAtoms} atoms</span>
+              <span className="text-[10px] text-fg-dim tabular-nums">{group.totalAtoms} atoms</span>
               {hasSubTopics && (
                 <>
-                  <span className="text-dim">·</span>
-                  <span className="text-[10px] text-dim tabular-nums">
+                  <span className="text-fg-dim">·</span>
+                  <span className="text-[10px] text-fg-dim tabular-nums">
                     {group.topics.length} topics
                   </span>
                 </>
               )}
-              <span className="text-dim">·</span>
+              <span className="text-fg-dim">·</span>
               <span className="text-[10px] tabular-nums" style={{ color }}>
                 {pct}% {retentionLabel(group.avgRetention).toLowerCase()}
               </span>
@@ -217,7 +217,7 @@ function GroupCard({ group }: { group: TopicGroup }) {
           <ChevronDown
             size={14}
             strokeWidth={1.5}
-            className={`text-dim transition-transform duration-200 shrink-0 ${expanded ? "rotate-180" : ""}`}
+            className={`text-fg-dim transition-transform duration-200 shrink-0 ${expanded ? "rotate-180" : ""}`}
           />
         </div>
       </button>
@@ -244,11 +244,11 @@ export function AtomGraph() {
     return (
       <div className="flex flex-col items-center justify-center py-12 gap-3">
         <div className="p-2.5 rounded-xl bg-white/[0.04]">
-          <Layers size={20} className="text-dim" strokeWidth={1.5} />
+          <Layers size={20} className="text-fg-dim" strokeWidth={1.5} />
         </div>
         <div className="text-center">
-          <p className="text-[12px] text-muted-foreground">No knowledge topics yet</p>
-          <p className="text-[11px] text-dim mt-0.5">
+          <p className="text-ui-sm text-fg-secondary">No knowledge topics yet</p>
+          <p className="text-ui-xs text-fg-dim mt-0.5">
             Knowledge atoms are extracted from your notes automatically.
           </p>
         </div>
@@ -265,17 +265,17 @@ export function AtomGraph() {
       <div className="flex items-center gap-4 px-1">
         <div className="flex items-center gap-1.5">
           <Sparkles size={12} className="text-brand" strokeWidth={1.5} />
-          <span className="text-[11px] text-muted-foreground">
-            <span className="text-foreground font-medium tabular-nums">{totalAtoms}</span> atoms in{" "}
-            <span className="text-foreground font-medium tabular-nums">{groups.length}</span>{" "}
+          <span className="text-ui-xs text-fg-secondary">
+            <span className="text-fg font-medium tabular-nums">{totalAtoms}</span> atoms in{" "}
+            <span className="text-fg font-medium tabular-nums">{groups.length}</span>{" "}
             {groups.length === 1 ? "domain" : "domains"}
           </span>
         </div>
-        <span className="text-dim">·</span>
+        <span className="text-fg-dim">·</span>
         <div className="flex items-center gap-1.5">
-          <BookOpen size={12} className="text-success" strokeWidth={1.5} />
-          <span className="text-[11px] text-muted-foreground">
-            <span className="text-foreground font-medium tabular-nums">{avgRet}%</span> avg
+          <BookOpen size={12} className="text-status-success" strokeWidth={1.5} />
+          <span className="text-ui-xs text-fg-secondary">
+            <span className="text-fg font-medium tabular-nums">{avgRet}%</span> avg
             retention
           </span>
         </div>

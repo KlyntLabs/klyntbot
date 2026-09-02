@@ -1,0 +1,12 @@
+/* Fixed control / chrome sizes (pointer-first floors). */
+
+:root {
+  --ds-size-control-sm: 22px;
+  --ds-size-control-md: 28px;
+  --ds-size-control-lg: 36px;
+  --ds-size-sidebar-width: 240px;
+  --ds-size-sidebar-icon: 15px;
+  --ds-size-resizer-hit: 7px;
+  --ds-size-menu-min: 220px;
+  --ds-size-menu-max: 360px;
+}

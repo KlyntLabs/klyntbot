@@ -270,7 +270,7 @@ export function PracticeMode({
   if (phase === "loading") {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <span className="text-sm text-muted-foreground">Loading practice session...</span>
+        <span className="text-sm text-fg-secondary">Loading practice session...</span>
       </div>
     );
   }
@@ -385,7 +385,7 @@ export function PracticeMode({
 
       {/* Micro-toast */}
       {toastMessage && (
-        <div className="fixed bottom-4 right-4 bg-surface-base border border-border rounded-lg px-4 py-2 text-xs text-muted-foreground shadow-lg z-50 animate-fade-in">
+        <div className="fixed bottom-4 right-4 bg-bg-elevated border border-separator rounded-lg px-4 py-2 text-ui-sm text-fg-secondary shadow-lg z-50 animate-fade-in">
           {toastMessage}
         </div>
       )}

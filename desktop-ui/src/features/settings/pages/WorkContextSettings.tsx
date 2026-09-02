@@ -63,7 +63,7 @@ const PRESET_OPTIONS: { value: Preset; label: string; description: string }[] = 
 ];
 
 const INPUT_CLASS =
-  "w-full px-3 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim";
+  "w-full px-3 py-1.5 text-ui-sm text-fg bg-control-hover border border-separator rounded-control focus:outline-none focus:border-fg-secondary/50 focus:ring-2 focus:ring-separator transition-colors placeholder:text-fg-dim";
 
 // ── Component ────────────────────────────────────────────────────────
 
@@ -176,8 +176,8 @@ export function WorkContextSettings() {
   return (
     <div>
       <div className="mb-8">
-        <h2 className="text-lg font-medium text-foreground">Work Contexts</h2>
-        <p className="text-[13px] text-muted-foreground mt-1">
+        <h2 className="text-lg font-medium text-fg">Work Contexts</h2>
+        <p className="text-ui text-fg-secondary mt-1">
           Automatic activity grouping and context inference
         </p>
       </div>
@@ -188,8 +188,8 @@ export function WorkContextSettings() {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <div>
-                <span className="text-xs text-muted-foreground">Enable work contexts</span>
-                <p className="text-[11px] text-dim">
+                <span className="text-ui-xs text-fg-secondary">Enable work contexts</span>
+                <p className="text-ui-xs text-fg-dim">
                   Automatically track and group your activity into contexts
                 </p>
               </div>
@@ -197,10 +197,10 @@ export function WorkContextSettings() {
             </div>
 
             <label className="block">
-              <span className="block text-[11px] text-muted-foreground mb-0.5">
+              <span className="block text-ui-xs text-fg-secondary mb-0.5">
                 Inference interval (minutes)
               </span>
-              <p className="text-[11px] text-dim mb-1">How often to process unassigned events</p>
+              <p className="text-ui-xs text-fg-dim mb-1">How often to process unassigned events</p>
               <input
                 type="number"
                 min={1}
@@ -214,10 +214,10 @@ export function WorkContextSettings() {
             </label>
 
             <label className="block">
-              <span className="block text-[11px] text-muted-foreground mb-0.5">
+              <span className="block text-ui-xs text-fg-secondary mb-0.5">
                 Maximum active contexts
               </span>
-              <p className="text-[11px] text-dim mb-1">
+              <p className="text-ui-xs text-fg-dim mb-1">
                 Oldest contexts are auto-archived when this limit is reached
               </p>
               <input
@@ -238,10 +238,10 @@ export function WorkContextSettings() {
         <SettingsCard title="Inference mode">
           <div className="space-y-3">
             <div>
-              <span className="block text-[11px] text-muted-foreground mb-1">
+              <span className="block text-ui-xs text-fg-secondary mb-1">
                 How events are matched to contexts
               </span>
-              <p className="text-[11px] text-dim mb-2">
+              <p className="text-ui-xs text-fg-dim mb-2">
                 Light skips embeddings entirely for lowest CPU. Deep uses semantic similarity for
                 best accuracy.
               </p>
@@ -256,15 +256,15 @@ export function WorkContextSettings() {
                       className={`px-3 py-2 text-left rounded-lg border transition-colors ${
                         active
                           ? "bg-brand/10 border-brand/30"
-                          : "bg-accent border-border hover:border-border-hover"
+                          : "bg-control-hover border-separator hover:border-fg-secondary/40"
                       }`}
                     >
                       <span
-                        className={`text-xs font-medium ${active ? "text-brand" : "text-foreground"}`}
+                        className={`text-ui-sm font-medium ${active ? "text-brand" : "text-fg"}`}
                       >
                         {opt.label}
                       </span>
-                      <p className="text-[11px] text-dim mt-0.5">{opt.description}</p>
+                      <p className="text-ui-xs text-fg-dim mt-0.5">{opt.description}</p>
                     </button>
                   );
                 })}
@@ -277,19 +277,19 @@ export function WorkContextSettings() {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <div>
-                <span className="text-xs text-muted-foreground">Enable query enhancement</span>
-                <p className="text-[11px] text-dim">
+                <span className="text-ui-xs text-fg-secondary">Enable query enhancement</span>
+                <p className="text-ui-xs text-fg-dim">
                   Multi-stage retrieval pipeline that enriches queries and reranks results
                 </p>
               </div>
               <Toggle checked={qeVal("enabled", true)} onChange={(v) => setQeEdit("enabled", v)} />
             </div>
 
-            <div className="pt-2 border-t border-border">
+            <div className="pt-2 border-t border-separator">
               <div className="flex items-center justify-between">
                 <div>
-                  <span className="text-xs text-muted-foreground">Pseudo-relevance feedback</span>
-                  <p className="text-[11px] text-dim">
+                  <span className="text-ui-xs text-fg-secondary">Pseudo-relevance feedback</span>
+                  <p className="text-ui-xs text-fg-dim">
                     Heuristic expansion using terms from initial retrieval results
                   </p>
                 </div>
@@ -300,10 +300,10 @@ export function WorkContextSettings() {
               </div>
 
               <label className="block mt-3">
-                <span className="block text-[11px] text-muted-foreground mb-0.5">
+                <span className="block text-ui-xs text-fg-secondary mb-0.5">
                   PRF initial fetch limit
                 </span>
-                <p className="text-[11px] text-dim mb-1">
+                <p className="text-ui-xs text-fg-dim mb-1">
                   How many facts to fetch for term extraction
                 </p>
                 <input
@@ -320,10 +320,10 @@ export function WorkContextSettings() {
               </label>
 
               <label className="block mt-3">
-                <span className="block text-[11px] text-muted-foreground mb-0.5">
+                <span className="block text-ui-xs text-fg-secondary mb-0.5">
                   PRF score threshold
                 </span>
-                <p className="text-[11px] text-dim mb-1">
+                <p className="text-ui-xs text-fg-dim mb-1">
                   Minimum score for a fact to contribute expansion terms
                 </p>
                 <input
@@ -341,10 +341,10 @@ export function WorkContextSettings() {
               </label>
 
               <label className="block mt-3">
-                <span className="block text-[11px] text-muted-foreground mb-0.5">
+                <span className="block text-ui-xs text-fg-secondary mb-0.5">
                   PRF max expansion terms
                 </span>
-                <p className="text-[11px] text-dim mb-1">
+                <p className="text-ui-xs text-fg-dim mb-1">
                   How many terms to extract from initial results
                 </p>
                 <input
@@ -361,13 +361,13 @@ export function WorkContextSettings() {
               </label>
             </div>
 
-            <div className="pt-2 border-t border-border">
+            <div className="pt-2 border-t border-separator">
               <div className="flex items-center justify-between">
                 <div>
-                  <span className="text-xs text-muted-foreground">
+                  <span className="text-ui-xs text-fg-secondary">
                     Multi-query expansion (Deep+)
                   </span>
-                  <p className="text-[11px] text-dim">
+                  <p className="text-ui-xs text-fg-dim">
                     LLM generates query variants — only runs in DeepThink/Ultra modes
                   </p>
                 </div>
@@ -378,10 +378,10 @@ export function WorkContextSettings() {
               </div>
 
               <label className="block mt-3">
-                <span className="block text-[11px] text-muted-foreground mb-0.5">
+                <span className="block text-ui-xs text-fg-secondary mb-0.5">
                   Multi-query max variants
                 </span>
-                <p className="text-[11px] text-dim mb-1">
+                <p className="text-ui-xs text-fg-dim mb-1">
                   Number of alternative query formulations to generate
                 </p>
                 <input
@@ -398,10 +398,10 @@ export function WorkContextSettings() {
               </label>
 
               <label className="block mt-3">
-                <span className="block text-[11px] text-muted-foreground mb-0.5">
+                <span className="block text-ui-xs text-fg-secondary mb-0.5">
                   Multi-query model override
                 </span>
-                <p className="text-[11px] text-dim mb-1">
+                <p className="text-ui-xs text-fg-dim mb-1">
                   Leave unset to inherit the rewriter model
                 </p>
                 <select
@@ -420,11 +420,11 @@ export function WorkContextSettings() {
               </label>
             </div>
 
-            <div className="pt-2 border-t border-border">
+            <div className="pt-2 border-t border-separator">
               <div className="flex items-center justify-between">
                 <div>
-                  <span className="text-xs text-muted-foreground">Result reranking</span>
-                  <p className="text-[11px] text-dim">
+                  <span className="text-ui-xs text-fg-secondary">Result reranking</span>
+                  <p className="text-ui-xs text-fg-dim">
                     Heuristic rerank always runs; LLM rerank only in DeepThink/Ultra modes
                   </p>
                 </div>
@@ -435,10 +435,10 @@ export function WorkContextSettings() {
               </div>
 
               <label className="block mt-3">
-                <span className="block text-[11px] text-muted-foreground mb-0.5">
+                <span className="block text-ui-xs text-fg-secondary mb-0.5">
                   LLM rerank top-N
                 </span>
-                <p className="text-[11px] text-dim mb-1">
+                <p className="text-ui-xs text-fg-dim mb-1">
                   How many top results to send to the LLM for pairwise reranking
                 </p>
                 <input
@@ -455,10 +455,10 @@ export function WorkContextSettings() {
               </label>
 
               <label className="block mt-3">
-                <span className="block text-[11px] text-muted-foreground mb-0.5">
+                <span className="block text-ui-xs text-fg-secondary mb-0.5">
                   LLM rerank model override
                 </span>
-                <p className="text-[11px] text-dim mb-1">
+                <p className="text-ui-xs text-fg-dim mb-1">
                   Leave unset to inherit the rewriter model
                 </p>
                 <select
@@ -477,20 +477,20 @@ export function WorkContextSettings() {
               </label>
             </div>
 
-            <div className="pt-2 border-t border-border">
+            <div className="pt-2 border-t border-separator">
               <div>
-                <span className="text-xs text-muted-foreground">Budget overrides</span>
-                <p className="text-[11px] text-dim">
+                <span className="text-ui-xs text-fg-secondary">Budget overrides</span>
+                <p className="text-ui-xs text-fg-dim">
                   Per-depth-mode latency + LLM call ceilings. Leave blank for defaults.
                 </p>
               </div>
 
               {DEPTH_MODES.map(({ key, label }) => (
                 <div key={key} className="mt-3 space-y-2">
-                  <span className="block text-[11px] text-muted-foreground">{label}</span>
+                  <span className="block text-ui-xs text-fg-secondary">{label}</span>
                   <div className="flex gap-3">
                     <label className="block flex-1">
-                      <span className="block text-[11px] text-dim mb-0.5">max latency (ms)</span>
+                      <span className="block text-ui-xs text-fg-dim mb-0.5">max latency (ms)</span>
                       <input
                         type="number"
                         min={50}
@@ -512,7 +512,7 @@ export function WorkContextSettings() {
                       />
                     </label>
                     <label className="block flex-1">
-                      <span className="block text-[11px] text-dim mb-0.5">max LLM calls</span>
+                      <span className="block text-ui-xs text-fg-dim mb-0.5">max LLM calls</span>
                       <input
                         type="number"
                         min={0}

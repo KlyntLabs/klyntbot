@@ -444,7 +444,7 @@ export function SplitEditor({
           style={{ width: `${splitRatio * 100}%` }}
           onScroll={() => handleSyncScroll("left")}
         >
-          <div className="px-3 py-1.5 text-2xs text-muted-foreground uppercase tracking-wider border-b border-border shrink-0">
+          <div className="px-3 py-1.5 text-ui-xs text-fg-secondary uppercase tracking-wider border-b border-separator shrink-0">
             {leftLabel}
           </div>
           <EditorContentWrapper editor={leftEditor} className="flex-1 min-h-0" />
@@ -489,7 +489,7 @@ export function SplitEditor({
             />
           ) : (
             <>
-              <div className="px-3 py-1.5 text-2xs text-muted-foreground uppercase tracking-wider border-b border-border shrink-0">
+              <div className="px-3 py-1.5 text-ui-xs text-fg-secondary uppercase tracking-wider border-b border-separator shrink-0">
                 {rightLabel}
               </div>
               <EditorContentWrapper editor={rightEditor} className="flex-1 min-h-0" />
@@ -500,15 +500,15 @@ export function SplitEditor({
 
       {/* Cornell summary footer */}
       {splitMode === "cornell" && (
-        <div className="border-t border-border">
-          <div className="px-3 py-1.5 text-2xs text-muted-foreground uppercase tracking-wider">
+        <div className="border-t border-separator">
+          <div className="px-3 py-1.5 text-ui-xs text-fg-secondary uppercase tracking-wider">
             Summary
           </div>
           <textarea
             value={summaryText}
             onChange={(e) => handleSummaryChange(e.target.value)}
             placeholder="Write a brief summary of this note..."
-            className="w-full bg-transparent px-3 py-2 text-sm text-foreground placeholder:text-dim resize-none"
+            className="w-full bg-transparent px-3 py-2 text-sm text-fg placeholder:text-fg-dim resize-none"
             rows={3}
           />
         </div>

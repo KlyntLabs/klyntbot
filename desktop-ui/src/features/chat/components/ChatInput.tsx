@@ -51,7 +51,7 @@ export function ChatInput({ input, isStreaming, onInputChange, onSend }: ChatInp
           <button
             type="button"
             aria-label="Add attachment"
-            className="size-8 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors shrink-0 rounded-lg hover:bg-accent"
+            className="size-8 flex items-center justify-center text-fg-secondary hover:text-fg transition-colors shrink-0 rounded-lg hover:bg-control-hover"
           >
             <Plus className="size-4" strokeWidth={1.5} />
           </button>
@@ -69,7 +69,7 @@ export function ChatInput({ input, isStreaming, onInputChange, onSend }: ChatInp
             aria-label="Message input"
             placeholder="Ask Klynt anything, @ to add files, / for commands"
             rows={1}
-            className="flex-1 bg-transparent py-3.5 text-[13px] text-foreground placeholder:text-muted-foreground font-light resize-none overflow-hidden outline-none"
+            className="flex-1 bg-transparent py-3.5 text-ui text-fg placeholder:text-fg-secondary font-light resize-none overflow-hidden outline-none"
             style={{ maxHeight: "200px" }}
           />
           <button
@@ -79,8 +79,8 @@ export function ChatInput({ input, isStreaming, onInputChange, onSend }: ChatInp
             className={cn(
               "size-8 flex items-center justify-center transition-colors shrink-0 rounded-lg",
               isDictating
-                ? "text-destructive animate-pulse bg-destructive/10"
-                : "text-muted-foreground hover:text-foreground hover:bg-accent",
+                ? "text-status-danger animate-pulse bg-status-danger/10"
+                : "text-fg-secondary hover:text-fg hover:bg-control-hover",
             )}
           >
             <Mic className="size-4" strokeWidth={1.5} />
@@ -90,7 +90,7 @@ export function ChatInput({ input, isStreaming, onInputChange, onSend }: ChatInp
             onClick={onSend}
             disabled={!input.trim() || isStreaming}
             aria-label="Send message"
-            className="size-9 rounded-full bg-brand hover:bg-brand-hover disabled:bg-accent disabled:text-muted-foreground flex items-center justify-center transition-all shrink-0"
+            className="size-9 rounded-full bg-brand text-brand-foreground hover:bg-brand-hover disabled:bg-control-hover disabled:text-fg-secondary flex items-center justify-center transition-all shrink-0"
           >
             <Send className="size-4" strokeWidth={2} />
           </button>

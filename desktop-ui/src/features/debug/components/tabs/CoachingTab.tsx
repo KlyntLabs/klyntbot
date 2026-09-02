@@ -83,11 +83,11 @@ function Gauge({
             strokeLinecap="round"
           />
         </svg>
-        <span className="absolute inset-0 flex items-center justify-center text-[11px] text-muted-foreground font-mono">
+        <span className="absolute inset-0 flex items-center justify-center text-ui-xs text-fg-secondary font-mono">
           {pct}%
         </span>
       </div>
-      <span className="text-2xs text-muted-foreground text-center leading-tight">{label}</span>
+      <span className="text-ui-xs text-fg-secondary text-center leading-tight">{label}</span>
     </div>
   );
 }
@@ -186,29 +186,29 @@ export function CoachingTab() {
     <div className="space-y-6">
       {/* Situation Gauges */}
       <div>
-        <h2 className="text-[13px] font-medium text-muted-foreground mb-3">User Situation</h2>
-        <div className="flex gap-4 items-start p-4 bg-card rounded-lg border border-border">
+        <h2 className="text-ui font-medium text-fg-secondary mb-3">User Situation</h2>
+        <div className="flex gap-4 items-start p-4 bg-bg-elevated rounded-panel border border-separator">
           <Gauge label="Energy" value={situation.energyLevel} />
           <Gauge label="Focus" value={situation.focusState} />
-          <Gauge label="Deadline" value={situation.deadlinePressure} color="text-destructive" />
+          <Gauge label="Deadline" value={situation.deadlinePressure} color="text-status-danger" />
           <Gauge label="Distraction" value={situation.distractionRisk} color="text-brand" />
-          <Gauge label="Receptivity" value={situation.coachingReceptivity} color="text-success" />
-          <div className="flex flex-col gap-1 ml-4 text-[11px]">
-            <span className="text-muted-foreground">
+          <Gauge label="Receptivity" value={situation.coachingReceptivity} color="text-status-success" />
+          <div className="flex flex-col gap-1 ml-4 text-ui-xs">
+            <span className="text-fg-secondary">
               Hours active:{" "}
-              <span className="text-muted-foreground">
+              <span className="text-fg-secondary">
                 {situation.hoursActiveToday.toFixed(1)}h
               </span>
             </span>
-            <span className="text-muted-foreground">
+            <span className="text-fg-secondary">
               Since break:{" "}
-              <span className="text-muted-foreground">
+              <span className="text-fg-secondary">
                 {situation.minsSinceBreak.toFixed(0)}min
               </span>
             </span>
-            <span className="text-muted-foreground">
+            <span className="text-fg-secondary">
               Context switches:{" "}
-              <span className="text-muted-foreground">{situation.recentContextSwitches}</span>
+              <span className="text-fg-secondary">{situation.recentContextSwitches}</span>
             </span>
             {situation.taskAvoidanceDetected && (
               <span className="text-brand font-medium">Task avoidance detected</span>
@@ -220,27 +220,27 @@ export function CoachingTab() {
       {/* Active Interventions */}
       {interventions.length > 0 && (
         <div>
-          <h2 className="text-[13px] font-medium text-muted-foreground mb-3">
+          <h2 className="text-ui font-medium text-fg-secondary mb-3">
             Active Interventions ({interventions.length})
           </h2>
           <div className="space-y-2">
             {interventions.map((iv) => (
-              <div key={iv.id} className="p-3 bg-card rounded-lg border border-brand/30">
+              <div key={iv.id} className="p-3 bg-bg-elevated rounded-panel border border-brand/30">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="text-2xs px-1.5 py-0.5 bg-brand/20 text-brand rounded font-medium">
+                      <span className="text-ui-xs px-1.5 py-0.5 bg-brand/20 text-brand rounded font-medium">
                         {iv.interventionType}
                       </span>
-                      <span className="text-2xs text-muted-foreground">{iv.triggerName}</span>
+                      <span className="text-ui-xs text-fg-secondary">{iv.triggerName}</span>
                     </div>
-                    <p className="text-xs text-muted-foreground leading-relaxed">{iv.message}</p>
+                    <p className="text-ui-sm text-fg-secondary leading-relaxed">{iv.message}</p>
                   </div>
                   <div className="flex gap-1 shrink-0">
                     <button
                       type="button"
                       onClick={() => handleFeedback(iv.id, "helpful")}
-                      className="p-1.5 rounded hover:bg-success/20 text-muted-foreground hover:text-success transition-colors"
+                      className="p-1.5 rounded hover:bg-status-success/20 text-fg-secondary hover:text-status-success transition-colors"
                       title="Helpful"
                     >
                       <Check className="size-3.5" />
@@ -248,7 +248,7 @@ export function CoachingTab() {
                     <button
                       type="button"
                       onClick={() => handleFeedback(iv.id, "dismissed")}
-                      className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                      className="p-1.5 rounded hover:bg-control-hover text-fg-secondary hover:text-fg transition-colors"
                       title="Dismiss"
                     >
                       <X className="size-3.5" />
@@ -256,7 +256,7 @@ export function CoachingTab() {
                     <button
                       type="button"
                       onClick={() => handleFeedback(iv.id, "stop")}
-                      className="p-1.5 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors"
+                      className="p-1.5 rounded hover:bg-status-danger/20 text-fg-secondary hover:text-status-danger transition-colors"
                       title="Stop suggesting"
                     >
                       <XCircle className="size-3.5" />
@@ -274,25 +274,25 @@ export function CoachingTab() {
         <div className="space-y-4">
           <div>
             <div className="flex items-center justify-between mb-2">
-              <h3 className="text-[13px] font-medium text-muted-foreground">Signal Accumulator</h3>
+              <h3 className="text-ui font-medium text-fg-secondary">Signal Accumulator</h3>
               <button
                 type="button"
                 onClick={handleClearSignals}
-                className="text-2xs text-muted-foreground hover:text-foreground flex items-center gap-1"
+                className="text-ui-xs text-fg-secondary hover:text-fg flex items-center gap-1"
               >
                 <Trash2 className="size-3" /> Clear
               </button>
             </div>
-            <div className="p-3 bg-card rounded-lg border border-border">
-              <p className="text-xs text-muted-foreground">
+            <div className="p-3 bg-bg-elevated rounded-panel border border-separator">
+              <p className="text-ui-sm text-fg-secondary">
                 {signals.windowSize} signals in 30min window
               </p>
               {signals.triggers.length > 0 && (
                 <div className="mt-2 space-y-1">
                   {signals.triggers.map((t) => (
-                    <div key={t.name} className="flex items-center justify-between text-[11px]">
-                      <span className="text-muted-foreground">{t.name}</span>
-                      <span className="text-muted-foreground">
+                    <div key={t.name} className="flex items-center justify-between text-ui-xs">
+                      <span className="text-fg-secondary">{t.name}</span>
+                      <span className="text-fg-secondary">
                         {t.cooldownRemainingSecs > 0
                           ? `${t.cooldownRemainingSecs}s cooldown`
                           : "ready"}
@@ -305,27 +305,27 @@ export function CoachingTab() {
           </div>
 
           <div>
-            <h3 className="text-[13px] font-medium text-muted-foreground mb-2">
+            <h3 className="text-ui font-medium text-fg-secondary mb-2">
               Detected Patterns
             </h3>
             <div className="space-y-2">
               {patterns.map((p) => (
-                <div key={p.name} className="p-3 bg-card rounded-lg border border-border">
+                <div key={p.name} className="p-3 bg-bg-elevated rounded-panel border border-separator">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs text-muted-foreground font-medium">{p.name}</span>
-                    <span className="text-2xs text-muted-foreground">{p.signalCount} signals</span>
+                    <span className="text-ui-sm text-fg-secondary font-medium">{p.name}</span>
+                    <span className="text-ui-xs text-fg-secondary">{p.signalCount} signals</span>
                   </div>
-                  <div className="w-full bg-muted rounded-full h-1 mb-1">
+                  <div className="w-full bg-control-hover rounded-full h-1 mb-1">
                     <div
                       className="bg-brand h-1 rounded-full"
                       style={{ width: `${p.confidence * 100}%` }}
                     />
                   </div>
-                  <p className="text-[11px] text-muted-foreground">{p.description}</p>
+                  <p className="text-ui-xs text-fg-secondary">{p.description}</p>
                 </div>
               ))}
               {patterns.length === 0 && (
-                <p className="text-xs text-muted-foreground">No patterns detected</p>
+                <p className="text-ui-sm text-fg-secondary">No patterns detected</p>
               )}
             </div>
           </div>
@@ -334,20 +334,20 @@ export function CoachingTab() {
         {/* Right: Router & Feedback */}
         <div className="space-y-4">
           <div>
-            <h3 className="text-[13px] font-medium text-muted-foreground mb-2">
+            <h3 className="text-ui font-medium text-fg-secondary mb-2">
               Intervention Router
             </h3>
-            <div className="p-3 bg-card rounded-lg border border-border">
-              <div className="flex gap-4 text-xs">
-                <span className="text-muted-foreground">
+            <div className="p-3 bg-bg-elevated rounded-panel border border-separator">
+              <div className="flex gap-4 text-ui-sm">
+                <span className="text-fg-secondary">
                   Hourly:{" "}
-                  <span className="text-muted-foreground">
+                  <span className="text-fg-secondary">
                     {router.hourlyCount}/{router.hourlyLimit}
                   </span>
                 </span>
-                <span className="text-muted-foreground">
+                <span className="text-fg-secondary">
                   Daily:{" "}
-                  <span className="text-muted-foreground">
+                  <span className="text-fg-secondary">
                     {router.dailyCount}/{router.dailyLimit}
                   </span>
                 </span>
@@ -357,43 +357,43 @@ export function CoachingTab() {
 
           <div>
             <div className="flex items-center justify-between mb-2">
-              <h3 className="text-[13px] font-medium text-muted-foreground">Strategy Feedback</h3>
+              <h3 className="text-ui font-medium text-fg-secondary">Strategy Feedback</h3>
               <button
                 type="button"
                 onClick={handleResetDismissals}
-                className="text-2xs text-muted-foreground hover:text-foreground flex items-center gap-1"
+                className="text-ui-xs text-fg-secondary hover:text-fg flex items-center gap-1"
               >
                 <RefreshCw className="size-3" /> Reset All
               </button>
             </div>
-            <div className="bg-card rounded-lg border border-border overflow-hidden">
-              <table className="w-full text-xs">
+            <div className="bg-bg-elevated rounded-panel border border-separator overflow-hidden">
+              <table className="w-full text-ui-sm">
                 <thead>
-                  <tr className="border-b border-border-subtle">
-                    <th className="text-left p-2 text-muted-foreground font-normal">Trigger</th>
-                    <th className="text-left p-2 text-muted-foreground font-normal">Type</th>
-                    <th className="text-left p-2 text-muted-foreground font-normal">Used</th>
-                    <th className="text-left p-2 text-muted-foreground font-normal">Accept</th>
-                    <th className="text-left p-2 text-muted-foreground font-normal">Effect</th>
+                  <tr className="border-b border-separator">
+                    <th className="text-left p-2 text-fg-secondary font-normal">Trigger</th>
+                    <th className="text-left p-2 text-fg-secondary font-normal">Type</th>
+                    <th className="text-left p-2 text-fg-secondary font-normal">Used</th>
+                    <th className="text-left p-2 text-fg-secondary font-normal">Accept</th>
+                    <th className="text-left p-2 text-fg-secondary font-normal">Effect</th>
                   </tr>
                 </thead>
                 <tbody>
                   {feedback.map((s) => (
-                    <tr key={s.strategyType} className="border-b border-border-subtle">
-                      <td className="p-2 text-muted-foreground">{s.strategyType}</td>
-                      <td className="p-2 text-muted-foreground">{s.domain}</td>
-                      <td className="p-2 text-muted-foreground">{s.timesUsed}</td>
-                      <td className="p-2 text-muted-foreground">
+                    <tr key={s.strategyType} className="border-b border-separator">
+                      <td className="p-2 text-fg-secondary">{s.strategyType}</td>
+                      <td className="p-2 text-fg-secondary">{s.domain}</td>
+                      <td className="p-2 text-fg-secondary">{s.timesUsed}</td>
+                      <td className="p-2 text-fg-secondary">
                         {(s.acceptanceRate * 100).toFixed(0)}%
                       </td>
-                      <td className="p-2 text-muted-foreground">
+                      <td className="p-2 text-fg-secondary">
                         {(s.effectiveness * 100).toFixed(0)}%
                       </td>
                     </tr>
                   ))}
                   {feedback.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="p-4 text-center text-muted-foreground">
+                      <td colSpan={5} className="p-4 text-center text-fg-secondary">
                         No feedback data
                       </td>
                     </tr>

@@ -86,8 +86,8 @@ export function ActivityFeed() {
   if (events.length === 0) {
     return (
       <div className="glass-card p-4">
-        <h2 className="text-[13px] font-medium text-muted-foreground mb-3">Activity</h2>
-        <p className="text-xs font-light text-dim">No recent activity</p>
+        <h2 className="text-ui font-medium text-fg-secondary mb-3">Activity</h2>
+        <p className="text-ui-sm font-light text-fg-dim">No recent activity</p>
       </div>
     );
   }
@@ -95,10 +95,10 @@ export function ActivityFeed() {
   return (
     <div className="glass-card p-4 flex flex-col gap-3">
       <div className="flex items-center justify-between">
-        <h2 className="text-[13px] font-medium text-muted-foreground">Activity</h2>
+        <h2 className="text-ui font-medium text-fg-secondary">Activity</h2>
         <div className="flex items-center gap-1.5">
-          <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
-          <span className="text-2xs font-light text-dim">Live</span>
+          <span className="w-1.5 h-1.5 rounded-full bg-status-success animate-pulse" />
+          <span className="text-ui-xs font-light text-fg-dim">Live</span>
         </div>
       </div>
       <div ref={scrollRef} className="flex flex-col gap-0 max-h-64 overflow-y-auto">
@@ -115,25 +115,25 @@ export function ActivityFeed() {
           return (
             <div
               key={key}
-              className={`flex items-center gap-2 py-1.5 ${isFirst ? "" : "border-t border-border-subtle"}`}
+              className={`flex items-center gap-2 py-1.5 ${isFirst ? "" : "border-t border-separator"}`}
               style={isNew ? { animation: "fade-in 0.4s ease-out" } : undefined}
             >
               {/* App icon */}
               <div className="flex-shrink-0">
                 {e.isIdle ? (
-                  <span className="size-3.5 rounded-full bg-muted block" />
+                  <span className="size-3.5 rounded-full bg-control-hover block" />
                 ) : (
                   <AppIcon appName={name} color={color} />
                 )}
               </div>
 
               {/* Time */}
-              <span className="text-2xs tabular-nums w-10 flex-shrink-0 font-light text-dim">
+              <span className="text-ui-xs tabular-nums w-10 flex-shrink-0 font-light text-fg-dim">
                 {formatTime(e.startedAt)}
               </span>
               {tag && (
                 <span
-                  className={`text-[9px] font-medium tabular-nums flex-shrink-0 ${isRecent ? "text-success" : "text-muted-foreground"}`}
+                  className={`text-[9px] font-medium tabular-nums flex-shrink-0 ${isRecent ? "text-status-success" : "text-fg-secondary"}`}
                 >
                   {tag}
                 </span>
@@ -143,13 +143,13 @@ export function ActivityFeed() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5">
                   <span
-                    className={`text-[11px] truncate ${e.isIdle ? "text-dim italic" : isFirst ? "font-normal text-foreground" : "font-light text-muted-foreground"}`}
+                    className={`text-ui-xs truncate ${e.isIdle ? "text-fg-dim italic" : isFirst ? "font-normal text-fg" : "font-light text-fg-secondary"}`}
                   >
                     {name}
                   </span>
                 </div>
                 {subtitle && !e.isIdle && (
-                  <p className="text-[9px] font-light text-dim truncate leading-tight">
+                  <p className="text-[9px] font-light text-fg-dim truncate leading-tight">
                     {subtitle}
                   </p>
                 )}

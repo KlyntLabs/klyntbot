@@ -32,9 +32,9 @@ export function TaskProgressCard() {
       onClick={() => navigate(`/project/${project?.id ?? ""}/tasks`)}
       className="glass-card rounded-xl p-5 text-left transition-colors hover:border-brand/30"
     >
-      <p className="text-2xs text-muted-foreground uppercase tracking-wider mb-3">Task Progress</p>
-      <span className="text-2xl font-bold text-foreground">{activeCount}</span>
-      <span className="text-[11px] text-muted-foreground ml-1.5">
+      <p className="text-ui-xs text-fg-secondary uppercase tracking-wider mb-3">Task Progress</p>
+      <span className="text-2xl font-bold text-fg">{activeCount}</span>
+      <span className="text-ui-xs text-fg-secondary ml-1.5">
         active task{activeCount !== 1 ? "s" : ""}
       </span>
 
@@ -45,12 +45,12 @@ export function TaskProgressCard() {
         />
       </div>
 
-      <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+      <div className="flex items-center gap-3 text-ui-xs text-fg-secondary">
         <span>
           {completedCount}/{totalCount} completed
         </span>
-        {dueToday > 0 && <span className="text-warning">{dueToday} due today</span>}
-        {overdue > 0 && <span className="text-destructive">{overdue} overdue</span>}
+        {dueToday > 0 && <span className="text-status-warning">{dueToday} due today</span>}
+        {overdue > 0 && <span className="text-status-danger">{overdue} overdue</span>}
       </div>
     </button>
   );

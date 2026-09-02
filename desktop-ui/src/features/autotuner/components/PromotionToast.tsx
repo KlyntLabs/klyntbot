@@ -12,13 +12,13 @@ export function PromotionToast({ impact, onDismiss }: PromotionToastProps) {
     <div className="animate-[slideIn_0.2s_ease-out]">
       <div
         className="glass-card p-4 flex items-center gap-3 border-l-2"
-        style={{ borderLeftColor: "var(--success)" }}
+        style={{ borderLeftColor: "var(--ds-status-success)" }}
       >
         <div className="flex-1 min-w-0">
-          <span className="text-xs font-medium text-foreground">
+          <span className="text-ui-sm font-medium text-fg">
             I just improved how I understand you
           </span>
-          <p className="text-[11px] font-light text-muted-foreground mt-0.5">{impact}</p>
+          <p className="text-ui-xs font-light text-fg-secondary mt-0.5">{impact}</p>
         </div>
 
         <div className="flex items-center gap-2 flex-shrink-0">
@@ -28,14 +28,14 @@ export function PromotionToast({ impact, onDismiss }: PromotionToastProps) {
               onDismiss();
               navigate("/settings/general");
             }}
-            className="text-[11px] font-medium px-3 py-1.5 rounded-lg bg-success/15 text-success hover:bg-success/25 transition-colors"
+            className="text-ui-xs font-medium px-3 py-1.5 rounded-lg bg-status-success/15 text-status-success hover:bg-status-success/25 transition-colors"
           >
             Show me
           </button>
           <button
             type="button"
             onClick={onDismiss}
-            className="text-[11px] font-medium px-3 py-1.5 rounded-lg bg-[var(--surface-glass-subtle)] text-muted-foreground hover:bg-[var(--surface-glass-subtle-hover)] transition-colors"
+            className="text-ui-xs font-medium px-3 py-1.5 rounded-lg bg-[var(--surface-glass-subtle)] text-fg-secondary hover:bg-[var(--surface-glass-subtle-hover)] transition-colors"
           >
             Dismiss
           </button>

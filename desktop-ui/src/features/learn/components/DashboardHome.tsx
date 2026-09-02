@@ -64,9 +64,9 @@ export function DashboardHome({
     return (
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center">
-          <GraduationCap className="size-12 text-muted-foreground mx-auto mb-3" strokeWidth={1.5} />
-          <h1 className="text-xl font-semibold text-foreground">Learning Hub</h1>
-          <p className="text-muted-foreground mt-1 text-sm">Loading dashboard...</p>
+          <GraduationCap className="size-12 text-fg-secondary mx-auto mb-3" strokeWidth={1.5} />
+          <h1 className="text-xl font-semibold text-fg">Learning Hub</h1>
+          <p className="text-fg-secondary mt-1 text-sm">Loading dashboard...</p>
         </div>
       </div>
     );
@@ -78,10 +78,10 @@ export function DashboardHome({
     return (
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center max-w-sm space-y-4">
-          <GraduationCap size={40} className="mx-auto text-muted-foreground" strokeWidth={1.5} />
+          <GraduationCap size={40} className="mx-auto text-fg-secondary" strokeWidth={1.5} />
           <div>
-            <h1 className="text-xl font-semibold text-foreground">Learning Hub</h1>
-            <p className="text-sm text-muted-foreground mt-1">
+            <h1 className="text-xl font-semibold text-fg">Learning Hub</h1>
+            <p className="text-sm text-fg-secondary mt-1">
               No flashcards yet. Create your first card to get started with spaced repetition
               learning.
             </p>
@@ -89,11 +89,11 @@ export function DashboardHome({
           <button
             type="button"
             onClick={onQuickAdd}
-            className="glass-button px-4 py-2 text-sm text-foreground inline-flex items-center gap-2"
+            className="glass-button px-4 py-2 text-sm text-fg inline-flex items-center gap-2"
           >
             <Plus size={16} strokeWidth={1.5} />
             Create Card
-            <span className="text-2xs text-muted-foreground ml-1">{"\u2318"}N</span>
+            <span className="text-ui-xs text-fg-secondary ml-1">{"\u2318"}N</span>
           </button>
         </div>
       </div>
@@ -106,23 +106,23 @@ export function DashboardHome({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2.5">
           <GraduationCap size={22} className="text-brand" strokeWidth={1.5} />
-          <h1 className="text-lg font-semibold text-foreground">Learning Hub</h1>
+          <h1 className="text-lg font-semibold text-fg">Learning Hub</h1>
         </div>
         <button
           type="button"
           onClick={onQuickAdd}
-          className="glass-button px-3 py-1.5 text-xs text-foreground inline-flex items-center gap-1.5"
+          className="glass-button px-3 py-1.5 text-ui-sm text-fg inline-flex items-center gap-1.5"
         >
           <Plus size={14} strokeWidth={1.5} />
           Quick Add
-          <span className="text-2xs text-muted-foreground">{"\u2318"}N</span>
+          <span className="text-ui-xs text-fg-secondary">{"\u2318"}N</span>
         </button>
       </div>
 
       {/* Stats */}
       <Suspense
         fallback={
-          <div className="flex items-center justify-center h-full text-muted text-sm">
+          <div className="flex items-center justify-center h-full text-fg-secondary text-sm">
             Loading...
           </div>
         }
@@ -147,9 +147,9 @@ export function DashboardHome({
             <div className="p-1.5 rounded-lg bg-brand/10">
               <Play size={16} className="text-brand" strokeWidth={1.5} />
             </div>
-            <span className="text-sm font-medium text-foreground">Start Review</span>
+            <span className="text-sm font-medium text-fg">Start Review</span>
           </div>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-ui-sm text-fg-secondary">
             {totalDue > 0
               ? `${totalDue} card${totalDue !== 1 ? "s" : ""} due for review`
               : "No cards due right now"}
@@ -172,8 +172,8 @@ export function DashboardHome({
           <Focus size={16} className="text-purple-400" strokeWidth={1.5} />
         </div>
         <div className="flex-1 min-w-0">
-          <span className="text-sm font-medium text-foreground">Focused Review</span>
-          <p className="text-xs text-muted-foreground">
+          <span className="text-sm font-medium text-fg">Focused Review</span>
+          <p className="text-ui-sm text-fg-secondary">
             Review all due cards in a distraction-free session
           </p>
         </div>
@@ -188,8 +188,8 @@ export function DashboardHome({
           <Activity size={16} className="text-green-400" strokeWidth={1.5} />
         </div>
         <div className="flex-1 min-w-0">
-          <span className="text-sm font-medium text-foreground">Knowledge Health</span>
-          <p className="text-xs text-muted-foreground">Track retention across topics</p>
+          <span className="text-sm font-medium text-fg">Knowledge Health</span>
+          <p className="text-ui-sm text-fg-secondary">Track retention across topics</p>
         </div>
       </Link>
 
@@ -198,8 +198,8 @@ export function DashboardHome({
         <div className="space-y-2">
           <div className="flex items-center gap-2">
             <AlertTriangle size={14} className="text-red-400" strokeWidth={1.5} />
-            <span className="text-sm font-medium text-foreground">Needs Attention</span>
-            <span className="text-2xs text-muted-foreground">
+            <span className="text-sm font-medium text-fg">Needs Attention</span>
+            <span className="text-ui-xs text-fg-secondary">
               {struggling.length} card{struggling.length !== 1 ? "s" : ""} struggling
             </span>
           </div>
@@ -207,16 +207,16 @@ export function DashboardHome({
             {struggling.map((card) => (
               <div key={card.id} className="glass-card p-3 flex items-center gap-3 group">
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm text-foreground truncate">{card.front}</p>
+                  <p className="text-sm text-fg truncate">{card.front}</p>
                   <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-2xs text-muted-foreground">{card.deck}</span>
-                    <span className="text-2xs text-red-400 font-medium">{card.lapses} lapses</span>
+                    <span className="text-ui-xs text-fg-secondary">{card.deck}</span>
+                    <span className="text-ui-xs text-red-400 font-medium">{card.lapses} lapses</span>
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => onGenerateFromText(`${card.front}\n\nExpected: ${card.back}`)}
-                  className="glass-button px-2.5 py-1 text-2xs text-foreground inline-flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                  className="glass-button px-2.5 py-1 text-ui-xs text-fg inline-flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
                 >
                   <RefreshCw size={12} strokeWidth={1.5} />
                   Regenerate
@@ -239,7 +239,7 @@ export function DashboardHome({
         <div className="glass-card p-4">
           <Suspense
             fallback={
-              <div className="flex items-center justify-center h-full text-muted text-sm">
+              <div className="flex items-center justify-center h-full text-fg-secondary text-sm">
                 Loading...
               </div>
             }

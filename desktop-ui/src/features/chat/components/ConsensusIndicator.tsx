@@ -16,7 +16,7 @@ export function ConsensusIndicator({
   // Show round progress instead of raw Jaccard score (which is misleading for natural language)
   if (round && totalRounds) {
     return (
-      <div className="flex items-center gap-1.5 text-2xs text-dim">
+      <div className="flex items-center gap-1.5 text-ui-xs text-fg-dim">
         <span>
           Round {round}/{totalRounds}
         </span>
@@ -42,7 +42,7 @@ export function ConsensusIndicator({
 
   // Fallback: simple consensus badge
   if (reached) {
-    return <span className="text-2xs text-green-400">Consensus reached</span>;
+    return <span className="text-ui-xs text-green-400">Consensus reached</span>;
   }
 
   return null;

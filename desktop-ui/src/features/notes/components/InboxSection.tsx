@@ -26,7 +26,7 @@ export function InboxSection({ items, onCreateAsNote, onDiscard }: InboxSectionP
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
-        className="flex items-center gap-1 px-2 py-1 text-2xs uppercase tracking-wider text-dim hover:text-muted-foreground transition-colors"
+        className="flex items-center gap-1 px-2 py-1 text-ui-xs uppercase tracking-wider text-fg-dim hover:text-fg-secondary transition-colors"
       >
         <ChevronRight className={`size-3 transition-transform ${isOpen ? "rotate-90" : ""}`} />
         <Inbox className="size-3" />
@@ -62,13 +62,13 @@ function InboxItemRow({
   onDiscard: () => void;
 }) {
   return (
-    <div className="flex flex-col gap-1 px-2 py-1.5 rounded-lg hover:bg-accent transition-colors group">
-      <span className="text-xs text-muted-foreground line-clamp-2">{item.content}</span>
+    <div className="flex flex-col gap-1 px-2 py-1.5 rounded-lg hover:bg-control-hover transition-colors group">
+      <span className="text-ui-sm text-fg-secondary line-clamp-2">{item.content}</span>
       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
         <button
           type="button"
           onClick={onCreateAsNote}
-          className="flex items-center gap-1 text-2xs text-brand hover:text-brand/80 transition-colors"
+          className="flex items-center gap-1 text-ui-xs text-brand hover:text-brand/80 transition-colors"
           title="Create as note"
         >
           <FilePlus size={11} />
@@ -77,7 +77,7 @@ function InboxItemRow({
         <button
           type="button"
           onClick={onDiscard}
-          className="flex items-center gap-1 text-2xs text-dim hover:text-destructive transition-colors ml-2"
+          className="flex items-center gap-1 text-ui-xs text-fg-dim hover:text-status-danger transition-colors ml-2"
           title="Discard"
         >
           <Trash2 size={11} />

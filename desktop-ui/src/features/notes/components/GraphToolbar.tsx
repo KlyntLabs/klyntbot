@@ -62,16 +62,16 @@ export function GraphToolbar({
   return (
     <div className="flex items-center gap-2 px-3 py-2 shrink-0">
       {/* Smart view pills */}
-      <div className="flex items-center gap-0.5 bg-card rounded-lg p-0.5">
+      <div className="flex items-center gap-0.5 bg-bg-elevated rounded-lg p-0.5">
         {VIEW_OPTIONS.map((opt) => (
           <button
             key={opt.value}
             type="button"
             onClick={() => onViewChange(opt.value)}
-            className={`px-2.5 py-1 text-xs rounded-md transition-all ${
+            className={`px-2.5 py-1 text-ui-sm rounded-md transition-all ${
               view === opt.value
                 ? "bg-brand/20 text-brand font-medium shadow-sm"
-                : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                : "text-fg-secondary hover:text-fg hover:bg-control-hover"
             }`}
           >
             {opt.label}
@@ -81,18 +81,18 @@ export function GraphToolbar({
 
       {/* Hop radius selector (only for local view) */}
       {view === "local" && (
-        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+        <div className="flex items-center gap-1 text-ui-sm text-fg-secondary">
           <span>Hops:</span>
-          <div className="flex items-center gap-0.5 bg-card rounded-lg p-0.5">
+          <div className="flex items-center gap-0.5 bg-bg-elevated rounded-lg p-0.5">
             {[1, 2, 3].map((r) => (
               <button
                 key={r}
                 type="button"
                 onClick={() => onHopRadiusChange(r)}
-                className={`size-6 rounded-md text-xs flex items-center justify-center transition-all ${
+                className={`size-6 rounded-md text-ui-sm flex items-center justify-center transition-all ${
                   hopRadius === r
                     ? "bg-brand/20 text-brand font-medium"
-                    : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                    : "text-fg-secondary hover:text-fg hover:bg-control-hover"
                 }`}
               >
                 {r}
@@ -103,7 +103,7 @@ export function GraphToolbar({
       )}
 
       {/* Clustering mode switcher */}
-      <div className="flex items-center gap-0.5 bg-card rounded-lg p-0.5">
+      <div className="flex items-center gap-0.5 bg-bg-elevated rounded-lg p-0.5">
         {CLUSTERING_OPTIONS.map((opt) => (
           <button
             key={opt.value}
@@ -113,10 +113,10 @@ export function GraphToolbar({
                 ? handleSemanticClick
                 : () => onClusteringModeChange(opt.value)
             }
-            className={`px-2 py-1 text-xs rounded-md transition-all ${
+            className={`px-2 py-1 text-ui-sm rounded-md transition-all ${
               clusteringMode === opt.value
                 ? "bg-brand/20 text-brand font-medium shadow-sm"
-                : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                : "text-fg-secondary hover:text-fg hover:bg-control-hover"
             }`}
             title={
               opt.value === "semantic"
@@ -131,18 +131,18 @@ export function GraphToolbar({
 
       {/* Layer toggles — only visible in Semantic clustering mode */}
       {clusteringMode === "semantic" && (
-        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+        <div className="flex items-center gap-1 text-ui-sm text-fg-secondary">
           <span>Layers:</span>
-          <div className="flex items-center gap-0.5 bg-card rounded-lg p-0.5">
+          <div className="flex items-center gap-0.5 bg-bg-elevated rounded-lg p-0.5">
             {LAYER_OPTIONS.map(({ key, label, Icon }) => (
               <button
                 key={key}
                 type="button"
                 onClick={() => onLayerToggle(key)}
-                className={`px-2 py-1 text-xs rounded-md transition-all flex items-center gap-1 ${
+                className={`px-2 py-1 text-ui-sm rounded-md transition-all flex items-center gap-1 ${
                   layerState[key]
                     ? "bg-brand/20 text-brand font-medium shadow-sm"
-                    : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                    : "text-fg-secondary hover:text-fg hover:bg-control-hover"
                 }`}
                 title={`Toggle ${label} layer`}
               >
@@ -161,10 +161,10 @@ export function GraphToolbar({
       <button
         type="button"
         onClick={() => onRenderModeChange(renderMode === "2d" ? "3d" : "2d")}
-        className={`flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-lg transition-all ${
+        className={`flex items-center gap-1.5 px-2.5 py-1 text-ui-sm rounded-lg transition-all ${
           renderMode === "3d"
             ? "bg-brand/20 text-brand font-medium shadow-sm"
-            : "text-muted-foreground hover:text-foreground hover:bg-accent"
+            : "text-fg-secondary hover:text-fg hover:bg-control-hover"
         }`}
         title={renderMode === "3d" ? "Exit Brain View" : "Enter Brain View"}
       >
@@ -174,13 +174,13 @@ export function GraphToolbar({
 
       {/* Search input */}
       <div className="relative">
-        <Search className="absolute left-2 top-1/2 -translate-y-1/2 size-3.5 text-dim pointer-events-none" />
+        <Search className="absolute left-2 top-1/2 -translate-y-1/2 size-3.5 text-fg-dim pointer-events-none" />
         <input
           type="text"
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
           placeholder="Filter nodes..."
-          className="w-40 pl-7 pr-2 py-1 text-xs rounded-lg bg-card border border-border-subtle text-foreground placeholder:text-dim outline-none focus:border-brand/40 transition-colors"
+          className="w-40 pl-7 pr-2 py-1 text-ui-sm bg-control-hover border border-separator rounded-control text-fg placeholder:text-fg-dim outline-none focus:border-fg-secondary/40 transition-colors"
         />
       </div>
     </div>

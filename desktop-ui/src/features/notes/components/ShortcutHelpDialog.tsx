@@ -66,14 +66,14 @@ export function ShortcutHelpDialog({ open, onClose }: ShortcutHelpDialogProps) {
       <div className="grid grid-cols-2 gap-x-8 gap-y-5 max-h-[60vh] overflow-y-auto pr-1">
         {SHORTCUT_GROUPS.map((group) => (
           <div key={group.title}>
-            <h4 className="text-2xs font-medium text-brand uppercase tracking-wider mb-2">
+            <h4 className="text-ui-xs font-medium text-brand uppercase tracking-wider mb-2">
               {group.title}
             </h4>
             <div className="space-y-1">
               {group.shortcuts.map((s) => (
                 <div key={s.keys} className="flex items-center justify-between gap-3">
-                  <span className="text-xs text-muted-foreground">{s.description}</span>
-                  <kbd className="shrink-0 text-2xs font-mono px-1.5 py-0.5 rounded bg-muted/50 border border-border text-foreground/70">
+                  <span className="text-ui-sm text-fg-secondary">{s.description}</span>
+                  <kbd className="shrink-0 text-ui-xs font-mono px-1.5 py-0.5 rounded bg-control-hover/50 border border-separator text-fg/70">
                     {s.keys}
                   </kbd>
                 </div>

@@ -23,14 +23,14 @@ export function FormField({
   return (
     <div className={cn("space-y-1.5", className)}>
       {label && (
-        <label htmlFor={fieldId} className="text-xs font-medium text-muted-foreground">
+        <label htmlFor={fieldId} className="text-ui-sm font-medium text-fg-secondary">
           {label}
-          {required && <span className="text-destructive ml-0.5">*</span>}
+          {required && <span className="text-status-danger ml-0.5">*</span>}
         </label>
       )}
-      {description && <p className="text-xs text-muted-foreground">{description}</p>}
+      {description && <p className="text-ui-sm text-fg-secondary">{description}</p>}
       <div id={fieldId}>{children}</div>
-      {error && <p className="text-xs text-destructive">{error}</p>}
+      {error && <p className="text-ui-sm text-status-danger">{error}</p>}
     </div>
   );
 }

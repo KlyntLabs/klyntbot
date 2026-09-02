@@ -58,9 +58,9 @@ export function InlineSelect({
         onClick={openDropdown}
         onKeyDown={handleKeyDown}
         disabled={disabled}
-        className="inline-block border-b-2 border-accent bg-transparent text-accent font-semibold outline-none cursor-pointer hover:border-accent/70 transition-colors disabled:opacity-50"
+        className="inline-block bg-control-hover border border-separator text-fg font-semibold outline-none cursor-pointer px-2 py-0.5 rounded-control focus:border-fg-secondary/50 focus:ring-2 focus:ring-separator transition-colors disabled:opacity-50"
       >
-        {selectedLabel} <span className="text-muted-foreground/50 text-xs">&#9662;</span>
+        {selectedLabel} <span className="text-fg-secondary/50 text-ui-sm">&#9662;</span>
       </button>
 
       {open &&
@@ -76,7 +76,7 @@ export function InlineSelect({
             />
             {/* Dropdown */}
             <div
-              className="fixed z-50 glass-panel border border-border rounded-lg py-1 shadow-lg min-w-[160px]"
+              className="fixed z-50 glass-panel border border-separator rounded-lg py-1 shadow-lg min-w-[160px]"
               style={{ top: dropdownPos.top, left: dropdownPos.left }}
             >
               {options.map((opt) => (
@@ -84,10 +84,10 @@ export function InlineSelect({
                   key={opt.value}
                   type="button"
                   onClick={() => select(opt.value)}
-                  className={`block w-full text-left px-3 py-1.5 text-[13px] transition-colors ${
+                  className={`block w-full text-left px-3 py-1.5 text-ui transition-colors ${
                     opt.value === value
-                      ? "text-accent bg-accent/10"
-                      : "text-foreground hover:bg-accent"
+                      ? "text-brand bg-brand/10"
+                      : "text-fg hover:bg-control-hover"
                   }`}
                 >
                   {opt.label}

@@ -44,7 +44,7 @@ export function TypewriterText({
     return (
       <button type="button" onClick={handleClick} className="cursor-pointer text-left">
         {before}
-        <span className="inline-block border-b-2 border-accent/40 min-w-[80px]">&nbsp;</span>
+        <span className="inline-block border-b-2 border-brand/40 min-w-[80px]">&nbsp;</span>
         {after}
       </button>
     );

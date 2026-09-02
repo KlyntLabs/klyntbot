@@ -74,8 +74,8 @@ export function AISuggestionsPanel({
 
   return (
     <>
-      <div className="border-b border-border px-3 py-2">
-        <div className="text-2xs font-medium text-dim uppercase tracking-wider mb-1.5">
+      <div className="border-b border-separator px-3 py-2">
+        <div className="text-ui-xs font-medium text-fg-dim uppercase tracking-wider mb-1.5">
           Language
         </div>
         <div className="flex gap-2">
@@ -96,18 +96,18 @@ export function AISuggestionsPanel({
 
       {/* AI Suggestions section */}
       <div
-        className="border-b border-border"
+        className="border-b border-separator"
         style={{ borderLeftColor: ACCENT, borderLeftWidth: 2 }}
       >
         <button
           type="button"
           onClick={() => setCollapsed(!collapsed)}
-          className="w-full flex items-center gap-1.5 px-3 py-2 text-2xs font-medium uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
+          className="w-full flex items-center gap-1.5 px-3 py-2 text-ui-xs font-medium uppercase tracking-wider text-fg-secondary hover:text-fg transition-colors"
         >
           {collapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
           <span style={{ color: ACCENT }}>AI Suggestions</span>
           {hasData && (
-            <span className="ml-auto text-[9px] text-dim">
+            <span className="ml-auto text-[9px] text-fg-dim">
               {suggestions.relatedNotes.length + suggestions.linkSuggestions.length}
             </span>
           )}
@@ -117,7 +117,7 @@ export function AISuggestionsPanel({
           <div className="px-3 pb-3" style={{ backgroundColor: ACCENT_BG }}>
             {/* Related Notes */}
             <div className="py-1.5">
-              <div className="text-2xs font-medium text-dim uppercase tracking-wider mb-1">
+              <div className="text-ui-xs font-medium text-fg-dim uppercase tracking-wider mb-1">
                 Related Notes
               </div>
               {suggestions.relatedNotes.length > 0 ? (
@@ -127,25 +127,25 @@ export function AISuggestionsPanel({
                       key={item.note.id}
                       type="button"
                       onClick={() => onSelectNote(item.note.id)}
-                      className="flex flex-col gap-0.5 px-2 py-1 rounded text-left hover:bg-accent transition-colors"
+                      className="flex flex-col gap-0.5 px-2 py-1 rounded text-left hover:bg-control-hover transition-colors"
                     >
-                      <span className="text-[11px] text-muted-foreground truncate">
+                      <span className="text-ui-xs text-fg-secondary truncate">
                         {item.note.title}
                       </span>
-                      <span className="text-[9px] text-dim truncate">{item.reason}</span>
+                      <span className="text-[9px] text-fg-dim truncate">{item.reason}</span>
                     </button>
                   ))}
                 </div>
               ) : (
-                <div className="text-2xs text-dim italic">
+                <div className="text-ui-xs text-fg-dim italic">
                   {noteId ? "No suggestions yet" : "Select a note"}
                 </div>
               )}
             </div>
 
             {/* Link Suggestions */}
-            <div className="py-1.5 border-t border-border-subtle">
-              <div className="text-2xs font-medium text-dim uppercase tracking-wider mb-1">
+            <div className="py-1.5 border-t border-separator">
+              <div className="text-ui-xs font-medium text-fg-dim uppercase tracking-wider mb-1">
                 Link Suggestions
               </div>
               {suggestions.linkSuggestions.length > 0 ? (
@@ -155,23 +155,23 @@ export function AISuggestionsPanel({
                       key={item.note.id}
                       type="button"
                       onClick={() => onSelectNote(item.note.id)}
-                      className="flex flex-col gap-0.5 px-2 py-1 rounded text-left hover:bg-accent transition-colors"
+                      className="flex flex-col gap-0.5 px-2 py-1 rounded text-left hover:bg-control-hover transition-colors"
                     >
-                      <span className="text-[11px] text-muted-foreground truncate">
+                      <span className="text-ui-xs text-fg-secondary truncate">
                         Link to: {item.note.title}
                       </span>
-                      <span className="text-[9px] text-dim truncate">{item.reason}</span>
+                      <span className="text-[9px] text-fg-dim truncate">{item.reason}</span>
                     </button>
                   ))}
                 </div>
               ) : (
-                <div className="text-2xs text-dim italic">No link suggestions</div>
+                <div className="text-ui-xs text-fg-dim italic">No link suggestions</div>
               )}
             </div>
 
             {/* Suggested Tags */}
-            <div className="py-1.5 border-t border-border-subtle">
-              <div className="text-2xs font-medium text-dim uppercase tracking-wider mb-1">
+            <div className="py-1.5 border-t border-separator">
+              <div className="text-ui-xs font-medium text-fg-dim uppercase tracking-wider mb-1">
                 Suggested Tags
               </div>
               {suggestions.suggestedTags.length > 0 ? (
@@ -179,7 +179,7 @@ export function AISuggestionsPanel({
                   {suggestions.suggestedTags.map((tag) => (
                     <span
                       key={tag}
-                      className="text-2xs px-1.5 py-0.5 rounded-full"
+                      className="text-ui-xs px-1.5 py-0.5 rounded-full"
                       style={{
                         color: tagColor(tag),
                         backgroundColor: tagBgColor(tag),
@@ -190,17 +190,17 @@ export function AISuggestionsPanel({
                   ))}
                 </div>
               ) : (
-                <div className="text-2xs text-dim italic">No tag suggestions</div>
+                <div className="text-ui-xs text-fg-dim italic">No tag suggestions</div>
               )}
             </div>
 
             {/* Action buttons */}
-            <div className="flex gap-1.5 mt-2 pt-2 border-t border-border-subtle relative">
+            <div className="flex gap-1.5 mt-2 pt-2 border-t border-separator relative">
               <button
                 type="button"
                 onClick={() => onOpenInsight?.()}
                 disabled={!noteId}
-                className="flex items-center gap-1 text-2xs px-2 py-1 rounded-md bg-accent text-muted-foreground hover:bg-accent/80 hover:text-foreground transition-colors disabled:text-dim disabled:cursor-not-allowed"
+                className="flex items-center gap-1 text-ui-xs px-2 py-1 rounded-md bg-control-hover text-fg-secondary hover:bg-control-hover/80 hover:text-fg transition-colors disabled:text-fg-dim disabled:cursor-not-allowed"
               >
                 <Brain size={10} />
                 Learn
@@ -208,7 +208,7 @@ export function AISuggestionsPanel({
               <button
                 type="button"
                 disabled
-                className="flex items-center gap-1 text-2xs px-2 py-1 rounded-md bg-accent text-dim cursor-not-allowed"
+                className="flex items-center gap-1 text-ui-xs px-2 py-1 rounded-md bg-control-hover text-fg-dim cursor-not-allowed"
               >
                 <MessageSquare size={10} />
                 Ask AI
@@ -224,10 +224,10 @@ export function AISuggestionsPanel({
                   }
                 }}
                 disabled={!noteId || suggestions.linkSuggestions.length === 0}
-                className={`flex items-center gap-1 text-2xs px-2 py-1 rounded-md transition-colors ${
+                className={`flex items-center gap-1 text-ui-xs px-2 py-1 rounded-md transition-colors ${
                   noteId && suggestions.linkSuggestions.length > 0
-                    ? "bg-accent text-muted-foreground hover:bg-accent/80 hover:text-foreground"
-                    : "bg-accent text-dim cursor-not-allowed"
+                    ? "bg-control-hover text-fg-secondary hover:bg-control-hover/80 hover:text-fg"
+                    : "bg-control-hover text-fg-dim cursor-not-allowed"
                 }`}
               >
                 <Link2 size={10} />
@@ -245,7 +245,7 @@ export function AISuggestionsPanel({
                         insertWikiLink(item.note.id, item.note.title);
                         setShowLinkPicker(false);
                       }}
-                      className="w-full text-left px-3 py-1.5 text-[11px] text-muted-foreground hover:bg-accent hover:text-foreground transition-colors truncate"
+                      className="w-full text-left px-3 py-1.5 text-ui-xs text-fg-secondary hover:bg-control-hover hover:text-fg transition-colors truncate"
                     >
                       [[{item.note.title}]]
                     </button>
@@ -298,12 +298,12 @@ function LanguageDropdown({
         type="button"
         disabled={disabled}
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between gap-1 px-2 py-1 rounded-md text-[11px] text-muted-foreground bg-surface-base hover:bg-surface-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        className="w-full flex items-center justify-between gap-1 px-2 py-1 rounded-md text-ui-xs text-fg-secondary bg-bg-elevated hover:bg-control-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
       >
         <span className="truncate">{display}</span>
-        <ChevronDown size={10} className="shrink-0 text-dim" />
+        <ChevronDown size={10} className="shrink-0 text-fg-dim" />
       </button>
-      <div className="text-[9px] text-dim mt-0.5 px-1">{label}</div>
+      <div className="text-[9px] text-fg-dim mt-0.5 px-1">{label}</div>
       {open &&
         (() => {
           const rect = ref.current?.getBoundingClientRect();
@@ -325,10 +325,10 @@ function LanguageDropdown({
                     onChange(lang.code);
                     setOpen(false);
                   }}
-                  className={`w-full text-left px-2 py-1 text-[11px] transition-colors ${
+                  className={`w-full text-left px-2 py-1 text-ui-xs transition-colors ${
                     lang.code === value
-                      ? "text-foreground bg-accent"
-                      : "text-muted-foreground hover:bg-surface-hover hover:text-foreground"
+                      ? "text-fg bg-control-hover"
+                      : "text-fg-secondary hover:bg-control-hover hover:text-fg"
                   }`}
                 >
                   {lang.flag} {lang.native}

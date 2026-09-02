@@ -36,18 +36,18 @@ export function InterventionRow({
   const canGiveFeedback = !feedback || feedback === "ignored";
 
   return (
-    <div className="flex items-start gap-3 py-3 border-b border-border last:border-0">
-      <span className="text-2xs text-dim tabular-nums w-14 pt-0.5 shrink-0">
+    <div className="flex items-start gap-3 py-3 border-b border-separator last:border-0">
+      <span className="text-ui-xs text-fg-dim tabular-nums w-14 pt-0.5 shrink-0">
         {formatTime(deliveredAt)}
       </span>
 
       <div className="flex-1 min-w-0">
-        <p className="text-[11px] text-foreground leading-relaxed">{message}</p>
+        <p className="text-ui-xs text-fg leading-relaxed">{message}</p>
         <div className="flex items-center gap-2 mt-1.5">
-          <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-accent/30 text-dim">
+          <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-control-hover/30 text-fg-dim">
             {interventionType}
           </span>
-          <span className="text-[9px] text-dim">{triggerName}</span>
+          <span className="text-[9px] text-fg-dim">{triggerName}</span>
         </div>
       </div>
 
@@ -55,7 +55,7 @@ export function InterventionRow({
         <button
           type="button"
           onClick={() => navigate(actionUrl)}
-          className="text-2xs text-brand hover:underline shrink-0"
+          className="text-ui-xs text-brand hover:underline shrink-0"
         >
           Open →
         </button>
@@ -68,7 +68,7 @@ export function InterventionRow({
             <button
               type="button"
               onClick={() => handleFeedback("helpful")}
-              className="flex items-center gap-1 text-2xs text-muted-foreground hover:text-success transition-colors"
+              className="flex items-center gap-1 text-ui-xs text-fg-secondary hover:text-status-success transition-colors"
               title="Mark as helpful"
             >
               <ThumbsUp className="size-3" />
@@ -76,7 +76,7 @@ export function InterventionRow({
             <button
               type="button"
               onClick={() => handleFeedback("dismissed")}
-              className="flex items-center gap-1 text-2xs text-muted-foreground hover:text-destructive transition-colors"
+              className="flex items-center gap-1 text-ui-xs text-fg-secondary hover:text-status-danger transition-colors"
               title="Dismiss"
             >
               <X className="size-3" />

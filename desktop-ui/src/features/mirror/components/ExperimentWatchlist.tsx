@@ -34,7 +34,7 @@ export function ExperimentWatchlist({ previews, onAction }: ExperimentWatchlistP
 
   return (
     <div className="flex flex-col gap-3">
-      <h2 className="text-[13px] font-medium text-muted-foreground flex items-center gap-1.5">
+      <h2 className="text-ui font-medium text-fg-secondary flex items-center gap-1.5">
         <FlaskConical className="size-3.5" />
         Experiment Watchlist
       </h2>
@@ -47,29 +47,29 @@ export function ExperimentWatchlist({ previews, onAction }: ExperimentWatchlistP
         return (
           <div key={preview.id} className="glass-card rounded-xl p-4">
             <div className="flex items-center justify-between">
-              <span className="text-[12px] font-medium text-foreground">
+              <span className="text-ui-sm font-medium text-fg">
                 Trial {preview.trialId.slice(0, 8)}
               </span>
-              <span className="text-2xs text-dim">{preview.messagesScored} messages scored</span>
+              <span className="text-ui-xs text-fg-dim">{preview.messagesScored} messages scored</span>
             </div>
 
-            <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">
+            <p className="text-ui-xs text-fg-secondary mt-1 leading-relaxed">
               {preview.narrative}
             </p>
 
-            <div className="flex items-center justify-between mt-3 pt-3 border-t border-border-subtle">
+            <div className="flex items-center justify-between mt-3 pt-3 border-t border-separator">
               <span
-                className={`text-2xs font-medium ${
+                className={`text-ui-xs font-medium ${
                   isKill
-                    ? "text-destructive"
+                    ? "text-status-danger"
                     : isContinue
-                      ? "text-success"
-                      : "text-muted-foreground"
+                      ? "text-status-success"
+                      : "text-fg-secondary"
                 }`}
               >
                 {isKill ? "Recommend kill" : isContinue ? "Looking good" : "Needs more data"}
                 {" \u00B7 "}
-                <span className={delta < 0 ? "text-destructive" : "text-success"}>
+                <span className={delta < 0 ? "text-status-danger" : "text-status-success"}>
                   {formatDelta(delta)}
                 </span>
               </span>
@@ -81,7 +81,7 @@ export function ExperimentWatchlist({ previews, onAction }: ExperimentWatchlistP
                     await kill({ trialId: preview.trialId });
                     onAction?.();
                   }}
-                  className="flex items-center gap-1 px-2 py-1 rounded text-2xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                  className="flex items-center gap-1 px-2 py-1 rounded text-ui-xs text-fg-secondary hover:text-status-danger hover:bg-status-danger/10 transition-colors"
                 >
                   <Square className="size-3" />
                   Kill
@@ -92,7 +92,7 @@ export function ExperimentWatchlist({ previews, onAction }: ExperimentWatchlistP
                     await cont({ trialId: preview.trialId });
                     onAction?.();
                   }}
-                  className="flex items-center gap-1 px-2 py-1 rounded text-2xs text-muted-foreground hover:text-success hover:bg-success/10 transition-colors"
+                  className="flex items-center gap-1 px-2 py-1 rounded text-ui-xs text-fg-secondary hover:text-status-success hover:bg-status-success/10 transition-colors"
                 >
                   <Play className="size-3" />
                   Continue

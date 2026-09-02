@@ -25,8 +25,8 @@ export function ModeSelector({ current, onChange }: ModeSelectorProps) {
             className={[
               "text-[9px] px-2 py-0.5 rounded-full border transition-colors",
               isActive
-                ? "border-accent bg-accent/15 text-accent"
-                : "border-border bg-white/[0.03] text-dim hover:text-muted-foreground hover:bg-white/[0.06]",
+                ? "border-brand bg-brand/15 text-brand"
+                : "border-separator bg-white/[0.03] text-fg-dim hover:text-fg-secondary hover:bg-white/[0.06]",
             ].join(" ")}
           >
             {label}

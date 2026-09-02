@@ -33,7 +33,7 @@ export function GradeActions({
       <button
         type="button"
         onClick={() => onConfirm()}
-        className="w-full text-[11px] font-medium px-3 py-2 rounded-lg bg-accent/20 text-accent hover:bg-accent/30 text-center"
+        className="w-full text-ui-xs font-medium px-3 py-2 rounded-lg bg-brand/20 text-brand hover:bg-brand/30 text-center"
       >
         Confirm: {suggestedLabel} (Enter)
       </button>
@@ -45,7 +45,7 @@ export function GradeActions({
             key={key}
             type="button"
             onClick={() => onConfirm(quality)}
-            className="text-[9px] px-2 py-1 rounded-md bg-white/[0.04] text-muted-foreground hover:text-foreground hover:bg-white/[0.08]"
+            className="text-[9px] px-2 py-1 rounded-md bg-white/[0.04] text-fg-secondary hover:text-fg hover:bg-white/[0.08]"
           >
             {label}
           </button>
@@ -57,21 +57,21 @@ export function GradeActions({
         <button
           type="button"
           onClick={onExplain}
-          className="text-[9px] text-dim hover:text-foreground"
+          className="text-[9px] text-fg-dim hover:text-fg"
         >
           (e) Explain
         </button>
         <button
           type="button"
           onClick={onSaveInsight}
-          className="text-[9px] text-dim hover:text-foreground"
+          className="text-[9px] text-fg-dim hover:text-fg"
         >
           (s) Save insight
         </button>
         <button
           type="button"
           onClick={onJumpToSource}
-          className="text-[9px] text-dim hover:text-foreground"
+          className="text-[9px] text-fg-dim hover:text-fg"
         >
           (j) Source note
         </button>

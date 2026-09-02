@@ -411,7 +411,7 @@ export function getAppColor(appName: string, category: string | null): string {
   const key = appName.toLowerCase();
   if (APP_COLORS[key]) return APP_COLORS[key];
   if (category) return getCategoryColor(category);
-  return "var(--brand)";
+  return "var(--ds-accent)";
 }
 
 /** Render an app's brand icon, falling back to a generic AppWindow icon. */
@@ -482,11 +482,11 @@ export function getCategoryTypeColor(categoryType: string): string {
 
 /** Resolve activity block color from category type. Used by timeline and activity track. */
 export function resolveActivityColor(categoryType: string | undefined, isIdle: boolean): string {
-  if (isIdle) return "var(--surface-highest)";
-  if (categoryType === "productive") return "var(--success)";
-  if (categoryType === "distracting") return "var(--destructive)";
-  if (categoryType === "neutral") return "var(--text-muted-foreground)";
-  return "var(--brand)";
+  if (isIdle) return "var(--ds-glass-bg-strong)";
+  if (categoryType === "productive") return "var(--ds-status-success)";
+  if (categoryType === "distracting") return "var(--ds-status-danger)";
+  if (categoryType === "neutral") return "var(--ds-text-secondary)";
+  return "var(--ds-accent)";
 }
 
 /** Resolve category type to a human-readable label. */
@@ -499,10 +499,10 @@ export function resolveCategoryLabel(categoryType: string): string {
 
 /** Score color thresholds — shared between ScoreRing and stats widgets. */
 export function scoreColor(score: number): string {
-  if (score >= 80) return "var(--success)";
-  if (score >= 60) return "var(--brand)";
-  if (score >= 40) return "var(--text-muted-foreground)";
-  return "var(--destructive)";
+  if (score >= 80) return "var(--ds-status-success)";
+  if (score >= 60) return "var(--ds-accent)";
+  if (score >= 40) return "var(--ds-text-secondary)";
+  return "var(--ds-status-danger)";
 }
 
 /**

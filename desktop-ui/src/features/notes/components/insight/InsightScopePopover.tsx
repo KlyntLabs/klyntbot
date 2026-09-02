@@ -50,7 +50,7 @@ export function InsightScopePopover({ value, onChange }: Props) {
       <PopoverPrimitive.Trigger asChild>
         <button
           type="button"
-          className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-2xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+          className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-ui-xs text-fg-secondary hover:text-fg hover:bg-control-hover transition-colors"
           title="Scope Config"
         >
           <Sliders size={10} />
@@ -63,7 +63,7 @@ export function InsightScopePopover({ value, onChange }: Props) {
           align="start"
           sideOffset={6}
           className={cn(
-            "z-50 w-56 rounded-lg border border-border bg-popover p-3 text-foreground shadow-lg outline-none",
+            "z-50 w-56 rounded-lg border border-separator bg-glass-strong p-3 text-fg shadow-lg outline-none",
             "data-[state=open]:animate-in data-[state=closed]:animate-out",
             "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
             "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
@@ -73,7 +73,7 @@ export function InsightScopePopover({ value, onChange }: Props) {
           <div className="flex flex-col gap-3">
             {/* Scope type */}
             <div className="flex flex-col gap-1.5">
-              <span className="text-2xs font-medium text-muted-foreground uppercase tracking-wider">
+              <span className="text-ui-xs font-medium text-fg-secondary uppercase tracking-wider">
                 Context scope
               </span>
               <div className="flex flex-col gap-1">
@@ -85,16 +85,16 @@ export function InsightScopePopover({ value, onChange }: Props) {
                       type="button"
                       onClick={() => onChange({ ...value, scopeType: st.id })}
                       className={cn(
-                        "flex items-center gap-2.5 px-2.5 py-2 rounded-md text-2xs text-left transition-colors border",
+                        "flex items-center gap-2.5 px-2.5 py-2 rounded-md text-ui-xs text-left transition-colors border",
                         value.scopeType === st.id
-                          ? "bg-accent text-foreground border-border"
-                          : "bg-transparent text-muted-foreground hover:bg-accent/50 border-transparent",
+                          ? "bg-control-hover text-fg border-separator"
+                          : "bg-transparent text-fg-secondary hover:bg-control-hover/50 border-transparent",
                       )}
                     >
-                      <Icon size={14} className="shrink-0 text-muted-foreground" />
+                      <Icon size={14} className="shrink-0 text-fg-secondary" />
                       <div>
                         <div className="font-medium">{st.label}</div>
-                        <div className="text-[9px] text-muted">{st.desc}</div>
+                        <div className="text-[9px] text-fg-secondary">{st.desc}</div>
                       </div>
                     </button>
                   );
@@ -103,7 +103,7 @@ export function InsightScopePopover({ value, onChange }: Props) {
             </div>
 
             {/* Toggles */}
-            <div className="flex flex-col gap-2 pt-2 border-t border-border">
+            <div className="flex flex-col gap-2 pt-2 border-t border-separator">
               <Toggle
                 label="Cognitive Context"
                 description="Include facts, memories, rules"
@@ -146,7 +146,7 @@ function Toggle({
       <div
         className={cn(
           "w-7 h-4 rounded-full transition-colors flex items-center px-0.5",
-          checked ? "bg-brand" : "bg-accent",
+          checked ? "bg-brand" : "bg-control-hover",
         )}
       >
         <div
@@ -157,8 +157,8 @@ function Toggle({
         />
       </div>
       <div className="flex flex-col">
-        <span className="text-2xs font-medium text-foreground">{label}</span>
-        <span className="text-[9px] text-muted">{description}</span>
+        <span className="text-ui-xs font-medium text-fg">{label}</span>
+        <span className="text-[9px] text-fg-secondary">{description}</span>
       </div>
     </button>
   );

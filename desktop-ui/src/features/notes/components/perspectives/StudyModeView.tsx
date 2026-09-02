@@ -33,7 +33,7 @@ export function StudyModeView({ noteId, sectionId: _ }: StudyModeViewProps) {
 
   if (!cards || cards.length === 0) {
     return (
-      <div className="flex h-full items-center justify-center text-xs text-muted">
+      <div className="flex h-full items-center justify-center text-ui-sm text-fg-secondary">
         No flashcards for this note. Create some with ⌥F.
       </div>
     );
@@ -45,11 +45,11 @@ export function StudyModeView({ noteId, sectionId: _ }: StudyModeViewProps) {
   return (
     <div className="flex h-full flex-col gap-3 overflow-y-auto p-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-xs font-medium text-muted">
+        <h3 className="text-ui-sm font-medium text-fg-secondary">
           {cards.length} card{cards.length !== 1 ? "s" : ""}
         </h3>
         {dueCards.length > 0 && (
-          <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-2xs text-amber-400">
+          <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-ui-xs text-amber-400">
             {dueCards.length} due
           </span>
         )}
@@ -65,16 +65,16 @@ export function StudyModeView({ noteId, sectionId: _ }: StudyModeViewProps) {
             key={card.id}
             onClick={() => toggleReveal(index)}
             className={`rounded-lg border p-3 text-left transition-all ${
-              isDue ? "border-amber-500/30 bg-amber-500/5" : "border-border bg-surface-base"
+              isDue ? "border-amber-500/30 bg-amber-500/5" : "border-separator bg-bg-elevated"
             }`}
           >
-            <p className="text-xs font-medium text-primary">{card.front}</p>
+            <p className="text-ui-sm font-medium text-brand">{card.front}</p>
             {revealed && (
-              <div className="mt-2 border-t border-border pt-2">
-                <p className="text-xs text-muted">{card.back}</p>
+              <div className="mt-2 border-t border-separator pt-2">
+                <p className="text-ui-sm text-fg-secondary">{card.back}</p>
               </div>
             )}
-            {!revealed && <p className="mt-1 text-2xs text-muted">Click to reveal</p>}
+            {!revealed && <p className="mt-1 text-ui-xs text-fg-secondary">Click to reveal</p>}
           </button>
         );
       })}

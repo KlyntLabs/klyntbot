@@ -89,7 +89,7 @@ export function mergeActivitySessions<E extends MergeableEvent>(parsed: E[]): Me
       }
     }
 
-    let dominantColor = "var(--brand)";
+    let dominantColor = "var(--ds-accent)";
     let dominantCategory = "uncategorized";
     let maxDur = 0;
     for (const [cat, val] of catTally) {

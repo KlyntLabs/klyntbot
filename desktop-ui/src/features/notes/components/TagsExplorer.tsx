@@ -42,12 +42,12 @@ export function TagsExplorer({
   return (
     <div className="flex flex-col gap-1">
       <div className="flex items-center justify-between px-2 py-1">
-        <span className="text-2xs uppercase tracking-wider text-dim">Tags</span>
+        <span className="text-ui-xs uppercase tracking-wider text-fg-dim">Tags</span>
         {activeTags.length > 0 && (
           <button
             type="button"
             onClick={onClearTags}
-            className="text-2xs text-muted-foreground hover:text-foreground"
+            className="text-ui-xs text-fg-secondary hover:text-fg"
           >
             Clear
           </button>
@@ -62,7 +62,7 @@ export function TagsExplorer({
               type="button"
               key={tag}
               onClick={(e) => onToggleTag(tag, e.metaKey || e.ctrlKey)}
-              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[11px] transition-opacity"
+              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-ui-xs transition-opacity"
               style={{
                 color: tagColor(tag),
                 backgroundColor: tagBgColor(tag),
@@ -81,7 +81,7 @@ export function TagsExplorer({
       {/* Filtered notes list */}
       {filteredNotes.length > 0 && (
         <div className="flex flex-col gap-0.5 mt-1">
-          <div className="h-px bg-card mx-2" />
+          <div className="h-px bg-bg-elevated mx-2" />
           {filteredNotes.map((note) => (
             <button
               type="button"
@@ -89,8 +89,8 @@ export function TagsExplorer({
               onClick={() => onSelectNote(note.id)}
               className={`px-2 py-1 rounded text-sm truncate text-left w-full transition-colors ${
                 note.id === selectedNoteId
-                  ? "bg-muted text-foreground"
-                  : "text-muted-foreground hover:bg-card"
+                  ? "bg-control-hover text-fg"
+                  : "text-fg-secondary hover:bg-bg-elevated"
               }`}
             >
               {note.title || "Untitled"}

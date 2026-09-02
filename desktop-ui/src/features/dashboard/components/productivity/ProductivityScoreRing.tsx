@@ -20,14 +20,14 @@ export function ScoreBar({ label, value }: { label: string; value: number }) {
   const pct = Math.round(Math.min(Math.max(value, 0), 1) * 100);
   return (
     <div className="flex items-center gap-1.5 text-[9px] font-light">
-      <span className="w-[68px] text-muted-foreground text-right shrink-0 truncate">{label}</span>
-      <div className="flex-1 h-1 rounded-full bg-muted overflow-hidden">
+      <span className="w-[68px] text-fg-secondary text-right shrink-0 truncate">{label}</span>
+      <div className="flex-1 h-1 rounded-full bg-control-hover overflow-hidden">
         <div
           className="h-full rounded-full bg-brand/60 transition-[width]"
           style={{ width: `${pct}%` }}
         />
       </div>
-      <span className="w-7 text-dim tabular-nums shrink-0">{pct}%</span>
+      <span className="w-7 text-fg-dim tabular-nums shrink-0">{pct}%</span>
     </div>
   );
 }
@@ -112,35 +112,35 @@ export function ProductivityScoreRing({ score, size = 110, summary }: Productivi
           <span className="text-[26px] font-light tabular-nums leading-none" style={{ color }}>
             {Math.round(score)}
           </span>
-          <span className="text-[9px] font-light text-dim mt-0.5">/100</span>
+          <span className="text-[9px] font-light text-fg-dim mt-0.5">/100</span>
         </div>
 
         {/* Hover tooltip */}
         {hovered && summary && summary.totalActiveSecs > 0 && (
           <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 z-50 glass-panel rounded-lg px-3 py-2 shadow-lg min-w-[160px]">
-            <div className="flex flex-col gap-1.5 text-2xs">
+            <div className="flex flex-col gap-1.5 text-ui-xs">
               {focusRatio != null && (
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Focus time</span>
-                  <span className="text-foreground tabular-nums">
+                  <span className="text-fg-secondary">Focus time</span>
+                  <span className="text-fg tabular-nums">
                     {focusRatio}% ({formatHumanDuration(summary.productiveSecs)})
                   </span>
                 </div>
               )}
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Context switches</span>
-                <span className="text-foreground tabular-nums">{summary.contextSwitches}</span>
+                <span className="text-fg-secondary">Context switches</span>
+                <span className="text-fg tabular-nums">{summary.contextSwitches}</span>
               </div>
               {qualityAvg != null && (
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Session quality</span>
-                  <span className="text-foreground tabular-nums">{qualityAvg}%</span>
+                  <span className="text-fg-secondary">Session quality</span>
+                  <span className="text-fg tabular-nums">{qualityAvg}%</span>
                 </div>
               )}
               {distractionRatio != null && (
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Distraction</span>
-                  <span className="text-destructive tabular-nums">{distractionRatio}%</span>
+                  <span className="text-fg-secondary">Distraction</span>
+                  <span className="text-status-danger tabular-nums">{distractionRatio}%</span>
                 </div>
               )}
             </div>
@@ -149,7 +149,7 @@ export function ProductivityScoreRing({ score, size = 110, summary }: Productivi
       </div>
 
       {/* Label below */}
-      <span className="text-2xs font-medium tracking-wide uppercase" style={{ color }}>
+      <span className="text-ui-xs font-medium tracking-wide uppercase" style={{ color }}>
         {scoreLabel(score)}
       </span>
 

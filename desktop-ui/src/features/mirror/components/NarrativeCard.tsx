@@ -33,8 +33,8 @@ export function NarrativeCard({ narrative }: NarrativeCardProps) {
   if (!narrative) {
     return (
       <div className="glass-card rounded-xl p-5">
-        <h2 className="text-[13px] font-medium text-muted-foreground mb-2">Weekly Reflection</h2>
-        <p className="text-[11px] text-muted-foreground">
+        <h2 className="text-ui font-medium text-fg-secondary mb-2">Weekly Reflection</h2>
+        <p className="text-ui-xs text-fg-secondary">
           Your first weekly reflection will appear after 7 days of use.
         </p>
       </div>
@@ -44,16 +44,16 @@ export function NarrativeCard({ narrative }: NarrativeCardProps) {
   return (
     <div className="glass-card rounded-xl p-5">
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-[13px] font-medium text-muted-foreground">Weekly Reflection</h2>
-        <span className="text-2xs text-dim">
+        <h2 className="text-ui font-medium text-fg-secondary">Weekly Reflection</h2>
+        <span className="text-ui-xs text-fg-dim">
           {new Date(narrative.periodStart).toLocaleDateString()}
         </span>
       </div>
-      <p className="text-[12px] text-foreground leading-relaxed">{narrative.fullNarrative}</p>
-      <div className="flex items-center gap-2 mt-4 pt-3 border-t border-border-subtle">
-        <span className="text-2xs text-dim mr-1">Was this helpful?</span>
+      <p className="text-ui-sm text-fg leading-relaxed">{narrative.fullNarrative}</p>
+      <div className="flex items-center gap-2 mt-4 pt-3 border-t border-separator">
+        <span className="text-ui-xs text-fg-dim mr-1">Was this helpful?</span>
         {feedbackSent ? (
-          <span className="text-2xs text-muted-foreground">
+          <span className="text-ui-xs text-fg-secondary">
             {feedbackSent === "helpful" ? "Thanks for the feedback!" : "Got it, we'll improve."}
           </span>
         ) : (
@@ -62,7 +62,7 @@ export function NarrativeCard({ narrative }: NarrativeCardProps) {
               type="button"
               onClick={() => handleFeedback("helpful")}
               disabled={loading}
-              className="flex items-center gap-1 px-2 py-1 rounded text-2xs text-muted-foreground hover:text-success hover:bg-success/10 transition-colors disabled:opacity-50"
+              className="flex items-center gap-1 px-2 py-1 rounded text-ui-xs text-fg-secondary hover:text-status-success hover:bg-status-success/10 transition-colors disabled:opacity-50"
             >
               <ThumbsUp className="size-3" />
               Helpful
@@ -71,7 +71,7 @@ export function NarrativeCard({ narrative }: NarrativeCardProps) {
               type="button"
               onClick={() => handleFeedback("not_helpful")}
               disabled={loading}
-              className="flex items-center gap-1 px-2 py-1 rounded text-2xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
+              className="flex items-center gap-1 px-2 py-1 rounded text-ui-xs text-fg-secondary hover:text-status-danger hover:bg-status-danger/10 transition-colors disabled:opacity-50"
             >
               <ThumbsDown className="size-3" />
               Not helpful

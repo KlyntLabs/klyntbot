@@ -16,11 +16,11 @@ export function BacklinksPanel({ noteId, onSelectNote }: BacklinksPanelProps) {
   const [collapsed, setCollapsed] = useState(false);
 
   return (
-    <div className="border-b border-border">
+    <div className="border-b border-separator">
       <button
         type="button"
         onClick={() => setCollapsed(!collapsed)}
-        className="w-full flex items-center gap-1.5 px-3 py-2 text-2xs font-medium uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
+        className="w-full flex items-center gap-1.5 px-3 py-2 text-ui-xs font-medium uppercase tracking-wider text-fg-secondary hover:text-fg transition-colors"
       >
         {collapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
         <span>Backlinks ({backlinks.length})</span>
@@ -29,7 +29,7 @@ export function BacklinksPanel({ noteId, onSelectNote }: BacklinksPanelProps) {
       {!collapsed && (
         <div className="px-3 pb-2.5">
           {backlinks.length === 0 ? (
-            <div className="text-[11px] text-dim py-1">No backlinks yet</div>
+            <div className="text-ui-xs text-fg-dim py-1">No backlinks yet</div>
           ) : (
             <div className="flex flex-col gap-1">
               {backlinks.map((bl) => (
@@ -37,18 +37,18 @@ export function BacklinksPanel({ noteId, onSelectNote }: BacklinksPanelProps) {
                   key={bl.note.id}
                   type="button"
                   onClick={() => onSelectNote(bl.note.id)}
-                  className="w-full text-left rounded-md px-2 py-1.5 hover:bg-accent transition-colors group"
+                  className="w-full text-left rounded-md px-2 py-1.5 hover:bg-control-hover transition-colors group"
                 >
                   <div className="flex items-center gap-1.5">
-                    <span className="text-xs text-muted-foreground group-hover:text-foreground truncate flex-1">
+                    <span className="text-ui-sm text-fg-secondary group-hover:text-fg truncate flex-1">
                       {bl.note.title}
                     </span>
-                    <span className="text-2xs text-dim shrink-0">
+                    <span className="text-ui-xs text-fg-dim shrink-0">
                       {formatRelativeTime(bl.note.updatedAt)}
                     </span>
                   </div>
                   {bl.context && (
-                    <div className="text-2xs text-dim mt-0.5 truncate">{bl.context}</div>
+                    <div className="text-ui-xs text-fg-dim mt-0.5 truncate">{bl.context}</div>
                   )}
                   {bl.note.tags.length > 0 && (
                     <div className="flex gap-1 mt-1 flex-wrap">
@@ -72,8 +72,8 @@ export function BacklinksPanel({ noteId, onSelectNote }: BacklinksPanelProps) {
           )}
 
           {/* Unlinked Mentions */}
-          <div className="mt-3 pt-2 border-t border-border-subtle">
-            <div className="text-2xs font-medium text-dim uppercase tracking-wider mb-1">
+          <div className="mt-3 pt-2 border-t border-separator">
+            <div className="text-ui-xs font-medium text-fg-dim uppercase tracking-wider mb-1">
               Unlinked Mentions ({unlinkedMentions.length})
             </div>
             {unlinkedMentions.length > 0 ? (
@@ -83,14 +83,14 @@ export function BacklinksPanel({ noteId, onSelectNote }: BacklinksPanelProps) {
                     key={note.id}
                     type="button"
                     onClick={() => onSelectNote(note.id)}
-                    className="text-[11px] text-muted-foreground hover:text-foreground text-left px-1 py-0.5 rounded hover:bg-accent truncate transition-colors"
+                    className="text-ui-xs text-fg-secondary hover:text-fg text-left px-1 py-0.5 rounded hover:bg-control-hover truncate transition-colors"
                   >
                     {note.title}
                   </button>
                 ))}
               </div>
             ) : (
-              <div className="text-2xs text-dim italic">No unlinked mentions</div>
+              <div className="text-ui-xs text-fg-dim italic">No unlinked mentions</div>
             )}
           </div>
         </div>

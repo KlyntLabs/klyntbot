@@ -27,10 +27,10 @@ export function SplitToolbar({ currentMode, onModeChange }: SplitToolbarProps) {
             type="button"
             onClick={() => onModeChange(mode.key)}
             title={mode.label}
-            className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] transition-all ${
+            className={`flex items-center gap-1 px-2 py-1 rounded-lg text-ui-xs transition-all ${
               isActive
                 ? "bg-brand/15 text-brand"
-                : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                : "text-fg-secondary hover:text-fg hover:bg-control-hover"
             }`}
           >
             <Icon className="size-3.5" strokeWidth={1.5} />

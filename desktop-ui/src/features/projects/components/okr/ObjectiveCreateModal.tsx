@@ -104,7 +104,7 @@ export function ObjectiveCreateModal({
         <div>
           <label
             htmlFor="obj-title"
-            className="block text-xs font-medium text-muted-foreground mb-1"
+            className="block text-ui-sm font-medium text-fg-secondary mb-1"
           >
             Title <span className="text-red-400">*</span>
           </label>
@@ -116,7 +116,7 @@ export function ObjectiveCreateModal({
             placeholder="e.g. Improve API latency by 50%"
             autoFocus
             required
-            className="w-full px-3 py-2 text-sm bg-transparent border border-border rounded-md text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-brand"
+            className="w-full px-3 py-2 text-sm bg-transparent border border-separator rounded-md text-fg placeholder:text-fg-secondary focus:outline-none focus:ring-1 focus:ring-fg-secondary/30"
           />
         </div>
 
@@ -124,7 +124,7 @@ export function ObjectiveCreateModal({
         <div>
           <label
             htmlFor="obj-desc"
-            className="block text-xs font-medium text-muted-foreground mb-1"
+            className="block text-ui-sm font-medium text-fg-secondary mb-1"
           >
             Description
           </label>
@@ -134,7 +134,7 @@ export function ObjectiveCreateModal({
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Why this objective matters..."
             rows={3}
-            className="w-full px-3 py-2 text-sm bg-transparent border border-border rounded-md text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-brand resize-none"
+            className="w-full px-3 py-2 text-sm bg-transparent border border-separator rounded-md text-fg placeholder:text-fg-secondary focus:outline-none focus:ring-1 focus:ring-fg-secondary/30 resize-none"
           />
         </div>
 
@@ -143,7 +143,7 @@ export function ObjectiveCreateModal({
           <div className="flex-1">
             <label
               htmlFor="obj-priority"
-              className="block text-xs font-medium text-muted-foreground mb-1"
+              className="block text-ui-sm font-medium text-fg-secondary mb-1"
             >
               Priority
             </label>
@@ -151,7 +151,7 @@ export function ObjectiveCreateModal({
               id="obj-priority"
               value={priority}
               onChange={(e) => setPriority(e.target.value)}
-              className="w-full px-3 py-2 text-sm bg-transparent border border-border rounded-md text-foreground focus:outline-none focus:ring-1 focus:ring-brand"
+              className="w-full px-3 py-2 text-sm bg-transparent border border-separator rounded-md text-fg focus:outline-none focus:ring-1 focus:ring-fg-secondary/30"
             >
               <option value="1">1 - Critical</option>
               <option value="2">2 - High</option>
@@ -163,7 +163,7 @@ export function ObjectiveCreateModal({
           <div className="flex-1">
             <label
               htmlFor="obj-due"
-              className="block text-xs font-medium text-muted-foreground mb-1"
+              className="block text-ui-sm font-medium text-fg-secondary mb-1"
             >
               Due Date
             </label>
@@ -172,7 +172,7 @@ export function ObjectiveCreateModal({
               type="date"
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
-              className="w-full px-3 py-2 text-sm bg-transparent border border-border rounded-md text-foreground focus:outline-none focus:ring-1 focus:ring-brand"
+              className="w-full px-3 py-2 text-sm bg-transparent border border-separator rounded-md text-fg focus:outline-none focus:ring-1 focus:ring-fg-secondary/30"
             />
           </div>
         </div>
@@ -182,14 +182,14 @@ export function ObjectiveCreateModal({
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+            className="px-4 py-2 text-ui-sm font-medium text-fg-secondary hover:text-fg transition-colors"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={!title.trim() || loading}
-            className="px-4 py-2 text-xs font-medium rounded-md bg-brand text-white hover:bg-brand/90 disabled:opacity-50 transition-colors"
+            className="px-4 py-2 text-ui-sm font-medium rounded-md bg-brand text-white hover:bg-brand/90 disabled:opacity-50 transition-colors"
           >
             {loading ? "Saving..." : isEdit ? "Update Objective" : "Create Objective"}
           </button>

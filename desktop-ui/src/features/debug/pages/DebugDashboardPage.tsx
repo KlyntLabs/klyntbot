@@ -58,10 +58,10 @@ export function DebugDashboardPage() {
                 role="tab"
                 aria-selected={isActive}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex-1 py-2 rounded-xl text-[13px] font-light transition-all duration-200 flex items-center justify-center gap-1.5 ${
+                className={`flex-1 py-2 rounded-control text-ui font-light transition-all duration-200 flex items-center justify-center gap-1.5 ${
                   isActive
-                    ? "glass-button-active text-foreground"
-                    : "text-muted-foreground hover:text-foreground hover:bg-card"
+                    ? "glass-button-active text-fg"
+                    : "text-fg-secondary hover:text-fg hover:bg-control-hover"
                 }`}
               >
                 <Icon className="size-3.5" strokeWidth={1.5} />

@@ -41,9 +41,9 @@ export function SocraticPanel({ cardId, userAnswer, gradeExplanation }: Socratic
 
   if (loading) {
     return (
-      <div className="rounded-lg bg-white/[0.03] border border-accent/20 p-3 flex items-center gap-2">
-        <Loader2 size={12} className="animate-spin text-accent" />
-        <span className="text-2xs text-dim">Thinking deeper...</span>
+      <div className="rounded-lg bg-white/[0.03] border border-brand/20 p-3 flex items-center gap-2">
+        <Loader2 size={12} className="animate-spin text-brand" />
+        <span className="text-ui-xs text-fg-dim">Thinking deeper...</span>
       </div>
     );
   }
@@ -51,15 +51,15 @@ export function SocraticPanel({ cardId, userAnswer, gradeExplanation }: Socratic
   if (error) {
     return (
       <div className="rounded-lg bg-red-500/10 border border-red-500/20 p-3">
-        <p className="text-2xs text-red-400">{error}</p>
+        <p className="text-ui-xs text-red-400">{error}</p>
       </div>
     );
   }
 
   return (
-    <div className="rounded-lg bg-white/[0.03] border border-accent/20 p-3">
-      <p className="text-[9px] text-accent font-medium mb-1.5">Socratic follow-up</p>
-      <p className="text-2xs text-muted-foreground leading-relaxed whitespace-pre-wrap">
+    <div className="rounded-lg bg-white/[0.03] border border-brand/20 p-3">
+      <p className="text-[9px] text-brand font-medium mb-1.5">Socratic follow-up</p>
+      <p className="text-ui-xs text-fg-secondary leading-relaxed whitespace-pre-wrap">
         {explanation}
       </p>
     </div>

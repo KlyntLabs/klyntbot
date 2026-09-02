@@ -1,0 +1,18 @@
+/* @klyntbot/design-system CSS entry — Tailwind v4 + DS tokens (no Astryx). */
+
+@layer theme, base, components, utilities;
+
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/preflight.css" layer(base);
+
+@import "../tokens/index.css";
+@import "./theme.css";
+@import "./variants.css";
+@import "./compat.css";
+@import "../recipes/recipes.css";
+@import "./base.css";
+
+@import "tailwindcss/utilities.css" layer(utilities);
+
+/* Scan this package so utilities used only in DS components are emitted. */
+@source "../";

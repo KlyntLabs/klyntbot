@@ -81,10 +81,10 @@ export function ContextMenuItem({ children, onClick, destructive, icon }: Contex
       role="menuitem"
       tabIndex={-1}
       onClick={onClick}
-      className={`w-[calc(100%-10px)] mx-[5px] px-2.5 py-[5px] text-[13px] font-normal rounded-md flex items-center gap-2.5 text-left transition-colors outline-none focus-visible:outline-none ${
+      className={`w-[calc(100%-10px)] mx-[5px] px-2.5 py-[5px] text-ui font-normal rounded-control flex items-center gap-2.5 text-left transition-colors outline-none focus-visible:outline-none ${
         destructive
-          ? "text-destructive hover:bg-destructive/[0.12] focus:bg-destructive/[0.12]"
-          : "text-muted-foreground hover:bg-muted focus:bg-muted hover:text-foreground focus:text-foreground"
+          ? "text-status-danger hover:bg-status-danger/[0.12] focus:bg-status-danger/[0.12]"
+          : "text-fg-secondary hover:bg-control-hover focus:bg-control-hover hover:text-fg focus:text-fg"
       }`}
     >
       {icon && (
@@ -98,7 +98,7 @@ export function ContextMenuItem({ children, onClick, destructive, icon }: Contex
 // ── Separator ───────────────────────────────────────────────────────────
 
 export function ContextMenuSeparator() {
-  return <div className="h-px bg-muted my-[5px] mx-2.5" />;
+  return <div className="h-px bg-control-hover my-[5px] mx-2.5" />;
 }
 
 // ── Submenu trigger ─────────────────────────────────────────────────────
@@ -128,7 +128,7 @@ export function ContextMenuSubmenu({
         role="menuitem"
         tabIndex={-1}
         onClick={onToggle}
-        className="w-[calc(100%-10px)] mx-[5px] px-2.5 py-[5px] text-[13px] font-normal rounded-md flex items-center gap-2.5 text-left text-muted-foreground hover:bg-muted focus:bg-muted hover:text-foreground focus:text-foreground transition-colors outline-none focus-visible:outline-none"
+        className="w-[calc(100%-10px)] mx-[5px] px-2.5 py-[5px] text-ui font-normal rounded-control flex items-center gap-2.5 text-left text-fg-secondary hover:bg-control-hover focus:bg-control-hover hover:text-fg focus:text-fg transition-colors outline-none focus-visible:outline-none"
       >
         {icon && (
           <span className="size-4 flex items-center justify-center shrink-0 opacity-70">
@@ -142,7 +142,7 @@ export function ContextMenuSubmenu({
         <div
           className={
             panelClassName ??
-            "absolute left-full top-0 ml-1 py-[5px] min-w-[180px] max-h-52 overflow-y-auto rounded-[10px] border border-border bg-[rgb(22,22,24)] shadow-xl animate-[menu-appear_100ms_ease-out]"
+            "absolute left-full top-0 ml-1 py-[5px] min-w-[180px] max-h-52 overflow-y-auto rounded-menu border border-separator bg-bg-elevated shadow-xl animate-[menu-appear_100ms_ease-out]"
           }
         >
           {children}

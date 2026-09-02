@@ -262,8 +262,8 @@ export function PersonalizationSettings() {
   return (
     <div>
       <div className="mb-8">
-        <h2 className="text-lg font-medium text-foreground">Personalization</h2>
-        <p className="text-[13px] text-muted-foreground mt-1">
+        <h2 className="text-lg font-medium text-fg">Personalization</h2>
+        <p className="text-ui text-fg-secondary mt-1">
           Provider, model, and learning preferences
         </p>
       </div>
@@ -278,17 +278,17 @@ export function PersonalizationSettings() {
         <SettingsCard title="Provider & Model">
           <div className="space-y-3">
             <label className="block">
-              <span className="block text-[11px] text-muted-foreground mb-1">Active provider</span>
+              <span className="block text-ui-xs text-fg-secondary mb-1">Active provider</span>
               <select
                 value={editedProvider}
                 onChange={(e) => handleProviderChange(e.target.value)}
-                className="w-full px-3 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+                className="w-full px-3 py-1.5 text-ui text-fg bg-control-hover border border-separator rounded-control focus:outline-none focus:border-fg-secondary/50 focus:ring-2 focus:ring-separator transition-colors"
               >
-                <option value="" className="bg-popover">
+                <option value="" className="bg-glass-strong">
                   Auto-detect
                 </option>
                 {PROVIDERS.map((p) => (
-                  <option key={p.value} value={p.value} className="bg-popover">
+                  <option key={p.value} value={p.value} className="bg-glass-strong">
                     {p.label}
                   </option>
                 ))}
@@ -298,7 +298,7 @@ export function PersonalizationSettings() {
             {editedProvider && (
               <>
                 <div>
-                  <span className="block text-[11px] text-muted-foreground mb-1">
+                  <span className="block text-ui-xs text-fg-secondary mb-1">
                     API Key ({PROVIDERS.find((p) => p.value === editedProvider)?.label})
                   </span>
                   <SecretInput
@@ -309,7 +309,7 @@ export function PersonalizationSettings() {
                 </div>
 
                 <label className="block">
-                  <span className="block text-[11px] text-muted-foreground mb-1">
+                  <span className="block text-ui-xs text-fg-secondary mb-1">
                     API Base (optional)
                   </span>
                   <input
@@ -319,20 +319,20 @@ export function PersonalizationSettings() {
                       setProviderEdits((prev) => ({ ...prev, apiBase: e.target.value }))
                     }
                     placeholder="Leave blank for default"
-                    className="w-full px-3 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
+                    className="w-full px-3 py-1.5 text-ui text-fg bg-control-hover border border-separator rounded-control focus:outline-none focus:border-fg-secondary/50 focus:ring-2 focus:ring-separator transition-colors placeholder:text-fg-dim"
                   />
                 </label>
               </>
             )}
 
             <label className="block">
-              <span className="block text-[11px] text-muted-foreground mb-1">Default model</span>
+              <span className="block text-ui-xs text-fg-secondary mb-1">Default model</span>
               <input
                 type="text"
                 value={editedModel}
                 onChange={(e) => setProviderEdits((prev) => ({ ...prev, model: e.target.value }))}
                 placeholder="e.g. anthropic/claude-opus-4-5"
-                className="w-full px-3 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
+                className="w-full px-3 py-1.5 text-ui text-fg bg-control-hover border border-separator rounded-control focus:outline-none focus:border-fg-secondary/50 focus:ring-2 focus:ring-separator transition-colors placeholder:text-fg-dim"
               />
             </label>
 
@@ -343,13 +343,13 @@ export function PersonalizationSettings() {
         {/* ── Cognitive AI ──────────────────────────────────────── */}
         <SettingsCard title="Cognitive AI">
           <div className="space-y-3">
-            <p className="text-[11px] text-dim -mt-1">
+            <p className="text-ui-xs text-fg-dim -mt-1">
               Background AI for memory extraction, consolidation, reflection, and coaching.
               Lightweight tasks — fast, cheaper models recommended.
             </p>
 
             <label className="block">
-              <span className="block text-[11px] text-muted-foreground mb-1">
+              <span className="block text-ui-xs text-fg-secondary mb-1">
                 Provider override
               </span>
               <select
@@ -362,14 +362,14 @@ export function PersonalizationSettings() {
                     model: "",
                   }))
                 }
-                className="w-full px-3 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+                className="w-full px-3 py-1.5 text-ui text-fg bg-control-hover border border-separator rounded-control focus:outline-none focus:border-fg-secondary/50 focus:ring-2 focus:ring-separator transition-colors"
               >
-                <option value="" className="bg-popover">
+                <option value="" className="bg-glass-strong">
                   Same as main ({PROVIDERS.find((p) => p.value === editedProvider)?.label || "auto"}
                   )
                 </option>
                 {PROVIDERS.map((p) => (
-                  <option key={p.value} value={p.value} className="bg-popover">
+                  <option key={p.value} value={p.value} className="bg-glass-strong">
                     {p.label}
                   </option>
                 ))}
@@ -377,20 +377,20 @@ export function PersonalizationSettings() {
             </label>
 
             <div>
-              <span className="block text-[11px] text-muted-foreground mb-1">Model</span>
+              <span className="block text-ui-xs text-fg-secondary mb-1">Model</span>
               {cogModelOptions.length > 0 ? (
                 <select
                   value={cogModel}
                   onChange={(e) =>
                     setCognitiveEdits((prev) => ({ ...prev, model: e.target.value }))
                   }
-                  className="w-full px-3 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+                  className="w-full px-3 py-1.5 text-ui text-fg bg-control-hover border border-separator rounded-control focus:outline-none focus:border-fg-secondary/50 focus:ring-2 focus:ring-separator transition-colors"
                 >
-                  <option value="" className="bg-popover">
+                  <option value="" className="bg-glass-strong">
                     Same as main agent model
                   </option>
                   {cogModelOptions.map((m) => (
-                    <option key={m.value} value={m.value} className="bg-popover">
+                    <option key={m.value} value={m.value} className="bg-glass-strong">
                       {m.label}
                       {m.recommended ? " ★ recommended" : ""}
                     </option>
@@ -404,15 +404,15 @@ export function PersonalizationSettings() {
                     setCognitiveEdits((prev) => ({ ...prev, model: e.target.value }))
                   }
                   placeholder="Leave blank to use main agent model"
-                  className="w-full px-3 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
+                  className="w-full px-3 py-1.5 text-ui text-fg bg-control-hover border border-separator rounded-control focus:outline-none focus:border-fg-secondary/50 focus:ring-2 focus:ring-separator transition-colors placeholder:text-fg-dim"
                 />
               )}
             </div>
 
-            <div className="flex items-center justify-between pt-1 border-t border-border">
+            <div className="flex items-center justify-between pt-1 border-t border-separator">
               <div>
-                <span className="text-xs text-muted-foreground">Deep Intelligence Mode</span>
-                <p className="text-[11px] text-dim">
+                <span className="text-ui-xs text-fg-secondary">Deep Intelligence Mode</span>
+                <p className="text-ui-xs text-fg-dim">
                   Use full LLM processing for memory extraction and consolidation instead of
                   heuristics. Higher quality but uses more tokens.
                 </p>
@@ -433,10 +433,10 @@ export function PersonalizationSettings() {
               />
             </div>
 
-            <div className="flex items-center justify-between pt-1 border-t border-border">
+            <div className="flex items-center justify-between pt-1 border-t border-separator">
               <div>
-                <span className="text-xs text-muted-foreground">Auto-extract knowledge atoms</span>
-                <p className="text-[11px] text-dim">
+                <span className="text-ui-xs text-fg-secondary">Auto-extract knowledge atoms</span>
+                <p className="text-ui-xs text-fg-dim">
                   Automatically extract concepts and facts from notes
                 </p>
               </div>
@@ -454,7 +454,7 @@ export function PersonalizationSettings() {
 
             {hasCognitiveChanges && (
               <>
-                <p className="text-2xs text-warning/80">Changes take effect after restart</p>
+                <p className="text-ui-xs text-status-warning/80">Changes take effect after restart</p>
                 <SaveButton onClick={saveCognitive} saving={savingCognitive} />
               </>
             )}
@@ -466,8 +466,8 @@ export function PersonalizationSettings() {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <div>
-                <span className="text-xs text-muted-foreground">Enable learning</span>
-                <p className="text-[11px] text-dim">
+                <span className="text-ui-xs text-fg-secondary">Enable learning</span>
+                <p className="text-ui-xs text-fg-dim">
                   Adaptive confidence thresholds based on outcomes
                 </p>
               </div>
@@ -478,7 +478,7 @@ export function PersonalizationSettings() {
             </div>
 
             <label className="block">
-              <span className="block text-[11px] text-muted-foreground mb-1">
+              <span className="block text-ui-xs text-fg-secondary mb-1">
                 Analysis interval (seconds)
               </span>
               <input
@@ -492,13 +492,13 @@ export function PersonalizationSettings() {
                 }
                 step="60"
                 min="60"
-                className="w-full px-3 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+                className="w-full px-3 py-1.5 text-ui text-fg bg-control-hover border border-separator rounded-control focus:outline-none focus:border-fg-secondary/50 focus:ring-2 focus:ring-separator transition-colors"
               />
             </label>
 
             <div className="flex gap-3">
               <label className="flex-1">
-                <span className="block text-[11px] text-muted-foreground mb-1">Min threshold</span>
+                <span className="block text-ui-xs text-fg-secondary mb-1">Min threshold</span>
                 <input
                   type="number"
                   value={getLearningValue("minThreshold", 0.4)}
@@ -511,11 +511,11 @@ export function PersonalizationSettings() {
                   step="0.05"
                   min="0"
                   max="1"
-                  className="w-full px-3 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+                  className="w-full px-3 py-1.5 text-ui text-fg bg-control-hover border border-separator rounded-control focus:outline-none focus:border-fg-secondary/50 focus:ring-2 focus:ring-separator transition-colors"
                 />
               </label>
               <label className="flex-1">
-                <span className="block text-[11px] text-muted-foreground mb-1">Max threshold</span>
+                <span className="block text-ui-xs text-fg-secondary mb-1">Max threshold</span>
                 <input
                   type="number"
                   value={getLearningValue("maxThreshold", 0.9)}
@@ -528,13 +528,13 @@ export function PersonalizationSettings() {
                   step="0.05"
                   min="0"
                   max="1"
-                  className="w-full px-3 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+                  className="w-full px-3 py-1.5 text-ui text-fg bg-control-hover border border-separator rounded-control focus:outline-none focus:border-fg-secondary/50 focus:ring-2 focus:ring-separator transition-colors"
                 />
               </label>
             </div>
 
             <label className="block">
-              <span className="block text-[11px] text-muted-foreground mb-1">
+              <span className="block text-ui-xs text-fg-secondary mb-1">
                 Min outcomes for adaptation
               </span>
               <input
@@ -547,7 +547,7 @@ export function PersonalizationSettings() {
                   }))
                 }
                 min="1"
-                className="w-full px-3 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+                className="w-full px-3 py-1.5 text-ui text-fg bg-control-hover border border-separator rounded-control focus:outline-none focus:border-fg-secondary/50 focus:ring-2 focus:ring-separator transition-colors"
               />
             </label>
 
@@ -558,22 +558,22 @@ export function PersonalizationSettings() {
         {/* ── Provider Routing ──────────────────────────────────── */}
         <SettingsCard title="Provider routing">
           <div className="space-y-3">
-            <p className="text-[11px] text-dim">
+            <p className="text-ui-xs text-fg-dim">
               Configure primary and fallback providers for automatic failover
             </p>
 
             <label className="block">
-              <span className="block text-[11px] text-muted-foreground mb-1">Primary provider</span>
+              <span className="block text-ui-xs text-fg-secondary mb-1">Primary provider</span>
               <select
                 value={pmVal("primary")}
                 onChange={(e) => setPmEdits((prev) => ({ ...prev, primary: e.target.value }))}
-                className="w-full px-3 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+                className="w-full px-3 py-1.5 text-ui text-fg bg-control-hover border border-separator rounded-control focus:outline-none focus:border-fg-secondary/50 focus:ring-2 focus:ring-separator transition-colors"
               >
-                <option value="" className="bg-popover">
+                <option value="" className="bg-glass-strong">
                   Auto (use agent default)
                 </option>
                 {PROVIDERS.map((p) => (
-                  <option key={p.value} value={p.value} className="bg-popover">
+                  <option key={p.value} value={p.value} className="bg-glass-strong">
                     {p.label}
                   </option>
                 ))}
@@ -581,19 +581,19 @@ export function PersonalizationSettings() {
             </label>
 
             <label className="block">
-              <span className="block text-[11px] text-muted-foreground mb-1">
+              <span className="block text-ui-xs text-fg-secondary mb-1">
                 Fallback provider
               </span>
               <select
                 value={pmVal("fallback")}
                 onChange={(e) => setPmEdits((prev) => ({ ...prev, fallback: e.target.value }))}
-                className="w-full px-3 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+                className="w-full px-3 py-1.5 text-ui text-fg bg-control-hover border border-separator rounded-control focus:outline-none focus:border-fg-secondary/50 focus:ring-2 focus:ring-separator transition-colors"
               >
-                <option value="" className="bg-popover">
+                <option value="" className="bg-glass-strong">
                   None
                 </option>
                 {PROVIDERS.map((p) => (
-                  <option key={p.value} value={p.value} className="bg-popover">
+                  <option key={p.value} value={p.value} className="bg-glass-strong">
                     {p.label}
                   </option>
                 ))}
@@ -601,8 +601,8 @@ export function PersonalizationSettings() {
             </label>
 
             <label className="block">
-              <span className="block text-[11px] text-muted-foreground mb-1">Classifier model</span>
-              <p className="text-[11px] text-dim mb-1">
+              <span className="block text-ui-xs text-fg-secondary mb-1">Classifier model</span>
+              <p className="text-ui-xs text-fg-dim mb-1">
                 Model used to classify request complexity for routing decisions
               </p>
               <input
@@ -612,7 +612,7 @@ export function PersonalizationSettings() {
                   setPmEdits((prev) => ({ ...prev, classifierModel: e.target.value }))
                 }
                 placeholder="e.g. claude-haiku"
-                className="w-full px-3 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
+                className="w-full px-3 py-1.5 text-ui text-fg bg-control-hover border border-separator rounded-control focus:outline-none focus:border-fg-secondary/50 focus:ring-2 focus:ring-separator transition-colors placeholder:text-fg-dim"
               />
             </label>
 

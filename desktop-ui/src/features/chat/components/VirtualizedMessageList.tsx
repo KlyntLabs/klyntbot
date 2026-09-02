@@ -111,7 +111,7 @@ function MessageRow({
               <div className="glass-bubble px-4 py-3 flex items-center gap-2">
                 <ThinkingDots size="sm" />
                 {statusPhase && (
-                  <span className="text-xs text-muted-foreground">{statusPhase}</span>
+                  <span className="text-ui-sm text-fg-secondary">{statusPhase}</span>
                 )}
               </div>
             </div>
@@ -122,11 +122,11 @@ function MessageRow({
               <div
                 className="rounded-xl px-4 py-3"
                 style={{
-                  background: "var(--glass-tint-destructive)",
+                  background: "color-mix(in srgb, var(--ds-status-danger) 6%, transparent)",
                   border: "1px solid rgba(244, 63, 94, 0.15)",
                 }}
               >
-                <p className="text-xs font-light text-destructive">{error}</p>
+                <p className="text-ui-sm font-light text-status-danger">{error}</p>
               </div>
             </div>
           )}
@@ -160,7 +160,7 @@ function MessageRow({
         >
           {msg.role === "user" ? (
             <div className="max-w-[85%] glass-bubble-user px-5 py-3.5">
-              <p className="text-[13px] font-light whitespace-pre-wrap leading-relaxed text-foreground">
+              <p className="text-ui font-light whitespace-pre-wrap leading-relaxed text-fg">
                 {msg.content}
               </p>
             </div>
@@ -203,11 +203,11 @@ function MessageRow({
               </div>
               <div className="max-w-[80%]">
                 <div className="flex items-baseline gap-1.5 mb-1">
-                  <span className="text-[11px] font-medium text-foreground">{pm.personaName}</span>
-                  {pm.personaRole && <span className="text-[9px] text-dim">{pm.personaRole}</span>}
+                  <span className="text-ui-xs font-medium text-fg">{pm.personaName}</span>
+                  {pm.personaRole && <span className="text-[9px] text-fg-dim">{pm.personaRole}</span>}
                 </div>
                 <div className="glass-bubble px-4 py-3">
-                  <div className="text-[13px] font-light text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                  <div className="text-ui font-light text-fg-secondary leading-relaxed whitespace-pre-wrap">
                     {pm.content}
                   </div>
                 </div>
@@ -356,7 +356,7 @@ export function VirtualizedMessageList({
               scrollToBottom();
               setUserScrolledUp(false);
             }}
-            className="glass-badge px-4 py-2 text-[11px] text-muted-foreground font-light hover:text-foreground hover:bg-muted transition-all"
+            className="glass-badge px-4 py-2 text-ui-xs text-fg-secondary font-light hover:text-fg hover:bg-control-hover transition-all"
             aria-label="Scroll to bottom"
           >
             Scroll to bottom

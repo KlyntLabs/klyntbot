@@ -115,7 +115,7 @@ export function NavigationSidebar({
         />
 
         {/* Footer */}
-        <div className="mt-auto shrink-0 px-4 py-2 text-2xs text-dim flex items-center gap-2">
+        <div className="mt-auto shrink-0 px-4 py-2 text-ui-xs text-fg-dim flex items-center gap-2">
           <span>
             {noteCount} note{noteCount !== 1 ? "s" : ""}
           </span>

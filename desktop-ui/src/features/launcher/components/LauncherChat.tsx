@@ -92,20 +92,20 @@ export function LauncherChat({ sessionKey, initialQuery, onBack, onExpand }: Lau
   return (
     <div className="flex flex-col" style={{ height: 568 }}>
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border-subtle">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-separator">
         <button
           type="button"
           onClick={onBack}
-          className="flex items-center gap-1.5 text-xs font-light text-muted-foreground hover:text-foreground transition-colors"
+          className="flex items-center gap-1.5 text-ui-sm font-light text-fg-secondary hover:text-fg transition-colors"
         >
           <ArrowLeft className="size-3.5" strokeWidth={1.5} />
           Back
         </button>
-        <span className="text-[13px] font-light text-foreground">Klynt AI</span>
+        <span className="text-ui font-light text-fg">Klynt AI</span>
         <button
           type="button"
           onClick={onExpand}
-          className="flex items-center gap-1.5 text-[11px] font-light text-muted-foreground hover:text-foreground transition-colors"
+          className="flex items-center gap-1.5 text-ui-xs font-light text-fg-secondary hover:text-fg transition-colors"
         >
           <ArrowUpRight className="size-3.5" strokeWidth={1.5} />
           Expand
@@ -141,13 +141,13 @@ export function LauncherChat({ sessionKey, initialQuery, onBack, onExpand }: Lau
             placeholder="Follow up\u2026"
             aria-label="Message Klynt"
             rows={1}
-            className="flex-1 bg-transparent text-foreground text-[13px] placeholder:text-muted-foreground outline-none font-light resize-none max-h-[80px]"
+            className="flex-1 bg-transparent text-fg text-ui placeholder:text-fg-secondary outline-none font-light resize-none max-h-[80px]"
           />
           <button
             type="button"
             onClick={() => chat.send()}
             disabled={!chat.input.trim() || chat.isStreaming}
-            className="text-brand hover:text-brand/80 disabled:text-muted-foreground transition-colors shrink-0"
+            className="text-brand hover:text-brand/80 disabled:text-fg-secondary transition-colors shrink-0"
           >
             <Send className="size-4" strokeWidth={1.5} />
           </button>
@@ -155,8 +155,8 @@ export function LauncherChat({ sessionKey, initialQuery, onBack, onExpand }: Lau
       </div>
 
       {/* Footer */}
-      <div className="px-5 py-2.5 border-t border-border-subtle">
-        <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+      <div className="px-5 py-2.5 border-t border-separator">
+        <div className="flex items-center justify-between text-ui-xs text-fg-secondary">
           <span className="flex items-center gap-1.5 font-light">
             <kbd className="px-1.5 py-0.5 glass-badge">Esc</kbd>
             Back to commands

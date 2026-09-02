@@ -1,6 +1,6 @@
 import { createContext, type ReactNode, useContext, useEffect, useState } from "react";
 
-const THEMES = ["dark", "retro"] as const;
+const THEMES = ["light", "dark"] as const;
 export type Theme = (typeof THEMES)[number];
 
 interface ThemeContextValue {
@@ -15,23 +15,27 @@ const ThemeContext = createContext<ThemeContextValue>({
   themes: THEMES,
 });
 
+function readStoredTheme(): Theme {
+  try {
+    const stored = localStorage.getItem("klynt-theme");
+    if (stored === "light" || stored === "dark") return stored;
+    // Retired themes map to dark
+    if (stored === "retro") return "dark";
+  } catch {
+    // localStorage unavailable
+  }
+  return "dark";
+}
+
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setTheme] = useState<Theme>(() => {
-    try {
-      const stored = localStorage.getItem("klynt-theme");
-      if (stored && THEMES.includes(stored as Theme)) return stored as Theme;
-    } catch {
-      // localStorage not available, use default
-    }
-    return "dark";
-  });
+  const [theme, setTheme] = useState<Theme>(readStoredTheme);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
     try {
       localStorage.setItem("klynt-theme", theme);
     } catch {
-      // localStorage not available, skip persistence
+      // localStorage unavailable
     }
   }, [theme]);
 

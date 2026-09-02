@@ -20,7 +20,7 @@ export function AutoTunerPanel() {
   if (!status) {
     return (
       <div className="glass-card p-4">
-        <p className="text-xs font-light text-dim">AutoTuner unavailable</p>
+        <p className="text-ui-sm font-light text-fg-dim">AutoTuner unavailable</p>
       </div>
     );
   }

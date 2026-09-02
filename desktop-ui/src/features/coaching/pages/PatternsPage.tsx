@@ -10,13 +10,13 @@ export function PatternsPage() {
   );
 
   if (loading) {
-    return <div className="text-[11px] text-muted-foreground">Loading patterns...</div>;
+    return <div className="text-ui-xs text-fg-secondary">Loading patterns...</div>;
   }
 
   if (!patterns || patterns.length === 0) {
     return (
       <div className="flex items-center justify-center h-48">
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-ui-xs text-fg-secondary">
           No patterns detected yet. Patterns emerge as the coaching system observes your work habits
           over time.
         </p>

@@ -90,14 +90,14 @@ export function VersionHistoryOverlay({
       {/* Content */}
       <div className="relative flex w-full h-full">
         {/* Left side: Timeline (40%) */}
-        <div className="w-[40%] flex flex-col border-r border-border-subtle">
+        <div className="w-[40%] flex flex-col border-r border-separator">
           {/* Header */}
-          <div className="shrink-0 flex items-center justify-between px-5 py-4 border-b border-border-subtle">
-            <h2 className="text-sm font-medium text-foreground">Version History</h2>
+          <div className="shrink-0 flex items-center justify-between px-5 py-4 border-b border-separator">
+            <h2 className="text-sm font-medium text-fg">Version History</h2>
             <button
               type="button"
               onClick={onClose}
-              className="p-1.5 rounded-md text-dim hover:text-foreground transition-colors"
+              className="p-1.5 rounded-md text-fg-dim hover:text-fg transition-colors"
               aria-label="Close"
             >
               <X size={16} />
@@ -108,8 +108,8 @@ export function VersionHistoryOverlay({
           <div className="flex-1 overflow-y-auto">
             {versions.length === 0 ? (
               <div className="px-5 py-12 text-center">
-                <div className="text-dim text-sm">No versions yet</div>
-                <div className="text-dim/60 text-xs mt-1">
+                <div className="text-fg-dim text-sm">No versions yet</div>
+                <div className="text-fg-dim/60 text-ui-sm mt-1">
                   Versions are created automatically as you edit
                 </div>
               </div>
@@ -121,7 +121,7 @@ export function VersionHistoryOverlay({
                     type="button"
                     onClick={() => setSelectedId(v.id)}
                     className={`w-full flex gap-3 px-5 py-3 text-left transition-colors ${
-                      v.id === selectedId ? "bg-muted" : "hover:bg-card"
+                      v.id === selectedId ? "bg-control-hover" : "hover:bg-bg-elevated"
                     }`}
                   >
                     {/* Timeline dot + line */}
@@ -134,7 +134,7 @@ export function VersionHistoryOverlay({
                         }`}
                       />
                       {i < versions.length - 1 && (
-                        <div className="w-px flex-1 min-h-[20px] bg-muted mt-1" />
+                        <div className="w-px flex-1 min-h-[20px] bg-control-hover mt-1" />
                       )}
                     </div>
 
@@ -143,13 +143,13 @@ export function VersionHistoryOverlay({
                       <div
                         className={`text-sm ${
                           v.id === selectedId
-                            ? "text-foreground font-medium"
-                            : "text-muted-foreground"
+                            ? "text-fg font-medium"
+                            : "text-fg-secondary"
                         }`}
                       >
                         {formatRelativeTime(v.createdAt)}
                       </div>
-                      <div className="text-xs text-muted-foreground mt-0.5">
+                      <div className="text-ui-sm text-fg-secondary mt-0.5">
                         {wordCountDelta(v)}
                       </div>
                     </div>
@@ -163,7 +163,7 @@ export function VersionHistoryOverlay({
         {/* Right side: Preview (60%) */}
         <div className="w-[60%] flex flex-col">
           {/* Header with actions */}
-          <div className="shrink-0 flex items-center justify-between px-5 py-4 border-b border-border-subtle">
+          <div className="shrink-0 flex items-center justify-between px-5 py-4 border-b border-separator">
             <div className="flex items-center gap-3">
               {selectedVersion && (
                 <>
@@ -177,7 +177,7 @@ export function VersionHistoryOverlay({
                     {restoring ? "Restoring..." : "Restore this version"}
                   </button>
                   {restoreError && (
-                    <span className="text-xs text-destructive ml-2">{restoreError}</span>
+                    <span className="text-ui-sm text-status-danger ml-2">{restoreError}</span>
                   )}
                 </>
               )}
@@ -187,10 +187,10 @@ export function VersionHistoryOverlay({
                 <button
                   type="button"
                   onClick={() => setShowDiff((prev) => !prev)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  className={`px-3 py-1.5 rounded-lg text-ui-sm font-medium transition-colors ${
                     showDiff
-                      ? "bg-muted text-foreground"
-                      : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                      ? "bg-control-hover text-fg"
+                      : "text-fg-secondary hover:text-fg hover:bg-control-hover"
                   }`}
                 >
                   {showDiff ? "Hide diff" : "Show diff"}
@@ -202,7 +202,7 @@ export function VersionHistoryOverlay({
           {/* Preview content */}
           <div className="flex-1 overflow-y-auto px-8 py-6">
             {!selectedVersion ? (
-              <div className="flex items-center justify-center h-full text-dim text-sm">
+              <div className="flex items-center justify-center h-full text-fg-dim text-sm">
                 Select a version to preview
               </div>
             ) : showDiff && diffResult ? (
@@ -214,10 +214,10 @@ export function VersionHistoryOverlay({
                       key={key}
                       className={
                         part.added
-                          ? "bg-success/20 text-success"
+                          ? "bg-status-success/20 text-status-success"
                           : part.removed
-                            ? "bg-destructive/20 text-destructive"
-                            : "text-muted-foreground"
+                            ? "bg-status-danger/20 text-status-danger"
+                            : "text-fg-secondary"
                       }
                     >
                       {part.value}
@@ -226,7 +226,7 @@ export function VersionHistoryOverlay({
                 })}
               </div>
             ) : (
-              <div className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
+              <div className="text-sm text-fg-secondary leading-relaxed whitespace-pre-wrap">
                 {selectedVersion.body}
               </div>
             )}

@@ -123,18 +123,18 @@ export function SessionSummary({
               {avgPct}%
             </text>
           </svg>
-          <p className="text-[11px] text-dim">Session score</p>
+          <p className="text-ui-xs text-fg-dim">Session score</p>
         </div>
       )}
 
       {/* Beat 2 — stats cards */}
       {beat2 && (
         <div className="animate-in fade-in duration-500 flex flex-col items-center gap-2 w-full">
-          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-            <span className="font-medium text-foreground">{stats.cardsReviewed}</span>
+          <div className="flex items-center gap-1.5 text-ui-xs text-fg-secondary">
+            <span className="font-medium text-fg">{stats.cardsReviewed}</span>
             <span>cards</span>
-            <span className="text-dim">·</span>
-            <span className="font-medium text-foreground">{durationMin}</span>
+            <span className="text-fg-dim">·</span>
+            <span className="font-medium text-fg">{durationMin}</span>
             <span>min</span>
           </div>
 
@@ -146,7 +146,7 @@ export function SessionSummary({
                 return (
                   <span
                     key={mode}
-                    className="text-[9px] px-1.5 py-0.5 rounded bg-white/[0.05] text-dim"
+                    className="text-[9px] px-1.5 py-0.5 rounded bg-white/[0.05] text-fg-dim"
                   >
                     {mode.replace("_", " ")} {modePct}%
                   </span>
@@ -161,13 +161,13 @@ export function SessionSummary({
       {beat3 && (
         <div className="animate-in fade-in duration-500 flex flex-col items-center gap-1.5">
           {stats.propagationCount > 0 && (
-            <p className="text-2xs text-muted-foreground">
-              <span className="text-foreground font-medium">{stats.propagationCount}</span>
+            <p className="text-ui-xs text-fg-secondary">
+              <span className="text-fg font-medium">{stats.propagationCount}</span>
               {" knowledge connections strengthened"}
             </p>
           )}
           {stats.weakCards.length > 0 && (
-            <p className="text-2xs text-muted-foreground">
+            <p className="text-ui-xs text-fg-secondary">
               <span className="text-yellow-400 font-medium">{stats.weakCards.length}</span>
               {" weak spot"}
               {stats.weakCards.length !== 1 ? "s" : ""}
@@ -175,7 +175,7 @@ export function SessionSummary({
             </p>
           )}
           {stats.propagationCount === 0 && stats.weakCards.length === 0 && (
-            <p className="text-2xs text-dim">All cards held strong.</p>
+            <p className="text-ui-xs text-fg-dim">All cards held strong.</p>
           )}
         </div>
       )}
@@ -183,7 +183,7 @@ export function SessionSummary({
       {/* Reflection pulse */}
       {showPulse && !pulseDismissed && (
         <div className="animate-in fade-in duration-500 w-full rounded-lg bg-white/[0.04] border border-white/[0.07] p-3 flex flex-col gap-2 text-left">
-          <p className="text-2xs text-muted-foreground leading-snug">
+          <p className="text-ui-xs text-fg-secondary leading-snug">
             What felt different about today's answers?
           </p>
           <textarea
@@ -191,7 +191,7 @@ export function SessionSummary({
             onChange={(e) => setReflectionText(e.target.value)}
             placeholder="Optional reflection…"
             rows={2}
-            className="w-full bg-transparent resize-none text-2xs text-foreground placeholder:text-dim outline-none border-none"
+            className="w-full bg-transparent resize-none text-ui-xs text-fg placeholder:text-fg-dim outline-none border-none"
           />
           <div className="flex justify-end">
             <button
@@ -202,7 +202,7 @@ export function SessionSummary({
                 }
                 setPulseDismissed(true);
               }}
-              className="text-[9px] text-dim hover:text-muted-foreground"
+              className="text-[9px] text-fg-dim hover:text-fg-secondary"
             >
               {reflectionText.trim() ? "Save & close" : "Skip"}
             </button>
@@ -217,7 +217,7 @@ export function SessionSummary({
             <button
               type="button"
               onClick={onReviewWeak}
-              className="w-full text-2xs py-1.5 rounded-md bg-yellow-400/10 text-yellow-300 hover:bg-yellow-400/20 transition-colors"
+              className="w-full text-ui-xs py-1.5 rounded-md bg-yellow-400/10 text-yellow-300 hover:bg-yellow-400/20 transition-colors"
             >
               Review {stats.weakCards.length} weak spot
               {stats.weakCards.length !== 1 ? "s" : ""}
@@ -226,14 +226,14 @@ export function SessionSummary({
           <button
             type="button"
             onClick={onSaveInsight}
-            className="w-full text-2xs py-1.5 rounded-md bg-white/[0.06] text-muted-foreground hover:text-foreground transition-colors"
+            className="w-full text-ui-xs py-1.5 rounded-md bg-white/[0.06] text-fg-secondary hover:text-fg transition-colors"
           >
             Save as insight
           </button>
           <button
             type="button"
             onClick={onClose}
-            className="w-full text-2xs py-1.5 rounded-md bg-white/[0.03] text-dim hover:text-muted-foreground transition-colors"
+            className="w-full text-ui-xs py-1.5 rounded-md bg-white/[0.03] text-fg-dim hover:text-fg-secondary transition-colors"
           >
             Done
           </button>

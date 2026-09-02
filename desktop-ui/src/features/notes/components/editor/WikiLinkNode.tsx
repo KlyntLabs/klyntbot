@@ -329,15 +329,15 @@ export function WikiLinkMenu({ editor, currentNoteTitle }: WikiLinkMenuProps) {
           type="button"
           onClick={() => handleCreateAndLink(state.query)}
           className={`w-full px-3 py-1.5 text-sm text-left flex items-center gap-2 transition-colors ${
-            selectedIndex === 0 ? "bg-muted text-brand" : "text-brand/80 hover:bg-card"
+            selectedIndex === 0 ? "bg-control-hover text-brand" : "text-brand/80 hover:bg-bg-elevated"
           }`}
         >
-          <span className="text-xs">&#10024;</span>
+          <span className="text-ui-sm">&#10024;</span>
           <span className="truncate">Create &ldquo;{state.query}&rdquo;</span>
         </button>
       )}
       {!hasCreateOption && results.length === 0 && (
-        <div className="px-3 py-2 text-xs text-dim">Type to search notes...</div>
+        <div className="px-3 py-2 text-ui-sm text-fg-dim">Type to search notes...</div>
       )}
       {results.map((note, i) => {
         const itemIndex = hasCreateOption ? i + 1 : i;
@@ -348,8 +348,8 @@ export function WikiLinkMenu({ editor, currentNoteTitle }: WikiLinkMenuProps) {
             onClick={() => insertWikiLink(note)}
             className={`w-full px-3 py-1.5 text-sm text-left flex items-center gap-2 transition-colors ${
               itemIndex === selectedIndex
-                ? "bg-muted text-foreground"
-                : "text-muted-foreground hover:bg-card"
+                ? "bg-control-hover text-fg"
+                : "text-fg-secondary hover:bg-bg-elevated"
             }`}
           >
             <span className="truncate">{note.title}</span>

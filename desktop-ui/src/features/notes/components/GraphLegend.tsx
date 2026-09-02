@@ -43,7 +43,7 @@ function LegendItem({
         onDoubleClick={() => onHighlight(null)}
         onMouseEnter={() => onHighlight(cluster.id)}
         onMouseLeave={() => onHighlight(null)}
-        className={`flex items-center gap-2 flex-1 min-w-0 text-left px-1 py-0.5 rounded hover:bg-accent transition-colors ${
+        className={`flex items-center gap-2 flex-1 min-w-0 text-left px-1 py-0.5 rounded hover:bg-control-hover transition-colors ${
           isHidden ? "opacity-40" : ""
         }`}
       >
@@ -51,16 +51,16 @@ function LegendItem({
           className="size-2.5 rounded-full shrink-0"
           style={{ backgroundColor: cluster.color }}
         />
-        <span className="text-[11px] text-muted-foreground truncate flex-1 min-w-0">
+        <span className="text-ui-xs text-fg-secondary truncate flex-1 min-w-0">
           {cluster.label}
         </span>
-        <span className="text-2xs text-dim shrink-0">{cluster.count}</span>
+        <span className="text-ui-xs text-fg-dim shrink-0">{cluster.count}</span>
       </button>
 
       <button
         type="button"
         onClick={() => onToggleCluster(cluster.id)}
-        className="size-5 flex items-center justify-center rounded text-dim hover:text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+        className="size-5 flex items-center justify-center rounded text-fg-dim hover:text-fg-secondary opacity-0 group-hover:opacity-100 transition-opacity"
         aria-label={isHidden ? "Show cluster" : "Hide cluster"}
       >
         {isHidden ? <EyeOff size={10} /> : <Eye size={10} />}
@@ -90,7 +90,7 @@ export function GraphLegend({
       <button
         type="button"
         onClick={() => setCollapsed(!collapsed)}
-        className="flex items-center gap-1.5 text-2xs font-semibold text-muted-foreground uppercase tracking-wider w-full"
+        className="flex items-center gap-1.5 text-ui-xs font-semibold text-fg-secondary uppercase tracking-wider w-full"
       >
         <span>Legend</span>
         <span className="ml-auto">
@@ -104,7 +104,7 @@ export function GraphLegend({
             <button
               type="button"
               onClick={onShowAll}
-              className="flex items-center gap-2 w-full text-left px-1 py-1 rounded text-2xs text-brand hover:bg-accent transition-colors"
+              className="flex items-center gap-2 w-full text-left px-1 py-1 rounded text-ui-xs text-brand hover:bg-brand transition-colors"
             >
               <Eye size={10} />
               Show all
@@ -114,7 +114,7 @@ export function GraphLegend({
           {/* Communities section */}
           {communities.length > 0 && (
             <div>
-              <div className="text-2xs font-semibold text-dim uppercase tracking-wider px-1 mb-1">
+              <div className="text-ui-xs font-semibold text-fg-dim uppercase tracking-wider px-1 mb-1">
                 Communities ({communities.length})
               </div>
               <div className="space-y-0.5">
@@ -136,7 +136,7 @@ export function GraphLegend({
           {clusters.length > 0 && (
             <div>
               {communities.length > 0 && (
-                <div className="text-2xs font-semibold text-dim uppercase tracking-wider px-1 mb-1">
+                <div className="text-ui-xs font-semibold text-fg-dim uppercase tracking-wider px-1 mb-1">
                   Clusters ({clusters.length})
                 </div>
               )}

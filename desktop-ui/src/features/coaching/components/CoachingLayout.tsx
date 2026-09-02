@@ -28,10 +28,10 @@ export function CoachingLayout({ children }: CoachingLayoutProps) {
                 role="tab"
                 aria-selected={isActive}
                 onClick={() => navigate(item.path)}
-                className={`flex-1 py-2 rounded-xl text-[13px] font-light transition-all duration-200 ${
+                className={`flex-1 py-2 rounded-control text-ui font-light transition-all duration-200 ${
                   isActive
-                    ? "glass-button-active text-foreground"
-                    : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                    ? "glass-button-active text-fg"
+                    : "text-fg-secondary hover:text-fg hover:bg-control-hover"
                 }`}
               >
                 {item.label}

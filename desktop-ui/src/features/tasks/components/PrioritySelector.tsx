@@ -35,7 +35,7 @@ export function PrioritySelector({ issueId, priority, onChanged }: PrioritySelec
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="flex items-center justify-center size-5 rounded hover:bg-accent transition-colors text-muted-foreground"
+          className="flex items-center justify-center size-5 rounded hover:bg-control-hover transition-colors text-fg-secondary"
           aria-label={`Priority: ${priority.name}`}
         >
           <PriorityIcon className="size-4" />
@@ -60,7 +60,7 @@ export function PrioritySelector({ issueId, priority, onChanged }: PrioritySelec
                       setOpen(false);
                     }}
                   >
-                    <Icon className="mr-2 h-4 w-4 text-muted-foreground" />
+                    <Icon className="mr-2 h-4 w-4 text-fg-secondary" />
                     {p.name}
                     <Check
                       className={cn(

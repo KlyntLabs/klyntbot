@@ -18,13 +18,13 @@ function CategoryBar({ summary }: { summary: ProductivitySummary }) {
   if (total === 0) return null;
 
   const segments = [
-    { key: "productive", secs: summary.productiveSecs, color: "var(--success)" },
-    { key: "neutral", secs: summary.neutralSecs, color: "var(--text-muted-foreground)" },
-    { key: "distracting", secs: summary.distractingSecs, color: "var(--destructive)" },
+    { key: "productive", secs: summary.productiveSecs, color: "var(--ds-status-success)" },
+    { key: "neutral", secs: summary.neutralSecs, color: "var(--ds-text-secondary)" },
+    { key: "distracting", secs: summary.distractingSecs, color: "var(--ds-status-danger)" },
   ].filter((s) => s.secs > 0);
 
   return (
-    <div className="flex h-1.5 rounded-full overflow-hidden bg-accent">
+    <div className="flex h-1.5 rounded-full overflow-hidden bg-control-hover">
       {segments.map((seg) => (
         <div
           key={seg.key}
@@ -52,7 +52,7 @@ function MiniScore({ score }: { score: number | null }) {
         background: `conic-gradient(${color} ${clamped * 3.6}deg, rgba(255,255,255,0.06) 0deg)`,
       }}
     >
-      <div className="w-[18px] h-[18px] rounded-full bg-popover flex items-center justify-center">
+      <div className="w-[18px] h-[18px] rounded-full bg-glass-strong flex items-center justify-center">
         <span style={{ color }}>{Math.round(clamped)}</span>
       </div>
     </div>
@@ -69,17 +69,17 @@ function TopAppsMini({ summary }: { summary: ProductivitySummary }) {
     <div className="flex flex-col gap-1">
       {apps.map((app) => (
         <div key={app.appName} className="flex items-center gap-2">
-          <span className="text-[9px] text-muted-foreground truncate w-14">{app.appName}</span>
-          <div className="flex-1 h-1 rounded-full bg-accent overflow-hidden">
+          <span className="text-[9px] text-fg-secondary truncate w-14">{app.appName}</span>
+          <div className="flex-1 h-1 rounded-full bg-control-hover overflow-hidden">
             <div
               className="h-full rounded-full"
               style={{
                 width: `${(app.durationSecs / maxDur) * 100}%`,
-                backgroundColor: "var(--brand)",
+                backgroundColor: "var(--ds-accent)",
               }}
             />
           </div>
-          <span className="text-[9px] text-dim tabular-nums w-6 text-right">
+          <span className="text-[9px] text-fg-dim tabular-nums w-6 text-right">
             {formatHumanDuration(app.durationSecs)}
           </span>
         </div>
@@ -96,12 +96,12 @@ export function ProductivityStrip({ summary }: ProductivityStripProps) {
   const productivePct = Math.round((summary.productiveSecs / summary.totalActiveSecs) * 100);
 
   return (
-    <div className="border-b border-border bg-card">
+    <div className="border-b border-separator bg-bg-elevated">
       {/* Compact bar — always visible */}
       <button
         type="button"
         onClick={() => setExpanded(!expanded)}
-        className="w-full px-3 py-2 flex items-center gap-3 hover:bg-card transition-colors"
+        className="w-full px-3 py-2 flex items-center gap-3 hover:bg-bg-elevated transition-colors"
       >
         <MiniScore score={summary.productivityScore} />
 
@@ -110,25 +110,25 @@ export function ProductivityStrip({ summary }: ProductivityStripProps) {
         </div>
 
         {/* Quick stats */}
-        <div className="flex items-center gap-3 text-2xs tabular-nums shrink-0">
-          <span className="text-muted-foreground">
+        <div className="flex items-center gap-3 text-ui-xs tabular-nums shrink-0">
+          <span className="text-fg-secondary">
             {formatHumanDuration(summary.totalActiveSecs)}
-            <span className="text-dim"> active</span>
+            <span className="text-fg-dim"> active</span>
           </span>
-          <span style={{ color: "var(--success)" }}>
-            {productivePct}%<span className="text-dim"> productive</span>
+          <span style={{ color: "var(--ds-status-success)" }}>
+            {productivePct}%<span className="text-fg-dim"> productive</span>
           </span>
           {summary.focusSessionsCount > 0 && (
-            <span className="text-muted-foreground">
+            <span className="text-fg-secondary">
               {summary.focusSessionsCount}
-              <span className="text-dim"> sessions</span>
+              <span className="text-fg-dim"> sessions</span>
             </span>
           )}
         </div>
 
         <svg
           aria-hidden="true"
-          className="size-3 text-dim transition-transform"
+          className="size-3 text-fg-dim transition-transform"
           style={{ transform: expanded ? "rotate(180deg)" : undefined }}
           viewBox="0 0 12 12"
           fill="none"
@@ -147,20 +147,20 @@ export function ProductivityStrip({ summary }: ProductivityStripProps) {
           </div>
           <div className="flex items-center gap-4 text-[9px] shrink-0">
             <span className="flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-success" />
-              <span className="text-muted-foreground">
+              <span className="w-1.5 h-1.5 rounded-full bg-status-success" />
+              <span className="text-fg-secondary">
                 {formatHumanDuration(summary.productiveSecs)}
               </span>
             </span>
             <span className="flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-[var(--text-muted-foreground)]" />
-              <span className="text-muted-foreground">
+              <span className="w-1.5 h-1.5 rounded-full bg-[var(--ds-text-secondary)]" />
+              <span className="text-fg-secondary">
                 {formatHumanDuration(summary.neutralSecs)}
               </span>
             </span>
             <span className="flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-destructive" />
-              <span className="text-muted-foreground">
+              <span className="w-1.5 h-1.5 rounded-full bg-status-danger" />
+              <span className="text-fg-secondary">
                 {formatHumanDuration(summary.distractingSecs)}
               </span>
             </span>

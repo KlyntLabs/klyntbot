@@ -39,15 +39,15 @@ export function NoteVersionHistory({ noteId, onRestore }: NoteVersionHistoryProp
 
   return (
     <div className="w-64 glass-panel rounded-2xl flex flex-col min-h-0">
-      <div className="px-3 py-2.5 border-b border-border">
-        <h3 className="text-xs font-medium text-muted-foreground tracking-wide">Version History</h3>
+      <div className="px-3 py-2.5 border-b border-separator">
+        <h3 className="text-ui-sm font-medium text-fg-secondary tracking-wide">Version History</h3>
       </div>
 
       <div className="flex-1 overflow-y-auto">
         {versions.length === 0 && (
           <div className="px-3 py-8 text-center">
-            <div className="text-dim text-xs">No versions yet</div>
-            <div className="text-dim/60 text-2xs mt-1">
+            <div className="text-fg-dim text-ui-sm">No versions yet</div>
+            <div className="text-fg-dim/60 text-ui-xs mt-1">
               Versions are created automatically as you edit
             </div>
           </div>
@@ -58,7 +58,7 @@ export function NoteVersionHistory({ noteId, onRestore }: NoteVersionHistoryProp
             type="button"
             onClick={() => setPreviewId(v.id === previewId ? null : v.id)}
             className={`w-full flex gap-3 px-3 py-2.5 text-left transition-colors ${
-              v.id === previewId ? "bg-accent" : "hover:bg-card"
+              v.id === previewId ? "bg-control-hover" : "hover:bg-bg-elevated"
             }`}
           >
             {/* Timeline dot */}
@@ -69,11 +69,11 @@ export function NoteVersionHistory({ noteId, onRestore }: NoteVersionHistoryProp
             {/* Content */}
             <div className="flex-1 min-w-0">
               <div
-                className={`text-xs ${v.id === previewId ? "text-foreground font-medium" : "font-light text-muted-foreground"}`}
+                className={`text-ui-sm ${v.id === previewId ? "text-fg font-medium" : "font-light text-fg-secondary"}`}
               >
                 {formatRelativeTime(v.createdAt)}
               </div>
-              <div className="text-2xs text-dim mt-0.5 truncate">
+              <div className="text-ui-xs text-fg-dim mt-0.5 truncate">
                 {v.body.slice(0, 80)}
                 {v.body.length > 80 ? "..." : ""}
               </div>
@@ -84,20 +84,20 @@ export function NoteVersionHistory({ noteId, onRestore }: NoteVersionHistoryProp
 
       {/* Preview + Restore */}
       {previewVersion && (
-        <div className="border-t border-border px-3 py-2">
-          <div className="text-2xs text-dim mb-1.5 max-h-20 overflow-y-auto whitespace-pre-wrap">
+        <div className="border-t border-separator px-3 py-2">
+          <div className="text-ui-xs text-fg-dim mb-1.5 max-h-20 overflow-y-auto whitespace-pre-wrap">
             {previewVersion.body.slice(0, 500)}
           </div>
           <button
             type="button"
             onClick={() => handleRestore(previewVersion.id)}
             disabled={restoring}
-            className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-light text-brand hover:bg-brand/10 transition-colors disabled:opacity-50"
+            className="flex items-center gap-1.5 px-2 py-1 rounded-md text-ui-xs font-light text-brand hover:bg-brand/10 transition-colors disabled:opacity-50"
           >
             <RotateCcw className="size-3" strokeWidth={1.5} />
             {restoring ? "Restoring..." : "Restore this version"}
           </button>
-          {restoreError && <p className="text-2xs text-destructive mt-1">{restoreError}</p>}
+          {restoreError && <p className="text-ui-xs text-status-danger mt-1">{restoreError}</p>}
         </div>
       )}
     </div>

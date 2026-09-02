@@ -65,24 +65,24 @@ export function ActivityTimeline() {
   if (grouped.size === 0) {
     return (
       <div className="glass-card rounded-xl p-5">
-        <p className="text-2xs text-muted-foreground uppercase tracking-wider mb-3">
+        <p className="text-ui-xs text-fg-secondary uppercase tracking-wider mb-3">
           Recent Activity
         </p>
-        <p className="text-[11px] text-muted-foreground">No recent activity</p>
+        <p className="text-ui-xs text-fg-secondary">No recent activity</p>
       </div>
     );
   }
 
   return (
     <div className="glass-card rounded-xl p-5">
-      <p className="text-2xs text-muted-foreground uppercase tracking-wider mb-4">
+      <p className="text-ui-xs text-fg-secondary uppercase tracking-wider mb-4">
         Recent Activity
       </p>
 
       <div className="flex flex-col gap-4">
         {Array.from(grouped.entries()).map(([group, groupItems]) => (
           <div key={group}>
-            <p className="text-2xs text-muted-foreground font-medium mb-2">{group}</p>
+            <p className="text-ui-xs text-fg-secondary font-medium mb-2">{group}</p>
             <div className="flex flex-col gap-2">
               {groupItems.map((item) => (
                 <div key={item.id} className="flex items-start gap-3">
@@ -93,8 +93,8 @@ export function ActivityTimeline() {
                     />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs text-foreground truncate">{item.label}</p>
-                    <p className="text-2xs text-muted-foreground">
+                    <p className="text-ui-sm text-fg truncate">{item.label}</p>
+                    <p className="text-ui-xs text-fg-secondary">
                       {formatRelativeTime(item.timestamp)}
                     </p>
                   </div>

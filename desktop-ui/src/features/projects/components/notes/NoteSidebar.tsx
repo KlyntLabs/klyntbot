@@ -78,38 +78,38 @@ export function NoteSidebar({
   const displayNotes = searchResults ?? recentNotes;
 
   return (
-    <div className="w-56 flex flex-col border-r border-border h-full">
+    <div className="w-56 flex flex-col border-r border-separator h-full">
       {/* Search */}
       <div className="p-3">
         <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-fg-secondary" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => handleSearchInput(e.target.value)}
             placeholder="Search notes..."
-            className="glass-input w-full pl-8 pr-3 py-1.5 text-xs rounded-lg"
+            className="glass-input w-full pl-8 pr-3 py-1.5 text-ui-sm rounded-lg"
           />
         </div>
       </div>
 
       {/* Notebook tree */}
       <div className="px-3 pb-2">
-        <h3 className="text-2xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5">
+        <h3 className="text-ui-xs font-medium text-fg-secondary uppercase tracking-wider mb-1.5">
           Notebooks
         </h3>
         {projectNotebooks.length === 0 ? (
-          <p className="text-xs text-muted-foreground italic">No linked notebooks</p>
+          <p className="text-ui-sm text-fg-secondary italic">No linked notebooks</p>
         ) : (
           <div className="space-y-0.5">
             {projectNotebooks.map((nb) => (
               <div
                 key={nb.id}
-                className="flex items-center gap-2 px-2 py-1 rounded text-xs text-muted-foreground"
+                className="flex items-center gap-2 px-2 py-1 rounded text-ui-sm text-fg-secondary"
               >
                 <BookOpen className="size-3.5 flex-shrink-0" />
                 <span className="truncate">{nb.title}</span>
-                <span className="ml-auto text-2xs opacity-60">{nb.noteCount}</span>
+                <span className="ml-auto text-ui-xs opacity-60">{nb.noteCount}</span>
               </div>
             ))}
           </div>
@@ -121,13 +121,13 @@ export function NoteSidebar({
 
       {/* Notes list */}
       <div className="flex-1 overflow-y-auto px-3 py-2">
-        <h3 className="text-2xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5">
+        <h3 className="text-ui-xs font-medium text-fg-secondary uppercase tracking-wider mb-1.5">
           {searchResults ? "Search Results" : "Recent Notes"}
         </h3>
         {loading || searching ? (
-          <p className="text-xs text-muted-foreground italic py-2">Loading...</p>
+          <p className="text-ui-sm text-fg-secondary italic py-2">Loading...</p>
         ) : displayNotes.length === 0 ? (
-          <p className="text-xs text-muted-foreground italic py-2">
+          <p className="text-ui-sm text-fg-secondary italic py-2">
             {searchResults ? "No results found" : "No notes yet"}
           </p>
         ) : (
@@ -137,14 +137,14 @@ export function NoteSidebar({
                 key={note.id}
                 type="button"
                 onClick={() => onSelectNote(note.id)}
-                className={`w-full text-left px-2 py-1.5 rounded text-xs transition-colors ${
+                className={`w-full text-left px-2 py-1.5 rounded text-ui-sm transition-colors ${
                   selectedNoteId === note.id
-                    ? "bg-brand/10 text-foreground"
-                    : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                    ? "bg-brand/10 text-fg"
+                    : "text-fg-secondary hover:text-fg hover:bg-control-hover"
                 }`}
               >
                 <div className="truncate font-medium">{note.title || "Untitled"}</div>
-                <div className="text-2xs opacity-60 mt-0.5">
+                <div className="text-ui-xs opacity-60 mt-0.5">
                   {new Date(note.updatedAt).toLocaleDateString()}
                 </div>
               </button>

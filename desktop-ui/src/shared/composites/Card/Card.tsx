@@ -11,9 +11,9 @@ export interface CardProps {
 }
 
 const cardVariants = {
-  glass: "glass-card",
-  surface: "bg-accent border border-border rounded-2xl",
-  outline: "border border-border rounded-2xl bg-transparent",
+  glass: "island",
+  surface: "bg-control-hover border border-separator rounded-card",
+  outline: "border border-separator rounded-card bg-transparent",
 };
 
 const cardPadding = {
@@ -39,7 +39,7 @@ export function Card({
         className={cn(
           cardVariants[variant],
           cardPadding[padding],
-          "cursor-pointer transition-colors hover:border-border",
+          "cursor-pointer transition-colors hover:border-separator",
           className,
         )}
       >
@@ -53,7 +53,7 @@ export function Card({
       className={cn(
         cardVariants[variant],
         cardPadding[padding],
-        interactive && "cursor-pointer transition-colors hover:border-border",
+        interactive && "cursor-pointer transition-colors hover:border-separator",
         className,
       )}
     >
@@ -70,7 +70,7 @@ export function CardTitle({ className, children }: { className?: string; childre
   return (
     <h3
       className={cn(
-        "text-xs font-medium text-muted-foreground uppercase tracking-wider",
+        "text-ui-sm font-medium text-fg-secondary uppercase tracking-wider",
         className,
       )}
     >
@@ -85,7 +85,7 @@ export function CardContent({ className, children }: { className?: string; child
 
 export function CardFooter({ className, children }: { className?: string; children: ReactNode }) {
   return (
-    <div className={cn("mt-4 pt-3 border-t border-border flex items-center gap-2", className)}>
+    <div className={cn("mt-4 pt-3 border-t border-separator flex items-center gap-2", className)}>
       {children}
     </div>
   );

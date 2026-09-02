@@ -54,7 +54,7 @@ export function CategoryEditor({ category, onSaved, onDeleted }: CategoryEditorP
   if (!category) {
     return (
       <div className="glass-card p-6 flex items-center justify-center h-full">
-        <p className="text-[13px] font-light text-dim">Select a category to edit</p>
+        <p className="text-ui font-light text-fg-dim">Select a category to edit</p>
       </div>
     );
   }
@@ -86,9 +86,9 @@ export function CategoryEditor({ category, onSaved, onDeleted }: CategoryEditorP
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="size-3 rounded-sm" style={{ backgroundColor: color }} />
-          <h3 className="text-[13px] font-medium text-muted-foreground">Edit Category</h3>
+          <h3 className="text-ui font-medium text-fg-secondary">Edit Category</h3>
           {category.isSystem && (
-            <span className="text-[9px] font-light text-dim bg-accent px-1.5 py-0.5 rounded">
+            <span className="text-[9px] font-light text-fg-dim bg-control-hover px-1.5 py-0.5 rounded">
               System
             </span>
           )}
@@ -97,7 +97,7 @@ export function CategoryEditor({ category, onSaved, onDeleted }: CategoryEditorP
           <button
             type="button"
             onClick={handleSave}
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-brand/20 text-brand text-[11px] font-medium hover:bg-brand/30 transition-colors"
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-brand/20 text-brand text-ui-xs font-medium hover:bg-brand/30 transition-colors"
           >
             <Save size={12} />
             Save
@@ -106,7 +106,7 @@ export function CategoryEditor({ category, onSaved, onDeleted }: CategoryEditorP
             <button
               type="button"
               onClick={handleDelete}
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-destructive/70 text-[11px] hover:bg-destructive/10 transition-colors"
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-status-danger/70 text-ui-xs hover:bg-status-danger/10 transition-colors"
             >
               <Trash2 size={12} />
             </button>
@@ -116,20 +116,20 @@ export function CategoryEditor({ category, onSaved, onDeleted }: CategoryEditorP
 
       {/* Name */}
       <div className="flex flex-col gap-1">
-        <span className="text-2xs font-medium text-muted-foreground uppercase tracking-wider">
+        <span className="text-ui-xs font-medium text-fg-secondary uppercase tracking-wider">
           Name
         </span>
         <input
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className="glass-input px-3 py-1.5 text-xs rounded-lg"
+          className="glass-input px-3 py-1.5 text-ui-sm rounded-lg"
         />
       </div>
 
       {/* Type */}
       <div className="flex flex-col gap-1">
-        <span className="text-2xs font-medium text-muted-foreground uppercase tracking-wider">
+        <span className="text-ui-xs font-medium text-fg-secondary uppercase tracking-wider">
           Type
         </span>
         <div className="flex gap-1.5">
@@ -138,10 +138,10 @@ export function CategoryEditor({ category, onSaved, onDeleted }: CategoryEditorP
               key={opt.value}
               type="button"
               onClick={() => setType(opt.value)}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-light transition-colors ${
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-ui-xs font-light transition-colors ${
                 type === opt.value
-                  ? "bg-muted text-foreground"
-                  : "text-muted-foreground hover:bg-card"
+                  ? "bg-control-hover text-fg"
+                  : "text-fg-secondary hover:bg-bg-elevated"
               }`}
             >
               <span
@@ -156,7 +156,7 @@ export function CategoryEditor({ category, onSaved, onDeleted }: CategoryEditorP
 
       {/* Color */}
       <div className="flex flex-col gap-1.5">
-        <span className="text-2xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+        <span className="text-ui-xs font-medium text-fg-secondary uppercase tracking-wider flex items-center gap-1">
           <Palette size={10} />
           Color
         </span>
@@ -218,20 +218,20 @@ function TagListField({
 
   return (
     <div className="flex flex-col gap-1.5">
-      <span className="text-2xs font-medium text-muted-foreground uppercase tracking-wider">
+      <span className="text-ui-xs font-medium text-fg-secondary uppercase tracking-wider">
         {label}
       </span>
       <div className="flex flex-wrap gap-1">
         {items.map((item) => (
           <span
             key={item}
-            className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-accent text-[11px] font-light text-muted-foreground"
+            className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-control-hover text-ui-xs font-light text-fg-secondary"
           >
             {item}
             <button
               type="button"
               onClick={() => onRemove(item)}
-              className="text-muted-foreground hover:text-destructive"
+              className="text-fg-secondary hover:text-status-danger"
             >
               <X size={10} />
             </button>
@@ -245,12 +245,12 @@ function TagListField({
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && add()}
           placeholder={placeholder}
-          className="glass-input flex-1 px-2.5 py-1 text-[11px] rounded-lg"
+          className="glass-input flex-1 px-2.5 py-1 text-ui-xs rounded-lg"
         />
         <button
           type="button"
           onClick={add}
-          className="px-2 py-1 rounded-lg bg-accent text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+          className="px-2 py-1 rounded-lg bg-control-hover text-ui-xs text-fg-secondary hover:text-fg transition-colors"
         >
           Add
         </button>

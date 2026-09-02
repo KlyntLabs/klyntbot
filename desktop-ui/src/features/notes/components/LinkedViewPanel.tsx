@@ -16,7 +16,7 @@ export function LinkedViewPanel({ noteId, sectionText }: LinkedViewPanelProps) {
 
   if (loading) {
     return (
-      <div className="flex h-full items-center justify-center text-xs text-muted">
+      <div className="flex h-full items-center justify-center text-ui-sm text-fg-secondary">
         Loading cognitive links...
       </div>
     );
@@ -24,7 +24,7 @@ export function LinkedViewPanel({ noteId, sectionText }: LinkedViewPanelProps) {
 
   if (totalLinks === 0) {
     return (
-      <div className="flex h-full items-center justify-center text-xs text-muted">
+      <div className="flex h-full items-center justify-center text-ui-sm text-fg-secondary">
         No cognitive links found for this section.
       </div>
     );
@@ -32,7 +32,7 @@ export function LinkedViewPanel({ noteId, sectionText }: LinkedViewPanelProps) {
 
   return (
     <div className="flex h-full flex-col gap-4 overflow-y-auto p-4">
-      <h3 className="text-xs font-medium text-muted">
+      <h3 className="text-ui-sm font-medium text-fg-secondary">
         {totalLinks} cognitive link{totalLinks !== 1 ? "s" : ""}
       </h3>
 
@@ -44,12 +44,12 @@ export function LinkedViewPanel({ noteId, sectionText }: LinkedViewPanelProps) {
               key={fact.id}
               className="rounded-md border border-purple-500/20 bg-purple-500/5 p-2"
             >
-              <p className="text-xs text-primary">
-                {fact.subject} <span className="text-muted">{fact.predicate}</span> {fact.object}
+              <p className="text-ui-sm text-brand">
+                {fact.subject} <span className="text-fg-secondary">{fact.predicate}</span> {fact.object}
               </p>
               <div className="mt-1 flex items-center gap-2">
                 <ConfidenceBar confidence={fact.confidence} />
-                <span className="text-2xs text-muted">{Math.round(fact.confidence * 100)}%</span>
+                <span className="text-ui-xs text-fg-secondary">{Math.round(fact.confidence * 100)}%</span>
               </div>
             </div>
           ))}
@@ -61,10 +61,10 @@ export function LinkedViewPanel({ noteId, sectionText }: LinkedViewPanelProps) {
         <Section title="Episodic Memories" color="orange">
           {context.episodicMemories.map((mem) => (
             <div key={mem.id} className="rounded-md border border-brand/20 bg-brand/5 p-2">
-              <p className="text-xs text-primary">{mem.content}</p>
+              <p className="text-ui-sm text-brand">{mem.content}</p>
               <div className="mt-1 flex items-center justify-between">
-                <span className="text-2xs text-muted">{mem.domain}</span>
-                <span className="text-2xs text-muted">
+                <span className="text-ui-xs text-fg-secondary">{mem.domain}</span>
+                <span className="text-ui-xs text-fg-secondary">
                   {new Date(mem.createdAt).toLocaleDateString()}
                 </span>
               </div>
@@ -78,9 +78,9 @@ export function LinkedViewPanel({ noteId, sectionText }: LinkedViewPanelProps) {
         <Section title="Related Annotations" color="green">
           {context.relatedAnnotations.map((ann) => (
             <div key={ann.id} className="rounded-md border border-green-500/20 bg-green-500/5 p-2">
-              <p className="text-xs text-primary">{ann.content}</p>
+              <p className="text-ui-sm text-brand">{ann.content}</p>
               {ann.quotedText && (
-                <p className="mt-1 text-2xs text-muted italic">"{ann.quotedText}"</p>
+                <p className="mt-1 text-ui-xs text-fg-secondary italic">"{ann.quotedText}"</p>
               )}
             </div>
           ))}
@@ -92,10 +92,10 @@ export function LinkedViewPanel({ noteId, sectionText }: LinkedViewPanelProps) {
         <Section title="Procedural Rules" color="blue">
           {context.proceduralRules.map((rule) => (
             <div key={rule.id} className="rounded-md border border-blue-500/20 bg-blue-500/5 p-2">
-              <p className="text-xs text-primary">{rule.ruleText}</p>
+              <p className="text-ui-sm text-brand">{rule.ruleText}</p>
               <div className="mt-1 flex items-center justify-between">
-                <span className="text-2xs text-muted">{rule.domain}</span>
-                <span className="text-2xs text-muted">
+                <span className="text-ui-xs text-fg-secondary">{rule.domain}</span>
+                <span className="text-ui-xs text-fg-secondary">
                   {rule.signalCount} signal{rule.signalCount !== 1 ? "s" : ""}
                 </span>
               </div>
@@ -129,7 +129,7 @@ function Section({
     <div className="flex flex-col gap-2">
       <div className="flex items-center gap-2">
         <div className={`h-2 w-2 rounded-full ${dotClass}`} />
-        <span className="text-[11px] font-medium text-muted">{title}</span>
+        <span className="text-ui-xs font-medium text-fg-secondary">{title}</span>
       </div>
       {children}
     </div>
@@ -138,7 +138,7 @@ function Section({
 
 function ConfidenceBar({ confidence }: { confidence: number }) {
   return (
-    <div className="h-1 w-16 rounded-full bg-surface-hover">
+    <div className="h-1 w-16 rounded-full bg-control-hover">
       <div
         className="h-full rounded-full bg-purple-400"
         style={{ width: `${Math.round(confidence * 100)}%` }}

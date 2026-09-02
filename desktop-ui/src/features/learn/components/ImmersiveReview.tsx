@@ -29,7 +29,7 @@ function ProgressSegments({ total, current }: { total: number; current: number }
             style={{ width: `${pct}%` }}
           />
         </div>
-        <span className="text-[10px] text-dim tabular-nums shrink-0">{pct}%</span>
+        <span className="text-[10px] text-fg-dim tabular-nums shrink-0">{pct}%</span>
       </div>
     );
   }
@@ -165,11 +165,11 @@ export function ImmersiveReview({ deck, onExit }: ImmersiveReviewProps) {
     return (
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center space-y-3">
-          <p className="text-muted-foreground text-sm">No cards due for review</p>
+          <p className="text-fg-secondary text-sm">No cards due for review</p>
           <button
             type="button"
             onClick={onExit}
-            className="glass-button px-4 py-2 text-sm text-foreground"
+            className="glass-button px-4 py-2 text-sm text-fg"
           >
             Back to Dashboard
           </button>
@@ -195,26 +195,26 @@ export function ImmersiveReview({ deck, onExit }: ImmersiveReviewProps) {
   return (
     <div className="flex-1 flex flex-col">
       {/* ── Top bar ──────────────────────────────────────────────── */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-separator">
         {/* Left: back */}
         <button
           type="button"
           onClick={onExit}
-          className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors shrink-0"
+          className="flex items-center gap-1.5 text-fg-secondary hover:text-fg transition-colors shrink-0"
         >
           <ArrowLeft size={15} strokeWidth={1.5} />
-          <span className="text-[11px] hidden sm:inline">ESC</span>
+          <span className="text-ui-xs hidden sm:inline">ESC</span>
         </button>
 
         {/* Center: progress + counter */}
         <div className="flex-1 flex flex-col items-center gap-1 min-w-0">
           <ProgressSegments total={cards.length} current={currentIndex} />
           <div className="flex items-center gap-1.5">
-            <span className="text-[11px] text-muted-foreground truncate max-w-[140px]">
+            <span className="text-ui-xs text-fg-secondary truncate max-w-[140px]">
               {deckLabel}
             </span>
-            <span className="text-dim">·</span>
-            <span className="text-[11px] text-dim tabular-nums">
+            <span className="text-fg-dim">·</span>
+            <span className="text-ui-xs text-fg-dim tabular-nums">
               {currentIndex + 1}/{cards.length}
             </span>
           </div>
@@ -225,10 +225,10 @@ export function ImmersiveReview({ deck, onExit }: ImmersiveReviewProps) {
           <button
             type="button"
             onClick={() => setAnswerMode("flip")}
-            className={`flex items-center gap-1 px-2 py-1 rounded text-[11px] transition-colors ${
+            className={`flex items-center gap-1 px-2 py-1 rounded text-ui-xs transition-colors ${
               answerMode === "flip"
-                ? "bg-white/10 text-foreground"
-                : "text-muted-foreground hover:text-foreground"
+                ? "bg-white/10 text-fg"
+                : "text-fg-secondary hover:text-fg"
             }`}
           >
             <RotateCcw size={11} strokeWidth={1.5} />
@@ -237,16 +237,16 @@ export function ImmersiveReview({ deck, onExit }: ImmersiveReviewProps) {
           <button
             type="button"
             onClick={() => setAnswerMode("type")}
-            className={`flex items-center gap-1 px-2 py-1 rounded text-[11px] transition-colors ${
+            className={`flex items-center gap-1 px-2 py-1 rounded text-ui-xs transition-colors ${
               answerMode === "type"
-                ? "bg-white/10 text-foreground"
-                : "text-muted-foreground hover:text-foreground"
+                ? "bg-white/10 text-fg"
+                : "text-fg-secondary hover:text-fg"
             }`}
           >
             <Keyboard size={11} strokeWidth={1.5} />
             Type
           </button>
-          <span className="text-[9px] text-dim ml-0.5">Tab</span>
+          <span className="text-[9px] text-fg-dim ml-0.5">Tab</span>
         </div>
       </div>
 
@@ -278,7 +278,7 @@ export function ImmersiveReview({ deck, onExit }: ImmersiveReviewProps) {
       {showSocratic && (socraticLoading || socraticExplanation) && (
         <div className="px-6 max-w-xl mx-auto w-full animate-[fade-in-up_0.2s_ease-out]">
           {socraticLoading ? (
-            <div className="flex items-center gap-2 text-xs text-muted-foreground justify-center py-2">
+            <div className="flex items-center gap-2 text-ui-sm text-fg-secondary justify-center py-2">
               <Lightbulb size={14} strokeWidth={1.5} className="animate-pulse" />
               Thinking...
             </div>
@@ -286,18 +286,18 @@ export function ImmersiveReview({ deck, onExit }: ImmersiveReviewProps) {
             <button
               type="button"
               onClick={() => setSocraticOpen(true)}
-              className="mx-auto flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors py-2"
+              className="mx-auto flex items-center gap-1.5 text-ui-sm text-fg-secondary hover:text-fg transition-colors py-2"
             >
               <Lightbulb size={14} strokeWidth={1.5} />
               Let's understand why
             </button>
           ) : socraticExplanation ? (
-            <div className="glass-card p-4 text-sm text-foreground whitespace-pre-wrap animate-[fade-in-up_0.2s_ease-out]">
+            <div className="glass-card p-4 text-sm text-fg whitespace-pre-wrap animate-[fade-in-up_0.2s_ease-out]">
               {socraticExplanation}
               <button
                 type="button"
                 onClick={dismissSocratic}
-                className="block mt-2 text-xs text-muted-foreground hover:text-foreground"
+                className="block mt-2 text-ui-sm text-fg-secondary hover:text-fg"
               >
                 Dismiss
               </button>
@@ -321,10 +321,10 @@ export function ImmersiveReview({ deck, onExit }: ImmersiveReviewProps) {
               <button
                 type="button"
                 onClick={reveal}
-                className="glass-button px-10 py-3 text-sm text-foreground font-medium group"
+                className="glass-button px-10 py-3 text-sm text-fg font-medium group"
               >
                 Show Answer
-                <span className="text-[10px] text-dim ml-2 group-hover:text-muted-foreground transition-colors">
+                <span className="text-[10px] text-fg-dim ml-2 group-hover:text-fg-secondary transition-colors">
                   Space
                 </span>
               </button>
@@ -351,15 +351,15 @@ export function ImmersiveReview({ deck, onExit }: ImmersiveReviewProps) {
             type="button"
             onClick={() => setEditing(true)}
             disabled={!revealed || !current}
-            className={`flex items-center gap-1 text-[11px] transition-colors ${
+            className={`flex items-center gap-1 text-ui-xs transition-colors ${
               revealed && current
-                ? "text-muted-foreground hover:text-foreground cursor-pointer"
-                : "text-dim cursor-not-allowed"
+                ? "text-fg-secondary hover:text-fg cursor-pointer"
+                : "text-fg-dim cursor-not-allowed"
             }`}
           >
             <Edit3 size={11} strokeWidth={1.5} />
             Edit
-            <span className="text-[10px] text-dim ml-0.5">E</span>
+            <span className="text-[10px] text-fg-dim ml-0.5">E</span>
           </button>
           <button
             type="button"
@@ -369,10 +369,10 @@ export function ImmersiveReview({ deck, onExit }: ImmersiveReviewProps) {
               }
             }}
             disabled={!current?.sourceNoteId}
-            className={`flex items-center gap-1 text-[11px] transition-colors ${
+            className={`flex items-center gap-1 text-ui-xs transition-colors ${
               current?.sourceNoteId
-                ? "text-muted-foreground hover:text-foreground cursor-pointer"
-                : "text-dim cursor-not-allowed"
+                ? "text-fg-secondary hover:text-fg cursor-pointer"
+                : "text-fg-dim cursor-not-allowed"
             }`}
           >
             <ExternalLink size={11} strokeWidth={1.5} />

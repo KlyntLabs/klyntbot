@@ -125,28 +125,28 @@ export function GeneralSettings() {
   return (
     <div>
       <div className="mb-8">
-        <h2 className="text-lg font-medium text-foreground">General</h2>
-        <p className="text-[13px] text-muted-foreground mt-1">Overview and system information</p>
+        <h2 className="text-lg font-medium text-fg">General</h2>
+        <p className="text-ui text-fg-secondary mt-1">Overview and system information</p>
       </div>
 
       <div className="space-y-4">
         <SettingsCard title="System">
           <div className="space-y-2">
-            <div className="flex justify-between text-[13px]">
-              <span className="text-muted-foreground">Version</span>
-              <span className="text-muted-foreground font-mono">{appInfo.version}</span>
+            <div className="flex justify-between text-ui">
+              <span className="text-fg-secondary">Version</span>
+              <span className="text-fg-secondary font-mono">{appInfo.version}</span>
             </div>
-            <div className="flex justify-between text-[13px]">
-              <span className="text-muted-foreground">Data directory</span>
-              <span className="text-muted-foreground font-mono">{appInfo.dataDir}</span>
+            <div className="flex justify-between text-ui">
+              <span className="text-fg-secondary">Data directory</span>
+              <span className="text-fg-secondary font-mono">{appInfo.dataDir}</span>
             </div>
-            <div className="flex justify-between text-[13px]">
-              <span className="text-muted-foreground">Agent status</span>
-              <span className="text-muted-foreground">{status.status}</span>
+            <div className="flex justify-between text-ui">
+              <span className="text-fg-secondary">Agent status</span>
+              <span className="text-fg-secondary">{status.status}</span>
             </div>
-            <div className="flex justify-between text-[13px]">
-              <span className="text-muted-foreground">Active tasks</span>
-              <span className="text-muted-foreground">{status.activeTaskCount}</span>
+            <div className="flex justify-between text-ui">
+              <span className="text-fg-secondary">Active tasks</span>
+              <span className="text-fg-secondary">{status.activeTaskCount}</span>
             </div>
           </div>
         </SettingsCard>
@@ -160,7 +160,7 @@ export function GeneralSettings() {
               ] as const
             ).map(([key, label]) => (
               <div key={key} className="flex items-center justify-between gap-4">
-                <span className="text-xs text-muted-foreground w-28 shrink-0">{label}</span>
+                <span className="text-ui-xs text-fg-secondary w-28 shrink-0">{label}</span>
                 <ShortcutRecorder
                   value={currentShortcuts[key]}
                   defaultValue={SHORTCUT_DEFAULTS[key]}
@@ -174,7 +174,7 @@ export function GeneralSettings() {
               </div>
             ))}
 
-            {shortcutError && <p className="text-xs text-red-400">{shortcutError}</p>}
+            {shortcutError && <p className="text-ui-sm text-red-400">{shortcutError}</p>}
 
             {hasShortcutChanges && (
               <div className="flex justify-end">
@@ -191,19 +191,19 @@ export function GeneralSettings() {
         <SettingsCard title="Agent defaults">
           <div className="space-y-3">
             <label className="block">
-              <span className="block text-xs text-muted-foreground mb-1">Default model</span>
+              <span className="block text-ui-xs text-fg-secondary mb-1">Default model</span>
               <input
                 type="text"
                 value={currentModel}
                 onChange={(e) => setModel(e.target.value)}
                 placeholder="e.g. anthropic/claude-opus-4-5"
-                className="w-full px-3 py-1.5 text-[13px] text-foreground bg-accent border border-border rounded-lg focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
+                className="w-full px-3 py-1.5 text-ui text-fg bg-control-hover border border-separator rounded-control focus:outline-none focus:border-fg-secondary/50 focus:ring-2 focus:ring-separator transition-colors placeholder:text-fg-dim"
               />
             </label>
 
             <div className="flex gap-3">
               <label className="flex-1">
-                <span className="block text-xs text-muted-foreground mb-1">Temperature</span>
+                <span className="block text-ui-xs text-fg-secondary mb-1">Temperature</span>
                 <input
                   type="number"
                   value={currentTemp}
@@ -211,18 +211,18 @@ export function GeneralSettings() {
                   step="0.1"
                   min="0"
                   max="2"
-                  className="w-full px-3 py-1.5 text-[13px] text-foreground bg-accent border border-border rounded-lg focus:outline-none focus:border-brand/50 transition-colors"
+                  className="w-full px-3 py-1.5 text-ui text-fg bg-control-hover border border-separator rounded-control focus:outline-none focus:border-fg-secondary/50 focus:ring-2 focus:ring-separator transition-colors"
                 />
               </label>
               <label className="flex-1">
-                <span className="block text-xs text-muted-foreground mb-1">Max tokens</span>
+                <span className="block text-ui-xs text-fg-secondary mb-1">Max tokens</span>
                 <input
                   type="number"
                   value={currentMaxTokens}
                   onChange={(e) => setMaxTokens(e.target.value)}
                   step="256"
                   min="256"
-                  className="w-full px-3 py-1.5 text-[13px] text-foreground bg-accent border border-border rounded-lg focus:outline-none focus:border-brand/50 transition-colors"
+                  className="w-full px-3 py-1.5 text-ui text-fg bg-control-hover border border-separator rounded-control focus:outline-none focus:border-fg-secondary/50 focus:ring-2 focus:ring-separator transition-colors"
                 />
               </label>
             </div>
@@ -238,7 +238,7 @@ export function GeneralSettings() {
         <PermissionsCard />
 
         <SettingsCard title="AI Self-Improvement">
-          <p className="text-xs text-muted-foreground mb-3">
+          <p className="text-ui-xs text-fg-secondary mb-3">
             AutoTuner continuously learns your preferences and optimizes response quality.
           </p>
           <AutoTunerPanel />

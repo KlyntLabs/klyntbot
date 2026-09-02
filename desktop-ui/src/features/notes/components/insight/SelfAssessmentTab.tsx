@@ -29,10 +29,10 @@ function SkeletonLoader() {
   return (
     <div className="space-y-3 animate-pulse">
       {[0, 1, 2].map((i) => (
-        <div key={i} className="rounded-lg bg-card border border-border-subtle p-4 space-y-3">
-          <div className="h-3 bg-card rounded w-3/4" />
-          <div className="h-3 bg-card rounded w-full" />
-          <div className="h-3 bg-card rounded w-1/2" />
+        <div key={i} className="island p-4 space-y-3">
+          <div className="h-3 bg-bg-elevated rounded w-3/4" />
+          <div className="h-3 bg-bg-elevated rounded w-full" />
+          <div className="h-3 bg-bg-elevated rounded w-1/2" />
         </div>
       ))}
     </div>
@@ -75,7 +75,7 @@ export function SelfAssessmentTab({
 
   if (status === "idle") {
     return (
-      <p className="text-[11px] text-dim italic">
+      <p className="text-ui-xs text-fg-dim italic">
         Start an insight review to test your understanding
       </p>
     );
@@ -84,7 +84,7 @@ export function SelfAssessmentTab({
   if ((status === "done" || status === "error") && questions.length === 0) {
     return (
       <div className="space-y-2">
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-ui-xs text-fg-secondary">
           Quiz questions couldn't be generated. Try regenerating this tab.
         </p>
       </div>
@@ -97,7 +97,7 @@ export function SelfAssessmentTab({
 
   if (status === "error") {
     return (
-      <p className="text-[11px] text-destructive">
+      <p className="text-ui-xs text-status-danger">
         Failed to generate quiz questions. Try regenerating.
       </p>
     );
@@ -109,14 +109,14 @@ export function SelfAssessmentTab({
     <div className="space-y-3">
       {anyRevealed && (
         <div className="flex items-center justify-between mb-4">
-          <div className="text-[13px] font-medium text-foreground">
+          <div className="text-ui font-medium text-fg">
             Score: {quizState.score} / {quizState.total}
           </div>
           {quizState.revealed.size >= 3 && quizState.revealed.size < questions.length && (
             <button
               type="button"
               onClick={onRevealAll}
-              className="text-2xs text-muted-foreground hover:text-foreground transition-colors"
+              className="text-ui-xs text-fg-secondary hover:text-fg transition-colors"
             >
               Reveal all answers
             </button>
@@ -129,10 +129,10 @@ export function SelfAssessmentTab({
         const userAnswer = quizState.answers[q.id];
 
         return (
-          <div key={q.id} className="rounded-lg bg-card border border-border-subtle p-4 space-y-3">
+          <div key={q.id} className="island p-4 space-y-3">
             <div className="flex items-start justify-between gap-2">
-              <span className="text-xs text-foreground leading-relaxed">{q.question}</span>
-              <span className="text-[9px] px-1.5 py-0.5 rounded bg-accent text-dim shrink-0">
+              <span className="text-ui-sm text-fg leading-relaxed">{q.question}</span>
+              <span className="text-[9px] px-1.5 py-0.5 rounded bg-control-hover text-fg-dim shrink-0">
                 {q.difficulty}
               </span>
             </div>
@@ -145,22 +145,22 @@ export function SelfAssessmentTab({
                   const isCorrect = choice === q.correctAnswer;
 
                   let choiceClass =
-                    "w-full flex items-center gap-2 px-3 py-1.5 rounded-md border text-left text-[11px] transition-colors ";
+                    "w-full flex items-center gap-2 px-3 py-1.5 rounded-md border text-left text-ui-xs transition-colors ";
 
                   if (isRevealed) {
                     if (isCorrect) {
-                      choiceClass += "border-success/50 bg-success/10 text-foreground";
+                      choiceClass += "border-status-success/50 bg-status-success/10 text-fg";
                     } else if (isSelected && !isCorrect) {
-                      choiceClass += "border-destructive/50 bg-destructive/10 text-foreground";
+                      choiceClass += "border-status-danger/50 bg-status-danger/10 text-fg";
                     } else {
-                      choiceClass += "border-border-subtle bg-card text-dim";
+                      choiceClass += "border-separator bg-bg-elevated text-fg-dim";
                     }
                   } else {
                     if (isSelected) {
-                      choiceClass += "border-border bg-muted text-foreground hover:bg-muted";
+                      choiceClass += "border-separator bg-control-hover text-fg hover:bg-control-hover";
                     } else {
                       choiceClass +=
-                        "border-border-subtle bg-card text-muted-foreground hover:bg-accent";
+                        "border-separator bg-bg-elevated text-fg-secondary hover:bg-control-hover";
                     }
                   }
 
@@ -172,7 +172,7 @@ export function SelfAssessmentTab({
                       onClick={() => onAnswer(q.id, choice)}
                       className={choiceClass}
                     >
-                      <span className="text-2xs text-dim shrink-0 w-4">{label}</span>
+                      <span className="text-ui-xs text-fg-dim shrink-0 w-4">{label}</span>
                       <span>{choice}</span>
                     </button>
                   );
@@ -185,7 +185,7 @@ export function SelfAssessmentTab({
                 onChange={(e) => onAnswer(q.id, e.target.value)}
                 placeholder="Type your answer..."
                 disabled={isRevealed}
-                className="w-full bg-card border border-border rounded-md px-3 py-1.5 text-[11px] text-foreground placeholder:text-dim focus:border-purple-400/50 focus:outline-none disabled:opacity-50"
+                className="w-full bg-bg-elevated border border-separator rounded-md px-3 py-1.5 text-ui-xs text-fg placeholder:text-fg-dim focus:border-purple-400/50 focus:outline-none disabled:opacity-50"
               />
             )}
 
@@ -193,19 +193,19 @@ export function SelfAssessmentTab({
               <button
                 type="button"
                 onClick={() => onReveal(q.id)}
-                className="text-2xs px-3 py-1 rounded-md bg-purple/20 text-purple hover:bg-purple/30 transition-colors"
+                className="text-ui-xs px-3 py-1 rounded-md bg-purple/20 text-purple hover:bg-purple/30 transition-colors"
               >
                 Check
               </button>
             )}
 
             {isRevealed && (
-              <div className="pt-2 border-t border-border-subtle">
-                <div className="text-2xs text-muted-foreground leading-relaxed">
-                  <span className="font-medium text-muted-foreground">Correct: </span>
+              <div className="pt-2 border-t border-separator">
+                <div className="text-ui-xs text-fg-secondary leading-relaxed">
+                  <span className="font-medium text-fg-secondary">Correct: </span>
                   {q.correctAnswer}
                 </div>
-                <div className="text-2xs text-dim mt-1">{q.explanation}</div>
+                <div className="text-ui-xs text-fg-dim mt-1">{q.explanation}</div>
               </div>
             )}
           </div>
@@ -218,7 +218,7 @@ export function SelfAssessmentTab({
           type="button"
           onClick={handleGenerateScenario}
           disabled={scenarioLoading}
-          className="flex items-center gap-1.5 text-[11px] text-brand hover:text-brand/80 transition-colors disabled:text-dim"
+          className="flex items-center gap-1.5 text-ui-xs text-brand hover:text-brand/80 transition-colors disabled:text-fg-dim"
         >
           {scenarioLoading ? (
             <>
@@ -234,7 +234,7 @@ export function SelfAssessmentTab({
         </button>
       )}
       {scenarioError && !scenario && (
-        <p className="text-2xs text-destructive mt-1">Failed to generate scenario. Try again.</p>
+        <p className="text-ui-xs text-status-danger mt-1">Failed to generate scenario. Try again.</p>
       )}
 
       {scenario && <ScenarioChallenge scenario={scenario} />}
@@ -243,7 +243,7 @@ export function SelfAssessmentTab({
         <button
           type="button"
           onClick={() => onSaveFlashcards(`insight-${Date.now()}`)}
-          className="w-full mt-4 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-brand/20 text-brand hover:bg-brand/30 transition-colors text-[11px] font-medium"
+          className="w-full mt-4 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-brand/20 text-brand hover:bg-brand/30 transition-colors text-ui-xs font-medium"
         >
           <BookOpen size={14} />
           Save as Flashcard Deck

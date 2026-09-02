@@ -6,10 +6,10 @@ const progressIndicatorVariants = cva("h-full rounded-full transition-[width] du
   variants: {
     color: {
       brand: "bg-brand",
-      success: "bg-success",
-      warning: "bg-warning",
-      destructive: "bg-destructive",
-      info: "bg-info",
+      success: "bg-status-success",
+      warning: "bg-status-warning",
+      destructive: "bg-status-danger",
+      info: "bg-status-info",
     },
   },
   defaultVariants: {
@@ -26,7 +26,7 @@ export function Progress({ value, className, color }: ProgressProps) {
   return (
     <ProgressPrimitive.Root
       value={value}
-      className={cn("h-1.5 w-full bg-muted rounded-full overflow-hidden", className)}
+      className={cn("h-1.5 w-full bg-control-hover rounded-full overflow-hidden", className)}
     >
       <ProgressPrimitive.Indicator
         className={cn(progressIndicatorVariants({ color }))}
