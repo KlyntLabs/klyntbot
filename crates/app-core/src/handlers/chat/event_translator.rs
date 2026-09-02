@@ -192,11 +192,14 @@ impl ChatEventTranslator {
                     agent: agent.clone(),
                 });
                 // Emit entity:updated so the UI refreshes affected lists
-                if success && is_mutating_action(action.as_deref()) {
-                    if let Some(kind) = entity_kind_for_tool(&name) {
+                if success {
+                    for intent in crate::entity_update_intent::project_entity_update(
+                        &name,
+                        action.as_deref(),
+                    ) {
                         let payload = serde_json::json!({
-                            "entityKind": kind,
-                            "id": ""
+                            "entityKind": intent.kind,
+                            "id": intent.id,
                         });
                         out.push(UiEmission {
                             event: ENTITY_UPDATED,
@@ -951,7 +954,7 @@ impl ChatEventTranslator {
     }
 }
 
-use super::streaming::{entity_kind_for_tool, is_mutating_action};
+
 
 #[cfg(test)]
 mod tests {
@@ -997,6 +1000,71 @@ mod tests {
         });
         assert_eq!(tr.state().segments.len(), 1);
         assert_eq!(tr.state().tool_names, vec!["tasks".to_string()]);
+    }
+
+    #[test]
+    fn tool_end_success_mutating_emits_wildcard_entity_updated() {
+        let mut tr = ChatEventTranslator::new("sess-1".to_string(), 0);
+        tr.handle(AgentEvent::ToolStart {
+            name: "tasks".to_string(),
+            args: serde_json::json!({"action": "create"}),
+            agent: None,
+            call_id: None,
+        });
+        let emits = tr.handle(AgentEvent::ToolEnd {
+            name: "tasks".to_string(),
+            success: true,
+            duration_ms: 5,
+            result: Some("ok".to_string()),
+            agent: None,
+            call_id: None,
+        });
+        let entity = emits
+            .iter()
+            .find(|e| e.event == ENTITY_UPDATED)
+            .expect("entity:updated");
+        assert_eq!(entity.payload["id"], "*");
+        assert_eq!(entity.payload["entityKind"], "task");
+    }
+
+    #[test]
+    fn tool_end_success_read_only_skips_entity_updated() {
+        let mut tr = ChatEventTranslator::new("sess-1".to_string(), 0);
+        tr.handle(AgentEvent::ToolStart {
+            name: "tasks".to_string(),
+            args: serde_json::json!({"action": "list"}),
+            agent: None,
+            call_id: None,
+        });
+        let emits = tr.handle(AgentEvent::ToolEnd {
+            name: "tasks".to_string(),
+            success: true,
+            duration_ms: 5,
+            result: Some("ok".to_string()),
+            agent: None,
+            call_id: None,
+        });
+        assert!(emits.iter().all(|e| e.event != ENTITY_UPDATED));
+    }
+
+    #[test]
+    fn tool_end_failure_skips_entity_updated() {
+        let mut tr = ChatEventTranslator::new("sess-1".to_string(), 0);
+        tr.handle(AgentEvent::ToolStart {
+            name: "tasks".to_string(),
+            args: serde_json::json!({"action": "create"}),
+            agent: None,
+            call_id: None,
+        });
+        let emits = tr.handle(AgentEvent::ToolEnd {
+            name: "tasks".to_string(),
+            success: false,
+            duration_ms: 5,
+            result: Some("err".to_string()),
+            agent: None,
+            call_id: None,
+        });
+        assert!(emits.iter().all(|e| e.event != ENTITY_UPDATED));
     }
 
     #[test]

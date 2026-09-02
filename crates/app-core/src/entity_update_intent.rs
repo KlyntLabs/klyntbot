@@ -240,4 +240,31 @@ mod tests {
     fn project_entity_update_todo_aliases_tasks() {
         assert_eq!(kinds_of("todo", Some("update")), vec![EntityKind::Task]);
     }
+
+    /// Shared chat/MCP parity fixture (same name+action ⇒ same kinds).
+    #[test]
+    fn project_entity_update_parity_fixture() {
+        let cases: &[(&str, Option<&str>, &[EntityKind])] = &[
+            ("tasks", Some("create"), &[EntityKind::Task]),
+            ("tasks", Some("list"), &[]),
+            ("notes", Some("create_note"), &[EntityKind::Note]),
+            ("notes", Some("list_notes"), &[]),
+            (
+                "okr",
+                Some("objective.create"),
+                &[EntityKind::Objective, EntityKind::KeyResult],
+            ),
+            ("okr", Some("kr.show"), &[]),
+            ("project", Some("update"), &[EntityKind::Project]),
+            ("work_context", Some("rename"), &[EntityKind::Productivity]),
+            ("unknown", Some("create"), &[]),
+        ];
+        for (tool, action, expected) in cases {
+            assert_eq!(
+                kinds_of(tool, *action).as_slice(),
+                *expected,
+                "parity {tool:?} {action:?}"
+            );
+        }
+    }
 }
