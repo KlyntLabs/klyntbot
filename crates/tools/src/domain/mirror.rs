@@ -55,7 +55,8 @@ impl MirrorTool {
     description = "Query the Mirror self-reflection layer for routing patterns, brain versions, narratives, and experiment status. All actions are read-only.",
     category = "Memory",
     tags = "mirror,reflection,routing,brain,narrative,meta-rule",
-    cost = "Free"
+    cost = "Free",
+    mcp_exposure = "default"
 )]
 impl MirrorTool {
     /// Return the full current MirrorState (latest snapshot, narrative,
@@ -157,6 +158,18 @@ mod tests {
         let rt = tokio::runtime::Runtime::new().unwrap();
         let tool: Box<dyn tools_core::Tool> = Box::new(rt.block_on(setup()));
         assert_eq!(tool.name(), "mirror");
+    }
+
+    #[tokio::test]
+    async fn historical_mcp_default() {
+        use tools_core::{McpExposure, Tool};
+        let tool = setup().await;
+        let policy = tool.exposure_policy();
+        assert_eq!(tool.name(), "mirror");
+        assert_eq!(policy.mcp, McpExposure::Default);
+        assert!(!policy.subagent);
+        assert_eq!(tool.allowed_channels(), policy.llm_channels);
+        assert!(!tool.subagent_visible());
     }
 
     #[tokio::test]

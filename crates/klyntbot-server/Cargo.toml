@@ -23,6 +23,3 @@ uuid.workspace = true
 
 [dev-dependencies]
 async-trait.workspace = true
-
-[package.metadata.cargo-machete]
-ignored = ["mcp"]

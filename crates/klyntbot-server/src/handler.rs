@@ -1,13 +1,14 @@
 //! MCP server handler — bridges rmcp protocol to klyntbot's AppCore.
 //!
-//! Combines built-in tools (get_status) with dynamically bridged tools
-//! from klyntbot's internal ToolRegistry.
+//! Combines MCP-server builtins (`get_status`, optional `agent`) with
+//! registry tools from a validated [`ExposureValidation`] effective set.
 
 use std::sync::Arc;
 
 use app_core::events::AppEventEmitter;
 use app_core::AppCore;
 use desktop_shared::types::EntityKind;
+use mcp::server::exposure::{BuiltinId, ExposureValidation};
 use rmcp::handler::server::ServerHandler;
 use rmcp::model::*;
 use rmcp::service::{RequestContext, RoleServer};
@@ -28,18 +29,24 @@ pub struct KlyntbotServerHandler {
 }
 
 impl KlyntbotServerHandler {
-    pub fn new(app: Arc<AppCore>, whitelist: Vec<String>) -> Self {
+    /// Build a handler from AppCore + shared exposure validation.
+    ///
+    /// Registry tools come from `effective_registry_tools`. `get_status` is
+    /// always advertised; `agent` follows `effective_builtins` (`BuiltinId`),
+    /// not a registry-tool name (auto-fill no longer inserts `"agent"`).
+    pub fn new(app: Arc<AppCore>, exposure: &ExposureValidation) -> Self {
         let registry = app.agent.tool_registry();
-        let has_agent = whitelist.iter().any(|w| w == "agent");
+        let effective_registry_tools = exposure.effective_registry_tools.clone();
+        let include_agent = exposure.effective_builtins.contains(&BuiltinId::Agent);
         let bridge = if let Ok(bus) = app.domain_event_bus() {
-            ToolRegistryBridge::new_with_bus(registry, whitelist, bus)
+            ToolRegistryBridge::new_with_bus(registry, effective_registry_tools, bus)
         } else {
-            ToolRegistryBridge::new(registry, whitelist)
+            ToolRegistryBridge::new(registry, effective_registry_tools)
         };
         let agent_bridge = AgentBridge::new(Arc::clone(&app));
 
         let status_tool = Self::build_status_tool();
-        let agent_tool = if has_agent {
+        let agent_tool = if include_agent {
             Some(Self::build_agent_tool())
         } else {
             None

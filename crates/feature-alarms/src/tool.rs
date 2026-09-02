@@ -224,6 +224,13 @@ impl Tool for AlarmTool {
         "alarm"
     }
 
+    fn exposure_policy(&self) -> tools_core::ExposurePolicy {
+        tools_core::ExposurePolicy {
+            mcp: tools_core::McpExposure::Default,
+            ..Default::default()
+        }
+    }
+
     fn description(&self) -> &str {
         "Standalone reminders not tied to any task. Create with `fire_at` (ISO 8601) or \
          `relative_duration` (e.g. '10m', '1h', '2d'). Use 'tasks' tool with `alarms` \
@@ -308,6 +315,17 @@ mod tests {
 
     fn ctx() -> RoutingContext {
         RoutingContext::new(common::ChannelName::new("cli"), common::ChatId::new("test"))
+    }
+
+    #[tokio::test]
+    async fn historical_mcp_default() {
+        let (tool, _) = setup().await;
+        let policy = tool.exposure_policy();
+        assert_eq!(tool.name(), "alarm");
+        assert_eq!(policy.mcp, tools_core::McpExposure::Default);
+        assert!(!policy.subagent);
+        assert_eq!(tool.allowed_channels(), policy.llm_channels);
+        assert!(!tool.subagent_visible());
     }
 
     #[tokio::test]

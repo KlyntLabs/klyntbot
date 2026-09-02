@@ -43,8 +43,11 @@ impl Tool for NotesTool {
         "notes"
     }
 
-    fn allowed_channels(&self) -> common::ChannelMask {
-        common::ChannelMask::ALL
+    fn exposure_policy(&self) -> tools_core::ExposurePolicy {
+        tools_core::ExposurePolicy {
+            mcp: tools_core::McpExposure::Default,
+            ..Default::default()
+        }
     }
 
     fn description(&self) -> &str {
@@ -519,6 +522,17 @@ mod tests {
         let sql = crate::NotesFeature::migration_sql();
         sqlx::query(sql).execute(&pool).await.unwrap();
         NotesTool::new(crate::repo::NoteRepo::new(pool))
+    }
+
+    #[tokio::test]
+    async fn historical_mcp_default() {
+        let tool = setup().await;
+        let policy = tool.exposure_policy();
+        assert_eq!(tool.name(), "notes");
+        assert_eq!(policy.mcp, tools_core::McpExposure::Default);
+        assert!(!policy.subagent);
+        assert_eq!(tool.allowed_channels(), policy.llm_channels);
+        assert!(!tool.subagent_visible());
     }
 
     #[tokio::test]

@@ -1,6 +1,7 @@
 //! AiFeatureRegistry — runtime collection of FeatureRecord entries built at
-//! app-core startup. Consumed by:
-//! - `default_exposed_tools()` (MCP server tool exposure)
+//! app-core startup. Recall-domain metadata only — not an MCP tool-exposure
+//! proxy (that lives on `Tool::exposure_policy` / the live `ToolRegistry`).
+//! Consumed by:
 //! - `dispatch_entity_update()` (MCP entity-update fan-out)
 //! - `RecallProviderRegistry` seeding (cognitive context source)
 //! - the activity-log normalizer consumer (event-kind allowlist)

@@ -418,24 +418,27 @@ mod tests {
         async fn execute(&self, _args: Value, _ctx: &RoutingContext) -> Result<String> {
             Ok("ok".into())
         }
-        fn subagent_visible(&self) -> bool {
-            true
+        fn exposure_policy(&self) -> crate::ExposurePolicy {
+            crate::ExposurePolicy {
+                subagent: true,
+                ..Default::default()
+            }
         }
     }
 
     #[test]
     fn projects_only_subagent_visible_tools() {
-        // Mirrors the subagent spawn projection: take the parent registry's
-        // tools and keep those that opt into `subagent_visible`.
+        // Mirrors the subagent spawn projection: keep tools with
+        // `exposure_policy().subagent`.
         let mut reg = ToolRegistry::new();
-        reg.register(FakeSearchTool); // default: not subagent-visible
-        reg.register(FakeWebTool); // default: not subagent-visible
+        reg.register(FakeSearchTool); // default: not subagent
+        reg.register(FakeWebTool); // default: not subagent
         reg.register(FakeSubagentTool); // opted in
 
         let projected: Vec<String> = reg
             .dyn_tools()
             .into_iter()
-            .filter(|t| t.subagent_visible())
+            .filter(|t| t.exposure_policy().subagent)
             .map(|t| t.name().to_string())
             .collect();
 

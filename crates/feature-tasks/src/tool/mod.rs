@@ -211,8 +211,11 @@ impl Tool for TaskTool {
         "tasks"
     }
 
-    fn allowed_channels(&self) -> common::ChannelMask {
-        common::ChannelMask::ALL
+    fn exposure_policy(&self) -> tools_core::ExposurePolicy {
+        tools_core::ExposurePolicy {
+            mcp: tools_core::McpExposure::Default,
+            ..Default::default()
+        }
     }
 
     fn description(&self) -> &str {
@@ -489,6 +492,17 @@ mod tests {
 
     fn test_ctx() -> RoutingContext {
         RoutingContext::new(common::ChannelName::new("cli"), common::ChatId::new("test"))
+    }
+
+    #[tokio::test]
+    async fn historical_mcp_default() {
+        let tool = make_tool().await;
+        let policy = tool.exposure_policy();
+        assert_eq!(tool.name(), "tasks");
+        assert_eq!(policy.mcp, tools_core::McpExposure::Default);
+        assert!(!policy.subagent);
+        assert_eq!(tool.allowed_channels(), policy.llm_channels);
+        assert!(!tool.subagent_visible());
     }
 
     #[tokio::test]

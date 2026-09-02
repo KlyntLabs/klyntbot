@@ -37,6 +37,29 @@ fn preview_text(content: &str, max: usize) -> String {
     }
 }
 
+/// LLM tool-def channel filter — reads [`tools_core::Tool::exposure_policy`].
+fn filter_defs_for_channel(
+    registry: &tools::registry::ToolRegistry,
+    tool_defs: &[serde_json::Value],
+    channel: common::tool_channel::Channel,
+) -> Vec<serde_json::Value> {
+    tool_defs
+        .iter()
+        .filter(|def| {
+            let name = def
+                .get("function")
+                .and_then(|f| f.get("name"))
+                .and_then(|n| n.as_str())
+                .unwrap_or("");
+            registry
+                .get(name)
+                .map(|tool| tool.exposure_policy().llm_channels.allows(channel))
+                .unwrap_or(true)
+        })
+        .cloned()
+        .collect()
+}
+
 /// Handle for consuming streaming agent output.
 pub struct StreamingHandle {
     /// Agent events (content chunks, tool status).
@@ -948,23 +971,8 @@ impl AgentLoop {
         let channel = common::tool_channel::Channel::from_name(routing_ctx.channel.as_str());
         let registry = self.tool_registry.read().await;
         tracing::debug!("run_pipeline: tool_registry read lock acquired");
-        let filtered_defs: Arc<Vec<serde_json::Value>> = Arc::new(
-            tool_defs
-                .iter()
-                .filter(|def| {
-                    let name = def
-                        .get("function")
-                        .and_then(|f| f.get("name"))
-                        .and_then(|n| n.as_str())
-                        .unwrap_or("");
-                    registry
-                        .get(name)
-                        .map(|tool| tool.allowed_channels().allows(channel))
-                        .unwrap_or(true)
-                })
-                .cloned()
-                .collect(),
-        );
+        let filtered_defs: Arc<Vec<serde_json::Value>> =
+            Arc::new(filter_defs_for_channel(&registry, &tool_defs, channel));
         drop(registry);
         tracing::debug!(
             filtered = filtered_defs.len(),
@@ -1486,5 +1494,96 @@ mod tests {
         assert_eq!(reaction_to_satisfaction("\u{1F914}"), None);
         assert_eq!(reaction_to_satisfaction("hello"), None);
         assert_eq!(reaction_to_satisfaction(""), None);
+    }
+}
+
+#[cfg(test)]
+mod exposure_channel_filter_tests {
+    use super::filter_defs_for_channel;
+    use async_trait::async_trait;
+    use common::tool_channel::{Channel, ChannelMask};
+    use common::Result;
+    use serde_json::{json, Value};
+    use tools::registry::ToolRegistry;
+    use tools_core::{ExposurePolicy, RoutingContext, Tool};
+
+    struct AllChannelsTool;
+    struct DesktopOnlyTool;
+
+    #[async_trait]
+    impl Tool for AllChannelsTool {
+        fn name(&self) -> &str {
+            "all_channels"
+        }
+        fn description(&self) -> &str {
+            "visible everywhere"
+        }
+        fn parameters(&self) -> Value {
+            json!({"type": "object"})
+        }
+        async fn execute(&self, _args: Value, _ctx: &RoutingContext) -> Result<String> {
+            Ok("ok".into())
+        }
+    }
+
+    #[async_trait]
+    impl Tool for DesktopOnlyTool {
+        fn name(&self) -> &str {
+            "desktop_only"
+        }
+        fn description(&self) -> &str {
+            "desktop only"
+        }
+        fn parameters(&self) -> Value {
+            json!({"type": "object"})
+        }
+        async fn execute(&self, _args: Value, _ctx: &RoutingContext) -> Result<String> {
+            Ok("ok".into())
+        }
+        fn exposure_policy(&self) -> ExposurePolicy {
+            ExposurePolicy {
+                llm_channels: ChannelMask::DESKTOP_ONLY,
+                ..Default::default()
+            }
+        }
+    }
+
+    fn def_names(defs: &[Value]) -> Vec<String> {
+        let mut names: Vec<String> = defs
+            .iter()
+            .filter_map(|d| {
+                d.get("function")
+                    .and_then(|f| f.get("name"))
+                    .and_then(|n| n.as_str())
+                    .map(str::to_string)
+            })
+            .collect();
+        names.sort();
+        names
+    }
+
+    #[test]
+    fn channel_filter_reads_exposure_policy_llm_channels() {
+        let mut registry = ToolRegistry::new();
+        registry.register(AllChannelsTool);
+        registry.register(DesktopOnlyTool);
+        let defs = registry.get_definitions();
+
+        let desktop = filter_defs_for_channel(&registry, &defs, Channel::Desktop);
+        let other = filter_defs_for_channel(&registry, &defs, Channel::Other);
+
+        assert_eq!(
+            def_names(&desktop),
+            vec!["all_channels".to_string(), "desktop_only".to_string()]
+        );
+        assert_eq!(def_names(&other), vec!["all_channels".to_string()]);
+        assert!(AllChannelsTool
+            .exposure_policy()
+            .llm_channels
+            .allows(Channel::Other));
+        assert!(!DesktopOnlyTool
+            .exposure_policy()
+            .llm_channels
+            .allows(Channel::Other));
     }
 }

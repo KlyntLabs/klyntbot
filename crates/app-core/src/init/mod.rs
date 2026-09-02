@@ -395,6 +395,7 @@ impl AppCore {
 
             host: host_result.host.clone(),
             assistant_runtime: std::sync::OnceLock::new(),
+            mcp_exposure: std::sync::OnceLock::new(),
         };
 
         // Run plugin post-init hooks now that AppCore is assembled.

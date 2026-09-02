@@ -3,10 +3,11 @@
 use std::collections::HashMap;
 
 use desktop_shared::commands::{
-    McpAddServerParams, McpConfigResponse, McpRemoveParams, McpServerResponse, McpToggleParams,
-    McpUpdateServerParams,
+    EmbeddedMcpRejection, EmbeddedMcpStatusResponse, McpAddServerParams, McpConfigResponse,
+    McpRemoveParams, McpServerResponse, McpToggleParams, McpUpdateServerParams,
 };
 use desktop_shared::errors::ApiError;
+use mcp::server::exposure::{ExposureValidation, RuntimeState};
 
 use crate::errors::map_config_save_err;
 use crate::state::AppCore;
@@ -51,6 +52,30 @@ pub fn build_mcp_response(cfg: &config::Config) -> McpConfigResponse {
     McpConfigResponse {
         enabled: cfg.mcp.enabled,
         servers: cfg.mcp.servers.iter().map(server_to_response).collect(),
+    }
+}
+
+/// Map stored [`ExposureValidation`] into the embedded-status DTO.
+pub fn embedded_status_from_validation(v: &ExposureValidation) -> EmbeddedMcpStatusResponse {
+    let mut effective: Vec<String> = v
+        .effective_builtins
+        .iter()
+        .map(|b| b.as_str().to_string())
+        .collect();
+    effective.extend(v.effective_registry_tools.iter().cloned());
+
+    EmbeddedMcpStatusResponse {
+        state: v.runtime_state.as_str().to_string(),
+        requested: v.requested.clone(),
+        effective,
+        rejected: v
+            .rejected
+            .iter()
+            .map(|r| EmbeddedMcpRejection {
+                name: r.name.clone(),
+                reason: r.reason.as_str().to_string(),
+            })
+            .collect(),
     }
 }
 
@@ -291,5 +316,89 @@ impl AppCore {
         }
 
         Ok(response)
+    }
+
+    /// Embedded MCP status DTO for settings UI (EXPO-5.*).
+    #[tracing::instrument(skip(self), err)]
+    pub async fn mcp_get_embedded_status(&self) -> Result<EmbeddedMcpStatusResponse, ApiError> {
+        let validation = self
+            .mcp_exposure()
+            .ok_or_else(|| ApiError::new("INTERNAL", "MCP exposure status not available yet"))?;
+        Ok(embedded_status_from_validation(validation))
+    }
+
+    /// Whether the embedded HTTP MCP server may bind (Ready only).
+    pub fn embedded_mcp_bind_allowed(&self) -> bool {
+        mcp_bind_allowed(self.mcp_exposure())
+    }
+}
+
+/// Ready-only gate for embedded HTTP MCP bind (EXPO-3.8 / EXPO-7.2).
+pub fn mcp_bind_allowed(validation: Option<&ExposureValidation>) -> bool {
+    validation.is_some_and(|v| v.runtime_state == RuntimeState::Ready)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use mcp::server::exposure::{BuiltinId, RejectedEntry, RejectionReason, RuntimeState};
+
+    fn sample(state: RuntimeState) -> ExposureValidation {
+        ExposureValidation {
+            runtime_state: state,
+            requested: vec!["tasks".into(), "bogus".into()],
+            effective_registry_tools: vec!["tasks".into()],
+            effective_builtins: vec![BuiltinId::GetStatus, BuiltinId::Agent],
+            rejected: if state == RuntimeState::Invalid {
+                vec![RejectedEntry {
+                    name: "bogus".into(),
+                    reason: RejectionReason::Unknown,
+                }]
+            } else {
+                vec![]
+            },
+        }
+    }
+
+    #[test]
+    fn dto_maps_ready_effective_and_empty_rejected() {
+        let dto = embedded_status_from_validation(&sample(RuntimeState::Ready));
+        assert_eq!(dto.state, "ready");
+        assert_eq!(dto.effective, vec!["get_status", "agent", "tasks"]);
+        assert!(dto.rejected.is_empty());
+        assert_eq!(dto.requested, vec!["tasks", "bogus"]);
+    }
+
+    #[test]
+    fn dto_maps_invalid_rejections() {
+        let dto = embedded_status_from_validation(&sample(RuntimeState::Invalid));
+        assert_eq!(dto.state, "invalid");
+        assert_eq!(dto.rejected.len(), 1);
+        assert_eq!(dto.rejected[0].name, "bogus");
+        assert_eq!(dto.rejected[0].reason, "unknown");
+    }
+
+    #[test]
+    fn dto_maps_disabled() {
+        let dto = embedded_status_from_validation(&sample(RuntimeState::Disabled));
+        assert_eq!(dto.state, "disabled");
+    }
+
+    #[test]
+    fn bind_allowed_ready_only() {
+        let cases = [
+            (Some(RuntimeState::Ready), true),
+            (Some(RuntimeState::Disabled), false),
+            (Some(RuntimeState::Invalid), false),
+            (None, false),
+        ];
+        for (state, expected) in cases {
+            let validation = state.map(sample);
+            assert_eq!(
+                mcp_bind_allowed(validation.as_ref()),
+                expected,
+                "state={state:?}"
+            );
+        }
     }
 }

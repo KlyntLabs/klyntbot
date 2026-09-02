@@ -1,9 +1,12 @@
 //! Tests for `#[derive(Tool)]` macro — generates Tool trait from ToolExecute + metadata.
 
 use async_trait::async_trait;
-use common::{ChannelName, ChatId};
+use common::{ChannelMask, ChannelName, ChatId};
 use serde_json::json;
-use tools_core::{RoutingContext, Tool as ToolTrait, ToolCategory, ToolExecute, ToolParams};
+use tools_core::{
+    ExposurePolicy, McpExposure, RoutingContext, Tool as ToolTrait, ToolCategory, ToolExecute,
+    ToolParams,
+};
 
 // ── Params ──────────────────────────────────────────────────
 
@@ -182,4 +185,79 @@ fn test_default_metadata_when_no_attributes() {
     let meta = tool.metadata();
     assert_eq!(meta.category, ToolCategory::General);
     assert!(meta.tags.is_empty());
+}
+
+// ── Exposure policy ─────────────────────────────────────────
+
+#[test]
+fn test_default_exposure_policy_is_all_false_forbidden() {
+    let tool = NoopTool;
+    let policy = tool.exposure_policy();
+    assert_eq!(policy, ExposurePolicy::default());
+    assert_eq!(policy.llm_channels, ChannelMask::ALL);
+    assert!(!policy.subagent);
+    assert_eq!(policy.mcp, McpExposure::Forbidden);
+    // Thin accessors match policy
+    assert_eq!(tool.allowed_channels(), policy.llm_channels);
+    assert_eq!(tool.subagent_visible(), policy.subagent);
+}
+
+#[derive(tools_core::Tool)]
+#[tool(
+    name = "exposed_echo",
+    description = "Echo with MCP Default",
+    params = "EchoParams",
+    mcp_exposure = "default",
+    subagent = "true",
+    allowed_channels = "desktop_only"
+)]
+pub struct ExposedEchoTool;
+
+#[async_trait]
+impl ToolExecute for ExposedEchoTool {
+    type Params = EchoParams;
+    type Ctx<'a> = ();
+
+    async fn execute<'c>(&self, params: EchoParams, _ctx: ()) -> common::Result<String> {
+        Ok(params.text)
+    }
+}
+
+#[test]
+fn test_derive_exposure_policy_overrides() {
+    let tool = ExposedEchoTool;
+    let policy = tool.exposure_policy();
+    assert_eq!(policy.llm_channels, ChannelMask::DESKTOP_ONLY);
+    assert!(policy.subagent);
+    assert_eq!(policy.mcp, McpExposure::Default);
+    assert_eq!(tool.allowed_channels(), ChannelMask::DESKTOP_ONLY);
+    assert!(tool.subagent_visible());
+}
+
+#[derive(tools_core::Tool)]
+#[tool(
+    name = "opt_in_tool",
+    description = "MCP OptIn only",
+    params = "NoParams",
+    mcp_exposure = "opt_in"
+)]
+pub struct OptInTool;
+
+#[async_trait]
+impl ToolExecute for OptInTool {
+    type Params = NoParams;
+    type Ctx<'a> = ();
+
+    async fn execute<'c>(&self, _params: NoParams, _ctx: ()) -> common::Result<String> {
+        Ok("ok".into())
+    }
+}
+
+#[test]
+fn test_derive_mcp_opt_in_keeps_channel_and_subagent_defaults() {
+    let tool = OptInTool;
+    let policy = tool.exposure_policy();
+    assert_eq!(policy.mcp, McpExposure::OptIn);
+    assert_eq!(policy.llm_channels, ChannelMask::ALL);
+    assert!(!policy.subagent);
 }

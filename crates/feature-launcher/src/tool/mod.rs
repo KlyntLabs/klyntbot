@@ -33,7 +33,8 @@ impl LauncherTool {
     description = "Search and execute launcher items: apps, scripts, files, system commands, window layouts, browser bookmarks, contacts, and more.",
     category = "System",
     tags = "launcher,search,apps,files,commands",
-    cost = "Free"
+    cost = "Free",
+    mcp_exposure = "default"
 )]
 impl LauncherTool {
     #[action(name = "search")]
@@ -97,6 +98,7 @@ fn parse_window_action(s: &str) -> Result<WindowAction> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tools_core::{McpExposure, Tool};
 
     #[test]
     fn parse_basic_actions() {
@@ -109,5 +111,21 @@ mod tests {
             WindowAction::Preset(_)
         ));
         assert!(parse_window_action("garbage").is_err());
+    }
+
+    #[tokio::test]
+    async fn historical_mcp_default() {
+        let pool = storage::StoragePool::connect_in_memory().await.unwrap();
+        let tool = LauncherTool::new(
+            Arc::new(SourceRegistry::new(vec![])),
+            Arc::new(FrequencyRepo::new(pool.inner().clone())),
+            Arc::new(PinsRepo::new(&pool)),
+        );
+        let policy = tool.exposure_policy();
+        assert_eq!(tool.name(), "launcher");
+        assert_eq!(policy.mcp, McpExposure::Default);
+        assert!(!policy.subagent);
+        assert_eq!(tool.allowed_channels(), policy.llm_channels);
+        assert!(!tool.subagent_visible());
     }
 }

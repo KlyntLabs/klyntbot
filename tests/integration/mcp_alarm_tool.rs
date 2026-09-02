@@ -1,12 +1,9 @@
-//! MCP smoke test — verifies that the merged `klyntbot mcp tools --list`
-//! subcommand lists the expected tools.
+//! MCP smoke test — verifies that `klyntbot mcp tools --list` boots the live
+//! ToolRegistry, runs shared exposure validation, and lists effective tools.
 //!
 //! **Alarm tool gap (deferred):** No `AlarmTool` has been wired into the MCP
-//! tool registry yet; `"alarm"` does not appear in `default_exposed_tools()`.
-//! Until an AlarmTool is built and registered this test instead asserts the
-//! presence of `"cron"` (the scheduling-adjacent tool that is exposed) and
-//! `"tasks"` (core task tool).  A TODO marks the alarm assertion so it can be
-//! uncommented when AlarmTool lands.
+//! tool registry yet. Until an AlarmTool is built and registered this test
+//! asserts `"cron"` / `"tasks"` (MCP Default registry tools) plus builtins.
 
 /// Resolve the path to the `desktop` binary built by the `desktop` crate.
 /// Cargo places integration test binaries in `target/debug/deps/`; the desktop
@@ -43,7 +40,19 @@ fn mcp_tools_list_exits_successfully() {
 
     let stdout = String::from_utf8_lossy(&out.stdout);
 
-    // Core tools that must always be present.
+    assert!(
+        stdout.contains("runtime_state:"),
+        "diagnostic missing runtime_state:\n{stdout}"
+    );
+    assert!(
+        stdout.contains("get_status"),
+        "\"get_status\" builtin missing from MCP output:\n{stdout}"
+    );
+    assert!(
+        stdout.contains("agent"),
+        "\"agent\" builtin missing from MCP default output:\n{stdout}"
+    );
+    // Core registry tools that must be present under auto-default.
     assert!(
         stdout.contains("tasks"),
         "\"tasks\" tool missing from MCP output:\n{stdout}"
@@ -53,11 +62,9 @@ fn mcp_tools_list_exits_successfully() {
         "\"cron\" tool missing from MCP output:\n{stdout}"
     );
 
-    // TODO(alarm-tool): uncomment once AlarmTool is built and registered in
-    // `default_exposed_tools()` in `crates/config/src/schema/mcp.rs`:
-    //
-    // assert!(
-    //     stdout.contains("alarm"),
-    //     "\"alarm\" tool missing from MCP output:\n{stdout}"
-    // );
+    // Legacy AiFeature∪allowlist reconstruction must be gone.
+    assert!(
+        !stdout.contains("AiFeature"),
+        "diagnostic must not reconstruct AiFeature allowlist:\n{stdout}"
+    );
 }

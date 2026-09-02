@@ -3,6 +3,7 @@ import { useMutation } from "@shared/hooks/useMutation";
 import { useQuery } from "@shared/hooks/useQuery";
 import { useToastContext } from "@shared/hooks/useToast";
 import type {
+  EmbeddedMcpStatusResponse,
   McpAddServerParams,
   McpConfigResponse,
   McpServerConfig,
@@ -13,6 +14,7 @@ import type {
 import { Plug, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AddServerDialog } from "../components/mcp/AddServerDialog";
+import { EmbeddedMcpStatusSection } from "../components/mcp/EmbeddedMcpStatusSection";
 import { CustomServerCard, RecommendedServerCard } from "../components/mcp/McpServerCard";
 import { recommendedServers } from "../components/mcp/recommendedServers";
 
@@ -22,6 +24,10 @@ export function McpServersSettings() {
     enabled: true,
     servers: [],
   });
+  const { data: embeddedStatus, loading: embeddedLoading } = useQuery<EmbeddedMcpStatusResponse>(
+    "mcp_get_embedded_status",
+    undefined,
+  );
 
   const { mutate: addServer } = useMutation<McpConfigResponse, McpAddServerParams>(
     "mcp_add_server",
@@ -192,6 +198,8 @@ export function McpServersSettings() {
           Connect external tools and data sources via the Model Context Protocol
         </p>
       </div>
+
+      <EmbeddedMcpStatusSection status={embeddedStatus ?? null} loading={embeddedLoading} />
 
       {/* Custom servers */}
       <div className="mb-8">

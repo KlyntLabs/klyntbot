@@ -603,8 +603,11 @@ impl Tool for ProductivityTool {
         "productivity"
     }
 
-    fn allowed_channels(&self) -> common::ChannelMask {
-        common::ChannelMask::ALL
+    fn exposure_policy(&self) -> tools_core::ExposurePolicy {
+        tools_core::ExposurePolicy {
+            mcp: tools_core::McpExposure::Default,
+            ..Default::default()
+        }
     }
 
     fn description(&self) -> &str {
@@ -821,4 +824,35 @@ fn format_summary(summary: &crate::types::DailySummary) -> String {
         lines.push(format!("\nProductivity score: {:.0}/100", score));
     }
     lines.join("\n")
+}
+
+#[cfg(test)]
+mod exposure_tests {
+    use super::*;
+    use crate::config::FocusConfig;
+    use crate::repos::ProductivityRepos;
+    use tools_core::McpExposure;
+
+    async fn setup_tool() -> ProductivityTool {
+        let pool = storage::StoragePool::connect_in_memory().await.unwrap();
+        let inner = pool.inner().clone();
+        storage::StoragePool::run_feature_migrations(&inner, &crate::productivity_migrations())
+            .await
+            .unwrap();
+        let repos = ProductivityRepos::new(inner);
+        let focus_manager = Arc::new(FocusManager::new(repos.clone(), FocusConfig::default()));
+        let aggregator = Arc::new(DailyAggregator::new(repos.clone()));
+        ProductivityTool::new(repos, focus_manager, aggregator)
+    }
+
+    #[tokio::test]
+    async fn historical_mcp_default() {
+        let tool = setup_tool().await;
+        let policy = tool.exposure_policy();
+        assert_eq!(tool.name(), "productivity");
+        assert_eq!(policy.mcp, McpExposure::Default);
+        assert!(!policy.subagent);
+        assert_eq!(tool.allowed_channels(), policy.llm_channels);
+        assert!(!tool.subagent_visible());
+    }
 }

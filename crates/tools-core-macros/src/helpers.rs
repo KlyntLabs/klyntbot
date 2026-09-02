@@ -423,6 +423,55 @@ pub fn collect_field_tokens(
     Ok((schema_properties, required_fields, from_value_fields))
 }
 
+/// Generate `exposure_policy()` when any exposure axis attr is set.
+///
+/// Channel literals: `"all"` | `"desktop_only"`.
+/// MCP literals: `"default"` | `"opt_in"` | `"forbidden"`.
+/// Returns empty TokenStream when all axes are unspecified (trait default applies).
+pub fn gen_exposure_policy_impl(
+    allowed_channels: Option<&str>,
+    subagent: Option<bool>,
+    mcp_exposure: Option<&str>,
+    attr_name: &str,
+) -> proc_macro2::TokenStream {
+    if allowed_channels.is_none() && subagent.is_none() && mcp_exposure.is_none() {
+        return quote! {};
+    }
+
+    let channels_expr = match allowed_channels {
+        Some("desktop_only") => quote! { ::common::ChannelMask::DESKTOP_ONLY },
+        Some("all") | None => quote! { ::common::ChannelMask::ALL },
+        Some(other) => panic!(
+            "#[{attr_name}(allowed_channels = \"{other}\")] is invalid. Use \"all\" or \"desktop_only\""
+        ),
+    };
+
+    let subagent_expr = match subagent {
+        Some(true) => quote! { true },
+        Some(false) | None => quote! { false },
+    };
+
+    let mcp_expr = match mcp_exposure {
+        Some("default") => quote! { ::tools_core::McpExposure::Default },
+        Some("opt_in") => quote! { ::tools_core::McpExposure::OptIn },
+        Some("forbidden") => quote! { ::tools_core::McpExposure::Forbidden },
+        None => quote! { ::tools_core::McpExposure::Forbidden },
+        Some(other) => panic!(
+            "#[{attr_name}(mcp_exposure = \"{other}\")] is invalid. Use \"default\", \"opt_in\", or \"forbidden\""
+        ),
+    };
+
+    quote! {
+        fn exposure_policy(&self) -> ::tools_core::ExposurePolicy {
+            ::tools_core::ExposurePolicy {
+                llm_channels: #channels_expr,
+                subagent: #subagent_expr,
+                mcp: #mcp_expr,
+            }
+        }
+    }
+}
+
 /// Generate the `metadata()` method TokenStream from optional category, tags, cost strings.
 /// Returns empty TokenStream if no metadata attributes are provided.
 pub fn gen_metadata_impl(

@@ -260,31 +260,204 @@ impl AppCorePlugin for AiPipelinePlugin {
     }
 
     async fn post_init(&self, app: &AppCore) -> common::Result<()> {
-        // Post-load fill: if the user hasn't overridden exposed_tools, derive it
-        // from the registry so new features are auto-exposed without config edits.
-        let mut config = app.config.write().await;
-        if config.mcp.server.exposed_tools.is_empty() {
-            let registry = app
-                .host
-                .get::<ai_core::AiFeatureRegistry>()
-                .expect("feature registry built");
-            let mut tools: Vec<String> = registry
-                .tool_names()
-                .into_iter()
-                .map(|s| s.to_string())
-                .collect();
-            tools.extend(
-                config::schema::EXPLICIT_TOOL_ALLOWLIST
-                    .iter()
-                    .map(|s| s.to_string()),
-            );
-            config.mcp.server.exposed_tools = tools;
-            config.mcp.server.exposed_tools_auto_filled = true;
-            tracing::info!(
-                tools = ?config.mcp.server.exposed_tools,
-                "mcp exposed_tools auto-filled from AiFeatureRegistry"
-            );
+        // Derive MCP defaults from live agent ToolRegistry policy (not AiFeature∪allowlist).
+        let registry = app.agent.tool_registry();
+        let registry_guard = registry.read().await;
+
+        // `exposed_tools_auto_filled` is skip_serializing (always false on load);
+        // cutover sets the flag when it fills an empty override.
+        let (server_enabled, mut exposed_tools) = {
+            let config = app.config.read().await;
+            (
+                config.mcp.server.enabled,
+                config.mcp.server.exposed_tools.clone(),
+            )
+        };
+        let mut auto_filled = false;
+
+        let validation = apply_mcp_exposure_cutover(
+            &*registry_guard,
+            server_enabled,
+            &mut exposed_tools,
+            &mut auto_filled,
+        );
+        drop(registry_guard);
+
+        {
+            let mut config = app.config.write().await;
+            if auto_filled {
+                config.mcp.server.exposed_tools = exposed_tools;
+                config.mcp.server.exposed_tools_auto_filled = true;
+            }
+        }
+
+        match validation.runtime_state {
+            mcp::server::exposure::RuntimeState::Ready => {
+                tracing::info!(
+                    tools = ?validation.effective_registry_tools,
+                    builtins = ?validation
+                        .effective_builtins
+                        .iter()
+                        .map(|b| b.as_str())
+                        .collect::<Vec<_>>(),
+                    "mcp exposure Ready (policy-derived from ToolRegistry)"
+                );
+            }
+            mcp::server::exposure::RuntimeState::Disabled => {
+                tracing::info!("mcp exposure Disabled (server.enabled = false)");
+            }
+            mcp::server::exposure::RuntimeState::Invalid => {
+                // Keep the desktop process up; only the MCP subsystem is invalid.
+                tracing::warn!(
+                    rejected = ?validation.rejected,
+                    "mcp exposure Invalid; leaving exposed_tools override untouched"
+                );
+            }
+        }
+
+        if app.mcp_exposure.set(validation).is_err() {
+            tracing::warn!("mcp_exposure status already set; ignoring duplicate post_init");
         }
         Ok(())
+    }
+}
+
+/// Validate MCP exposure and auto-fill empty overrides when Ready.
+///
+/// Always returns the full [`ExposureValidation`]. When the override list is
+/// empty and the result is Ready, writes `effective_registry_tools` into
+/// `exposed_tools` and sets `auto_filled`. Invalid overrides are left untouched.
+pub fn apply_mcp_exposure_cutover(
+    registry: &tools_core::ToolRegistry,
+    server_enabled: bool,
+    exposed_tools: &mut Vec<String>,
+    auto_filled: &mut bool,
+) -> mcp::server::exposure::ExposureValidation {
+    use mcp::server::exposure::{validate_mcp_exposure, ExposureInput, RuntimeState};
+
+    let override_empty = exposed_tools.is_empty();
+    let validation = validate_mcp_exposure(ExposureInput {
+        registry,
+        server_enabled,
+        override_tools: if override_empty {
+            None
+        } else {
+            Some(exposed_tools.as_slice())
+        },
+    });
+
+    if override_empty && validation.runtime_state == RuntimeState::Ready {
+        *exposed_tools = validation.effective_registry_tools.clone();
+        *auto_filled = true;
+    }
+
+    validation
+}
+
+#[cfg(test)]
+mod cutover_tests {
+    use super::apply_mcp_exposure_cutover;
+    use async_trait::async_trait;
+    use mcp::server::exposure::{RejectionReason, RuntimeState};
+    use serde_json::{json, Value};
+    use tools_core::{ExposurePolicy, McpExposure, RoutingContext, Tool, ToolRegistry};
+
+    struct NamedTool {
+        name: &'static str,
+        mcp: McpExposure,
+    }
+
+    #[async_trait]
+    impl Tool for NamedTool {
+        fn name(&self) -> &str {
+            self.name
+        }
+        fn description(&self) -> &str {
+            "test"
+        }
+        fn parameters(&self) -> Value {
+            json!({"type": "object"})
+        }
+        async fn execute(&self, _args: Value, _ctx: &RoutingContext) -> common::Result<String> {
+            Ok("ok".into())
+        }
+        fn exposure_policy(&self) -> ExposurePolicy {
+            ExposurePolicy {
+                mcp: self.mcp,
+                ..Default::default()
+            }
+        }
+    }
+
+    fn registry_with(tools: &[(&'static str, McpExposure)]) -> ToolRegistry {
+        let mut reg = ToolRegistry::new();
+        for (name, mcp) in tools {
+            reg.register(NamedTool {
+                name,
+                mcp: *mcp,
+            });
+        }
+        reg
+    }
+
+    #[test]
+    fn empty_override_ready_fills_defaults_only() {
+        let reg = registry_with(&[
+            ("tasks", McpExposure::Default),
+            ("shell", McpExposure::Forbidden),
+        ]);
+        let mut exposed = Vec::new();
+        let mut auto = false;
+        let v = apply_mcp_exposure_cutover(&reg, true, &mut exposed, &mut auto);
+        assert_eq!(v.runtime_state, RuntimeState::Ready);
+        assert!(auto);
+        assert_eq!(exposed, vec!["tasks".to_string()]);
+        assert!(!exposed.iter().any(|n| n == "shell" || n == "agent"));
+    }
+
+    #[test]
+    fn empty_override_disabled_does_not_fill() {
+        let reg = registry_with(&[("tasks", McpExposure::Default)]);
+        let mut exposed = Vec::new();
+        let mut auto = false;
+        let v = apply_mcp_exposure_cutover(&reg, false, &mut exposed, &mut auto);
+        assert_eq!(v.runtime_state, RuntimeState::Disabled);
+        assert!(!auto);
+        assert!(exposed.is_empty());
+        assert_eq!(v.effective_registry_tools, vec!["tasks".to_string()]);
+    }
+
+    #[test]
+    fn invalid_override_left_untouched_and_does_not_exit() {
+        let reg = registry_with(&[
+            ("tasks", McpExposure::Default),
+            ("shell", McpExposure::Forbidden),
+        ]);
+        let original = vec!["tasks".into(), "shell".into(), "ghost".into()];
+        let mut exposed = original.clone();
+        let mut auto = false;
+        let v = apply_mcp_exposure_cutover(&reg, true, &mut exposed, &mut auto);
+        assert_eq!(v.runtime_state, RuntimeState::Invalid);
+        assert!(!auto);
+        assert_eq!(exposed, original);
+        assert!(v
+            .rejected
+            .iter()
+            .any(|r| r.name == "shell" && r.reason == RejectionReason::Forbidden));
+        assert!(v
+            .rejected
+            .iter()
+            .any(|r| r.name == "ghost" && r.reason == RejectionReason::Unknown));
+    }
+
+    #[test]
+    fn non_empty_valid_override_preserved() {
+        let reg = registry_with(&[("tasks", McpExposure::Default)]);
+        let mut exposed = vec!["tasks".into()];
+        let mut auto = false;
+        let v = apply_mcp_exposure_cutover(&reg, true, &mut exposed, &mut auto);
+        assert_eq!(v.runtime_state, RuntimeState::Ready);
+        assert!(!auto);
+        assert_eq!(exposed, vec!["tasks".to_string()]);
     }
 }

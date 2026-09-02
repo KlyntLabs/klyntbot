@@ -413,6 +413,7 @@ desktop_macros::klynt_collect_commands![
     crate::commands::settings::config_mark_setup_completed,
     crate::commands::settings::config_update_section,
     crate::commands::settings::mcp_get_config,
+    crate::commands::settings::mcp_get_embedded_status,
     crate::commands::settings::mcp_add_server,
     crate::commands::settings::mcp_remove_server,
     crate::commands::settings::mcp_toggle_server,

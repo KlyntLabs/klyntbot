@@ -571,10 +571,10 @@ impl AgentLoopBuilder {
             },
         ));
 
-        // Project `subagent_visible` domain tools (e.g. memory) from the main
-        // agent's registry into spawned subagents. Wired here — once the registry
-        // is `Arc`-wrapped — rather than via a post-init setter, so the subagent
-        // manager is fully resolved by the time the AgentLoop is returned.
+        // Project `exposure_policy().subagent` domain tools (e.g. memory) from the
+        // main agent's registry into spawned subagents. Wired here — once the
+        // registry is `Arc`-wrapped — rather than via a post-init setter, so the
+        // subagent manager is fully resolved by the time the AgentLoop is returned.
         subagent_manager.set_parent_registry(Arc::clone(&tool_registry));
 
         // Session cleanup and memory maintenance are handled by CronService

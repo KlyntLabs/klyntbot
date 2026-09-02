@@ -21,8 +21,11 @@ impl Tool for LanguagePracticeTool {
         "language_practice"
     }
 
-    fn allowed_channels(&self) -> common::ChannelMask {
-        common::ChannelMask::ALL
+    fn exposure_policy(&self) -> tools_core::ExposurePolicy {
+        tools_core::ExposurePolicy {
+            mcp: tools_core::McpExposure::Default,
+            ..Default::default()
+        }
     }
 
     fn description(&self) -> &str {
@@ -119,5 +122,22 @@ impl Tool for LanguagePracticeTool {
             Some("start_session" | "end_session" | "log_exam") => ApprovalClass::Sensitive,
             _ => ApprovalClass::Safe,
         }
+    }
+}
+
+#[cfg(test)]
+mod exposure_tests {
+    use super::*;
+    use tools_core::McpExposure;
+
+    #[test]
+    fn historical_mcp_default() {
+        let tool = LanguagePracticeTool::new();
+        let policy = tool.exposure_policy();
+        assert_eq!(tool.name(), "language_practice");
+        assert_eq!(policy.mcp, McpExposure::Default);
+        assert!(!policy.subagent);
+        assert_eq!(tool.allowed_channels(), policy.llm_channels);
+        assert!(!tool.subagent_visible());
     }
 }

@@ -9,6 +9,7 @@
 pub mod approval_class;
 pub mod config_persistence;
 pub mod events;
+pub mod exposure;
 pub mod feature;
 pub mod interceptor;
 pub mod job_supervisor;
@@ -28,6 +29,9 @@ pub use tools_core_macros::{tool_actions, ActionParams, DomainEnum, Tool, ToolPa
 
 pub use config_persistence::ConfigPersistence;
 pub use events::ToolEvent;
+pub use exposure::{
+    ExposurePolicy, McpExposure, EXPO_23_FORBIDDEN_STUB_TOOLS, HISTORICAL_MCP_DEFAULT_TOOLS,
+};
 pub use feature::{FeatureMigration, FeaturePackage, HealthStatus};
 pub use interceptor::{InterceptorChain, ToolCallInterceptor};
 pub use job_supervisor::{
@@ -124,21 +128,34 @@ pub trait Tool: Send + Sync {
         false
     }
 
-    /// Channels in which this tool is visible to the LLM. Default = ALL.
+    /// Cohesive exposure policy (LLM channels, subagent projection, MCP).
+    ///
+    /// Defaults: all channels, not subagent-visible, MCP Forbidden.
+    /// Override this method (or `#[tool(...)]` / `#[tool_actions(...)]` attrs)
+    /// rather than overriding the thin accessors below.
+    fn exposure_policy(&self) -> crate::ExposurePolicy {
+        crate::ExposurePolicy::default()
+    }
+
+    /// Channels in which this tool is visible to the LLM.
+    ///
+    /// Thin accessor over [`Self::exposure_policy`]. Prefer overriding
+    /// `exposure_policy` rather than this method.
     fn allowed_channels(&self) -> common::ChannelMask {
-        common::ChannelMask::ALL
+        self.exposure_policy().llm_channels
     }
 
     /// Whether this tool is projected into autonomous subagents' toolkits.
     ///
-    /// Default `false`: a spawned subagent gets only the filesystem primitives
-    /// and recall stubs built by `ToolKitBuilder`. A *cwd-independent* domain
-    /// tool (e.g. `memory`) opts in here to also be available to subagents,
-    /// projected from the parent agent's registry at spawn time. Tools that
-    /// hold workspace-scoped state (the primitives) must NOT opt in — they are
-    /// rebuilt per-subagent with the subagent's own cwd.
+    /// Thin accessor over [`Self::exposure_policy`]. Default `false`: a
+    /// spawned subagent gets only the filesystem primitives and recall stubs
+    /// built by `ToolKitBuilder`. A *cwd-independent* domain tool (e.g.
+    /// `memory`) opts in via `exposure_policy().subagent` to also be available
+    /// to subagents, projected from the parent agent's registry at spawn time.
+    /// Tools that hold workspace-scoped state (the primitives) must NOT opt
+    /// in — they are rebuilt per-subagent with the subagent's own cwd.
     fn subagent_visible(&self) -> bool {
-        false
+        self.exposure_policy().subagent
     }
 
     /// Optional per-tool timeout override.

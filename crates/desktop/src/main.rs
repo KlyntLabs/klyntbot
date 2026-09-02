@@ -157,8 +157,9 @@ fn run_mcp_stdio() {
         .build()
         .expect("Failed to create tokio runtime");
     rt.block_on(async {
-        // Read whitelist from AppCore's finalised config (auto-filled from
-        // AiFeatureRegistry when the user leaves exposed_tools empty).
+        // Boot AppCore; MCP exposure is validated in AI pipeline post_init and
+        // stored on AppCore. Handler advertises effective registry tools +
+        // BuiltinId set (get_status always; agent when selected).
         let config = config::load_with_env_overrides()
             .await
             .expect("config load failed");
@@ -184,27 +185,12 @@ fn run_mcp_stdio() {
         .expect("init failed");
         let app = Arc::new(app);
 
-        // Drain unused EventChannels — both receivers must close before task exits.
-        tokio::spawn(async move {
-            let mut intervention_rx = events.intervention_rx;
-            let mut pipeline_rx = events.pipeline_rx;
-            let mut intervention_closed = false;
-            let mut pipeline_closed = false;
-            while !intervention_closed || !pipeline_closed {
-                tokio::select! {
-                    msg = intervention_rx.recv(), if !intervention_closed => {
-                        if msg.is_none() { intervention_closed = true; }
-                    }
-                    result = pipeline_rx.recv(), if !pipeline_closed => {
-                        if result.is_err() { pipeline_closed = true; }
-                    }
-                }
-            }
-        });
+        events.spawn_background_drain();
 
-        let whitelist = app.config.read().await.mcp.server.exposed_tools.clone();
-        if let Err(e) = klyntbot_server::serve_stdio(app, whitelist).await {
+        // Invalid exposure → unsuccessful exit (EXPO-3.9); MCP is this process's sole purpose.
+        if let Err(e) = klyntbot_server::serve_stdio(app).await {
             tracing::error!("MCP serve failed: {e}");
+            std::process::exit(1);
         }
     });
 }
@@ -303,19 +289,31 @@ fn run_desktop_app() {
                 let _global_event_tx = global_event_tx;
             }
 
-            // Start embedded MCP HTTP server if enabled in config.
-            // Must clone before app.manage(core) moves the Arc.
+            // Start embedded MCP HTTP server only when AppCore status is Ready
+            // (EXPO-3.8 / EXPO-5.* / EXPO-8.10). Invalid/Disabled must not bind.
             {
                 let mcp_core = Arc::clone(&core);
-                let enabled = tauri::async_runtime::block_on(async {
-                    mcp_core.config.read().await.mcp.server.enabled
-                });
-                if enabled {
+                if !mcp_core.embedded_mcp_bind_allowed() {
+                    let state = mcp_core
+                        .mcp_exposure()
+                        .map(|v| v.runtime_state.as_str())
+                        .unwrap_or("missing");
+                    tracing::info!(
+                        runtime_state = state,
+                        "embedded MCP HTTP server not started (Ready required)"
+                    );
+                } else {
+                    // Ready gate above implies mcp_exposure is present.
+                    let exposure = Arc::new(
+                        mcp_core
+                            .mcp_exposure()
+                            .expect("embedded_mcp_bind_allowed requires mcp_exposure")
+                            .clone(),
+                    );
                     tauri::async_runtime::spawn(async move {
                         let config = mcp_core.config.read().await;
                         let host = config.mcp.server.host.clone();
                         let port = config.mcp.server.port;
-                        let whitelist = config.mcp.server.exposed_tools.clone();
                         let auth_config = config.mcp.server.auth.clone();
                         drop(config);
 
@@ -341,7 +339,7 @@ fn run_desktop_app() {
                             move || {
                                 Ok(klyntbot_server::KlyntbotServerHandler::new(
                                     factory_app.clone(),
-                                    whitelist.clone(),
+                                    exposure.as_ref(),
                                 ))
                             },
                             std::sync::Arc::new(LocalSessionManager::default()),

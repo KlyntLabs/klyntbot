@@ -15,6 +15,9 @@ pub fn expand(attr: TokenStream, item: TokenStream) -> TokenStream {
     let mut category: Option<String> = None;
     let mut tags: Option<String> = None;
     let mut cost: Option<String> = None;
+    let mut allowed_channels: Option<String> = None;
+    let mut subagent: Option<bool> = None;
+    let mut mcp_exposure: Option<String> = None;
     // Optional narrow context view (ADR-0002). When set (e.g. `ctx = "()"`),
     // the generated `execute` projects `&RoutingContext` into this view via
     // `FromRoutingContext` and passes it to each action handler. When absent,
@@ -39,6 +42,19 @@ pub fn expand(attr: TokenStream, item: TokenStream) -> TokenStream {
             tags = Some(val);
         } else if nv.path.is_ident("cost") {
             cost = Some(val);
+        } else if nv.path.is_ident("allowed_channels") {
+            allowed_channels = Some(val);
+        } else if nv.path.is_ident("subagent") {
+            subagent = Some(match val.as_str() {
+                "true" | "1" => true,
+                "false" | "0" => false,
+                other => panic!(
+                    "#[tool_actions(subagent = \"{}\")] is invalid. Use \"true\" or \"false\"",
+                    other
+                ),
+            });
+        } else if nv.path.is_ident("mcp_exposure") {
+            mcp_exposure = Some(val);
         }
     }
 
@@ -192,6 +208,12 @@ pub fn expand(attr: TokenStream, item: TokenStream) -> TokenStream {
         .collect();
 
     let metadata_impl = crate::helpers::gen_metadata_impl(&category, &tags, &cost);
+    let exposure_policy_impl = crate::helpers::gen_exposure_policy_impl(
+        allowed_channels.as_deref(),
+        subagent,
+        mcp_exposure.as_deref(),
+        "tool_actions",
+    );
 
     let expanded = quote! {
         impl #self_ty {
@@ -209,6 +231,7 @@ pub fn expand(attr: TokenStream, item: TokenStream) -> TokenStream {
             }
 
             #metadata_impl
+            #exposure_policy_impl
 
             fn parameters(&self) -> ::serde_json::Value {
                 let mut merged_properties = ::serde_json::Map::new();

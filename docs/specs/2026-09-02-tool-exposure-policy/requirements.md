@@ -1,7 +1,7 @@
 # Requirements: Tool exposure policy
 
 Feature code: EXPO
-Status: Approved
+Status: In-progress
 Date: 2026-09-02
 
 ## 1. Declare cohesive exposure policy on a tool
