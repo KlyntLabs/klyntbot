@@ -129,8 +129,13 @@ impl Tool for MemoryTool {
     /// Projected into subagents: memory/recall operates on shared backing
     /// services (recall handler, embedding store) with no main-agent-specific
     /// mutable state, so autonomous subagents share the same memory backend.
-    fn subagent_visible(&self) -> bool {
-        true
+    /// Historical MCP Default (EXPO).
+    fn exposure_policy(&self) -> tools_core::ExposurePolicy {
+        tools_core::ExposurePolicy {
+            subagent: true,
+            mcp: tools_core::McpExposure::Default,
+            ..Default::default()
+        }
     }
 
     fn description(&self) -> &str {

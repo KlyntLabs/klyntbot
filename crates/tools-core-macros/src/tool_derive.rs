@@ -7,6 +7,9 @@
 //! - Optional: `category = "FileSystem"` — maps to ToolCategory enum
 //! - Optional: `tags = "file,read,content"` — comma-separated tags
 //! - Optional: `cost = "Free"` — maps to CostHint enum
+//! - Optional: `allowed_channels = "all"|"desktop_only"` — maps into ExposurePolicy
+//! - Optional: `subagent = "true"|"false"` — maps into ExposurePolicy
+//! - Optional: `mcp_exposure = "default"|"opt_in"|"forbidden"` — maps into ExposurePolicy
 //! - The struct must also implement `ToolExecute<Params = ParamsType>`
 //!
 //! Generates the full `tools_core::Tool` implementation bridging the
@@ -22,7 +25,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
     let name = &input.ident;
 
     // Parse #[tool(name = "...", description = "...", params = "...", permission = "...",
-    //              category = "...", tags = "...", cost = "...")]
+    //              category = "...", tags = "...", cost = "...", mcp_exposure = "...", ...)]
     let mut tool_name: Option<String> = None;
     let mut tool_description: Option<String> = None;
     let mut params_type: Option<syn::Ident> = None;
@@ -31,6 +34,8 @@ pub fn derive(input: TokenStream) -> TokenStream {
     let mut cost: Option<String> = None;
     let mut concurrency_safe: Option<bool> = None;
     let mut allowed_channels: Option<String> = None;
+    let mut subagent: Option<bool> = None;
+    let mut mcp_exposure: Option<String> = None;
     let mut custom_timeout_secs: Option<u64> = None;
     let mut approval_class: Option<String> = None;
     let mut approval_scope: Option<String> = None;
@@ -74,6 +79,19 @@ pub fn derive(input: TokenStream) -> TokenStream {
                             }
                         } else if nv.path.is_ident("allowed_channels") {
                             allowed_channels = expect_str_lit(nv);
+                        } else if nv.path.is_ident("subagent") {
+                            if let Some(s) = expect_str_lit(nv) {
+                                subagent = Some(match s.as_str() {
+                                    "true" | "1" => true,
+                                    "false" | "0" => false,
+                                    other => panic!(
+                                        "#[tool(subagent = \"{}\")] is invalid. Use \"true\" or \"false\"",
+                                        other
+                                    ),
+                                });
+                            }
+                        } else if nv.path.is_ident("mcp_exposure") {
+                            mcp_exposure = expect_str_lit(nv);
                         } else if nv.path.is_ident("custom_timeout_secs") {
                             if let Some(s) = expect_str_lit(nv) {
                                 custom_timeout_secs = Some(s.parse().unwrap_or_else(|_| {
@@ -107,23 +125,12 @@ pub fn derive(input: TokenStream) -> TokenStream {
         _ => quote! {},
     };
 
-    let allowed_channels_impl = if let Some(channels) = allowed_channels {
-        let mask_expr = match channels.as_str() {
-            "desktop_only" => quote! { ::common::ChannelMask::DESKTOP_ONLY },
-            "all" => quote! { ::common::ChannelMask::ALL },
-            other => panic!(
-                "#[tool(allowed_channels = \"{}\")] is invalid. Use \"all\" or \"desktop_only\"",
-                other
-            ),
-        };
-        quote! {
-            fn allowed_channels(&self) -> ::common::ChannelMask {
-                #mask_expr
-            }
-        }
-    } else {
-        quote! {}
-    };
+    let exposure_policy_impl = crate::helpers::gen_exposure_policy_impl(
+        allowed_channels.as_deref(),
+        subagent,
+        mcp_exposure.as_deref(),
+        "tool",
+    );
 
     let custom_timeout_impl = if let Some(secs) = custom_timeout_secs {
         quote! {
@@ -200,7 +207,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
 
             #metadata_impl
             #concurrency_impl
-            #allowed_channels_impl
+            #exposure_policy_impl
             #custom_timeout_impl
             #approval_class_impl
             #approval_scope_impl

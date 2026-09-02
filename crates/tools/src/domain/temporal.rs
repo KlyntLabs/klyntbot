@@ -81,7 +81,8 @@ impl TemporalTool {
     description = "Time-oriented queries over the knowledge graph. Query fact history, find when something was first mentioned, compare knowledge states across time, and discover decision points where beliefs changed.",
     category = "Memory",
     tags = "temporal,history,memory,facts,timeline,change",
-    cost = "Free"
+    cost = "Free",
+    mcp_exposure = "default"
 )]
 impl TemporalTool {
     /// Return the state of a fact at a specific point in time.

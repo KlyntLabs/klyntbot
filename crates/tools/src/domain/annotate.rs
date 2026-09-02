@@ -90,7 +90,8 @@ impl AnnotateTool {
     description = "Add metadata annotations to internal system entities (tools, facts, rules, skills). For user-facing notes, use the 'notes' tool instead.",
     category = "Memory",
     tags = "annotation,note,gotcha",
-    cost = "Free"
+    cost = "Free",
+    mcp_exposure = "default"
 )]
 impl AnnotateTool {
     #[action(name = "create")]

@@ -33,7 +33,8 @@ impl LauncherTool {
     description = "Search and execute launcher items: apps, scripts, files, system commands, window layouts, browser bookmarks, contacts, and more.",
     category = "System",
     tags = "launcher,search,apps,files,commands",
-    cost = "Free"
+    cost = "Free",
+    mcp_exposure = "default"
 )]
 impl LauncherTool {
     #[action(name = "search")]

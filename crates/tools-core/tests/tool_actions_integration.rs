@@ -1,8 +1,10 @@
 //! Integration tests for `#[tool_actions]` attribute macro (AC 2.4).
 
-use common::{ChannelName, ChatId};
+use common::{ChannelMask, ChannelName, ChatId};
 use serde_json::json;
-use tools_core::{tool_actions, ActionParams, RoutingContext, Tool};
+use tools_core::{
+    tool_actions, ActionParams, ExposurePolicy, McpExposure, RoutingContext, Tool,
+};
 
 // --- Param structs ---
 
@@ -153,4 +155,49 @@ async fn test_null_action_field_returns_error() {
     let tool = TestTool;
     let result = tool.execute(json!({"action": null}), &ctx()).await;
     assert!(result.is_err());
+}
+
+// ============================================================
+// Exposure policy defaults + mcp_exposure attr
+// ============================================================
+
+#[test]
+fn test_tool_actions_default_exposure_policy() {
+    let tool = TestTool;
+    let policy = tool.exposure_policy();
+    assert_eq!(policy, ExposurePolicy::default());
+    assert_eq!(policy.mcp, McpExposure::Forbidden);
+    assert_eq!(tool.allowed_channels(), ChannelMask::ALL);
+    assert!(!tool.subagent_visible());
+}
+
+pub struct ExposedActionsTool;
+
+#[tool_actions(
+    name = "exposed_actions",
+    description = "Actions tool with MCP Default",
+    mcp_exposure = "default",
+    subagent = "true",
+    allowed_channels = "desktop_only"
+)]
+impl ExposedActionsTool {
+    #[action(name = "ping")]
+    async fn handle_ping(
+        &self,
+        _params: GreetParams,
+        _ctx: &RoutingContext,
+    ) -> common::Result<String> {
+        Ok("pong".into())
+    }
+}
+
+#[test]
+fn test_tool_actions_exposure_policy_overrides() {
+    let tool = ExposedActionsTool;
+    let policy = tool.exposure_policy();
+    assert_eq!(policy.mcp, McpExposure::Default);
+    assert!(policy.subagent);
+    assert_eq!(policy.llm_channels, ChannelMask::DESKTOP_ONLY);
+    assert_eq!(tool.allowed_channels(), ChannelMask::DESKTOP_ONLY);
+    assert!(tool.subagent_visible());
 }

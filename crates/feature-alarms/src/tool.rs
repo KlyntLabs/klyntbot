@@ -224,6 +224,13 @@ impl Tool for AlarmTool {
         "alarm"
     }
 
+    fn exposure_policy(&self) -> tools_core::ExposurePolicy {
+        tools_core::ExposurePolicy {
+            mcp: tools_core::McpExposure::Default,
+            ..Default::default()
+        }
+    }
+
     fn description(&self) -> &str {
         "Standalone reminders not tied to any task. Create with `fire_at` (ISO 8601) or \
          `relative_duration` (e.g. '10m', '1h', '2d'). Use 'tasks' tool with `alarms` \

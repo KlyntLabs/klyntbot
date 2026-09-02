@@ -101,6 +101,13 @@ impl Tool for CronTool {
         "cron"
     }
 
+    fn exposure_policy(&self) -> tools_core::ExposurePolicy {
+        tools_core::ExposurePolicy {
+            mcp: tools_core::McpExposure::Default,
+            ..Default::default()
+        }
+    }
+
     fn description(&self) -> &str {
         "Schedule reminders and recurring tasks. Actions: add, list, remove, enable, disable, run."
     }

@@ -418,8 +418,11 @@ mod tests {
         async fn execute(&self, _args: Value, _ctx: &RoutingContext) -> Result<String> {
             Ok("ok".into())
         }
-        fn subagent_visible(&self) -> bool {
-            true
+        fn exposure_policy(&self) -> crate::ExposurePolicy {
+            crate::ExposurePolicy {
+                subagent: true,
+                ..Default::default()
+            }
         }
     }
 

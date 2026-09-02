@@ -55,7 +55,8 @@ impl MirrorTool {
     description = "Query the Mirror self-reflection layer for routing patterns, brain versions, narratives, and experiment status. All actions are read-only.",
     category = "Memory",
     tags = "mirror,reflection,routing,brain,narrative,meta-rule",
-    cost = "Free"
+    cost = "Free",
+    mcp_exposure = "default"
 )]
 impl MirrorTool {
     /// Return the full current MirrorState (latest snapshot, narrative,
