@@ -48,7 +48,24 @@ export function EmbeddedMcpStatusSection({ status, loading }: EmbeddedMcpStatusS
   }
 
   if (!status) {
-    return null;
+    return (
+      <section className="mb-8" aria-labelledby="embedded-mcp-heading">
+        <h3 id="embedded-mcp-heading" className="text-ui font-medium text-fg-secondary mb-3">
+          Embedded MCP server
+        </h3>
+        <div className="island rounded-lg p-4 space-y-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <Badge variant="warning" size="sm" aria-label="Status: Unavailable">
+              Unavailable
+            </Badge>
+            <p className="text-ui text-fg">Status could not be loaded</p>
+          </div>
+          <p className="text-ui-xs text-fg-dim">
+            KlyntBot&apos;s in-process MCP server — separate from external client servers below.
+          </p>
+        </div>
+      </section>
+    );
   }
 
   const chip = stateChip(status.state);

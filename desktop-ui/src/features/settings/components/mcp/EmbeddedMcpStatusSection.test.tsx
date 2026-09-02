@@ -58,4 +58,11 @@ describe("EmbeddedMcpStatusSection", () => {
     expect(screen.getByRole("heading", { name: "Embedded MCP server" })).toBeInTheDocument();
     expect(container.querySelector("[aria-busy='true']")).toBeInTheDocument();
   });
+
+  it("shows Unavailable chip when status fetch failed", () => {
+    render(<EmbeddedMcpStatusSection status={null} />);
+    expect(screen.getByRole("heading", { name: "Embedded MCP server" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Status: Unavailable")).toHaveTextContent("Unavailable");
+    expect(screen.getByText("Status could not be loaded")).toBeInTheDocument();
+  });
 });

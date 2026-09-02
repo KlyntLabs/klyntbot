@@ -329,9 +329,13 @@ impl AppCore {
 
     /// Whether the embedded HTTP MCP server may bind (Ready only).
     pub fn embedded_mcp_bind_allowed(&self) -> bool {
-        self.mcp_exposure()
-            .is_some_and(|v| v.runtime_state == RuntimeState::Ready)
+        mcp_bind_allowed(self.mcp_exposure())
     }
+}
+
+/// Ready-only gate for embedded HTTP MCP bind (EXPO-3.8 / EXPO-7.2).
+pub fn mcp_bind_allowed(validation: Option<&ExposureValidation>) -> bool {
+    validation.is_some_and(|v| v.runtime_state == RuntimeState::Ready)
 }
 
 #[cfg(test)]
@@ -378,5 +382,23 @@ mod tests {
     fn dto_maps_disabled() {
         let dto = embedded_status_from_validation(&sample(RuntimeState::Disabled));
         assert_eq!(dto.state, "disabled");
+    }
+
+    #[test]
+    fn bind_allowed_ready_only() {
+        let cases = [
+            (Some(RuntimeState::Ready), true),
+            (Some(RuntimeState::Disabled), false),
+            (Some(RuntimeState::Invalid), false),
+            (None, false),
+        ];
+        for (state, expected) in cases {
+            let validation = state.map(sample);
+            assert_eq!(
+                mcp_bind_allowed(validation.as_ref()),
+                expected,
+                "state={state:?}"
+            );
+        }
     }
 }
