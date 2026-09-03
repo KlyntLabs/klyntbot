@@ -79,10 +79,13 @@ Run in this order; all must pass before any completion claim.
 
 | Check | Command |
 |---|---|
-| Typecheck | `cargo check --workspace` && `cd desktop-ui && bun run typecheck` |
-| Lint | `cargo clippy --workspace --all-targets --all-features` && `cargo fmt --all --check` && `cd desktop-ui && bun run lint` |
-| Unit tests | `cargo nextest run --workspace` |
+| Typecheck (Rust) | `cargo check --workspace` |
+| Lint (Rust) | `cargo clippy --workspace --all-targets --all-features` && `cargo fmt --all --check` |
+| Unit tests (Rust) | `cargo nextest run --workspace` |
+| Frontend | `bun run verify:frontend` |
 | E2E / smoke | `./scripts/run_chat_perf_gates.sh` |
+
+`bun run verify:frontend --list` shows the registered frontend checks.
 
 Single test file: Rust `cargo nextest run -E 'test(<fn_name>)'` (matches the test function name, e.g. `cargo nextest run -E 'test(advertised_equals_builtins)'`); UI `cd desktop-ui && bun run test -- <path>`The traceability check is not a command here — the `audit-trace` skill runs it as
 `grep`/`git` over `docs/specs/` (and optional architecture). It is **docs-only**
