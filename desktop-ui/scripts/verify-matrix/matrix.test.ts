@@ -36,6 +36,21 @@ function validEntry(overrides: Partial<ManifestEntry> = {}): ManifestEntry {
   };
 }
 
+function expectThrownOnce<T>(
+  fn: () => unknown,
+  ctor: new (...args: never[]) => T,
+  assert: (err: T) => void,
+): void {
+  let thrown: unknown;
+  try {
+    fn();
+  } catch (err) {
+    thrown = err;
+  }
+  expect(thrown).toBeInstanceOf(ctor);
+  assert(thrown as T);
+}
+
 describe("loadManifest", () => {
   it("returns entries in file order for a valid manifest", () => {
     const entries = [
@@ -54,25 +69,17 @@ describe("loadManifest", () => {
 
   it("throws ManifestError naming the path when the file is missing", () => {
     const path = join(tmpdir(), "verify-manifest-missing", "no-such.json");
-    expect(() => loadManifest(path)).toThrow(ManifestError);
-    try {
-      loadManifest(path);
-    } catch (err) {
-      expect(err).toBeInstanceOf(ManifestError);
-      expect((err as ManifestError).path).toBe(path);
-    }
+    expectThrownOnce(loadManifest.bind(null, path), ManifestError, (err) => {
+      expect(err.path).toBe(path);
+    });
   });
 
   it("throws ManifestError naming the path for invalid JSON", () => {
     const { dir, path } = writeTempManifest("{ not json");
     try {
-      expect(() => loadManifest(path)).toThrow(ManifestError);
-      try {
-        loadManifest(path);
-      } catch (err) {
-        expect(err).toBeInstanceOf(ManifestError);
-        expect((err as ManifestError).path).toBe(path);
-      }
+      expectThrownOnce(loadManifest.bind(null, path), ManifestError, (err) => {
+        expect(err.path).toBe(path);
+      });
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -85,13 +92,9 @@ describe("loadManifest", () => {
       delete entry[field];
       const { dir, path } = writeTempManifest(JSON.stringify([entry]));
       try {
-        expect(() => loadManifest(path)).toThrow(ManifestError);
-        try {
-          loadManifest(path);
-        } catch (err) {
-          expect(err).toBeInstanceOf(ManifestError);
-          expect((err as ManifestError).path).toBe(path);
-        }
+        expectThrownOnce(loadManifest.bind(null, path), ManifestError, (err) => {
+          expect(err.path).toBe(path);
+        });
       } finally {
         rmSync(dir, { recursive: true, force: true });
       }
@@ -103,13 +106,9 @@ describe("loadManifest", () => {
       JSON.stringify([validEntry({ profiles: [] })]),
     );
     try {
-      expect(() => loadManifest(path)).toThrow(ManifestError);
-      try {
-        loadManifest(path);
-      } catch (err) {
-        expect(err).toBeInstanceOf(ManifestError);
-        expect((err as ManifestError).path).toBe(path);
-      }
+      expectThrownOnce(loadManifest.bind(null, path), ManifestError, (err) => {
+        expect(err.path).toBe(path);
+      });
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -163,47 +162,41 @@ describe("selectChecks", () => {
   });
 
   it("throws SelectionError listing registered names and profiles for an unknown name", () => {
-    expect(() => selectChecks(entries, { names: ["missing"] })).toThrow(
+    expectThrownOnce(
+      () => selectChecks(entries, { names: ["missing"] }),
       SelectionError,
+      (selectionErr) => {
+        expect(selectionErr.registeredNames).toEqual(["a", "b", "nightly-only"]);
+        expect(selectionErr.registeredProfiles).toEqual(
+          expect.arrayContaining(["default", "nightly"]),
+        );
+        expect(selectionErr.registeredProfiles).toHaveLength(2);
+        expect(selectionErr.message).toContain("a");
+        expect(selectionErr.message).toContain("b");
+        expect(selectionErr.message).toContain("nightly-only");
+        expect(selectionErr.message).toContain("default");
+        expect(selectionErr.message).toContain("nightly");
+      },
     );
-    try {
-      selectChecks(entries, { names: ["missing"] });
-    } catch (err) {
-      expect(err).toBeInstanceOf(SelectionError);
-      const selectionErr = err as SelectionError;
-      expect(selectionErr.registeredNames).toEqual(["a", "b", "nightly-only"]);
-      expect(selectionErr.registeredProfiles).toEqual(
-        expect.arrayContaining(["default", "nightly"]),
-      );
-      expect(selectionErr.registeredProfiles).toHaveLength(2);
-      expect(selectionErr.message).toContain("a");
-      expect(selectionErr.message).toContain("b");
-      expect(selectionErr.message).toContain("nightly-only");
-      expect(selectionErr.message).toContain("default");
-      expect(selectionErr.message).toContain("nightly");
-    }
   });
 
   it("throws SelectionError listing registered names and profiles for an unknown profile", () => {
-    expect(() => selectChecks(entries, { profile: "unknown" })).toThrow(
+    expectThrownOnce(
+      () => selectChecks(entries, { profile: "unknown" }),
       SelectionError,
+      (selectionErr) => {
+        expect(selectionErr.registeredNames).toEqual(["a", "b", "nightly-only"]);
+        expect(selectionErr.registeredProfiles).toEqual(
+          expect.arrayContaining(["default", "nightly"]),
+        );
+        expect(selectionErr.registeredProfiles).toHaveLength(2);
+        expect(selectionErr.message).toContain("a");
+        expect(selectionErr.message).toContain("b");
+        expect(selectionErr.message).toContain("nightly-only");
+        expect(selectionErr.message).toContain("default");
+        expect(selectionErr.message).toContain("nightly");
+      },
     );
-    try {
-      selectChecks(entries, { profile: "unknown" });
-    } catch (err) {
-      expect(err).toBeInstanceOf(SelectionError);
-      const selectionErr = err as SelectionError;
-      expect(selectionErr.registeredNames).toEqual(["a", "b", "nightly-only"]);
-      expect(selectionErr.registeredProfiles).toEqual(
-        expect.arrayContaining(["default", "nightly"]),
-      );
-      expect(selectionErr.registeredProfiles).toHaveLength(2);
-      expect(selectionErr.message).toContain("a");
-      expect(selectionErr.message).toContain("b");
-      expect(selectionErr.message).toContain("nightly-only");
-      expect(selectionErr.message).toContain("default");
-      expect(selectionErr.message).toContain("nightly");
-    }
   });
 });
 

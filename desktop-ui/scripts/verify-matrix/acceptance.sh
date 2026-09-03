@@ -5,7 +5,13 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 cd "$ROOT"
 
 BASE="3b3b1bab8d2ec80deef263df61960d89f2cfa40a"
-CHECKS=(typecheck lint test check:tokens check:performance test:e2e)
+# First column of `verify:frontend --list` (name mode profiles cwd command).
+CHECKS=()
+while IFS= read -r line; do
+  [[ -z "$line" ]] && continue
+  CHECKS+=("${line%% *}")
+done < <(bun run verify:frontend --list)
+test "${#CHECKS[@]}" -gt 0
 
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
@@ -18,7 +24,7 @@ echo "=== Acceptance: per-check exit parity ==="
 for name in "${CHECKS[@]}"; do
   safe="$(log_name "$name")"
   direct=0
-  (cd desktop-ui && bun run "$name") >"$TMP/direct-${safe}.log" 2>&1 || direct=$?
+  (cd desktop-ui && bun run "$name") >/dev/null 2>&1 || direct=$?
   matrix=0
   bun run verify:frontend "$name" >"$TMP/matrix-${safe}.log" 2>&1 || matrix=$?
   echo "parity  ${name}  direct=${direct}  matrix=${matrix}"
@@ -34,7 +40,8 @@ echo "full-matrix exit  run1=${run1}  run2=${run2}"
 test "$run1" -eq "$run2"
 
 extract_summary() {
-  awk '
+  local n="${#CHECKS[@]}"
+  awk -v n="$n" '
     /^name[[:space:]]+mode[[:space:]]+result[[:space:]]+exit[[:space:]]+seconds/ {
       p = 1
       print
@@ -42,7 +49,7 @@ extract_summary() {
     }
     p {
       print
-      if (++rows == 6) exit
+      if (++rows == n) exit
     }
   ' "$1"
 }
@@ -79,12 +86,11 @@ awk -v s="$quick_sum" 'BEGIN {
 }'
 
 echo "=== Acceptance: relayed observation markers ==="
-cat "$TMP"/matrix-*.log "$TMP/run1.log" >"$TMP/relayed.log"
-grep -F '==> Raw color literals' "$TMP/relayed.log" >/dev/null
+grep -F '==> Raw color literals' "$TMP/run1.log" >/dev/null
 echo "found: ==> Raw color literals"
-grep -E '1 passed' "$TMP/relayed.log" >/dev/null
+grep -E '1 passed' "$TMP/run1.log" >/dev/null
 echo "found: 1 passed"
-grep -E '[[:space:]]gzip[[:space:]]+file' "$TMP/relayed.log" >/dev/null
+grep -E '[[:space:]]gzip[[:space:]]+file' "$TMP/run1.log" >/dev/null
 echo "found: gzip column header"
 
 echo "=== Acceptance: change-boundary diffs vs ${BASE} ==="

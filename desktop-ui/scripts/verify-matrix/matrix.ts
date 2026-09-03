@@ -132,16 +132,7 @@ function collectRegistry(entries: ManifestEntry[]): {
   registeredProfiles: string[];
 } {
   const registeredNames = entries.map((entry) => entry.name);
-  const registeredProfiles: string[] = [];
-  const seenProfiles = new Set<string>();
-  for (const entry of entries) {
-    for (const profile of entry.profiles) {
-      if (!seenProfiles.has(profile)) {
-        seenProfiles.add(profile);
-        registeredProfiles.push(profile);
-      }
-    }
-  }
+  const registeredProfiles = [...new Set(entries.flatMap((e) => e.profiles))];
   return { registeredNames, registeredProfiles };
 }
 
@@ -214,7 +205,7 @@ function runOne(
   const cwd = join(opts.repoRoot, entry.cwd);
   const started = Date.now();
 
-  console.log(`▶ ${entry.name}  (${entry.mode})`);
+  opts.relay.stdout(`▶ ${entry.name}  (${entry.mode})\n`);
 
   return new Promise((resolve) => {
     let output = "";
@@ -247,16 +238,14 @@ function runOne(
       stdio: ["inherit", "pipe", "pipe"],
     });
 
-    child.stdout?.on("data", (chunk: Buffer | string) => {
-      const text = typeof chunk === "string" ? chunk : chunk.toString();
-      opts.relay.stdout(text);
-      output += text;
-    });
-    child.stderr?.on("data", (chunk: Buffer | string) => {
-      const text = typeof chunk === "string" ? chunk : chunk.toString();
-      opts.relay.stderr(text);
-      output += text;
-    });
+    const onPipeData =
+      (relay: (chunk: string) => void) => (chunk: Buffer | string) => {
+        const text = typeof chunk === "string" ? chunk : chunk.toString();
+        relay(text);
+        output += text;
+      };
+    child.stdout?.on("data", onPipeData(opts.relay.stdout));
+    child.stderr?.on("data", onPipeData(opts.relay.stderr));
     child.on("error", (err: Error) => {
       launchError = err.message;
       exitStatus = null;
