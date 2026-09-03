@@ -76,6 +76,7 @@ ID rules:
 **Goals:** GOAL-1
 **Members:**
 - **ROAD-3** frontend-verify-matrix — Surfaces: `docs/agents/project.md`, `desktop-ui/package.json`, `scripts/`
+- **ROAD-25** desktop-ui-lint-green — Surfaces: `desktop-ui/` (Biome config and sources under the existing `lint` script); clears the hard lint errors so `bun run verify:frontend` can exit 0 before proxy/native baseline lanes run
 - **ROAD-4** rendering-proxy-lane — Surfaces: `desktop-ui/playwright.config.ts`, `desktop-ui/tests/`
 - **ROAD-5** native-rendering-lane — Surfaces: None — the XCUIAutomation / XCTest / xctrace harness location is decided in its spec
 - **ROAD-6** migration-ledger-and-central-exclusion — Surfaces: `scripts/check-design-tokens.sh`, `docs/standards/`
@@ -84,7 +85,7 @@ ID rules:
 **Commitment:** Committed 2026-09-03
 **Closed:** None
 **Deferred:** None
-**Blockers:** None
+**Blockers:** None — ROAD-25 is the unblocker for a permanently-red default matrix after ROAD-3 landed with pre-existing Biome debt visible as one hard check
 
 ## MILE-3 — Design-system foundation
 
