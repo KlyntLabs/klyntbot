@@ -18,6 +18,7 @@
     "lint": "cd desktop-ui && bun run lint",
     "check:tokens": "bash scripts/check-design-tokens.sh",
     "check:performance": "cd desktop-ui && bun run check:performance",
+    "verify:frontend": "bun desktop-ui/scripts/verify-matrix/main.ts",
     "tauri:build": "cd crates/desktop && tauri build"
   }
 }
