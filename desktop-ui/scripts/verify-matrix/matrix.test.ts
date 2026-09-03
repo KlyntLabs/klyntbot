@@ -5,11 +5,15 @@ import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import {
+  formatSummary,
   loadManifest,
   ManifestError,
+  runMatrix,
   selectChecks,
   SelectionError,
+  splitCommand,
   type ManifestEntry,
+  type Relay,
 } from "./matrix.ts";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
@@ -199,6 +203,196 @@ describe("selectChecks", () => {
       expect(selectionErr.message).toContain("nightly-only");
       expect(selectionErr.message).toContain("default");
       expect(selectionErr.message).toContain("nightly");
+    }
+  });
+});
+
+function collectingRelay(): {
+  relay: Relay;
+  stdout: string;
+  stderr: string;
+} {
+  const buffers = { stdout: "", stderr: "" };
+  return {
+    get stdout() {
+      return buffers.stdout;
+    },
+    get stderr() {
+      return buffers.stderr;
+    },
+    relay: {
+      stdout: (chunk: string) => {
+        buffers.stdout += chunk;
+      },
+      stderr: (chunk: string) => {
+        buffers.stderr += chunk;
+      },
+    },
+  };
+}
+
+describe("splitCommand", () => {
+  it("splits on whitespace and keeps double-quoted segments whole", () => {
+    expect(splitCommand('sh -c "echo ok"')).toEqual(["sh", "-c", "echo ok"]);
+    expect(splitCommand('sh -c "echo boom >&2; exit 1"')).toEqual([
+      "sh",
+      "-c",
+      "echo boom >&2; exit 1",
+    ]);
+    expect(splitCommand("definitely-not-a-command-xyz")).toEqual([
+      "definitely-not-a-command-xyz",
+    ]);
+  });
+});
+
+describe("runMatrix", () => {
+  const fourEntries = (): ManifestEntry[] => [
+    validEntry({
+      name: "ok",
+      command: 'sh -c "echo ok"',
+      cwd: ".",
+      mode: "hard",
+    }),
+    validEntry({
+      name: "boom",
+      command: 'sh -c "echo boom >&2; exit 1"',
+      cwd: ".",
+      mode: "hard",
+    }),
+    validEntry({
+      name: "findings",
+      command: 'sh -c "echo findings; exit 1"',
+      cwd: ".",
+      mode: "report",
+    }),
+    validEntry({
+      name: "missing",
+      command: "definitely-not-a-command-xyz",
+      cwd: ".",
+      mode: "report",
+    }),
+  ];
+
+  it("runs every check in order, relays output, and fails the matrix after hard and launch failures", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "verify-matrix-run-"));
+    const collected = collectingRelay();
+    try {
+      const { rows, exitCode } = await runMatrix(fourEntries(), {
+        repoRoot: dir,
+        relay: collected.relay,
+      });
+
+      expect(rows.map((r) => r.name)).toEqual([
+        "ok",
+        "boom",
+        "findings",
+        "missing",
+      ]);
+      expect(exitCode).toBe(1);
+
+      expect(rows[0].result).toBe("pass");
+      expect(rows[0].exitStatus).toBe(0);
+      expect(rows[0].mode).toBe("hard");
+
+      expect(rows[1].result).toBe("fail");
+      expect(rows[1].exitStatus).toBe(1);
+      expect(rows[1].mode).toBe("hard");
+
+      expect(rows[2].result).toBe("fail");
+      expect(rows[2].exitStatus).toBe(1);
+      expect(rows[2].mode).toBe("report");
+      expect(rows[2].output).toContain("findings");
+
+      expect(rows[3].result).toBe("fail");
+      expect(rows[3].exitStatus).toBeNull();
+      expect(rows[3].launchError).toBeTruthy();
+      expect(rows[3].mode).toBe("report");
+
+      expect(collected.stdout + collected.stderr).toContain("findings");
+      expect(collected.stdout + collected.stderr).toContain("boom");
+
+      for (const row of rows) {
+        expect(row.durationSec).toBeGreaterThanOrEqual(0);
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("does not flip exitCode for a report-only non-zero exit", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "verify-matrix-report-"));
+    const collected = collectingRelay();
+    try {
+      const { rows, exitCode } = await runMatrix(
+        [
+          validEntry({
+            name: "findings",
+            command: 'sh -c "echo findings; exit 1"',
+            cwd: ".",
+            mode: "report",
+          }),
+        ],
+        { repoRoot: dir, relay: collected.relay },
+      );
+      expect(rows).toHaveLength(1);
+      expect(rows[0].result).toBe("fail");
+      expect(rows[0].exitStatus).toBe(1);
+      expect(exitCode).toBe(0);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("treats an unlaunchable command as a hard failure even when mode is report", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "verify-matrix-miss-"));
+    const collected = collectingRelay();
+    try {
+      const { rows, exitCode } = await runMatrix(
+        [
+          validEntry({
+            name: "missing",
+            command: "definitely-not-a-command-xyz",
+            cwd: ".",
+            mode: "report",
+          }),
+        ],
+        { repoRoot: dir, relay: collected.relay },
+      );
+      expect(rows).toHaveLength(1);
+      expect(rows[0].result).toBe("fail");
+      expect(rows[0].exitStatus).toBeNull();
+      expect(rows[0].launchError).toBeTruthy();
+      expect(exitCode).toBe(1);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("produces identical formatSummary text across consecutive runs", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "verify-matrix-sum-"));
+    try {
+      const first = await runMatrix(fourEntries(), {
+        repoRoot: dir,
+        relay: collectingRelay().relay,
+      });
+      const second = await runMatrix(fourEntries(), {
+        repoRoot: dir,
+        relay: collectingRelay().relay,
+      });
+      expect(formatSummary(first.rows)).toBe(formatSummary(second.rows));
+      const summary = formatSummary(first.rows);
+      expect(summary).toMatch(/name/i);
+      expect(summary).toMatch(/mode/i);
+      expect(summary).toMatch(/result/i);
+      expect(summary).toMatch(/exit/i);
+      expect(summary).toMatch(/seconds/i);
+      for (const row of first.rows) {
+        expect(summary).toContain(row.name);
+        expect(summary).toContain(row.mode);
+        expect(summary).toContain(row.result);
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
     }
   });
 });

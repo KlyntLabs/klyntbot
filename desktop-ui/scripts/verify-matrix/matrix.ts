@@ -1,4 +1,6 @@
+import { spawn as defaultSpawn } from "node:child_process";
 import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 export type ManifestEntry = {
   name: string;
@@ -6,6 +8,21 @@ export type ManifestEntry = {
   cwd: string;
   mode: "hard" | "report";
   profiles: string[];
+};
+
+export type Row = {
+  name: string;
+  mode: "hard" | "report";
+  result: "pass" | "fail";
+  exitStatus: number | null;
+  durationSec: number;
+  output: string;
+  launchError?: string;
+};
+
+export type Relay = {
+  stdout: (chunk: string) => void;
+  stderr: (chunk: string) => void;
 };
 
 export class ManifestError extends Error {
@@ -150,4 +167,163 @@ export function selectChecks(
     throw new SelectionError(registeredNames, registeredProfiles);
   }
   return entries.filter((entry) => entry.profiles.includes(profile));
+}
+
+export function splitCommand(command: string): string[] {
+  const parts: string[] = [];
+  let current = "";
+  let inQuotes = false;
+  for (const ch of command) {
+    if (ch === '"') {
+      inQuotes = !inQuotes;
+      continue;
+    }
+    if (!inQuotes && /\s/.test(ch)) {
+      if (current.length > 0) {
+        parts.push(current);
+        current = "";
+      }
+      continue;
+    }
+    current += ch;
+  }
+  if (current.length > 0) {
+    parts.push(current);
+  }
+  return parts;
+}
+
+const defaultRelay: Relay = {
+  stdout: (chunk) => {
+    process.stdout.write(chunk);
+  },
+  stderr: (chunk) => {
+    process.stderr.write(chunk);
+  },
+};
+
+function runOne(
+  entry: ManifestEntry,
+  opts: {
+    repoRoot: string;
+    spawn: typeof defaultSpawn;
+    relay: Relay;
+  },
+): Promise<Row> {
+  const [cmd, ...args] = splitCommand(entry.command);
+  const cwd = join(opts.repoRoot, entry.cwd);
+  const started = Date.now();
+
+  console.log(`▶ ${entry.name}  (${entry.mode})`);
+
+  return new Promise((resolve) => {
+    let output = "";
+    let launchError: string | undefined;
+    let exitStatus: number | null = null;
+    let settled = false;
+
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      const durationSec = Math.round(((Date.now() - started) / 1000) * 10) / 10;
+      const result: "pass" | "fail" =
+        exitStatus === 0 && launchError === undefined ? "pass" : "fail";
+      const row: Row = {
+        name: entry.name,
+        mode: entry.mode,
+        result,
+        exitStatus: launchError !== undefined ? null : exitStatus,
+        durationSec,
+        output,
+      };
+      if (launchError !== undefined) {
+        row.launchError = launchError;
+      }
+      resolve(row);
+    };
+
+    const child = opts.spawn(cmd, args, {
+      cwd,
+      stdio: ["inherit", "pipe", "pipe"],
+    });
+
+    child.stdout?.on("data", (chunk: Buffer | string) => {
+      const text = typeof chunk === "string" ? chunk : chunk.toString();
+      opts.relay.stdout(text);
+      output += text;
+    });
+    child.stderr?.on("data", (chunk: Buffer | string) => {
+      const text = typeof chunk === "string" ? chunk : chunk.toString();
+      opts.relay.stderr(text);
+      output += text;
+    });
+    child.on("error", (err: Error) => {
+      launchError = err.message;
+      exitStatus = null;
+      finish();
+    });
+    child.on("close", (code: number | null) => {
+      if (launchError !== undefined) {
+        finish();
+        return;
+      }
+      exitStatus = code;
+      finish();
+    });
+  });
+}
+
+export async function runMatrix(
+  entries: ManifestEntry[],
+  opts: {
+    repoRoot: string;
+    spawn?: typeof defaultSpawn;
+    relay?: Relay;
+  },
+): Promise<{ rows: Row[]; exitCode: 0 | 1 }> {
+  const spawnFn = opts.spawn ?? defaultSpawn;
+  const relay = opts.relay ?? defaultRelay;
+  const rows: Row[] = [];
+  let exitCode: 0 | 1 = 0;
+
+  for (const entry of entries) {
+    const row = await runOne(entry, {
+      repoRoot: opts.repoRoot,
+      spawn: spawnFn,
+      relay,
+    });
+    rows.push(row);
+    if (row.result === "fail") {
+      if (row.exitStatus === null || entry.mode === "hard") {
+        exitCode = 1;
+      }
+    }
+  }
+
+  return { rows, exitCode };
+}
+
+function pad(value: string, width: number): string {
+  return value.length >= width ? value : value + " ".repeat(width - value.length);
+}
+
+export function formatSummary(rows: Row[]): string {
+  const headers = ["name", "mode", "result", "exit", "seconds"] as const;
+  const cells = rows.map((row) => [
+    row.name,
+    row.mode,
+    row.result,
+    row.exitStatus === null ? "-" : String(row.exitStatus),
+    row.durationSec.toFixed(1),
+  ]);
+  const widths = headers.map((header, i) =>
+    Math.max(header.length, ...cells.map((cell) => cell[i].length)),
+  );
+  const lines = [
+    headers.map((header, i) => pad(header, widths[i])).join("  "),
+    ...cells.map((cell) =>
+      cell.map((value, i) => pad(value, widths[i])).join("  "),
+    ),
+  ];
+  return lines.join("\n");
 }
