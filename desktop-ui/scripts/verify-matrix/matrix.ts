@@ -18,6 +18,20 @@ export class ManifestError extends Error {
   }
 }
 
+export class SelectionError extends Error {
+  registeredNames: string[];
+  registeredProfiles: string[];
+
+  constructor(registeredNames: string[], registeredProfiles: string[]) {
+    super(
+      `unknown selection; registered names: ${registeredNames.join(", ")}; registered profiles: ${registeredProfiles.join(", ")}`,
+    );
+    this.name = "SelectionError";
+    this.registeredNames = registeredNames;
+    this.registeredProfiles = registeredProfiles;
+  }
+}
+
 const MODES = new Set(["hard", "report"]);
 
 function isNonEmptyString(value: unknown): value is string {
@@ -94,4 +108,46 @@ export function loadManifest(path: string): ManifestEntry[] {
   }
 
   return parsed.map((entry, index) => validateEntry(entry, path, index));
+}
+
+function collectRegistry(entries: ManifestEntry[]): {
+  registeredNames: string[];
+  registeredProfiles: string[];
+} {
+  const registeredNames = entries.map((entry) => entry.name);
+  const registeredProfiles: string[] = [];
+  const seenProfiles = new Set<string>();
+  for (const entry of entries) {
+    for (const profile of entry.profiles) {
+      if (!seenProfiles.has(profile)) {
+        seenProfiles.add(profile);
+        registeredProfiles.push(profile);
+      }
+    }
+  }
+  return { registeredNames, registeredProfiles };
+}
+
+export function selectChecks(
+  entries: ManifestEntry[],
+  sel: { names?: string[]; profile?: string } = {},
+): ManifestEntry[] {
+  const { registeredNames, registeredProfiles } = collectRegistry(entries);
+
+  if (sel.names !== undefined) {
+    const known = new Set(registeredNames);
+    for (const name of sel.names) {
+      if (!known.has(name)) {
+        throw new SelectionError(registeredNames, registeredProfiles);
+      }
+    }
+    const wanted = new Set(sel.names);
+    return entries.filter((entry) => wanted.has(entry.name));
+  }
+
+  const profile = sel.profile ?? "default";
+  if (!registeredProfiles.includes(profile)) {
+    throw new SelectionError(registeredNames, registeredProfiles);
+  }
+  return entries.filter((entry) => entry.profiles.includes(profile));
 }
