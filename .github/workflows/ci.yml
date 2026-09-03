@@ -61,17 +61,15 @@ jobs:
         working-directory: desktop-ui
         run: bun install --frozen-lockfile
 
-      - name: Lint
-        working-directory: desktop-ui
-        run: bun run lint
+      - name: Install ripgrep
+        run: command -v rg || brew install ripgrep
 
-      - name: Type check
+      - name: Install Playwright browser
         working-directory: desktop-ui
-        run: bun run typecheck
+        run: bunx playwright install chromium
 
-      - name: Test
-        working-directory: desktop-ui
-        run: bun run test
+      - name: Verify frontend
+        run: bun run verify:frontend
 
   desktop-build-check:
     runs-on: macos-latest
