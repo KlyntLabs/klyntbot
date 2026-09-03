@@ -16,3 +16,4 @@ only writer of the **Roadmap item** cell on new features.
 | Domain | Scope | Surface roots | Feature catalog |
 |---|---|---|---|
 | agent-runtime | Agent loop, tools, MCP server, exposure policy | `crates/tools-core/`, `crates/mcp/`, `crates/app-core/`, `crates/klyntbot-server/`, `crates/agent/`, `desktop-ui/src/features/settings/` | [catalog](./catalog/agent-runtime.md) |
+| frontend-platform | Desktop UI shell, design system, frontend verification gates | `desktop-ui/`, `packages/design-system/`, `scripts/check-design-tokens.sh` | [catalog](./catalog/frontend-platform.md) |
