@@ -7,7 +7,7 @@
 > for tracking.
 
 Feature code: FVM
-Status: In-progress
+Status: Implemented
 Date: 2026-09-03
 Execution-mode: continuous
 Max-concurrency: auto
