@@ -42,7 +42,7 @@ desktop-ui/scripts/verify-matrix/main.ts        CLI: parse argv → runMatrix �
         ▼
 desktop-ui/scripts/verify-matrix/matrix.ts      loadManifest · selectChecks · runMatrix
         │                       ▲
-        │ spawn("bun run <script>", { cwd, shell, stdio: pipe }) → relay + retain
+        │ spawn("bun", ["run", <script>], { cwd, stdio: pipe }) → relay + retain
         ▼                       │
 desktop-ui/package.json scripts (unchanged)     scripts/verify-frontend.manifest.json
 ```
@@ -51,7 +51,7 @@ desktop-ui/package.json scripts (unchanged)     scripts/verify-frontend.manifest
 
 Satisfies: FVM-1.6, FVM-2.1, FVM-2.2
 Reuse: none — new code (rung 7); no registry of checks exists anywhere in the repo (fresh retrieval: no owner)
-Interface: a JSON array; each entry is `{ "name": string, "command": string, "cwd": string, "mode": "hard" | "report", "profiles": string[] }`. `cwd` is relative to the repository root. Consumers know only these five fields and that order is run order.
+Interface: a JSON array; each entry is `{ "name": string, "command": string, "cwd": string, "mode": "hard" | "report", "profiles": string[] }`. `command` is an argv line (whitespace-separated, double quotes group), not a shell line. `cwd` is relative to the repository root. Consumers know only these five fields and that order is run order.
 Depth: if the manifest vanished, callers would need to know the six package-script names, that they run from `desktop-ui/`, that all are hard, and that they belong to `default` — five fields per row, nothing else.
 Locality: new file `scripts/verify-frontend.manifest.json`; `scripts/check-design-tokens.sh` and `scripts/run_chat_perf_gates.sh` — leave (they are commands the manifest points at, not readers of it).
 
@@ -64,7 +64,8 @@ Reuse: rung 3 — `node:child_process` `spawn` (Bun implements it; no dependency
 Interface:
 - `loadManifest(path: string): ManifestEntry[]` — parses and validates; throws `ManifestError(path, reason)` on unreadable, unparsable, or an entry missing `name`, `command`, `cwd`, `mode`, or a non-empty `profiles` (FVM-2.5).
 - `selectChecks(entries, { names?: string[]; profile?: string }): ManifestEntry[]` — no selector → profile `default`; names → those entries in manifest order; profile → entries whose `profiles` include it; an unknown name or profile throws `SelectionError(registeredNames, registeredProfiles)` (FVM-1.10).
-- `runMatrix(entries, { repoRoot, spawn?, relay? }): Promise<{ rows: Row[]; exitCode: 0 | 1 }>` — runs each entry in order, awaiting each before the next, via `spawn(entry.command, { cwd: join(repoRoot, entry.cwd), shell: true, stdio: ["inherit", "pipe", "pipe"] })`; every stdout/stderr chunk is written through to `relay` (default: the process's own stdout/stderr) as it arrives and appended to the row's `output`. `Row = { name, mode, result: "pass" | "fail", exitStatus: number | null, durationSec, output: string, launchError?: string }`. A `hard` row with non-zero or null status sets `exitCode = 1` but the loop continues (FVM-1.4); a `report` row never changes `exitCode` (FVM-1.5); a spawn `error` event (no exit status) is a `fail` row that sets `exitCode = 1` regardless of mode (FVM-2.3).
+- `splitCommand(command): string[]` — whitespace split with double-quoted segments kept whole; manifest commands are argv, not shell lines (no pipes, redirects, or `&&`).
+- `runMatrix(entries, { repoRoot, spawn?, relay? }): Promise<{ rows: Row[]; exitCode: 0 | 1 }>` — runs each entry in order, awaiting each before the next, via `spawn(cmd, args, { cwd: join(repoRoot, entry.cwd), stdio: ["inherit", "pipe", "pipe"] })` with `[cmd, ...args] = splitCommand(entry.command)` and **no shell**, so a missing executable or a missing `cwd` surfaces as the `error` event rather than a shell's exit 127; every stdout/stderr chunk is written through to `relay` (default: the process's own stdout/stderr) as it arrives and appended to the row's `output`. `Row = { name, mode, result: "pass" | "fail", exitStatus: number | null, durationSec, output: string, launchError?: string }`. A `hard` row with non-zero or null status sets `exitCode = 1` but the loop continues (FVM-1.4); a `report` row never changes `exitCode` (FVM-1.5); a spawn `error` event (no exit status) is a `fail` row that sets `exitCode = 1` regardless of mode (FVM-2.3).
 - `formatSummary(rows): string` — one aligned table: name · mode · result · exit · seconds (FVM-1.2).
 Depth: if this module vanished, callers would need to know "run each selected entry's command in its cwd, in order, pass exit status through, fail the run only after all have run, and print one table" — one sentence, far smaller than the argv handling, validation messages, and formatting it hides.
 Locality: new files under `desktop-ui/scripts/verify-matrix/`; `desktop-ui/scripts/check-performance-budget.sh` — leave; `desktop-ui/vitest.config.ts` — leave (its default glob already includes `desktop-ui/scripts/**/*.test.ts`); tests set `// @vitest-environment node` per file because the project default is jsdom.
