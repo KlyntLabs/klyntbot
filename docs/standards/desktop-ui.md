@@ -26,7 +26,8 @@ Run from `desktop-ui/` (root `package.json` delegates the same names where noted
 | Perf budget | `bun run check:performance` | Build + `scripts/check-performance-budget.sh` |
 
 Root shortcuts: `bun run typecheck` / `lint` / `test` / `build` / `check:tokens` /
-`check:performance` from the repo root.
+`check:performance` from the repo root. Root-only: `bun run verify:frontend`
+runs the full frontend verify matrix (see below).
 
 ## Verify matrix
 

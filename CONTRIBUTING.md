@@ -110,7 +110,7 @@ Every PR must keep these green:
 cargo nextest run --workspace
 cargo clippy --workspace --all-targets --all-features   # zero warnings
 cargo fmt --all --check
-cd desktop-ui && bun run lint && bun run typecheck
+bun run verify:frontend
 ```
 
 If you touched the Tauri IPC surface, also run `cargo tauri dev` once so `desktop-ui/src/bindings.ts` regenerates.
