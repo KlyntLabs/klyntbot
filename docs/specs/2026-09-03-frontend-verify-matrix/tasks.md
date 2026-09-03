@@ -7,7 +7,7 @@
 > for tracking.
 
 Feature code: FVM
-Status: In-progress
+Status: Implemented
 Date: 2026-09-03
 Execution-mode: continuous
 Max-concurrency: auto
@@ -65,10 +65,10 @@ Compact delta for every task:
 
 **Depends-on:** none
 
-- [ ] **Step 1:** Failing tests in `matrix.test.ts`: `loadManifest` returns entries in file order for a valid temp manifest; throws `ManifestError` naming the path for a missing file, invalid JSON, an entry missing any of the five fields, and an entry with empty `profiles`. Run: `cd desktop-ui && bun run test -- scripts/verify-matrix` — expect: module not found.
-- [ ] **Step 2:** Implement `ManifestEntry`, `ManifestError`, `loadManifest` (read with `node:fs`, `JSON.parse`, validate every field and `mode ∈ {hard, report}`). Run tests — expect: pass.
-- [ ] **Step 3:** Write `scripts/verify-frontend.manifest.json`: entries `typecheck`, `lint`, `test`, `check:tokens`, `check:performance`, `test:e2e`, each `command: "bun run <name>"`, `cwd: "desktop-ui"`, `mode: "hard"`, `profiles: ["default"]`. Add a test that loads the real manifest (path resolved from `import.meta.dir` + `../../../scripts/`) and asserts exactly those six names in that order, all `hard`, all `default`. Run — expect: pass.
-- [ ] **Step 4:** Commit: `feat(verify): add frontend check manifest and loader`.
+- [x] **Step 1:** Failing tests in `matrix.test.ts`: `loadManifest` returns entries in file order for a valid temp manifest; throws `ManifestError` naming the path for a missing file, invalid JSON, an entry missing any of the five fields, and an entry with empty `profiles`. Run: `cd desktop-ui && bun run test -- scripts/verify-matrix` — expect: module not found.
+- [x] **Step 2:** Implement `ManifestEntry`, `ManifestError`, `loadManifest` (read with `node:fs`, `JSON.parse`, validate every field and `mode ∈ {hard, report}`). Run tests — expect: pass.
+- [x] **Step 3:** Write `scripts/verify-frontend.manifest.json`: entries `typecheck`, `lint`, `test`, `check:tokens`, `check:performance`, `test:e2e`, each `command: "bun run <name>"`, `cwd: "desktop-ui"`, `mode: "hard"`, `profiles: ["default"]`. Add a test that loads the real manifest (path resolved from `import.meta.dir` + `../../../scripts/`) and asserts exactly those six names in that order, all `hard`, all `default`. Run — expect: pass.
+- [x] **Step 4:** Commit: `feat(verify): add frontend check manifest and loader`.
 
 _Requirements: FVM-1.6, FVM-2.1, FVM-2.5_
 
@@ -88,9 +88,9 @@ _Requirements: FVM-1.6, FVM-2.1, FVM-2.5_
 
 **Depends-on:** Task 1
 
-- [ ] **Step 1:** Failing tests: no selector → entries whose profiles include `default`, manifest order, and an entry with profiles `["nightly"]` is excluded; `names: ["b","a"]` → `[a, b]` in manifest order; `profile: "nightly"` → only that entry; unknown name or unknown profile → `SelectionError` whose message lists every registered name and profile. Run — expect: `selectChecks is not a function`.
-- [ ] **Step 2:** Implement `selectChecks` and `SelectionError`. Run — expect: pass.
-- [ ] **Step 3:** Commit: `feat(verify): select checks by name or profile`.
+- [x] **Step 1:** Failing tests: no selector → entries whose profiles include `default`, manifest order, and an entry with profiles `["nightly"]` is excluded; `names: ["b","a"]` → `[a, b]` in manifest order; `profile: "nightly"` → only that entry; unknown name or unknown profile → `SelectionError` whose message lists every registered name and profile. Run — expect: `selectChecks is not a function`.
+- [x] **Step 2:** Implement `selectChecks` and `SelectionError`. Run — expect: pass.
+- [x] **Step 3:** Commit: `feat(verify): select checks by name or profile`.
 
 _Requirements: FVM-1.7, FVM-1.8, FVM-1.10, FVM-2.2_
 
@@ -110,9 +110,9 @@ _Requirements: FVM-1.7, FVM-1.8, FVM-1.10, FVM-2.2_
 
 **Depends-on:** Task 1
 
-- [ ] **Step 1:** Failing tests with a temp manifest whose commands are `sh -c "echo ok"` (hard), `sh -c "echo boom >&2; exit 1"` (hard), `sh -c "echo findings; exit 1"` (report), and `definitely-not-a-command-xyz` (report), `cwd: "."`, `repoRoot` = the temp dir, `relay` collecting into buffers. Commands are split into argv by `splitCommand` (whitespace-separated, double-quoted segments kept whole) and spawned **without** a shell, so a missing executable raises the `error` event (ENOENT). Assert: all four rows present in order (hard failure did not stop the run); `exitCode === 1`; the report row with exit 1 has `result: "fail"` but would not on its own set exitCode (separate test with only that entry → `exitCode 0`); the unlaunchable entry has `result: "fail"`, `exitStatus: null`, `launchError` set, and alone yields `exitCode 1` despite `report`; `rows[2].output` contains `findings` and the relay buffer contains `findings` and `boom`; `durationSec >= 0`; each row's `exitStatus` equals the fake command's exit code; two consecutive runs produce identical `formatSummary` text. Run — expect: `runMatrix is not a function`.
-- [ ] **Step 2:** Implement `splitCommand` and `runMatrix` (sequential `await` per entry; `const [cmd, ...args] = splitCommand(entry.command); spawn(cmd, args, { cwd: join(repoRoot, entry.cwd), stdio: ["inherit","pipe","pipe"] })` — no shell; on `data` write through to relay and append to `output`; on `error` record `launchError`; print `▶ <name>  (<mode>)` before each check) and `formatSummary` (columns name · mode · result · exit · seconds, aligned, one row per check, one header line). Run — expect: pass.
-- [ ] **Step 3:** Commit: `feat(verify): run checks sequentially with relayed output and one summary`.
+- [x] **Step 1:** Failing tests with a temp manifest whose commands are `sh -c "echo ok"` (hard), `sh -c "echo boom >&2; exit 1"` (hard), `sh -c "echo findings; exit 1"` (report), and `definitely-not-a-command-xyz` (report), `cwd: "."`, `repoRoot` = the temp dir, `relay` collecting into buffers. Commands are split into argv by `splitCommand` (whitespace-separated, double-quoted segments kept whole) and spawned **without** a shell, so a missing executable raises the `error` event (ENOENT). Assert: all four rows present in order (hard failure did not stop the run); `exitCode === 1`; the report row with exit 1 has `result: "fail"` but would not on its own set exitCode (separate test with only that entry → `exitCode 0`); the unlaunchable entry has `result: "fail"`, `exitStatus: null`, `launchError` set, and alone yields `exitCode 1` despite `report`; `rows[2].output` contains `findings` and the relay buffer contains `findings` and `boom`; `durationSec >= 0`; each row's `exitStatus` equals the fake command's exit code; two consecutive runs produce identical `formatSummary` text. Run — expect: `runMatrix is not a function`.
+- [x] **Step 2:** Implement `splitCommand` and `runMatrix` (sequential `await` per entry; `const [cmd, ...args] = splitCommand(entry.command); spawn(cmd, args, { cwd: join(repoRoot, entry.cwd), stdio: ["inherit","pipe","pipe"] })` — no shell; on `data` write through to relay and append to `output`; on `error` record `launchError`; print `▶ <name>  (<mode>)` before each check) and `formatSummary` (columns name · mode · result · exit · seconds, aligned, one row per check, one header line). Run — expect: pass.
+- [x] **Step 3:** Commit: `feat(verify): run checks sequentially with relayed output and one summary`.
 
 _Requirements: FVM-1.2, FVM-1.3, FVM-1.4, FVM-1.5, FVM-2.4, FVM-7.2_
 
@@ -133,10 +133,10 @@ _Requirements: FVM-1.2, FVM-1.3, FVM-1.4, FVM-1.5, FVM-2.4, FVM-7.2_
 
 **Depends-on:** Task 1, Task 2, Task 3
 
-- [ ] **Step 1:** Failing integration tests in `main.test.ts` that `spawnSync("bun", [mainPath, ...args])` with `--manifest <temp>`: `--list` prints every entry's name, mode, profiles, cwd, command and exits 0 without running (a temp entry whose command writes a marker file; marker absent afterwards); `--list` against the real manifest prints the six default names; an appended temp entry with profile `["extra"]` runs under `--profile extra` (marker present) and not under no-arg (marker absent); unknown name → exit 1 and stderr lists registered names; unparsable manifest → exit 1 and stderr names the path. Run — expect: main.ts not found.
-- [ ] **Step 2:** Implement `main.ts`: parse argv (positional names, `--profile`, `--list`, `--manifest`), wrap `ManifestError`/`SelectionError` → print message, exit 1; print summary; `process.exit(exitCode)`. Run — expect: pass.
-- [ ] **Step 3:** Add `"verify:frontend": "bun desktop-ui/scripts/verify-matrix/main.ts"` to root `package.json` scripts. Run `bun run verify:frontend --list` from the repo root — expect: six rows, exit 0.
-- [ ] **Step 4:** Commit: `feat(verify): add bun run verify:frontend entry point`.
+- [x] **Step 1:** Failing integration tests in `main.test.ts` that `spawnSync("bun", [mainPath, ...args])` with `--manifest <temp>`: `--list` prints every entry's name, mode, profiles, cwd, command and exits 0 without running (a temp entry whose command writes a marker file; marker absent afterwards); `--list` against the real manifest prints the six default names; an appended temp entry with profile `["extra"]` runs under `--profile extra` (marker present) and not under no-arg (marker absent); unknown name → exit 1 and stderr lists registered names; unparsable manifest → exit 1 and stderr names the path. Run — expect: main.ts not found.
+- [x] **Step 2:** Implement `main.ts`: parse argv (positional names, `--profile`, `--list`, `--manifest`), wrap `ManifestError`/`SelectionError` → print message, exit 1; print summary; `process.exit(exitCode)`. Run — expect: pass.
+- [x] **Step 3:** Add `"verify:frontend": "bun desktop-ui/scripts/verify-matrix/main.ts"` to root `package.json` scripts. Run `bun run verify:frontend --list` from the repo root — expect: six rows, exit 0.
+- [x] **Step 4:** Commit: `feat(verify): add bun run verify:frontend entry point`.
 
 _Requirements: FVM-1.1, FVM-1.9, FVM-2.3_
 
@@ -155,9 +155,9 @@ _Requirements: FVM-1.1, FVM-1.9, FVM-2.3_
 
 **Depends-on:** Task 4
 
-- [ ] **Step 1:** Edit the job as specified. Run `git diff --exit-code <approved-base> -- .github/workflows/ci.yml` piped through `sed -n '14,48p;76,151p'` on both versions (extract the two other job blocks from base and working tree and `diff` them) — expect: no difference.
-- [ ] **Step 2:** Validate YAML locally: `python3 -c 'import yaml;print(list(yaml.safe_load(open(".github/workflows/ci.yml"))["jobs"]))'` (PyYAML is installed) — expect: `['rust-quality', 'desktop-ui-quality', 'desktop-build-check']`.
-- [ ] **Step 3:** Commit: `ci(verify): run the frontend verify matrix in desktop-ui-quality`. Push the branch and confirm the job runs the six checks and passes; note the job's wall-clock duration in the task report (FVM-4.4).
+- [x] **Step 1:** Edit the job as specified. Run `git diff --exit-code <approved-base> -- .github/workflows/ci.yml` piped through `sed -n '14,48p;76,151p'` on both versions (extract the two other job blocks from base and working tree and `diff` them) — expect: no difference.
+- [x] **Step 2:** Validate YAML locally: `python3 -c 'import yaml;print(list(yaml.safe_load(open(".github/workflows/ci.yml"))["jobs"]))'` (PyYAML is installed) — expect: `['rust-quality', 'desktop-ui-quality', 'desktop-build-check']`.
+- [x] **Step 3:** Commit: `ci(verify): run the frontend verify matrix in desktop-ui-quality`. Push the branch and confirm the job runs the six checks and passes; note the job's wall-clock duration in the task report (FVM-4.4).
 
 _Requirements: FVM-4.1, FVM-4.2, FVM-4.3, FVM-4.4, FVM-4.5_
 
@@ -180,10 +180,10 @@ _Requirements: FVM-4.1, FVM-4.2, FVM-4.3, FVM-4.4, FVM-4.5_
 
 Neighbor note (advisory from retrieval): the EXPO and EUPI plans pin `CLAUDE.md` (both) and `docs/agents/project.md` (EUPI) by sha256 as their Global Constraints source; editing these files leaves those pins stale. Informational only, no action in this feature.
 
-- [ ] **Step 1:** Rewrite the verify table as above; assert with `grep -c` that `cargo check --workspace`, `cargo clippy --workspace --all-targets --all-features`, `cargo fmt --all --check`, `cargo nextest run --workspace`, and `./scripts/run_chat_perf_gates.sh` each still appear exactly once.
-- [ ] **Step 2:** Add `## Verify matrix` to desktop-ui.md: entry command, manifest path and five fields, `hard` vs `report`, profiles (`default` only today), `--list` as discovery only, where ROAD-4/ROAD-5 lanes register. Update `## Done gates` to name `bun run verify:frontend` as the completion-claim command.
-- [ ] **Step 3:** Add `bun run verify:frontend   # all six frontend checks, one summary (run from repo root)` to CLAUDE.md's Desktop UI block.
-- [ ] **Step 4:** Commit: `docs(verify): add the frontend verify matrix to the verify table and standards`.
+- [x] **Step 1:** Rewrite the verify table as above; assert with `grep -c` that `cargo check --workspace`, `cargo clippy --workspace --all-targets --all-features`, `cargo fmt --all --check`, `cargo nextest run --workspace`, and `./scripts/run_chat_perf_gates.sh` each still appear exactly once.
+- [x] **Step 2:** Add `## Verify matrix` to desktop-ui.md: entry command, manifest path and five fields, `hard` vs `report`, profiles (`default` only today), `--list` as discovery only, where ROAD-4/ROAD-5 lanes register. Update `## Done gates` to name `bun run verify:frontend` as the completion-claim command.
+- [x] **Step 3:** Add `bun run verify:frontend   # all six frontend checks, one summary (run from repo root)` to CLAUDE.md's Desktop UI block.
+- [x] **Step 4:** Commit: `docs(verify): add the frontend verify matrix to the verify table and standards`.
 
 _Requirements: FVM-3.1, FVM-3.2, FVM-3.3_
 
@@ -202,9 +202,9 @@ _Requirements: FVM-3.1, FVM-3.2, FVM-3.3_
 
 **Depends-on:** Task 4
 
-- [ ] **Step 1:** Write `acceptance.sh` (run from repo root): for each of the six names run `(cd desktop-ui && bun run <name>)` and `bun run verify:frontend <name>`, capturing exit codes, and assert equal (FVM-5.2); run `bun run verify:frontend` twice, extract the summary block from each, `diff` them (FVM-7.3); parse the four quick-check durations from the summary and assert their sum ≤ 120 (FVM-7.1); grep the relayed output for the token gate's unconditional `==> Raw color literals` section header (the `(soft)` note appears only when findings exist), the Playwright `1 passed` line, and the perf budget's `gzip` column header (FVM-5.3, 5.4, 5.5).
-- [ ] **Step 2:** Boundary diffs, all against `3b3b1bab8d2ec80deef263df61960d89f2cfa40a`: `git diff --exit-code <base> -- packages/design-system/src/tokens/ scripts/check-design-tokens.sh desktop-ui/playwright.config.ts desktop-ui/tests/ desktop-ui/scripts/check-performance-budget.sh` (FVM-6.1–6.3); `git diff --exit-code <base> -- desktop-ui/package.json` (FVM-5.1); the two Rust job blocks as in Task 5 Step 1 (FVM-6.4). Include these in `acceptance.sh` so the run prints them.
-- [ ] **Step 3:** Run `./desktop-ui/scripts/verify-matrix/acceptance.sh` on the finished branch with no stray dev server on port 1420 — expect: every assertion passes; paste the report into the task report.
-- [ ] **Step 4:** Commit: `test(verify): add one-time acceptance script for parity, determinism, and change boundary`.
+- [x] **Step 1:** Write `acceptance.sh` (run from repo root): for each of the six names run `(cd desktop-ui && bun run <name>)` and `bun run verify:frontend <name>`, capturing exit codes, and assert equal (FVM-5.2); run `bun run verify:frontend` twice, extract the summary block from each, `diff` them (FVM-7.3); parse the four quick-check durations from the summary and assert their sum ≤ 120 (FVM-7.1); grep the relayed output for the token gate's unconditional `==> Raw color literals` section header (the `(soft)` note appears only when findings exist), the Playwright `1 passed` line, and the perf budget's `gzip` column header (FVM-5.3, 5.4, 5.5).
+- [x] **Step 2:** Boundary diffs, all against `3b3b1bab8d2ec80deef263df61960d89f2cfa40a`: `git diff --exit-code <base> -- packages/design-system/src/tokens/ scripts/check-design-tokens.sh desktop-ui/playwright.config.ts desktop-ui/tests/ desktop-ui/scripts/check-performance-budget.sh` (FVM-6.1–6.3); `git diff --exit-code <base> -- desktop-ui/package.json` (FVM-5.1); the two Rust job blocks as in Task 5 Step 1 (FVM-6.4). Include these in `acceptance.sh` so the run prints them.
+- [x] **Step 3:** Run `./desktop-ui/scripts/verify-matrix/acceptance.sh` on the finished branch with no stray dev server on port 1420 — expect: every assertion passes; paste the report into the task report.
+- [x] **Step 4:** Commit: `test(verify): add one-time acceptance script for parity, determinism, and change boundary`.
 
 _Requirements: FVM-5.1, FVM-5.2, FVM-5.3, FVM-5.4, FVM-5.5, FVM-6.1, FVM-6.2, FVM-6.3, FVM-6.4, FVM-7.1, FVM-7.3_
