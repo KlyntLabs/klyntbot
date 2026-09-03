@@ -7,9 +7,9 @@
 > for tracking.
 
 Feature code: FVM
-Status: Approved
+Status: In-progress
 Date: 2026-09-03
-Execution-mode: unset
+Execution-mode: continuous
 Max-concurrency: auto
 Requirements: ./requirements.md
 Design: ./design.md

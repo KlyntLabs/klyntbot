@@ -1,7 +1,7 @@
 # Requirements: Frontend verify matrix
 
 Feature code: FVM
-Status: Approved
+Status: In-progress
 Date: 2026-09-03
 
 Roadmap item: ROAD-3 (MILE-2 — Baselines, verification, migration ledger). Frame: `.skills/FVM/close-package.md`; locks in `.skills/FVM/knowns.md`. Approved base revision for guards: the `main` merge-base of the feature branch at approval time, recorded in `tasks.md`.
