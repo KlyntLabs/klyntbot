@@ -89,12 +89,17 @@ export function GapAnalysisTab({
                 onClick={() => onCreateNote?.(gap.suggestedTitle, gap.description)}
                 className="w-full flex items-start gap-2 p-2 rounded-lg bg-bg-elevated hover:bg-control-hover transition-colors text-left group"
               >
-                <FilePlus size={12} className="text-fg-dim group-hover:text-brand mt-0.5 shrink-0" />
+                <FilePlus
+                  size={12}
+                  className="text-fg-dim group-hover:text-brand mt-0.5 shrink-0"
+                />
                 <div>
                   <div className="text-ui-xs text-fg-secondary group-hover:text-fg">
                     {gap.topic}
                   </div>
-                  <div className="text-ui-xs text-fg-dim mt-0.5 line-clamp-2">{gap.description}</div>
+                  <div className="text-ui-xs text-fg-dim mt-0.5 line-clamp-2">
+                    {gap.description}
+                  </div>
                 </div>
               </button>
             ))}

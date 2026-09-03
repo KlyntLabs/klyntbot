@@ -195,9 +195,7 @@ function ChatBubble({
   return (
     <div className={`rounded-lg px-3 py-2 ${bgClass}`}>
       <div className={`text-[9px] font-medium mb-1 ${labelClass}`}>{label}</div>
-      <div
-        className={`text-ui-xs leading-relaxed ${isUser ? "text-fg" : "text-fg-secondary"}`}
-      >
+      <div className={`text-ui-xs leading-relaxed ${isUser ? "text-fg" : "text-fg-secondary"}`}>
         {isUser ? content : <MarkdownContent content={content} />}
       </div>
     </div>

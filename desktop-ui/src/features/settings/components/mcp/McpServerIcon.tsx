@@ -8,9 +8,7 @@ export function McpServerIcon({ name, className = "size-5" }: McpServerIconProps
   if (!icon) {
     // Fallback: first two letters
     return (
-      <span className="text-ui-xs font-medium text-fg-secondary uppercase">
-        {name.slice(0, 2)}
-      </span>
+      <span className="text-ui-xs font-medium text-fg-secondary uppercase">{name.slice(0, 2)}</span>
     );
   }
   return (

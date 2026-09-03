@@ -289,7 +289,10 @@ export function WeekCalendarView() {
                 };
 
                 return (
-                  <div key={day} className="flex-1 relative border-r border-separator last:border-r-0">
+                  <div
+                    key={day}
+                    className="flex-1 relative border-r border-separator last:border-r-0"
+                  >
                     {/* Activity session blocks — clean, merged bars */}
                     {activitySessions.map((session) => {
                       const top = session.startMin * PX_PER_MIN;

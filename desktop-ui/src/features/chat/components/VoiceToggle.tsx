@@ -22,9 +22,7 @@ export function VoiceToggle({ mode, onChange }: VoiceToggleProps) {
           type="button"
           onClick={() => onChange(value)}
           className={`flex items-center gap-1 text-ui-xs px-2 py-1 rounded transition-colors ${
-            mode === value
-              ? "bg-purple/20 text-purple-300"
-              : "text-fg-secondary hover:text-fg"
+            mode === value ? "bg-purple/20 text-purple-300" : "text-fg-secondary hover:text-fg"
           }`}
         >
           <Icon size={10} />

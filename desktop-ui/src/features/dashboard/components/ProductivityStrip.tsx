@@ -154,9 +154,7 @@ export function ProductivityStrip({ summary }: ProductivityStripProps) {
             </span>
             <span className="flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-[var(--ds-text-secondary)]" />
-              <span className="text-fg-secondary">
-                {formatHumanDuration(summary.neutralSecs)}
-              </span>
+              <span className="text-fg-secondary">{formatHumanDuration(summary.neutralSecs)}</span>
             </span>
             <span className="flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-status-danger" />

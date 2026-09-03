@@ -1035,7 +1035,9 @@ export function GraphView({
                 {selectedCommunity.topEntities.join(", ")}
               </div>
             )}
-            <div className="text-ui-sm text-fg-secondary">{selectedCommunity.members.length} members</div>
+            <div className="text-ui-sm text-fg-secondary">
+              {selectedCommunity.members.length} members
+            </div>
           </div>
         )}
       </div>

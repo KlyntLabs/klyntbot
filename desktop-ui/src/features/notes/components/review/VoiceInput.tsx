@@ -28,7 +28,9 @@ export function VoiceInput({ onSubmit }: VoiceInputProps) {
     return (
       <div className="flex items-center justify-center gap-2 rounded-lg bg-white/[0.03] border border-separator px-3 py-3">
         <Mic size={12} className="text-fg-dim shrink-0" />
-        <span className="text-ui-xs text-fg-dim">Voice input is not supported in this browser.</span>
+        <span className="text-ui-xs text-fg-dim">
+          Voice input is not supported in this browser.
+        </span>
       </div>
     );
   }

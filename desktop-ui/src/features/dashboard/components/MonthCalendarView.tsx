@@ -154,10 +154,7 @@ export function MonthCalendarView() {
         {/* Day-of-week header */}
         <div className="grid grid-cols-7 mb-1">
           {DAY_LABELS.map((label) => (
-            <div
-              key={label}
-              className="text-center text-ui-xs text-fg-secondary font-medium py-1"
-            >
+            <div key={label} className="text-center text-ui-xs text-fg-secondary font-medium py-1">
               {label}
             </div>
           ))}

@@ -73,7 +73,9 @@ export function AnnotationPopover({
       {/* Quoted text */}
       {annotation.quotedText && (
         <div className="mb-3 rounded-md border-l-2 border-brand/50 bg-control-hover/50 px-3 py-2">
-          <p className="text-ui-sm text-fg-secondary italic leading-relaxed">"{annotation.quotedText}"</p>
+          <p className="text-ui-sm text-fg-secondary italic leading-relaxed">
+            "{annotation.quotedText}"
+          </p>
         </div>
       )}
 

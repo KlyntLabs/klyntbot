@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from "react";
 import "../tasks.css";
-import { CreateIssueModal } from "../components/CreateIssueModal";
 import { PortalContainerProvider } from "@shared/lib/portal-container";
+import { CreateIssueModal } from "../components/CreateIssueModal";
 import { TabBar } from "../components/TabBar";
 import { TabContent } from "../components/TabContent";
 import { TasksLayout } from "../components/TasksLayout";

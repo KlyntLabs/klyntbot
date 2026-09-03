@@ -109,15 +109,11 @@ export function MorningBriefing() {
           </span>
         </div>
         <div className="text-ui-xs text-fg-secondary">
-          <span className="font-medium text-fg tabular-nums">
-            {summary.atomsReviewedThisWeek}
-          </span>{" "}
+          <span className="font-medium text-fg tabular-nums">{summary.atomsReviewedThisWeek}</span>{" "}
           reviewed this week
         </div>
         <div className="text-ui-xs text-fg-secondary">
-          <span className="font-medium text-fg tabular-nums">
-            {summary.atomsCreatedThisWeek}
-          </span>{" "}
+          <span className="font-medium text-fg tabular-nums">{summary.atomsCreatedThisWeek}</span>{" "}
           created this week
         </div>
       </div>
@@ -144,9 +140,7 @@ export function MorningBriefing() {
                       }
                     }}
                   >
-                    <span className="text-ui-xs text-fg truncate flex-1">
-                      {atom.subject}
-                    </span>
+                    <span className="text-ui-xs text-fg truncate flex-1">{atom.subject}</span>
                     <span
                       className={`text-ui-xs font-medium tabular-nums shrink-0 ${retentionTextColor(atom.retentionPct)}`}
                     >

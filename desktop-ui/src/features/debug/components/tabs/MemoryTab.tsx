@@ -253,9 +253,7 @@ export function MemoryTab() {
                     </div>
                   </td>
                   <td className="p-2 text-fg-secondary">{f.stability.toFixed(1)}</td>
-                  <td className="p-2 text-fg-secondary">
-                    {(f.retrievability * 100).toFixed(0)}%
-                  </td>
+                  <td className="p-2 text-fg-secondary">{(f.retrievability * 100).toFixed(0)}%</td>
                   <td className="p-2 text-fg-secondary">{f.accessCount}x</td>
                   <td className="p-2">
                     <button
@@ -293,9 +291,7 @@ export function MemoryTab() {
                   {m.domain}
                 </span>
                 <span className="text-ui-xs text-fg-secondary">{m.occurredAt}</span>
-                <span className="text-ui-xs text-fg-secondary">
-                  imp: {m.importance.toFixed(2)}
-                </span>
+                <span className="text-ui-xs text-fg-secondary">imp: {m.importance.toFixed(2)}</span>
               </div>
               <p className="text-ui-sm text-fg-secondary">{m.summary || m.content}</p>
               {m.summary && m.summary !== m.content && (
@@ -338,7 +334,9 @@ export function MemoryTab() {
                   <td className="p-2 text-fg-secondary">{r.confidence.toFixed(2)}</td>
                   <td className="p-2 text-fg-secondary">{r.signalCount}</td>
                   <td className="p-2">
-                    <span className={`text-ui-xs ${r.active ? "text-status-success" : "text-status-danger"}`}>
+                    <span
+                      className={`text-ui-xs ${r.active ? "text-status-success" : "text-status-danger"}`}
+                    >
                       {r.active ? "ON" : "OFF"}
                     </span>
                   </td>

@@ -142,16 +142,12 @@ export function VersionHistoryOverlay({
                     <div className="flex-1 min-w-0">
                       <div
                         className={`text-sm ${
-                          v.id === selectedId
-                            ? "text-fg font-medium"
-                            : "text-fg-secondary"
+                          v.id === selectedId ? "text-fg font-medium" : "text-fg-secondary"
                         }`}
                       >
                         {formatRelativeTime(v.createdAt)}
                       </div>
-                      <div className="text-ui-sm text-fg-secondary mt-0.5">
-                        {wordCountDelta(v)}
-                      </div>
+                      <div className="text-ui-sm text-fg-secondary mt-0.5">{wordCountDelta(v)}</div>
                     </div>
                   </button>
                 ))}

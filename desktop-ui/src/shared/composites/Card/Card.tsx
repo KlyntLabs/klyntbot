@@ -69,10 +69,7 @@ export function CardHeader({ className, children }: { className?: string; childr
 export function CardTitle({ className, children }: { className?: string; children: ReactNode }) {
   return (
     <h3
-      className={cn(
-        "text-ui-sm font-medium text-fg-secondary uppercase tracking-wider",
-        className,
-      )}
+      className={cn("text-ui-sm font-medium text-fg-secondary uppercase tracking-wider", className)}
     >
       {children}
     </h3>

@@ -538,7 +538,9 @@ export function VoiceSettings() {
 
             {(hasInputChanges || hasOutputChanges) && (
               <>
-                <p className="text-[10px] text-fg-dim">Device changes apply on next voice session.</p>
+                <p className="text-[10px] text-fg-dim">
+                  Device changes apply on next voice session.
+                </p>
                 <SaveButton
                   onClick={async () => {
                     if (hasInputChanges) await saveInput();
@@ -637,9 +639,7 @@ export function VoiceSettings() {
             </label>
 
             <div>
-              <span className="block text-ui-xs text-fg-secondary mb-2">
-                Allowed languages
-              </span>
+              <span className="block text-ui-xs text-fg-secondary mb-2">Allowed languages</span>
               <div className="flex flex-wrap gap-2">
                 {(() => {
                   const selected = inputVal<string[]>("allowedLanguages", ["en", "zh", "vi"]);
@@ -871,9 +871,7 @@ export function VoiceSettings() {
                       ? "Download the 1.7B CustomVoice model above to unlock voice personas."
                       : null;
               if (personasDisabledReason) {
-                return (
-                  <p className="text-ui-xs text-fg-secondary">{personasDisabledReason}</p>
-                );
+                return <p className="text-ui-xs text-fg-secondary">{personasDisabledReason}</p>;
               }
               return null;
             })()}
@@ -957,9 +955,7 @@ export function VoiceSettings() {
                 />
               </label>
               <label className="flex-1">
-                <span className="block text-ui-xs text-fg-secondary mb-1">
-                  Warm chat (minutes)
-                </span>
+                <span className="block text-ui-xs text-fg-secondary mb-1">Warm chat (minutes)</span>
                 <input
                   type="number"
                   value={convVal("warmChatMinutes", 5)}

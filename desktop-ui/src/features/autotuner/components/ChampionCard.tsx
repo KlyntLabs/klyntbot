@@ -78,7 +78,9 @@ export function ChampionCard({ status, onRefetch }: ChampionCardProps) {
         <p className="text-ui-xs text-fg-dim font-light">
           Active {champion.days_active === 1 ? "1 day" : `${champion.days_active} days`}
           {paused && (
-            <span className="ml-2 px-1.5 py-0.5 rounded bg-status-warning/10 text-status-warning">paused</span>
+            <span className="ml-2 px-1.5 py-0.5 rounded bg-status-warning/10 text-status-warning">
+              paused
+            </span>
           )}
         </p>
       </div>

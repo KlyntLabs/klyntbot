@@ -75,9 +75,7 @@ export function ActivityTimeline() {
 
   return (
     <div className="island rounded-xl p-5">
-      <p className="text-ui-xs text-fg-secondary uppercase tracking-wider mb-4">
-        Recent Activity
-      </p>
+      <p className="text-ui-xs text-fg-secondary uppercase tracking-wider mb-4">Recent Activity</p>
 
       <div className="flex flex-col gap-4">
         {Array.from(grouped.entries()).map(([group, groupItems]) => (

@@ -31,7 +31,11 @@ function StepDots({
             // biome-ignore lint/suspicious/noArrayIndexKey: static step indicator dots from Array.from
             key={`step-${i}`}
             className={`rounded-full transition-all duration-300 ${
-              isActive ? "w-6 h-2 bg-brand" : isDone ? "size-2 bg-brand/60" : "size-2 bg-control-hover"
+              isActive
+                ? "w-6 h-2 bg-brand"
+                : isDone
+                  ? "size-2 bg-brand/60"
+                  : "size-2 bg-control-hover"
             }`}
           />
         );

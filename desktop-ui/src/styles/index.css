@@ -1,10 +1,10 @@
 @import "./fonts.css";
 /* Design system owns Tailwind theme/preflight/utilities + tokens/recipes */
 @import "@klyntbot/design-system/styles/index.css";
-/* App source scan — DS package already @source's itself */
-@source "../**/*.{ts,tsx}";
 @import "./prose.css";
 @import "./editor.css";
+/* App source scan — DS package already @source's itself; after @import (Biome / CSS order) */
+@source "../**/*.{ts,tsx}";
 /* Legacy glass-* classes live in @klyntbot/design-system recipes/legacy-glass.css */
 
 body {

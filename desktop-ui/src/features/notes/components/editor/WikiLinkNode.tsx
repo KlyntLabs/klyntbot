@@ -329,7 +329,9 @@ export function WikiLinkMenu({ editor, currentNoteTitle }: WikiLinkMenuProps) {
           type="button"
           onClick={() => handleCreateAndLink(state.query)}
           className={`w-full px-3 py-1.5 text-sm text-left flex items-center gap-2 transition-colors ${
-            selectedIndex === 0 ? "bg-control-hover text-brand" : "text-brand/80 hover:bg-bg-elevated"
+            selectedIndex === 0
+              ? "bg-control-hover text-brand"
+              : "text-brand/80 hover:bg-bg-elevated"
           }`}
         >
           <span className="text-ui-sm">&#10024;</span>

@@ -26,9 +26,7 @@ export function SessionProgress({ remaining, total, avgScore, onExit }: SessionP
       <div className="flex items-center gap-2">
         <span className="text-[9px] text-fg-dim flex-1">
           {remaining} remaining
-          {scoreDisplay && (
-            <span className="ml-1.5 text-fg-secondary">· avg {scoreDisplay}</span>
-          )}
+          {scoreDisplay && <span className="ml-1.5 text-fg-secondary">· avg {scoreDisplay}</span>}
         </span>
         <button
           type="button"

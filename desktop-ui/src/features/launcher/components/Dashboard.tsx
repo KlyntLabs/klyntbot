@@ -187,7 +187,11 @@ function ScoreRing({ score, size = 44 }: { score: number; size?: number }) {
 
   // Color based on score
   const color =
-    score >= 70 ? "var(--ds-status-success)" : score >= 40 ? "var(--ds-accent)" : "var(--ds-status-danger)";
+    score >= 70
+      ? "var(--ds-status-success)"
+      : score >= 40
+        ? "var(--ds-accent)"
+        : "var(--ds-status-danger)";
 
   return (
     <svg

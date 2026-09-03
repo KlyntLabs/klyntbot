@@ -49,7 +49,9 @@ function CardPreviewRow({
           type="button"
           onClick={onToggle}
           className={`mt-0.5 size-5 rounded flex items-center justify-center flex-shrink-0 transition-colors ${
-            isApproved ? "bg-brand text-white" : "bg-control-hover text-fg-secondary hover:bg-control-hover"
+            isApproved
+              ? "bg-brand text-white"
+              : "bg-control-hover text-fg-secondary hover:bg-control-hover"
           }`}
         >
           {isApproved && <Check size={12} />}
@@ -93,16 +95,12 @@ function CardPreviewRow({
                 />
               </label>
               {card.sourceContext && (
-                <p className="text-ui-xs text-fg-secondary italic">
-                  Source: {card.sourceContext}
-                </p>
+                <p className="text-ui-xs text-fg-secondary italic">Source: {card.sourceContext}</p>
               )}
             </div>
           )}
 
-          {!expanded && (
-            <p className="text-ui-sm text-fg-secondary mt-0.5 truncate">{card.back}</p>
-          )}
+          {!expanded && <p className="text-ui-sm text-fg-secondary mt-0.5 truncate">{card.back}</p>}
         </div>
       </div>
     </div>

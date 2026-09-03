@@ -53,17 +53,13 @@ export function TokenBadge({ transparency }: TokenBadgeProps) {
           {usage.cacheReadTokens > 0 && (
             <div className="flex justify-between text-fg-secondary">
               <span>Cache read</span>
-              <span className="text-fg-secondary">
-                {usage.cacheReadTokens.toLocaleString()}
-              </span>
+              <span className="text-fg-secondary">{usage.cacheReadTokens.toLocaleString()}</span>
             </div>
           )}
           {usage.cacheWriteTokens > 0 && (
             <div className="flex justify-between text-fg-secondary">
               <span>Cache write</span>
-              <span className="text-fg-secondary">
-                {usage.cacheWriteTokens.toLocaleString()}
-              </span>
+              <span className="text-fg-secondary">{usage.cacheWriteTokens.toLocaleString()}</span>
             </div>
           )}
           {transparency.toolTokensTotal && transparency.toolTokensTotal > 0 && (

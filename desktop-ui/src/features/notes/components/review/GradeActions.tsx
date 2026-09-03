@@ -54,11 +54,7 @@ export function GradeActions({
 
       {/* Action links */}
       <div className="flex items-center gap-3 justify-center">
-        <button
-          type="button"
-          onClick={onExplain}
-          className="text-[9px] text-fg-dim hover:text-fg"
-        >
+        <button type="button" onClick={onExplain} className="text-[9px] text-fg-dim hover:text-fg">
           (e) Explain
         </button>
         <button

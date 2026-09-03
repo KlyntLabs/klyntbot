@@ -50,12 +50,12 @@ export function ExperimentWatchlist({ previews, onAction }: ExperimentWatchlistP
               <span className="text-ui-sm font-medium text-fg">
                 Trial {preview.trialId.slice(0, 8)}
               </span>
-              <span className="text-ui-xs text-fg-dim">{preview.messagesScored} messages scored</span>
+              <span className="text-ui-xs text-fg-dim">
+                {preview.messagesScored} messages scored
+              </span>
             </div>
 
-            <p className="text-ui-xs text-fg-secondary mt-1 leading-relaxed">
-              {preview.narrative}
-            </p>
+            <p className="text-ui-xs text-fg-secondary mt-1 leading-relaxed">{preview.narrative}</p>
 
             <div className="flex items-center justify-between mt-3 pt-3 border-t border-separator">
               <span

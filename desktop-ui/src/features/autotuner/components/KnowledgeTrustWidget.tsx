@@ -41,9 +41,7 @@ export function KnowledgeTrustWidget() {
           <p className="text-ui-xs text-fg-dim">How well I know you</p>
         </div>
         <div className="text-right">
-          <span className="text-2xl font-semibold text-fg">
-            {Math.round(data.overall * 100)}%
-          </span>
+          <span className="text-2xl font-semibold text-fg">{Math.round(data.overall * 100)}%</span>
           {data.trendPct != null && (
             <span className={`text-ui-xs ml-1 ${trendColor(data.trendPct)}`}>
               {trendArrow(data.trendPct)}

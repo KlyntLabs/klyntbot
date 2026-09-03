@@ -27,7 +27,9 @@ export function CustomServerCard({ server, onToggle, onRemove, onEdit }: CustomS
       <div className="flex items-center gap-1.5 flex-shrink-0">
         <span
           className={`text-ui-xs px-1.5 py-0.5 rounded ${
-            server.transport === "stdio" ? "bg-purple/10 text-purple" : "bg-status-info/10 text-status-info"
+            server.transport === "stdio"
+              ? "bg-purple/10 text-purple"
+              : "bg-status-info/10 text-status-info"
           }`}
         >
           {server.transport}
@@ -36,7 +38,9 @@ export function CustomServerCard({ server, onToggle, onRemove, onEdit }: CustomS
           type="button"
           onClick={() => onToggle(server.name, !server.enabled)}
           className={`size-7 rounded-md flex items-center justify-center transition-colors ${
-            server.enabled ? "text-status-success hover:bg-control-hover" : "text-fg-dim hover:bg-control-hover"
+            server.enabled
+              ? "text-status-success hover:bg-control-hover"
+              : "text-fg-dim hover:bg-control-hover"
           }`}
           aria-label={server.enabled ? "Disable" : "Enable"}
         >
@@ -183,7 +187,9 @@ export function RecommendedServerCard({
                 type="button"
                 onClick={() => onToggle?.(server.name, !enabled)}
                 className={`size-7 rounded-md flex items-center justify-center transition-colors ${
-                  enabled ? "text-status-success hover:bg-control-hover" : "text-fg-dim hover:bg-control-hover"
+                  enabled
+                    ? "text-status-success hover:bg-control-hover"
+                    : "text-fg-dim hover:bg-control-hover"
                 }`}
                 aria-label={enabled ? "Disable" : "Enable"}
               >

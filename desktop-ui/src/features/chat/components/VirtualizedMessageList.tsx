@@ -110,9 +110,7 @@ function MessageRow({
             <div className="flex justify-start mb-6">
               <div className="glass-bubble px-4 py-3 flex items-center gap-2">
                 <ThinkingDots size="sm" />
-                {statusPhase && (
-                  <span className="text-ui-sm text-fg-secondary">{statusPhase}</span>
-                )}
+                {statusPhase && <span className="text-ui-sm text-fg-secondary">{statusPhase}</span>}
               </div>
             </div>
           )}
@@ -204,7 +202,9 @@ function MessageRow({
               <div className="max-w-[80%]">
                 <div className="flex items-baseline gap-1.5 mb-1">
                   <span className="text-ui-xs font-medium text-fg">{pm.personaName}</span>
-                  {pm.personaRole && <span className="text-[9px] text-fg-dim">{pm.personaRole}</span>}
+                  {pm.personaRole && (
+                    <span className="text-[9px] text-fg-dim">{pm.personaRole}</span>
+                  )}
                 </div>
                 <div className="glass-bubble px-4 py-3">
                   <div className="text-ui font-light text-fg-secondary leading-relaxed whitespace-pre-wrap">

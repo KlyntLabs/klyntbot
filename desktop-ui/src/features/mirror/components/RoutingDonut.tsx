@@ -38,10 +38,7 @@ export function RoutingDonut({ snapshot }: RoutingDonutProps) {
       <div className="flex flex-col gap-2">
         {entries.map(([skillName, stats]) => (
           <div key={skillName} className="flex items-center gap-3">
-            <span
-              className="text-ui-xs text-fg-secondary w-32 shrink-0 truncate"
-              title={skillName}
-            >
+            <span className="text-ui-xs text-fg-secondary w-32 shrink-0 truncate" title={skillName}>
               {skillName}
             </span>
             <div className="flex-1 h-1.5 rounded-full bg-control-hover/40 overflow-hidden">

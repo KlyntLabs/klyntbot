@@ -26,9 +26,7 @@ function StatCard({
       <div className="text-fg-secondary shrink-0">{icon}</div>
       <div className="min-w-0">
         <p className="text-ui-xs text-fg-secondary leading-none mb-0.5">{label}</p>
-        <p
-          className={`text-sm font-semibold tabular-nums leading-none ${valueClass ?? "text-fg"}`}
-        >
+        <p className={`text-sm font-semibold tabular-nums leading-none ${valueClass ?? "text-fg"}`}>
           {value}
         </p>
       </div>

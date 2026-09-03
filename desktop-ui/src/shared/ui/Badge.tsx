@@ -1,1 +1,1 @@
-export { Badge, badgeVariants, type BadgeProps } from "@klyntbot/design-system";
+export { Badge, type BadgeProps, badgeVariants } from "@klyntbot/design-system";

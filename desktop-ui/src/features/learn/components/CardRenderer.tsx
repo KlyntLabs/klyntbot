@@ -32,9 +32,7 @@ function ClozeCard({ card, revealed }: { card: Flashcard; revealed: boolean }) {
 
   return (
     <div className="text-center space-y-6">
-      <div className="text-lg text-fg whitespace-pre-wrap">
-        {revealed ? fullText : maskedText}
-      </div>
+      <div className="text-lg text-fg whitespace-pre-wrap">{revealed ? fullText : maskedText}</div>
       {revealed && card.back && (
         <div className="animate-[fade-in-up_0.25s_ease-out]">
           <div className="glass-divider mb-6" />

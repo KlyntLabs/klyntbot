@@ -98,7 +98,10 @@ function EvaluationResults({ evaluation }: { evaluation: TranslationEvalResponse
       {corrections.length > 0 && (
         <div className="space-y-0.5">
           {corrections.map((c, i) => (
-            <div key={`${c.original}-${c.suggested}`} className="border-b border-separator/50 py-1.5">
+            <div
+              key={`${c.original}-${c.suggested}`}
+              className="border-b border-separator/50 py-1.5"
+            >
               <div className="flex items-center justify-between">
                 <div className="text-ui-sm">
                   <span className="text-red-400">✗</span>{" "}

@@ -192,19 +192,19 @@ export function CoachingTab() {
           <Gauge label="Focus" value={situation.focusState} />
           <Gauge label="Deadline" value={situation.deadlinePressure} color="text-status-danger" />
           <Gauge label="Distraction" value={situation.distractionRisk} color="text-brand" />
-          <Gauge label="Receptivity" value={situation.coachingReceptivity} color="text-status-success" />
+          <Gauge
+            label="Receptivity"
+            value={situation.coachingReceptivity}
+            color="text-status-success"
+          />
           <div className="flex flex-col gap-1 ml-4 text-ui-xs">
             <span className="text-fg-secondary">
               Hours active:{" "}
-              <span className="text-fg-secondary">
-                {situation.hoursActiveToday.toFixed(1)}h
-              </span>
+              <span className="text-fg-secondary">{situation.hoursActiveToday.toFixed(1)}h</span>
             </span>
             <span className="text-fg-secondary">
               Since break:{" "}
-              <span className="text-fg-secondary">
-                {situation.minsSinceBreak.toFixed(0)}min
-              </span>
+              <span className="text-fg-secondary">{situation.minsSinceBreak.toFixed(0)}min</span>
             </span>
             <span className="text-fg-secondary">
               Context switches:{" "}
@@ -305,12 +305,13 @@ export function CoachingTab() {
           </div>
 
           <div>
-            <h3 className="text-ui font-medium text-fg-secondary mb-2">
-              Detected Patterns
-            </h3>
+            <h3 className="text-ui font-medium text-fg-secondary mb-2">Detected Patterns</h3>
             <div className="space-y-2">
               {patterns.map((p) => (
-                <div key={p.name} className="p-3 bg-bg-elevated rounded-panel border border-separator">
+                <div
+                  key={p.name}
+                  className="p-3 bg-bg-elevated rounded-panel border border-separator"
+                >
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-ui-sm text-fg-secondary font-medium">{p.name}</span>
                     <span className="text-ui-xs text-fg-secondary">{p.signalCount} signals</span>
@@ -334,9 +335,7 @@ export function CoachingTab() {
         {/* Right: Router & Feedback */}
         <div className="space-y-4">
           <div>
-            <h3 className="text-ui font-medium text-fg-secondary mb-2">
-              Intervention Router
-            </h3>
+            <h3 className="text-ui font-medium text-fg-secondary mb-2">Intervention Router</h3>
             <div className="p-3 bg-bg-elevated rounded-panel border border-separator">
               <div className="flex gap-4 text-ui-sm">
                 <span className="text-fg-secondary">

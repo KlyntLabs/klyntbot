@@ -61,11 +61,15 @@ export function VoiceSettings() {
         </div>
         <div className="flex items-center justify-between">
           <span className="text-sm">Privacy mode</span>
-          <span className="text-ui-sm text-fg-secondary capitalize">{config.input.privacyMode}</span>
+          <span className="text-ui-sm text-fg-secondary capitalize">
+            {config.input.privacyMode}
+          </span>
         </div>
         <div className="flex items-center justify-between">
           <span className="text-sm">Transcription engine</span>
-          <span className="text-ui-sm text-fg-secondary">Local (whisper-{config.input.modelSize})</span>
+          <span className="text-ui-sm text-fg-secondary">
+            Local (whisper-{config.input.modelSize})
+          </span>
         </div>
       </section>
 
@@ -73,7 +77,9 @@ export function VoiceSettings() {
         <h4 className="text-sm font-medium text-fg-secondary">Voice Output</h4>
         <div className="flex items-center justify-between">
           <span className="text-sm">Enable spoken responses</span>
-          <span className="text-ui-sm text-fg-secondary">{config.output.enabled ? "On" : "Off"}</span>
+          <span className="text-ui-sm text-fg-secondary">
+            {config.output.enabled ? "On" : "Off"}
+          </span>
         </div>
         <div className="flex items-center justify-between">
           <span className="text-sm">Speaking rate</span>
@@ -91,7 +97,9 @@ export function VoiceSettings() {
         <h4 className="text-sm font-medium text-fg-secondary">Language Learning</h4>
         <div className="flex items-center justify-between">
           <span className="text-sm">Target language</span>
-          <span className="text-ui-sm text-fg-secondary">{config.learning.targetLanguage || "Not set"}</span>
+          <span className="text-ui-sm text-fg-secondary">
+            {config.learning.targetLanguage || "Not set"}
+          </span>
         </div>
         <div className="flex items-center justify-between">
           <span className="text-sm">Show pronunciation scores</span>

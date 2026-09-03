@@ -8,9 +8,7 @@ export function ArchivedSettings() {
     <div>
       <div className="mb-8">
         <h2 className="text-lg font-medium text-fg">Archived threads</h2>
-        <p className="text-ui text-fg-secondary mt-1">
-          View and restore archived conversations
-        </p>
+        <p className="text-ui text-fg-secondary mt-1">View and restore archived conversations</p>
       </div>
 
       <div className="island rounded-lg p-8 flex flex-col items-center text-center">

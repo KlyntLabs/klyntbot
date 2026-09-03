@@ -22,9 +22,7 @@ function CollapsibleBox({ title, icon: Icon, children, defaultOpen = true }: Col
         className="w-full flex items-center gap-2 px-3 py-2 rounded-t-[var(--ds-radius-lg)] bg-control-hover"
       >
         <Icon className="size-3 text-fg-secondary" strokeWidth={1.5} />
-        <span className="flex-1 text-left text-ui-xs font-medium text-fg-secondary">
-          {title}
-        </span>
+        <span className="flex-1 text-left text-ui-xs font-medium text-fg-secondary">{title}</span>
         <ChevronDown
           className={`size-3 text-fg-secondary transition-transform ${open ? "rotate-0" : "-rotate-90"}`}
           strokeWidth={1.5}

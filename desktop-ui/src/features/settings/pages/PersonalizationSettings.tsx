@@ -263,9 +263,7 @@ export function PersonalizationSettings() {
     <div>
       <div className="mb-8">
         <h2 className="text-lg font-medium text-fg">Personalization</h2>
-        <p className="text-ui text-fg-secondary mt-1">
-          Provider, model, and learning preferences
-        </p>
+        <p className="text-ui text-fg-secondary mt-1">Provider, model, and learning preferences</p>
       </div>
 
       <div className="space-y-4">
@@ -349,9 +347,7 @@ export function PersonalizationSettings() {
             </p>
 
             <label className="block">
-              <span className="block text-ui-xs text-fg-secondary mb-1">
-                Provider override
-              </span>
+              <span className="block text-ui-xs text-fg-secondary mb-1">Provider override</span>
               <select
                 value={cogProvider}
                 onChange={(e) =>
@@ -454,7 +450,9 @@ export function PersonalizationSettings() {
 
             {hasCognitiveChanges && (
               <>
-                <p className="text-ui-xs text-status-warning/80">Changes take effect after restart</p>
+                <p className="text-ui-xs text-status-warning/80">
+                  Changes take effect after restart
+                </p>
                 <SaveButton onClick={saveCognitive} saving={savingCognitive} />
               </>
             )}
@@ -581,9 +579,7 @@ export function PersonalizationSettings() {
             </label>
 
             <label className="block">
-              <span className="block text-ui-xs text-fg-secondary mb-1">
-                Fallback provider
-              </span>
+              <span className="block text-ui-xs text-fg-secondary mb-1">Fallback provider</span>
               <select
                 value={pmVal("fallback")}
                 onChange={(e) => setPmEdits((prev) => ({ ...prev, fallback: e.target.value }))}

@@ -403,11 +403,7 @@ function SessionDetail({ session, onClose }: { session: SessionBlock; onClose: (
         <h3 className="text-ui-sm font-semibold text-fg-secondary uppercase tracking-wider">
           Activity Session
         </h3>
-        <button
-          type="button"
-          onClick={onClose}
-          className="text-fg-secondary hover:text-fg"
-        >
+        <button type="button" onClick={onClose} className="text-fg-secondary hover:text-fg">
           <X className="size-4" />
         </button>
       </div>
@@ -526,11 +522,7 @@ function EntryDetail({
         <h3 className="text-ui-sm font-semibold text-fg-secondary uppercase tracking-wider">
           Details
         </h3>
-        <button
-          type="button"
-          onClick={onClose}
-          className="text-fg-secondary hover:text-fg"
-        >
+        <button type="button" onClick={onClose} className="text-fg-secondary hover:text-fg">
           <X className="size-4" />
         </button>
       </div>

@@ -166,11 +166,7 @@ export function ImmersiveReview({ deck, onExit }: ImmersiveReviewProps) {
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center space-y-3">
           <p className="text-fg-secondary text-sm">No cards due for review</p>
-          <button
-            type="button"
-            onClick={onExit}
-            className="glass-button px-4 py-2 text-sm text-fg"
-          >
+          <button type="button" onClick={onExit} className="glass-button px-4 py-2 text-sm text-fg">
             Back to Dashboard
           </button>
         </div>
@@ -210,9 +206,7 @@ export function ImmersiveReview({ deck, onExit }: ImmersiveReviewProps) {
         <div className="flex-1 flex flex-col items-center gap-1 min-w-0">
           <ProgressSegments total={cards.length} current={currentIndex} />
           <div className="flex items-center gap-1.5">
-            <span className="text-ui-xs text-fg-secondary truncate max-w-[140px]">
-              {deckLabel}
-            </span>
+            <span className="text-ui-xs text-fg-secondary truncate max-w-[140px]">{deckLabel}</span>
             <span className="text-fg-dim">·</span>
             <span className="text-ui-xs text-fg-dim tabular-nums">
               {currentIndex + 1}/{cards.length}
@@ -226,9 +220,7 @@ export function ImmersiveReview({ deck, onExit }: ImmersiveReviewProps) {
             type="button"
             onClick={() => setAnswerMode("flip")}
             className={`flex items-center gap-1 px-2 py-1 rounded text-ui-xs transition-colors ${
-              answerMode === "flip"
-                ? "bg-white/10 text-fg"
-                : "text-fg-secondary hover:text-fg"
+              answerMode === "flip" ? "bg-white/10 text-fg" : "text-fg-secondary hover:text-fg"
             }`}
           >
             <RotateCcw size={11} strokeWidth={1.5} />
@@ -238,9 +230,7 @@ export function ImmersiveReview({ deck, onExit }: ImmersiveReviewProps) {
             type="button"
             onClick={() => setAnswerMode("type")}
             className={`flex items-center gap-1 px-2 py-1 rounded text-ui-xs transition-colors ${
-              answerMode === "type"
-                ? "bg-white/10 text-fg"
-                : "text-fg-secondary hover:text-fg"
+              answerMode === "type" ? "bg-white/10 text-fg" : "text-fg-secondary hover:text-fg"
             }`}
           >
             <Keyboard size={11} strokeWidth={1.5} />

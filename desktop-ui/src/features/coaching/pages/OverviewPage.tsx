@@ -228,7 +228,11 @@ export function CoachingOverviewPage() {
           <Gauge label="Focus" value={situation.focusState} />
           <Gauge label="Deadline" value={situation.deadlinePressure} color="text-status-danger" />
           <Gauge label="Distraction" value={situation.distractionRisk} color="text-brand" />
-          <Gauge label="Receptivity" value={situation.coachingReceptivity} color="text-status-success" />
+          <Gauge
+            label="Receptivity"
+            value={situation.coachingReceptivity}
+            color="text-status-success"
+          />
           <div className="flex flex-col gap-1 ml-4 text-ui-xs">
             <span className="text-fg-secondary">
               Hours active:{" "}
@@ -257,7 +261,10 @@ export function CoachingOverviewPage() {
           </h2>
           <div className="flex flex-col gap-2">
             {interventions.map((iv) => (
-              <div key={iv.id} className="p-3 rounded-panel bg-control-hover/30 border border-brand/30">
+              <div
+                key={iv.id}
+                className="p-3 rounded-panel bg-control-hover/30 border border-brand/30"
+              >
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
@@ -382,9 +389,7 @@ export function CoachingOverviewPage() {
         <div className="flex flex-col gap-4">
           {/* Intervention Router */}
           <div className="island p-5">
-            <h2 className="text-ui font-medium text-fg-secondary mb-3">
-              Intervention Router
-            </h2>
+            <h2 className="text-ui font-medium text-fg-secondary mb-3">Intervention Router</h2>
             <div className="flex gap-4 text-ui-sm">
               <span className="text-fg-secondary">
                 Hourly:{" "}
@@ -453,9 +458,7 @@ export function CoachingOverviewPage() {
           {/* Recent Interventions preview */}
           <div className="island p-5">
             <div className="flex items-baseline justify-between mb-3">
-              <h2 className="text-ui font-medium text-fg-secondary">
-                Recent Interventions
-              </h2>
+              <h2 className="text-ui font-medium text-fg-secondary">Recent Interventions</h2>
               {history.length > 0 && (
                 <button
                   type="button"

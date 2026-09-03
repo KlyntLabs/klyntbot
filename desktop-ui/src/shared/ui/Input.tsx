@@ -1,1 +1,1 @@
-export { Input, inputVariants, type InputProps } from "@klyntbot/design-system";
+export { Input, type InputProps, inputVariants } from "@klyntbot/design-system";

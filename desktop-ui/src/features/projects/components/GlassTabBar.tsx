@@ -54,9 +54,7 @@ function SortableTab({
       type="button"
       onClick={() => navigate(path)}
       className={`flex items-center gap-1.5 px-4 py-2.5 text-ui-sm font-medium transition-colors border-b-2 -mb-px ${
-        isActive
-          ? "border-brand text-fg"
-          : "border-transparent text-fg-secondary hover:text-fg"
+        isActive ? "border-brand text-fg" : "border-transparent text-fg-secondary hover:text-fg"
       }`}
       {...attributes}
       {...listeners}

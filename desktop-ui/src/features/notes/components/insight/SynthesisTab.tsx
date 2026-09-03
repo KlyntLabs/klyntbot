@@ -36,7 +36,9 @@ export function SynthesisTab({
 }: SynthesisTabProps) {
   const chat = useInsightChat(noteId, "synthesis", status === "done", squadId, content);
   if (status === "idle") {
-    return <p className="text-ui-xs text-fg-dim italic">Start an insight review to see synthesis</p>;
+    return (
+      <p className="text-ui-xs text-fg-dim italic">Start an insight review to see synthesis</p>
+    );
   }
 
   if (status === "loading") {

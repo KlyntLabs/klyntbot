@@ -115,9 +115,7 @@ export function ProjectNotesTab() {
           <div className="flex-1 flex flex-col items-center justify-center text-center px-6">
             {notes.length === 0 && !loading ? (
               <>
-                <p className="text-sm text-fg-secondary mb-2">
-                  No notes linked to this project.
-                </p>
+                <p className="text-sm text-fg-secondary mb-2">No notes linked to this project.</p>
                 <p className="text-ui-sm text-fg-secondary">
                   Create a note or link an existing notebook to get started.
                 </p>

@@ -1,13 +1,5 @@
 import { useMutation } from "@shared/hooks/useMutation";
 import type { Task, TaskUpdateParams } from "@shared/types/tasks";
-import type React from "react";
-import { useStatusWorkflow } from "../contexts/StatusWorkflowContext";
-import { useRefetchTasks } from "../hooks/useTasksContext";
-import type { Issue } from "../lib/mappers";
-import { priorityToNumber, statusToMutationParams } from "../lib/mappers";
-import { priorities } from "../lib/priority-icons";
-import { renderStatusIcon } from "../lib/status-utils";
-import { useTabStore } from "../store/tab-store";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -19,6 +11,14 @@ import {
   ContextMenuSubTrigger,
   ContextMenuTrigger,
 } from "@shared/ui/RadixContextMenu";
+import type React from "react";
+import { useStatusWorkflow } from "../contexts/StatusWorkflowContext";
+import { useRefetchTasks } from "../hooks/useTasksContext";
+import type { Issue } from "../lib/mappers";
+import { priorityToNumber, statusToMutationParams } from "../lib/mappers";
+import { priorities } from "../lib/priority-icons";
+import { renderStatusIcon } from "../lib/status-utils";
+import { useTabStore } from "../store/tab-store";
 
 interface IssueContextMenuProps {
   issue: Issue;

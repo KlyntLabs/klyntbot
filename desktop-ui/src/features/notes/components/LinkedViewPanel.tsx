@@ -45,11 +45,14 @@ export function LinkedViewPanel({ noteId, sectionText }: LinkedViewPanelProps) {
               className="rounded-md border border-purple-500/20 bg-purple-500/5 p-2"
             >
               <p className="text-ui-sm text-brand">
-                {fact.subject} <span className="text-fg-secondary">{fact.predicate}</span> {fact.object}
+                {fact.subject} <span className="text-fg-secondary">{fact.predicate}</span>{" "}
+                {fact.object}
               </p>
               <div className="mt-1 flex items-center gap-2">
                 <ConfidenceBar confidence={fact.confidence} />
-                <span className="text-ui-xs text-fg-secondary">{Math.round(fact.confidence * 100)}%</span>
+                <span className="text-ui-xs text-fg-secondary">
+                  {Math.round(fact.confidence * 100)}%
+                </span>
               </div>
             </div>
           ))}

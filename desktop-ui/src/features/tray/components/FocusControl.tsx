@@ -204,7 +204,11 @@ function TimerView({ timer, onOpenSettings }: { timer: Timer; onOpenSettings: ()
         : formatElapsed(settings.focusDuration * 60);
 
   // Ring color: brand for focus, info-blue for break, warning pulse at 30s
-  const ringColor = showWarning ? "var(--ds-status-warning)" : isBreak ? "var(--ds-status-info)" : "var(--ds-accent)";
+  const ringColor = showWarning
+    ? "var(--ds-status-warning)"
+    : isBreak
+      ? "var(--ds-status-info)"
+      : "var(--ds-accent)";
 
   // Cycle state (from backend)
   const dotsCount = longBreakAfter;
@@ -413,7 +417,9 @@ function TimerView({ timer, onOpenSettings }: { timer: Timer; onOpenSettings: ()
       {/* ── DND unavailable hint ──────────────────────────────────── */}
       {dndHint && (
         <div className="flex items-center gap-2 mt-2 px-2">
-          <p className="text-[10px] text-status-warning/70 font-light leading-tight flex-1">{dndHint}</p>
+          <p className="text-[10px] text-status-warning/70 font-light leading-tight flex-1">
+            {dndHint}
+          </p>
           <button
             type="button"
             onClick={timer.dismissDndHint}
@@ -558,9 +564,7 @@ function WarningBanner({ timer, isWorking }: { timer: Timer; isWorking: boolean 
 function BreakPendingActions({ timer }: { timer: Timer }) {
   return (
     <div className="flex flex-col items-center gap-2 mt-3 animate-fade-in">
-      <p className="text-ui-xs text-fg-secondary font-light text-center">
-        Break starting soon
-      </p>
+      <p className="text-ui-xs text-fg-secondary font-light text-center">Break starting soon</p>
 
       <div className="flex gap-1.5">
         {[5, 10, 15].map((mins) => (
@@ -635,9 +639,7 @@ function FocusSettingsPanel({
           type="button"
           onClick={() => setTab("duration")}
           className={`flex-1 py-1.5 rounded-full text-ui-xs uppercase tracking-[0.12em] font-light transition-colors ${
-            tab === "duration"
-              ? "bg-control-hover text-fg"
-              : "text-fg-secondary hover:text-fg"
+            tab === "duration" ? "bg-control-hover text-fg" : "text-fg-secondary hover:text-fg"
           }`}
         >
           Duration
@@ -646,9 +648,7 @@ function FocusSettingsPanel({
           type="button"
           onClick={() => setTab("notifications")}
           className={`flex-1 py-1.5 rounded-full text-ui-xs uppercase tracking-[0.12em] font-light transition-colors ${
-            tab === "notifications"
-              ? "bg-control-hover text-fg"
-              : "text-fg-secondary hover:text-fg"
+            tab === "notifications" ? "bg-control-hover text-fg" : "text-fg-secondary hover:text-fg"
           }`}
         >
           Notifications
@@ -775,9 +775,7 @@ function SettingRow({
           onClick={startEdit}
           className="flex items-center gap-1.5 text-fg-secondary hover:text-fg transition-colors"
         >
-          <span className="text-ui font-light tabular-nums">
-            {String(value).padStart(2, "0")}
-          </span>
+          <span className="text-ui font-light tabular-nums">{String(value).padStart(2, "0")}</span>
           <span className="text-ui-xs font-light">{unit}</span>
           <ChevronRight className="size-3.5" strokeWidth={1.5} />
         </button>

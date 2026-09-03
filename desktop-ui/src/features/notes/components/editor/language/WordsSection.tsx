@@ -138,7 +138,9 @@ function WordRow({
           )}
         </div>
         <span className="text-ui-sm text-brand font-medium truncate">{word.word}</span>
-        {word.reading && <span className="text-ui-xs text-fg-secondary shrink-0">{word.reading}</span>}
+        {word.reading && (
+          <span className="text-ui-xs text-fg-secondary shrink-0">{word.reading}</span>
+        )}
         {word.isNew && <span className="text-[9px] text-brand font-medium shrink-0">new</span>}
       </div>
       <div className="flex items-center gap-2 shrink-0 ml-2">

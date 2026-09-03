@@ -3,7 +3,8 @@ import type { TimelineEntry } from "@shared/types";
 
 /** Maps focus quality score (0-10) to a CSS background color with 25% opacity via color-mix. */
 export function focusColor(qualityScore: number): string {
-  if (qualityScore > 7) return "color-mix(in oklch, var(--ds-timeline-focus-high) 25%, transparent)";
+  if (qualityScore > 7)
+    return "color-mix(in oklch, var(--ds-timeline-focus-high) 25%, transparent)";
   if (qualityScore < 4) return "color-mix(in oklch, var(--ds-timeline-focus-low) 25%, transparent)";
   return "color-mix(in oklch, var(--ds-timeline-focus) 25%, transparent)";
 }

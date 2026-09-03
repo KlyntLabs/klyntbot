@@ -39,8 +39,7 @@ export function PracticeSourcePanel({
         let className = "text-sm leading-relaxed py-1 transition-colors duration-200";
 
         if (isCurrent) {
-          className +=
-            " bg-brand/10 border-l-2 border-brand pl-2 rounded-r text-brand font-medium";
+          className += " bg-brand/10 border-l-2 border-brand pl-2 rounded-r text-brand font-medium";
         } else if (isCompleted) {
           className += " opacity-40 line-through pl-3";
         } else {

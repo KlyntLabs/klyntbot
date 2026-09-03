@@ -90,7 +90,9 @@ export function ConceptMapTab({
 
   if (status === "idle") {
     return (
-      <p className="text-ui-xs text-fg-dim italic">Start an insight review to see the concept map</p>
+      <p className="text-ui-xs text-fg-dim italic">
+        Start an insight review to see the concept map
+      </p>
     );
   }
 

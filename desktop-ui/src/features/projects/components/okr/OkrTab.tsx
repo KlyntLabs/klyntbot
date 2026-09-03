@@ -59,9 +59,7 @@ export function OkrTab() {
               type="button"
               onClick={() => setFilter(opt.value)}
               className={`px-2.5 py-1 text-ui-xs font-medium rounded transition-colors ${
-                filter === opt.value
-                  ? "bg-brand/20 text-brand"
-                  : "text-fg-secondary hover:text-fg"
+                filter === opt.value ? "bg-brand/20 text-brand" : "text-fg-secondary hover:text-fg"
               }`}
             >
               {opt.label}

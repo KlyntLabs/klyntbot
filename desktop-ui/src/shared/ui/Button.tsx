@@ -1,1 +1,1 @@
-export { Button, buttonVariants, type ButtonProps } from "@klyntbot/design-system";
+export { Button, type ButtonProps, buttonVariants } from "@klyntbot/design-system";

@@ -157,7 +157,8 @@ export function SelfAssessmentTab({
                     }
                   } else {
                     if (isSelected) {
-                      choiceClass += "border-separator bg-control-hover text-fg hover:bg-control-hover";
+                      choiceClass +=
+                        "border-separator bg-control-hover text-fg hover:bg-control-hover";
                     } else {
                       choiceClass +=
                         "border-separator bg-bg-elevated text-fg-secondary hover:bg-control-hover";
@@ -234,7 +235,9 @@ export function SelfAssessmentTab({
         </button>
       )}
       {scenarioError && !scenario && (
-        <p className="text-ui-xs text-status-danger mt-1">Failed to generate scenario. Try again.</p>
+        <p className="text-ui-xs text-status-danger mt-1">
+          Failed to generate scenario. Try again.
+        </p>
       )}
 
       {scenario && <ScenarioChallenge scenario={scenario} />}

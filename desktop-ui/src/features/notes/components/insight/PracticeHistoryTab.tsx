@@ -74,7 +74,9 @@ export function PracticeHistoryTab({ noteId }: PracticeHistoryTabProps) {
 
   if (!noteId) {
     return (
-      <p className="text-fg-secondary text-sm text-center py-8">Select a note to see practice history</p>
+      <p className="text-fg-secondary text-sm text-center py-8">
+        Select a note to see practice history
+      </p>
     );
   }
 
@@ -114,7 +116,9 @@ export function PracticeHistoryTab({ noteId }: PracticeHistoryTabProps) {
               <span className="text-ui-xs text-fg-secondary">
                 {formatSessionDate(session.startedAt)}
               </span>
-              <span className={`text-ui-xs font-medium rounded-full px-2 py-0.5 ${badge.className}`}>
+              <span
+                className={`text-ui-xs font-medium rounded-full px-2 py-0.5 ${badge.className}`}
+              >
                 {badge.label}
               </span>
             </div>

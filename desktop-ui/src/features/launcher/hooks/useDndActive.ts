@@ -8,12 +8,9 @@ import type { FocusSession } from "../types";
  * activations without needing bus-event wiring.
  */
 export function useDndActive() {
-  const query = useQuery<FocusSession | null>(
-    "focus_active",
-    { mode: "dnd" },
-    null,
-    { staleTime: 2_000 },
-  );
+  const query = useQuery<FocusSession | null>("focus_active", { mode: "dnd" }, null, {
+    staleTime: 2_000,
+  });
 
   useEffect(() => {
     const id = setInterval(() => query.refetch(), 2_000);

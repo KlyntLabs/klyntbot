@@ -167,9 +167,7 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
               onClick={() => navigateToView(v.key)}
               className={cn(
                 "px-3.5 py-1 rounded-full text-ui-sm font-medium transition-all",
-                mode === v.key
-                  ? "bg-control-hover text-fg"
-                  : "text-fg-secondary hover:text-fg",
+                mode === v.key ? "bg-control-hover text-fg" : "text-fg-secondary hover:text-fg",
               )}
             >
               {v.label}

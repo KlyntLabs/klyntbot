@@ -51,16 +51,12 @@ export function GradeDisplay({ result, userAnswer }: GradeDisplayProps) {
       {/* Your answer vs expected */}
       <div className="island p-3 space-y-2 text-sm">
         <div>
-          <span className="text-ui-xs text-fg-secondary uppercase tracking-wider">
-            Your answer
-          </span>
+          <span className="text-ui-xs text-fg-secondary uppercase tracking-wider">Your answer</span>
           <p className="text-fg mt-0.5">{userAnswer}</p>
         </div>
         <div className="glass-divider" />
         <div>
-          <span className="text-ui-xs text-fg-secondary uppercase tracking-wider">
-            Expected
-          </span>
+          <span className="text-ui-xs text-fg-secondary uppercase tracking-wider">Expected</span>
           <p className="text-fg mt-0.5">{result.expectedAnswer}</p>
         </div>
       </div>

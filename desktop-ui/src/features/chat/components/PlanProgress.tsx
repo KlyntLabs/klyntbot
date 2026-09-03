@@ -28,7 +28,9 @@ export function PlanProgress({ steps, completedSteps, isStreaming }: PlanProgres
         {doneCount < totalCount && isStreaming && (
           <Loader2 className="size-3 text-brand animate-spin" strokeWidth={2} />
         )}
-        {doneCount === totalCount && <Check className="size-3 text-status-success" strokeWidth={2} />}
+        {doneCount === totalCount && (
+          <Check className="size-3 text-status-success" strokeWidth={2} />
+        )}
       </div>
       <div className="space-y-1">
         {steps.map((step, i) => {
@@ -37,7 +39,10 @@ export function PlanProgress({ steps, completedSteps, isStreaming }: PlanProgres
           return (
             <div key={step} className="flex items-start gap-2">
               {isCompleted ? (
-                <Check className="mt-0.5 size-3 flex-shrink-0 text-status-success" strokeWidth={2} />
+                <Check
+                  className="mt-0.5 size-3 flex-shrink-0 text-status-success"
+                  strokeWidth={2}
+                />
               ) : isActive ? (
                 <Loader2
                   className="mt-0.5 size-3 flex-shrink-0 text-brand animate-spin"

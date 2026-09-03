@@ -136,36 +136,30 @@ function createVimPlugins(opts: Required<VimModeOptions>) {
         editorView.dispatch(editorView.state.tr);
       });
 
-      adapter.on(
-        "dialog",
-        ((data: {
-          template: unknown;
-          callback: (...args: unknown[]) => void;
-          options?: unknown;
-        }) => {
-          // Determine prefix from template
-          let prefix = ":";
-          if (data.template instanceof HTMLElement) {
-            const text = data.template.textContent || "";
-            if (text.includes("/")) prefix = "/";
-            else if (text.includes("?")) prefix = "?";
-          }
-          opts.onOpenCommandLine(prefix);
-        }) as (...args: unknown[]) => void,
-      );
+      adapter.on("dialog", ((data: {
+        template: unknown;
+        callback: (...args: unknown[]) => void;
+        options?: unknown;
+      }) => {
+        // Determine prefix from template
+        let prefix = ":";
+        if (data.template instanceof HTMLElement) {
+          const text = data.template.textContent || "";
+          if (text.includes("/")) prefix = "/";
+          else if (text.includes("?")) prefix = "?";
+        }
+        opts.onOpenCommandLine(prefix);
+      }) as (...args: unknown[]) => void);
 
       adapter.on("save", () => {
         document.dispatchEvent(new CustomEvent(VIM_SAVE_EVENT));
       });
 
-      adapter.on(
-        "searchOverlayChange",
-        ((overlay: { query: RegExp } | null) => {
-          searchOverlayQuery = overlay?.query ?? null;
-          // Force decoration recalculation
-          editorView.dispatch(editorView.state.tr);
-        }) as (...args: unknown[]) => void,
-      );
+      adapter.on("searchOverlayChange", ((overlay: { query: RegExp } | null) => {
+        searchOverlayQuery = overlay?.query ?? null;
+        // Force decoration recalculation
+        editorView.dispatch(editorView.state.tr);
+      }) as (...args: unknown[]) => void);
 
       // Enter vim mode
       vim.enterVimMode(adapter);

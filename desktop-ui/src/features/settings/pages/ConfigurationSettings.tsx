@@ -200,9 +200,7 @@ export function ConfigurationSettings() {
     <div>
       <div className="mb-8">
         <h2 className="text-lg font-medium text-fg">Configuration</h2>
-        <p className="text-ui text-fg-secondary mt-1">
-          Channels, tools, and gateway settings
-        </p>
+        <p className="text-ui text-fg-secondary mt-1">Channels, tools, and gateway settings</p>
       </div>
 
       <div className="space-y-4">
@@ -228,9 +226,7 @@ export function ConfigurationSettings() {
                         <ChevronRight className="size-3.5" />
                       )}
                     </button>
-                    <span className="flex-1 text-ui font-medium text-fg-secondary">
-                      {ch.label}
-                    </span>
+                    <span className="flex-1 text-ui font-medium text-fg-secondary">{ch.label}</span>
                     <Toggle
                       checked={enabled}
                       onChange={(v) => setChannelEdit(ch.key, "enabled", v)}
@@ -305,9 +301,7 @@ export function ConfigurationSettings() {
             </div>
 
             <label className="block">
-              <span className="block text-ui-xs text-fg-secondary mb-1">
-                Browser trust level
-              </span>
+              <span className="block text-ui-xs text-fg-secondary mb-1">Browser trust level</span>
               <select
                 value={String(getToolValue("browser.trustLevel") || "autonomous")}
                 onChange={(e) =>
@@ -328,9 +322,7 @@ export function ConfigurationSettings() {
             </label>
 
             <div>
-              <span className="block text-ui-xs text-fg-secondary mb-1">
-                Brave Search API key
-              </span>
+              <span className="block text-ui-xs text-fg-secondary mb-1">Brave Search API key</span>
               <SecretInput
                 value={String(getToolValue("web.braveApiKey") || "")}
                 onChange={(v) => setToolEdits((prev) => ({ ...prev, "web.braveApiKey": v }))}

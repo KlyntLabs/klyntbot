@@ -163,9 +163,7 @@ export function IntegrationsSettings() {
             <div className="flex flex-col gap-1.5">
               {Object.entries(captureStatus.eventCountLast24h).map(([source, count]) => (
                 <div key={source} className="flex items-center justify-between text-ui-sm">
-                  <span className="text-fg-secondary capitalize">
-                    {source.replace(/_/g, " ")}
-                  </span>
+                  <span className="text-fg-secondary capitalize">{source.replace(/_/g, " ")}</span>
                   <span className="text-fg-secondary tabular-nums">{count}</span>
                 </div>
               ))}

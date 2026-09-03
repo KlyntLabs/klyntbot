@@ -52,9 +52,7 @@ export function BrainTimeline() {
             <div className="island rounded-xl p-3 flex-1">
               <div className="flex items-center justify-between">
                 <div>
-                  <span className="text-ui-sm font-medium text-fg">
-                    Version {v.version}
-                  </span>
+                  <span className="text-ui-sm font-medium text-fg">Version {v.version}</span>
                   {v.reverted && (
                     <span className="text-ui-xs text-fg-secondary ml-2">(reverted)</span>
                   )}

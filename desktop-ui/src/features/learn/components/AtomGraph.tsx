@@ -100,7 +100,9 @@ function AtomRow({ atom }: { atom: AtomResponse }) {
     <div className="flex items-center gap-3 py-1.5">
       <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
       <span className="text-ui-sm text-fg truncate flex-1 min-w-0">{atom.subject}</span>
-      <span className="text-[9px] text-fg-dim uppercase tracking-wider shrink-0">{atom.atomType}</span>
+      <span className="text-[9px] text-fg-dim uppercase tracking-wider shrink-0">
+        {atom.atomType}
+      </span>
       <span className="text-ui-xs tabular-nums shrink-0 w-8 text-right" style={{ color }}>
         {pct}%
       </span>
@@ -275,8 +277,7 @@ export function AtomGraph() {
         <div className="flex items-center gap-1.5">
           <BookOpen size={12} className="text-status-success" strokeWidth={1.5} />
           <span className="text-ui-xs text-fg-secondary">
-            <span className="text-fg font-medium tabular-nums">{avgRet}%</span> avg
-            retention
+            <span className="text-fg font-medium tabular-nums">{avgRet}%</span> avg retention
           </span>
         </div>
       </div>

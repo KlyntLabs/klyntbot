@@ -166,9 +166,7 @@ export function NoteFinder({ isOpen, onClose, onSelectNote, notes }: NoteFinderP
           <div className="w-[62%] overflow-y-auto px-5 py-4">
             {selectedNote ? (
               <>
-                <div className="text-ui-sm font-medium text-fg/90 mb-1">
-                  {selectedNote.title}
-                </div>
+                <div className="text-ui-sm font-medium text-fg/90 mb-1">{selectedNote.title}</div>
                 {selectedNote.tags.length > 0 && (
                   <div className="flex gap-1 flex-wrap mb-2">
                     {selectedNote.tags.map((tag) => (

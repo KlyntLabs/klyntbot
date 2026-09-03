@@ -1,4 +1,10 @@
 import type { Project } from "@shared/types/tasks";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@shared/ui";
 import { Button } from "@shared/ui/Button";
 import { Columns3, List } from "lucide-react";
 import { useMemo } from "react";
@@ -6,12 +12,6 @@ import type { Issue } from "../lib/mappers";
 import { projectToDisplayProject } from "../lib/mappers";
 import { useViewStore } from "../store/view-store";
 import { Filter } from "./Filter";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@shared/ui";
 
 interface HeaderOptionsProps {
   issues: Issue[];

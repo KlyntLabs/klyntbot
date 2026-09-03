@@ -79,7 +79,9 @@ export function InlineCheckboxList({
               {opt.detected !== undefined && (
                 <span
                   className={`text-ui-xs font-medium px-1.5 py-0.5 rounded-md flex-shrink-0 ${
-                    opt.detected ? "bg-status-success/10 text-status-success" : "bg-control-hover text-fg-dim"
+                    opt.detected
+                      ? "bg-status-success/10 text-status-success"
+                      : "bg-control-hover text-fg-dim"
                   }`}
                 >
                   {opt.detected ? "Found" : "N/A"}

@@ -667,8 +667,10 @@ export default function KnowledgeBasePage() {
                 <div className="text-fg-secondary text-sm">Select a note to view</div>
                 <div className="text-fg-dim text-ui-sm mt-1">
                   or press{" "}
-                  <kbd className="px-1.5 py-0.5 rounded bg-control-hover text-ui-xs font-mono">Cmd+N</kbd> to
-                  create one
+                  <kbd className="px-1.5 py-0.5 rounded bg-control-hover text-ui-xs font-mono">
+                    Cmd+N
+                  </kbd>{" "}
+                  to create one
                 </div>
               </div>
             </div>

@@ -1,5 +1,3 @@
-import type React from "react";
-import { useTabStore } from "../store/tab-store";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -7,6 +5,8 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@shared/ui/RadixContextMenu";
+import type React from "react";
+import { useTabStore } from "../store/tab-store";
 
 interface TabContextMenuProps {
   tabId: string;

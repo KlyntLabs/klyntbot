@@ -261,7 +261,9 @@ export function ActiveReviewSession({ layout: _layout, onClose }: ActiveReviewSe
       />
 
       {/* Error */}
-      {error && <p className="text-ui-xs text-red-400 bg-red-500/10 rounded-md px-2 py-1">{error}</p>}
+      {error && (
+        <p className="text-ui-xs text-red-400 bg-red-500/10 rounded-md px-2 py-1">{error}</p>
+      )}
 
       {/* Card */}
       <ReviewCard

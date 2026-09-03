@@ -28,22 +28,13 @@ function reasonLabel(reason: string): string {
   }
 }
 
-function EmbeddedMcpShell({
-  children,
-  busy,
-}: {
-  children: ReactNode;
-  busy?: boolean;
-}) {
+function EmbeddedMcpShell({ children, busy }: { children: ReactNode; busy?: boolean }) {
   return (
     <section className="mb-8" aria-labelledby="embedded-mcp-heading">
       <h3 id="embedded-mcp-heading" className="text-ui font-medium text-fg-secondary mb-3">
         Embedded MCP server
       </h3>
-      <div
-        className="island rounded-lg p-4 space-y-3"
-        aria-busy={busy || undefined}
-      >
+      <div className="island rounded-lg p-4 space-y-3" aria-busy={busy || undefined}>
         {children}
       </div>
     </section>

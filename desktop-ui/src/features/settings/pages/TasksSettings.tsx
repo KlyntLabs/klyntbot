@@ -115,9 +115,7 @@ export function TasksSettings() {
         <SettingsCard title="Focus mode">
           <div className="space-y-3">
             <label className="block">
-              <span className="block text-ui-xs text-fg-secondary mb-0.5">
-                Maximum focus slots
-              </span>
+              <span className="block text-ui-xs text-fg-secondary mb-0.5">Maximum focus slots</span>
               <p className="text-ui-xs text-fg-dim mb-1">
                 How many tasks can be in focus simultaneously
               </p>
@@ -211,9 +209,7 @@ export function TasksSettings() {
             </div>
 
             <label className="block">
-              <span className="block text-ui-xs text-fg-secondary mb-1">
-                Daily digest time
-              </span>
+              <span className="block text-ui-xs text-fg-secondary mb-1">Daily digest time</span>
               <input
                 type="time"
                 value={val("notifications", "dailyDigestTime", "09:00")}
@@ -327,9 +323,7 @@ export function TasksSettings() {
             </label>
 
             <label className="block">
-              <span className="block text-ui-xs text-fg-secondary mb-0.5">
-                Embedding model
-              </span>
+              <span className="block text-ui-xs text-fg-secondary mb-0.5">Embedding model</span>
               <input
                 type="text"
                 value={val("search", "embeddingModel", "paraphrase-multilingual-MiniLM-L12-v2")}
@@ -339,9 +333,7 @@ export function TasksSettings() {
             </label>
 
             <label className="block">
-              <span className="block text-ui-xs text-fg-secondary mb-0.5">
-                RRF k parameter
-              </span>
+              <span className="block text-ui-xs text-fg-secondary mb-0.5">RRF k parameter</span>
               <p className="text-ui-xs text-fg-dim mb-1">
                 Reciprocal rank fusion constant for hybrid search (higher = more weight on keyword)
               </p>

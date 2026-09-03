@@ -39,7 +39,10 @@ export function SidebarTime({ task, taskState }: SidebarTimeProps) {
           <TimeRow label="Actual" value={formatHumanDuration(trackedSecs)} />
           {estimatedSecs > 0 && (
             <div
-              className={cn("text-ui-sm mt-1", deviation > 0 ? "text-status-danger" : "text-status-success")}
+              className={cn(
+                "text-ui-sm mt-1",
+                deviation > 0 ? "text-status-danger" : "text-status-success",
+              )}
             >
               {deviation > 0
                 ? `${deviation}% over estimate`
@@ -55,7 +58,8 @@ export function SidebarTime({ task, taskState }: SidebarTimeProps) {
   const ratio = estimatedSecs > 0 ? trackedSecs / estimatedSecs : 0;
   const percentage = Math.round(ratio * 100);
   const barWidth = Math.min(percentage, 100);
-  const barColor = ratio < 0.8 ? "bg-status-success" : ratio < 1.0 ? "bg-status-warning" : "bg-status-danger";
+  const barColor =
+    ratio < 0.8 ? "bg-status-success" : ratio < 1.0 ? "bg-status-warning" : "bg-status-danger";
 
   const statusText =
     ratio < 1.0 ? `${percentage}% · ahead of schedule` : `${percentage}% · over estimate`;

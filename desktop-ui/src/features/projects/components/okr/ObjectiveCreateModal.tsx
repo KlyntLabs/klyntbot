@@ -122,10 +122,7 @@ export function ObjectiveCreateModal({
 
         {/* Description */}
         <div>
-          <label
-            htmlFor="obj-desc"
-            className="block text-ui-sm font-medium text-fg-secondary mb-1"
-          >
+          <label htmlFor="obj-desc" className="block text-ui-sm font-medium text-fg-secondary mb-1">
             Description
           </label>
           <textarea

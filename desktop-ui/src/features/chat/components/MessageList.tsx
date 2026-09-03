@@ -192,9 +192,7 @@ export function MessageList({
                   </div>
                   <div className="max-w-[80%]">
                     <div className="flex items-baseline gap-1.5 mb-1">
-                      <span className="text-ui-xs font-medium text-fg">
-                        {pm.personaName}
-                      </span>
+                      <span className="text-ui-xs font-medium text-fg">{pm.personaName}</span>
                       {pm.personaRole && (
                         <span className="text-[9px] text-fg-dim">{pm.personaRole}</span>
                       )}

@@ -281,7 +281,9 @@ function SchedulePanel({
               <span
                 className={cn(
                   "size-4 rounded-full border-2 transition-colors flex items-center justify-center",
-                  fields.mode === key ? "border-brand" : "border-separator group-hover:border-separator",
+                  fields.mode === key
+                    ? "border-brand"
+                    : "border-separator group-hover:border-separator",
                 )}
               >
                 {fields.mode === key && <span className="size-2 rounded-full bg-brand" />}
@@ -561,7 +563,9 @@ function AutomationCreateForm({
         <JobScheduleBuilder value={schedule} onChange={setSchedule} />
       </div>
 
-      {createError && <p className="text-status-danger text-ui-sm font-light">{createError.message}</p>}
+      {createError && (
+        <p className="text-status-danger text-ui-sm font-light">{createError.message}</p>
+      )}
       <div className="flex justify-end gap-2">
         <button type="button" onClick={onClose} className="glass-button px-3 py-1.5 text-ui-sm">
           Cancel

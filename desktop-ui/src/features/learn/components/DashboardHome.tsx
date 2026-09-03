@@ -210,7 +210,9 @@ export function DashboardHome({
                   <p className="text-sm text-fg truncate">{card.front}</p>
                   <div className="flex items-center gap-2 mt-0.5">
                     <span className="text-ui-xs text-fg-secondary">{card.deck}</span>
-                    <span className="text-ui-xs text-red-400 font-medium">{card.lapses} lapses</span>
+                    <span className="text-ui-xs text-red-400 font-medium">
+                      {card.lapses} lapses
+                    </span>
                   </div>
                 </div>
                 <button

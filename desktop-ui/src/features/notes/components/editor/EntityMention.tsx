@@ -351,7 +351,9 @@ export function EntityMentionMenu({ editor }: EntityMentionMenuProps) {
           type="button"
           onClick={() => insertMention(item)}
           className={`w-full px-3 py-1.5 text-sm text-left flex items-center gap-2 transition-colors ${
-            i === selectedIndex ? "bg-control-hover text-fg" : "text-fg-secondary hover:bg-bg-elevated"
+            i === selectedIndex
+              ? "bg-control-hover text-fg"
+              : "text-fg-secondary hover:bg-bg-elevated"
           }`}
         >
           <span

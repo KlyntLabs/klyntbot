@@ -129,7 +129,10 @@ export function SystemTray() {
           {coachingNudge && (
             <div className="px-4 py-3" style={{ animation: "nudge-slide-in 0.25s ease-out" }}>
               <div className="flex items-start gap-2.5">
-                <Lightbulb className="size-3.5 text-status-info shrink-0 mt-0.5" strokeWidth={1.5} />
+                <Lightbulb
+                  className="size-3.5 text-status-info shrink-0 mt-0.5"
+                  strokeWidth={1.5}
+                />
                 <p className="flex-1 text-ui-sm text-fg-secondary font-light leading-relaxed">
                   {coachingNudge.message}
                 </p>

@@ -10,7 +10,9 @@ export interface PageHeaderProps {
 
 export function PageHeader({ title, nav, actions, className }: PageHeaderProps) {
   return (
-    <header className={cn("flex items-center gap-3 px-5 py-3 border-b border-separator", className)}>
+    <header
+      className={cn("flex items-center gap-3 px-5 py-3 border-b border-separator", className)}
+    >
       {title && <div className="text-ui font-semibold text-fg shrink-0">{title}</div>}
       {nav && <nav className="flex items-center gap-1.5">{nav}</nav>}
       <div className="flex-1" />

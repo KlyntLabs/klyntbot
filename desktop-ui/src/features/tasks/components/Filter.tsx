@@ -1,11 +1,3 @@
-import { Button } from "@shared/ui/Button";
-import { Check, ChevronLeft, ChevronRight, ListFilter, X } from "lucide-react";
-import { useMemo, useState } from "react";
-import { useStatusWorkflow } from "../contexts/StatusWorkflowContext";
-import type { DisplayProject, Issue } from "../lib/mappers";
-import { priorities } from "../lib/priority-icons";
-import { renderStatusIcon } from "../lib/status-utils";
-import { useFilterStore } from "../store/filter-store";
 import {
   Command,
   CommandEmpty,
@@ -18,6 +10,14 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@shared/ui";
+import { Button } from "@shared/ui/Button";
+import { Check, ChevronLeft, ChevronRight, ListFilter, X } from "lucide-react";
+import { useMemo, useState } from "react";
+import { useStatusWorkflow } from "../contexts/StatusWorkflowContext";
+import type { DisplayProject, Issue } from "../lib/mappers";
+import { priorities } from "../lib/priority-icons";
+import { renderStatusIcon } from "../lib/status-utils";
+import { useFilterStore } from "../store/filter-store";
 
 type FilterCategory = "status" | "priority" | "labels" | "project";
 

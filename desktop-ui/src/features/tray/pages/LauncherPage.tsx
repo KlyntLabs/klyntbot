@@ -249,10 +249,7 @@ function ShortcutHints() {
   return (
     <div className="px-3 py-2.5 flex items-center gap-2 flex-wrap">
       {hints.map((h) => (
-        <span
-          key={h.key}
-          className="inline-flex items-center gap-1 text-ui-xs text-fg-secondary"
-        >
+        <span key={h.key} className="inline-flex items-center gap-1 text-ui-xs text-fg-secondary">
           <kbd className="px-1.5 py-0.5 rounded bg-control-hover/60 text-fg/70 font-mono text-[10px]">
             {h.key}
           </kbd>

@@ -1,11 +1,5 @@
 import { formatDate, formatHumanDuration, formatTime } from "@shared/lib/dates";
 import { cn } from "@shared/lib/utils";
-import { Check } from "lucide-react";
-import { useState } from "react";
-import { useStatusWorkflow } from "../../contexts/StatusWorkflowContext";
-import type { DetailTask } from "../../lib/mappers";
-import { priorities } from "../../lib/priority-icons";
-import { renderStatusIcon } from "../../lib/status-utils";
 import {
   Command,
   CommandEmpty,
@@ -17,6 +11,12 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@shared/ui";
+import { Check } from "lucide-react";
+import { useState } from "react";
+import { useStatusWorkflow } from "../../contexts/StatusWorkflowContext";
+import type { DetailTask } from "../../lib/mappers";
+import { priorities } from "../../lib/priority-icons";
+import { renderStatusIcon } from "../../lib/status-utils";
 
 type EnergyLevel = "low" | "medium" | "high" | "deep";
 type TaskType = "manual" | "agentic" | "hybrid";
@@ -228,10 +228,7 @@ export function SidebarProperties({ task, compact, onUpdate }: SidebarProperties
       {/* Due date */}
       <PropertyRow label="Due">
         <span
-          className={cn(
-            "px-1.5 py-0.5 text-ui-sm",
-            task.dueDate ? "text-fg" : "text-fg-secondary",
-          )}
+          className={cn("px-1.5 py-0.5 text-ui-sm", task.dueDate ? "text-fg" : "text-fg-secondary")}
         >
           {dueDateDisplay}
         </span>
@@ -293,9 +290,7 @@ export function SidebarProperties({ task, compact, onUpdate }: SidebarProperties
 
           {/* Area */}
           <PropertyRow label="Area">
-            <span className="px-1.5 py-0.5 text-ui-sm text-fg">
-              {task.area?.name ?? "No area"}
-            </span>
+            <span className="px-1.5 py-0.5 text-ui-sm text-fg">{task.area?.name ?? "No area"}</span>
           </PropertyRow>
 
           {/* Project */}

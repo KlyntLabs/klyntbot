@@ -435,9 +435,7 @@ export function WorkContextSettings() {
               </div>
 
               <label className="block mt-3">
-                <span className="block text-ui-xs text-fg-secondary mb-0.5">
-                  LLM rerank top-N
-                </span>
+                <span className="block text-ui-xs text-fg-secondary mb-0.5">LLM rerank top-N</span>
                 <p className="text-ui-xs text-fg-dim mb-1">
                   How many top results to send to the LLM for pairwise reranking
                 </p>

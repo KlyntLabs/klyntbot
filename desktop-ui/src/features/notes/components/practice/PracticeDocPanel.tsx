@@ -78,7 +78,9 @@ export function PracticeDocPanel({
       ))}
 
       {/* Current unit placeholder */}
-      {!isComplete && <p className="text-fg-secondary italic text-sm">Waiting for your translation...</p>}
+      {!isComplete && (
+        <p className="text-fg-secondary italic text-sm">Waiting for your translation...</p>
+      )}
 
       <div ref={bottomRef} />
     </div>

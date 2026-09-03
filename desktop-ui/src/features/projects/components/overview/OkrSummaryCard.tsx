@@ -16,9 +16,7 @@ export function OkrSummaryCard() {
         className="island rounded-xl p-5 text-left transition-colors hover:border-brand/30"
       >
         <p className="text-ui-xs text-fg-secondary uppercase tracking-wider mb-3">OKR Summary</p>
-        <p className="text-ui-xs text-fg-secondary">
-          No objectives defined. Click to create one.
-        </p>
+        <p className="text-ui-xs text-fg-secondary">No objectives defined. Click to create one.</p>
       </button>
     );
   }
