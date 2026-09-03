@@ -70,14 +70,14 @@ window framing inside a feature. Domain UI stays in its feature folder.
 
 Before calling UI work done:
 
-1. `bun run typecheck` (from `desktop-ui/`)
-2. `bun run lint` (Biome)
-3. Unit tests for pure logic touched by the change
-4. **Light + dark** visual pass of touched surfaces
-5. `bun run check:tokens` when touching colors, chrome, or shared styles
+1. `bun run verify:frontend` from the repo root (completion-claim command for
+   frontend checks — see [`desktop-ui.md`](./desktop-ui.md) and the verify table
+   in [`docs/agents/project.md`](../agents/project.md))
+2. **Light + dark** visual pass of touched surfaces
 
 Perf-sensitive shell/dependency changes also follow
-[`frontend-performance.md`](./frontend-performance.md).
+[`frontend-performance.md`](./frontend-performance.md). Individual package
+scripts remain available for focused loops.
 
 ## Not a design-system catalog
 

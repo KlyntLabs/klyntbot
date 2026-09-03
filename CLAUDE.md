@@ -38,7 +38,8 @@ cd desktop-ui && bun run lint       # Biome check
 cd desktop-ui && bun run typecheck  # tsc --noEmit
 cd desktop-ui && bun run test       # Vitest (run once)
 cd desktop-ui && bun run test:watch # Vitest (watch mode)
-cd desktop-ui && bun run check:tokens  # Design-token gate (hard)
+cd desktop-ui && bun run check:tokens  # Design-token gate (default mode)
+bun run verify:frontend   # all six frontend checks, one summary (run from repo root)
 ```
 
 **Path aliases** (`vite.config.ts` + `tsconfig.json`):

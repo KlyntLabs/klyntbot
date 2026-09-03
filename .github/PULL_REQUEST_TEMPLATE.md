@@ -46,7 +46,7 @@ All four must pass before requesting review (see CONTRIBUTING.md):
 - [ ] `cargo nextest run --workspace`
 - [ ] `cargo clippy --workspace --all-targets --all-features` — zero warnings
 - [ ] `cargo fmt --all --check`
-- [ ] `cd desktop-ui && bun run lint && bun run typecheck`
+- [ ] `bun run verify:frontend`
 
 ## Tauri / IPC changes
 

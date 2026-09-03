@@ -26,7 +26,29 @@ Run from `desktop-ui/` (root `package.json` delegates the same names where noted
 | Perf budget | `bun run check:performance` | Build + `scripts/check-performance-budget.sh` |
 
 Root shortcuts: `bun run typecheck` / `lint` / `test` / `build` / `check:tokens` /
-`check:performance` from the repo root.
+`check:performance` from the repo root. Root-only: `bun run verify:frontend`
+runs the full frontend verify matrix (see below).
+
+## Verify matrix
+
+Entry command (repo root): `bun run verify:frontend`.
+
+Checks are registered in `scripts/verify-frontend.manifest.json`. Each entry has
+five fields: `name`, `command`, `cwd`, `mode`, and `profiles`.
+
+- **`hard`** — a non-zero exit contributes to the matrix exit code (after every
+  selected check has run).
+- **`report`** — recorded in the summary only; does not change the matrix exit
+  code (except launch failures, which are always hard).
+
+Profiles select which checks run. Today every entry lists `default` only; a
+no-argument run selects that profile. Future lanes (ROAD-4 rendering proxy,
+ROAD-5 native production-runtime) register in the same manifest with the
+profile(s) they belong to — registration does not decide cadence.
+
+`bun run verify:frontend --list` is registry discovery only: it prints every
+entry's name, mode, profiles, cwd, and command, then exits 0 without running
+checks. It is not a verification command.
 
 ## Path aliases
 
@@ -73,10 +95,10 @@ for list/detail reads — see [`frontend-performance.md`](./frontend-performance
 
 ## Done gates
 
-Before calling UI work done, follow the checklist in [`ui.md`](./ui.md)
-(typecheck, lint, tests for pure logic, light + dark pass, `check:tokens` when
-touching colors/chrome). Perf-sensitive shell or dependency changes also run
-`bun run check:performance`.
+Before calling UI work done, run `bun run verify:frontend` from the repo root
+(the completion-claim command for frontend checks). Also follow the checklist in
+[`ui.md`](./ui.md) (light + dark pass and any surface-specific notes). Individual
+package scripts remain available for focused loops.
 
 ## Related
 

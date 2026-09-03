@@ -1,0 +1,44 @@
+[
+  {
+    "name": "typecheck",
+    "command": "bun run typecheck",
+    "cwd": "desktop-ui",
+    "mode": "hard",
+    "profiles": ["default"]
+  },
+  {
+    "name": "lint",
+    "command": "bun run lint",
+    "cwd": "desktop-ui",
+    "mode": "hard",
+    "profiles": ["default"]
+  },
+  {
+    "name": "test",
+    "command": "bun run test",
+    "cwd": "desktop-ui",
+    "mode": "hard",
+    "profiles": ["default"]
+  },
+  {
+    "name": "check:tokens",
+    "command": "bun run check:tokens",
+    "cwd": "desktop-ui",
+    "mode": "hard",
+    "profiles": ["default"]
+  },
+  {
+    "name": "check:performance",
+    "command": "bun run check:performance",
+    "cwd": "desktop-ui",
+    "mode": "hard",
+    "profiles": ["default"]
+  },
+  {
+    "name": "test:e2e",
+    "command": "bun run test:e2e",
+    "cwd": "desktop-ui",
+    "mode": "hard",
+    "profiles": ["default"]
+  }
+]
