@@ -363,9 +363,40 @@ describe("runMatrix", () => {
       expect(rows[0].exitStatus).toBeNull();
       expect(rows[0].launchError).toBeTruthy();
       expect(exitCode).toBe(1);
+      expect(collected.stderr).toContain(rows[0].launchError!);
+      expect(collected.stderr).toContain("missing");
+      const summary = formatSummary(rows);
+      expect(summary).toContain(rows[0].launchError!);
+      expect(summary).toContain("missing");
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+
+  it("surfaces launchError in formatSummary without changing the table columns", () => {
+    const summary = formatSummary([
+      {
+        name: "ok",
+        mode: "hard",
+        result: "pass",
+        exitStatus: 0,
+        durationSec: 0.1,
+        output: "",
+      },
+      {
+        name: "missing",
+        mode: "report",
+        result: "fail",
+        exitStatus: null,
+        durationSec: 0,
+        output: "",
+        launchError: "spawn definitely-not-a-command-xyz ENOENT",
+      },
+    ]);
+    const lines = summary.split("\n");
+    expect(lines[0]).toMatch(/^name\s+mode\s+result\s+exit\s+seconds$/);
+    expect(summary).toContain("spawn definitely-not-a-command-xyz ENOENT");
+    expect(summary).toMatch(/launch error \(missing\):/);
   });
 
   it("produces identical formatSummary text across consecutive runs", async () => {
@@ -391,6 +422,9 @@ describe("runMatrix", () => {
         expect(summary).toContain(row.mode);
         expect(summary).toContain(row.result);
       }
+      const missing = first.rows.find((row) => row.name === "missing");
+      expect(missing?.launchError).toBeTruthy();
+      expect(summary).toContain(missing!.launchError!);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

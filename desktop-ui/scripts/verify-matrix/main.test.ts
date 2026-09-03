@@ -167,4 +167,25 @@ describe("verify-matrix CLI", () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  it("prints the launch error when a check cannot be started", () => {
+    const { dir, path } = writeTempManifest(() => [
+      {
+        name: "missing",
+        command: "definitely-not-a-command-xyz",
+        cwd: ".",
+        mode: "report",
+        profiles: ["default"],
+      },
+    ]);
+    try {
+      const result = runMain(["--manifest", path], { cwd: dir });
+      expect(result.status).toBe(1);
+      const combined = `${result.stdout}\n${result.stderr}`;
+      expect(combined).toMatch(/launch error \(missing\):/);
+      expect(combined).toMatch(/ENOENT|not found|definitely-not-a-command-xyz/i);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });

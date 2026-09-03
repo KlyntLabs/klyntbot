@@ -260,6 +260,7 @@ function runOne(
     child.on("error", (err: Error) => {
       launchError = err.message;
       exitStatus = null;
+      opts.relay.stderr(`launch error (${entry.name}): ${err.message}\n`);
       finish();
     });
     child.on("close", (code: number | null) => {
@@ -325,5 +326,10 @@ export function formatSummary(rows: Row[]): string {
       cell.map((value, i) => pad(value, widths[i])).join("  "),
     ),
   ];
+  for (const row of rows) {
+    if (row.launchError !== undefined) {
+      lines.push(`launch error (${row.name}): ${row.launchError}`);
+    }
+  }
   return lines.join("\n");
 }
