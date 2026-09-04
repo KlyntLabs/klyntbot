@@ -18,13 +18,13 @@ export async function sampleRaf(
 ): Promise<number[]> {
   return page.evaluate(async (options) => {
     const gaps: number[] = [];
-    const scroller = options.scroll
-      ? (document.querySelector(
-          '[data-render-path="virtualized"] > div',
-        ) as HTMLElement | null)
-      : null;
-
-    if (scroller) {
+    const scrollerSelector = '[data-render-path="virtualized"] > div';
+    let scroller: HTMLElement | null = null;
+    if (options.scroll) {
+      scroller = document.querySelector(scrollerSelector) as HTMLElement | null;
+      if (!scroller) {
+        throw new Error(`scroll scroller not found: ${scrollerSelector}`);
+      }
       scroller.scrollTop = scroller.scrollHeight;
     }
 

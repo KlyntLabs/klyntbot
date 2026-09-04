@@ -23,7 +23,7 @@ import {
   type RowResult,
   type Subcode,
 } from "./contract.ts";
-import { compareRows } from "./compare.ts";
+import { compareRows, identityMatches } from "./compare.ts";
 import { IdentityMismatch, describeEnvironment } from "./env.ts";
 import { renderSummary, writeStepSummary } from "./summary.ts";
 import {
@@ -35,6 +35,8 @@ import {
 const PERF_CONFIG = "playwright.perf-proxy.config.ts";
 const DEFAULT_LATEST = "test-results/perf-proxy/latest.json";
 const DEFAULT_BASELINES = "tests/perf-proxy/baselines";
+const DEFAULT_CHILD_TIMEOUT_MS = 300_000;
+const PERF_PORT = 1420;
 
 export type SpawnFn = typeof defaultSpawn;
 
@@ -44,6 +46,7 @@ export type RunProxyOpts = {
   baselinesDir?: string;
   latestPath?: string;
   env?: NodeJS.ProcessEnv;
+  childTimeoutMs?: number;
 };
 
 export type RunProxyResult = {
@@ -56,6 +59,7 @@ type MeasureRaw = {
   rows: RowResult[];
   output: string;
   exitCode: number | null;
+  timedOut: boolean;
 };
 
 function realOsFacts(): OsFacts {
@@ -102,15 +106,36 @@ function exitFor(outcome: Outcome): 0 | 1 | 2 {
   return 2;
 }
 
-function printOutcome(outcome: Outcome, subcode?: Subcode, identity?: Identity): void {
+function formatDeltaLine(delta: RowDelta): string {
+  return `${delta.row} ${delta.metric} baseline=${delta.baseline} current=${delta.current} delta=${delta.delta} margin=${delta.margin} exceeded=${delta.exceeded}`;
+}
+
+function printOutcome(
+  outcome: Outcome,
+  subcode?: Subcode,
+  identity?: Identity,
+  comparison?: RowDelta[],
+): void {
+  const id =
+    identity?.environmentKey && identity.environmentKey.length > 0
+      ? ` identity=${identity.environmentKey}`
+      : "";
+
   if (outcome === "COULD_NOT_MEASURE" && subcode) {
-    const id =
-      identity?.environmentKey && identity.environmentKey.length > 0
-        ? ` identity=${identity.environmentKey}`
-        : "";
-    console.log(`COULD_NOT_MEASURE / ${subcode}${id}`);
+    const port =
+      subcode === "PORT_BUSY" ? ` port=${PERF_PORT}` : "";
+    console.log(`COULD_NOT_MEASURE / ${subcode}${port}${id}`);
     return;
   }
+
+  if (outcome === "HEALTHY" || outcome === "DEGRADED") {
+    console.log(`${outcome}${id}`);
+    for (const delta of comparison ?? []) {
+      console.log(formatDeltaLine(delta));
+    }
+    return;
+  }
+
   console.log(outcome);
 }
 
@@ -124,22 +149,40 @@ function cleanStart(rowsDir: string, latestPath: string): void {
 function spawnPlaywright(
   spawnFn: SpawnFn,
   args: string[],
-): Promise<{ exitCode: number | null; output: string }> {
+  timeoutMs: number = DEFAULT_CHILD_TIMEOUT_MS,
+): Promise<{ exitCode: number | null; output: string; timedOut: boolean }> {
   return new Promise((resolve) => {
     let output = "";
     let exitCode: number | null = null;
     let launchError: string | undefined;
+    let timedOut = false;
     let settled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
 
     const finish = () => {
       if (settled) return;
       settled = true;
-      resolve({ exitCode, output });
+      if (timer !== undefined) {
+        clearTimeout(timer);
+      }
+      resolve({ exitCode, output, timedOut });
     };
 
     const child: ChildProcess = spawnFn("playwright", args, {
       stdio: ["inherit", "pipe", "pipe"],
     });
+
+    timer = setTimeout(() => {
+      if (settled) return;
+      timedOut = true;
+      output += `\nwrapper timeout after ${timeoutMs}ms\n`;
+      try {
+        child.kill("SIGTERM");
+      } catch {
+        // Child may already be gone.
+      }
+      finish();
+    }, timeoutMs);
 
     const onPipeData =
       (relay: (chunk: string) => void) => (chunk: Buffer | string) => {
@@ -157,6 +200,10 @@ function spawnPlaywright(
       finish();
     });
     child.on("close", (code: number | null) => {
+      if (timedOut) {
+        finish();
+        return;
+      }
       if (launchError !== undefined) {
         finish();
         return;
@@ -170,18 +217,19 @@ function spawnPlaywright(
 async function collectMeasurement(opts: {
   spawn: SpawnFn;
   rowsDir: string;
+  childTimeoutMs: number;
 }): Promise<MeasureRaw> {
-  const { exitCode, output } = await spawnPlaywright(opts.spawn, [
-    "test",
-    '--config',
-    PERF_CONFIG,
-  ]);
+  const { exitCode, output, timedOut } = await spawnPlaywright(
+    opts.spawn,
+    ["test", '--config', PERF_CONFIG],
+    opts.childTimeoutMs,
+  );
 
   let rows: RowResult[] = [];
   if (existsSync(opts.rowsDir)) {
     rows = readRowFiles(opts.rowsDir);
   }
-  return { rows, output, exitCode };
+  return { rows, output, exitCode, timedOut };
 }
 
 function missingExpectedRows(rows: RowResult[]): boolean {
@@ -249,7 +297,7 @@ export async function finalizeOutcome(input: {
     run.subcode = subcode;
   }
 
-  printOutcome(outcome, subcode, identity);
+  printOutcome(outcome, subcode, identity, input.comparison);
   const markdown = renderSummary(run, input.comparison, subcode);
   writeStepSummary(markdown, input.env);
   return exitFor(outcome);
@@ -260,14 +308,23 @@ export async function measureOnce(
     spawn?: SpawnFn;
     rowsDir?: string;
     env?: NodeJS.ProcessEnv;
+    childTimeoutMs?: number;
   } = {},
 ): Promise<{ rows: RowResult[]; identity: Identity }> {
   const spawnFn = opts.spawn ?? defaultSpawn;
   const rowsDir = opts.rowsDir ?? ROWS_DIR;
   const env = opts.env ?? process.env;
+  const childTimeoutMs = opts.childTimeoutMs ?? DEFAULT_CHILD_TIMEOUT_MS;
 
   rmSync(rowsDir, { recursive: true, force: true });
-  const raw = await collectMeasurement({ spawn: spawnFn, rowsDir });
+  const raw = await collectMeasurement({
+    spawn: spawnFn,
+    rowsDir,
+    childTimeoutMs,
+  });
+  if (raw.timedOut) {
+    throw new Error(`playwright timed out after ${childTimeoutMs}ms`);
+  }
   if (raw.exitCode !== 0) {
     throw new Error(
       `playwright exited ${raw.exitCode ?? "null"}: ${raw.output.slice(0, 500)}`,
@@ -297,10 +354,15 @@ export async function runProxy(opts: RunProxyOpts = {}): Promise<RunProxyResult>
   const baselinesDir = opts.baselinesDir ?? DEFAULT_BASELINES;
   const latestPath = opts.latestPath ?? DEFAULT_LATEST;
   const env = opts.env ?? process.env;
+  const childTimeoutMs = opts.childTimeoutMs ?? DEFAULT_CHILD_TIMEOUT_MS;
 
   cleanStart(rowsDir, latestPath);
 
-  const raw = await collectMeasurement({ spawn: spawnFn, rowsDir });
+  const raw = await collectMeasurement({
+    spawn: spawnFn,
+    rowsDir,
+    childTimeoutMs,
+  });
 
   let outcome: Outcome;
   let subcode: Subcode | undefined;
@@ -309,7 +371,10 @@ export async function runProxy(opts: RunProxyOpts = {}): Promise<RunProxyResult>
   let comparison: RowDelta[] | undefined;
   const rows = raw.rows;
 
-  if (raw.exitCode !== 0) {
+  if (raw.timedOut) {
+    outcome = "COULD_NOT_MEASURE";
+    subcode = "TIMEOUT";
+  } else if (raw.exitCode !== 0) {
     outcome = "COULD_NOT_MEASURE";
     subcode =
       raw.output.includes("is already used") ? "PORT_BUSY" : "CHILD_FAILED";
@@ -337,6 +402,9 @@ export async function runProxy(opts: RunProxyOpts = {}): Promise<RunProxyResult>
       if (!baseline) {
         outcome = "COULD_NOT_MEASURE";
         subcode = "NO_BASELINE";
+      } else if (!identityMatches(identity, baseline.identity)) {
+        outcome = "COULD_NOT_MEASURE";
+        subcode = "IDENTITY";
       } else {
         const provisional: LatestRun = {
           identity,
@@ -352,7 +420,7 @@ export async function runProxy(opts: RunProxyOpts = {}): Promise<RunProxyResult>
     } catch (err) {
       outcome = "COULD_NOT_MEASURE";
       subcode =
-        err instanceof IdentityMismatch ? "IDENTITY" : "CHILD_FAILED";
+        err instanceof IdentityMismatch ? "IDENTITY" : "LATEST_MALFORMED";
     }
   }
 

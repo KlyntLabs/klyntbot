@@ -53,7 +53,7 @@ export function compareRows(
   for (const result of latest.rows) {
     const stats = baseline.rows[result.row];
     if (!stats) {
-      continue;
+      throw new Error(`baseline missing row: ${result.row}`);
     }
     rows.push(...compareRow(result, stats));
   }

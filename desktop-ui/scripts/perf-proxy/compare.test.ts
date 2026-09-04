@@ -155,6 +155,20 @@ describe("compareRows", () => {
     expect(result.outcome).toBe("HEALTHY");
     expect(result.rows.every((delta) => delta.exceeded === false)).toBe(true);
   });
+
+  it("fails closed when a latest row is missing from the baseline", () => {
+    const baseline = baselineFor({
+      "idle-20×light": {
+        rafP95: metricStat({ median: 10, margin: 3 }),
+        screenshotP50: metricStat({ median: 40, margin: 6 }),
+      },
+    });
+    const latest = latestFor([
+      rowResult("idle-20×light", 12, 45),
+      rowResult("idle-200×light", 12, 45),
+    ]);
+    expect(() => compareRows(latest, baseline)).toThrow(/idle-200×light/);
+  });
 });
 
 describe("identityMatches", () => {

@@ -158,6 +158,9 @@ type CaseName =
   | "PORT_BUSY"
   | "ROW_MISSING"
   | "IDENTITY"
+  | "BASELINE_IDENTITY"
+  | "BASELINE_INCOMPLETE"
+  | "BASELINE_MALFORMED"
   | "WRITE_FAILED";
 
 describe("runProxy consistency table", () => {
@@ -255,19 +258,36 @@ describe("runProxy consistency table", () => {
       },
     });
 
-    if (name === "HEALTHY" || name === "DEGRADED" || name === "WRITE_FAILED") {
+    if (
+      name === "HEALTHY" ||
+      name === "DEGRADED" ||
+      name === "WRITE_FAILED" ||
+      name === "BASELINE_IDENTITY" ||
+      name === "BASELINE_INCOMPLETE"
+    ) {
       const baseline = baselineFor(
         desc.key,
-        allRows,
+        name === "BASELINE_INCOMPLETE" ? allRows.slice(0, 5) : allRows,
         desc.keyed,
         desc.diagnostic,
         name === "DEGRADED"
           ? { row: "idle-20×light", rafP95Median: 5 }
           : undefined,
       );
+      if (name === "BASELINE_IDENTITY") {
+        baseline.identity.schemaVersion = SCHEMA_VERSION + 1;
+      }
       writeFileSync(
         join(baselinesDir, `${desc.key}.json`),
         JSON.stringify(baseline),
+        "utf8",
+      );
+    }
+
+    if (name === "BASELINE_MALFORMED") {
+      writeFileSync(
+        join(baselinesDir, `${desc.key}.json`),
+        "{not-json",
         "utf8",
       );
     }
@@ -337,6 +357,24 @@ describe("runProxy consistency table", () => {
       exitCode: 2,
     },
     {
+      name: "BASELINE_IDENTITY",
+      outcome: "COULD_NOT_MEASURE",
+      subcode: "IDENTITY",
+      exitCode: 2,
+    },
+    {
+      name: "BASELINE_INCOMPLETE",
+      outcome: "COULD_NOT_MEASURE",
+      subcode: "LATEST_MALFORMED",
+      exitCode: 2,
+    },
+    {
+      name: "BASELINE_MALFORMED",
+      outcome: "COULD_NOT_MEASURE",
+      subcode: "LATEST_MALFORMED",
+      exitCode: 2,
+    },
+    {
       name: "WRITE_FAILED",
       outcome: "COULD_NOT_MEASURE",
       subcode: "WRITE_FAILED",
@@ -359,6 +397,19 @@ describe("runProxy consistency table", () => {
         expect(printedText).toContain(entry.subcode);
       }
 
+      if (entry.name === "HEALTHY" || entry.name === "DEGRADED") {
+        expect(printedText).toMatch(/identity=[0-9a-f]+/i);
+        expect(printedText).toContain("raf.p95");
+        expect(printedText).toContain("screenshot.p50");
+        expect(printedText).toContain("baseline=");
+        expect(printedText).toContain("current=");
+        expect(printedText).toContain("delta=");
+      }
+
+      if (entry.name === "PORT_BUSY") {
+        expect(printedText).toContain("1420");
+      }
+
       expect(summary).toContain(entry.outcome);
       if (entry.subcode) {
         expect(summary).toContain(entry.subcode);
@@ -376,4 +427,31 @@ describe("runProxy consistency table", () => {
       }
     });
   }
+
+  it("times out a hung Playwright child with TIMEOUT", async () => {
+    const hungSpawn = ((() => {
+      const child = new EventEmitter() as FakeChild;
+      child.stdout = new PassThrough();
+      child.stderr = new PassThrough();
+      (child as FakeChild & { kill: (signal?: string) => boolean }).kill = () => {
+        queueMicrotask(() => child.emit("close", null));
+        return true;
+      };
+      return child;
+    }) as unknown) as typeof import("node:child_process").spawn;
+
+    const result = await runProxy({
+      spawn: hungSpawn,
+      rowsDir,
+      baselinesDir,
+      latestPath,
+      env: { GITHUB_STEP_SUMMARY: summaryPath },
+      childTimeoutMs: 50,
+    });
+
+    expect(result.outcome).toBe("COULD_NOT_MEASURE");
+    expect(result.subcode).toBe("TIMEOUT");
+    expect(result.exitCode).toBe(2);
+    expect(printed.join("\n")).toContain("TIMEOUT");
+  });
 });
