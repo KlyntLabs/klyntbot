@@ -1,0 +1,76 @@
+name: Rendering proxy
+
+"on":
+  push:
+    branches: [main, dev]
+    paths:
+      - "desktop-ui/**"
+      - "packages/design-system/**"
+      - "scripts/verify-frontend.manifest.json"
+      - ".github/workflows/rendering-proxy.yml"
+  pull_request:
+    branches: [main, dev]
+    paths:
+      - "desktop-ui/**"
+      - "packages/design-system/**"
+      - "scripts/verify-frontend.manifest.json"
+      - ".github/workflows/rendering-proxy.yml"
+  workflow_dispatch:
+    inputs:
+      recalibrate:
+        description: Run recalibration and upload a candidate baseline
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  rendering-proxy:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        working-directory: desktop-ui
+        run: bun install --frozen-lockfile
+
+      - name: Install Playwright WebKit
+        working-directory: desktop-ui
+        run: bunx playwright install webkit
+
+      - name: Typecheck perf-proxy
+        working-directory: desktop-ui
+        run: bun run perf:proxy:typecheck
+
+      - name: Run rendering proxy
+        if: ${{ !inputs.recalibrate }}
+        working-directory: desktop-ui
+        run: bun run perf:proxy
+
+      - name: Recalibrate rendering proxy
+        if: ${{ inputs.recalibrate }}
+        working-directory: desktop-ui
+        run: bun run perf:proxy:recalibrate --candidate perf-proxy-candidate
+
+      - name: Upload latest.json
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf-proxy-latest
+          path: desktop-ui/test-results/perf-proxy/latest.json
+          if-no-files-found: ignore
+
+      - name: Upload baseline candidate
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf-proxy-baseline-candidate
+          path: desktop-ui/perf-proxy-candidate/
+          if-no-files-found: ignore
