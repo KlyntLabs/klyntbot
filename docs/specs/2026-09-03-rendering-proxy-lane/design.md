@@ -1,7 +1,7 @@
 # Design: Rendering proxy lane
 
 Feature code: PERFPROXY
-Status: In-progress
+Status: Implemented
 Date: 2026-09-04
 Requirements: ./requirements.md
 
