@@ -65,3 +65,27 @@ regression — split or drop weight first.
   rejected in review.
 - Changes that touch shell hot paths or add a runtime dependency should run
   `bun run check:performance` locally and note chunk impact before push.
+
+## Rendering proxy lane (advisory)
+
+`bun run perf:proxy` is an **advisory WebKit proxy** for chat-row rendering cost
+(rAF cadence and screenshot capture latency against a committed baseline). It is
+not native production-runtime evidence. **ROAD-5 native evidence alone decides
+the ambient-ground default**; no proxy outcome gates merge or that default.
+
+Outcomes and the required human record for MILE-4 rendering-sensitive branches:
+
+| Outcome | Exit | Required record |
+|---|---|---|
+| `HEALTHY` | 0 | Outcome and a run or artifact reference |
+| `DEGRADED` | 1 | Affected rows and deltas, disposition, and the reason for proceeding or investigating |
+| `COULD_NOT_MEASURE` | 2 | Cause (subcode), coverage gap, and follow-up |
+
+**Recording a disposition is required** for those branches. **Obtaining
+`HEALTHY` is not a shipping condition.**
+
+`desktop-ui/test-results/perf-proxy/latest.json` is a **versioned evidence
+format** (identity / schema fields, row metrics and deltas, outcome, and
+reason/subcode when present). MILE-4 specs **reference** it; they do **not**
+parse it as a machine API. Automated consumers need a separate compatibility
+decision.

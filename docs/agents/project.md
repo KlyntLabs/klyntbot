@@ -106,7 +106,7 @@ if that surface does not exist.
 | Backend / API | `cargo tauri dev` (with Vite already up) — embedded HTTP on `:3456` | Dev HTTP / Tauri IPC responds |
 | Frontend | `cd desktop-ui && bun run dev` | `http://localhost:1420` serves the app |
 
-Browser E2E (Playwright, Chromium): `cd desktop-ui && bun run test:e2e`
+Browser E2E (Playwright, Chromium smoke): `cd desktop-ui && bun run test:e2e`; rendering proxy (Playwright WebKit, report-only): `cd desktop-ui && bun run perf:proxy`
 
 ## Remote environments
 

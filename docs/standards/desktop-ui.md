@@ -41,10 +41,37 @@ five fields: `name`, `command`, `cwd`, `mode`, and `profiles`.
 - **`report`** — recorded in the summary only; does not change the matrix exit
   code (except launch failures, which are always hard).
 
-Profiles select which checks run. Today every entry lists `default` only; a
-no-argument run selects that profile. Future lanes (ROAD-4 rendering proxy,
-ROAD-5 native production-runtime) register in the same manifest with the
-profile(s) they belong to — registration does not decide cadence.
+Profiles select which checks run. A no-argument run selects `default`. Lanes
+register with the profile(s) they belong to — registration does not decide
+cadence. The rendering proxy (ROAD-4) is registered as:
+
+| Field | Value |
+|---|---|
+| `name` | `perf-proxy` |
+| `command` | `bun run perf:proxy` |
+| `cwd` | `desktop-ui` |
+| `mode` | `report` |
+| `profiles` | `["perf-proxy"]` |
+
+It is **not** on `default`. Run it with `bun run verify:frontend --profile
+perf-proxy` (or `cd desktop-ui && bun run perf:proxy`). Future: ROAD-5 native
+production-runtime registers the same way.
+
+Local scripts (from `desktop-ui/`):
+
+| Script | Role |
+|---|---|
+| `bun run perf:proxy` | Routine compare; exit `0` `HEALTHY` / `1` `DEGRADED` / `2` `COULD_NOT_MEASURE` |
+| `bun run perf:proxy:recalibrate` | Explicit baseline write (local tracked file, or `--candidate <dir>`) |
+| `bun run perf:proxy:typecheck` | `tsc --noEmit -p tsconfig.perf.json` |
+
+**Two-step baseline bootstrap:** (1) land with `NO_BASELINE` until a matching
+identity exists; (2) dispatch the `rendering-proxy` workflow with
+`recalibrate: true`, download `perf-proxy-baseline-candidate`, review, and
+commit under `desktop-ui/tests/perf-proxy/baselines/` before treating CI as
+calibrated. Local machines use `bun run perf:proxy:recalibrate` (no
+`--candidate`) for their own identity. Disposition protocol:
+[`frontend-performance.md`](./frontend-performance.md#rendering-proxy-lane-advisory).
 
 `bun run verify:frontend --list` is registry discovery only: it prints every
 entry's name, mode, profiles, cwd, and command, then exits 0 without running
