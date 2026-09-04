@@ -2,112 +2,112 @@
   "identity": {
     "schemaVersion": 1,
     "measurementContractVersion": 1,
-    "environmentKey": "e1abf9047ef620f0"
+    "environmentKey": "5189974c05d44bee"
   },
-  "recordedAt": "2026-09-04T04:30:39.302Z",
+  "recordedAt": "2026-09-04T04:37:40.087Z",
   "sourceRevision": "f2c7e77b4c9752e72de68ab84c22f57e61e34db5",
   "repetitions": 5,
   "rows": {
     "idle-200×dark": {
       "raf": {
         "p95": {
-          "median": 11,
+          "median": 23,
           "spread": 0,
           "margin": 2
         }
       },
       "screenshot": {
         "p50": {
-          "median": 13.225125000000844,
-          "spread": 1.9460839999956079,
-          "margin": 5.838251999986824
+          "median": 35.272625000005064,
+          "spread": 20.314707999990787,
+          "margin": 60.94412399997236
         }
       }
     },
     "idle-200×light": {
       "raf": {
         "p95": {
-          "median": 11,
-          "spread": 0,
-          "margin": 2
+          "median": 23,
+          "spread": 2,
+          "margin": 6
         }
       },
       "screenshot": {
         "p50": {
-          "median": 13.157834000001458,
-          "spread": 0.9082500000004075,
-          "margin": 2.7247500000012224
+          "median": 31.357958000000508,
+          "spread": 21.040667000001122,
+          "margin": 63.122001000003365
         }
       }
     },
     "idle-20×dark": {
       "raf": {
         "p95": {
-          "median": 11,
-          "spread": 0,
-          "margin": 2
+          "median": 23,
+          "spread": 2,
+          "margin": 6
         }
       },
       "screenshot": {
         "p50": {
-          "median": 13.767874999999549,
-          "spread": 1.6312500000021828,
-          "margin": 4.893750000006548
+          "median": 36.66820799999914,
+          "spread": 18.283415999998397,
+          "margin": 54.85024799999519
         }
       }
     },
     "idle-20×light": {
       "raf": {
         "p95": {
-          "median": 11,
-          "spread": 1,
-          "margin": 3
+          "median": 22,
+          "spread": 3,
+          "margin": 9
         }
       },
       "screenshot": {
         "p50": {
-          "median": 13.771833000000697,
-          "spread": 1.7501660000007178,
-          "margin": 5.250498000002153
+          "median": 39.49358299999949,
+          "spread": 30.138333999999304,
+          "margin": 90.41500199999791
         }
       }
     },
     "scroll-200×dark": {
       "raf": {
         "p95": {
-          "median": 10,
-          "spread": 1,
-          "margin": 3
+          "median": 24,
+          "spread": 5,
+          "margin": 15
         }
       },
       "screenshot": {
         "p50": {
-          "median": 14.251375000007101,
-          "spread": 1.9139159999976982,
-          "margin": 5.741747999993095
+          "median": 38.83541699999478,
+          "spread": 16.285666000003403,
+          "margin": 48.85699800001021
         }
       }
     },
     "scroll-200×light": {
       "raf": {
         "p95": {
-          "median": 11,
-          "spread": 0,
-          "margin": 2
+          "median": 24,
+          "spread": 3,
+          "margin": 9
         }
       },
       "screenshot": {
         "p50": {
-          "median": 14.15087499999936,
-          "spread": 1.819500000001426,
-          "margin": 5.458500000004278
+          "median": 39.13129199999821,
+          "spread": 8.039708000003884,
+          "margin": 24.119124000011652
         }
       }
     }
   },
   "environment": {
     "keyed": {
-      "runnerClass": "local:81bb67848134e975e1a5dba50c1d7505cfb278c28ae98280e7d0ba1189170a9e",
+      "runnerClass": "github:macos26",
       "platform": "darwin",
       "arch": "arm64",
       "osMajor": "25",
@@ -120,8 +120,8 @@
       "dpr": 1
     },
     "diagnostic": {
-      "cpuModel": "Apple M5 Pro",
-      "osRelease": "25.6.0",
+      "cpuModel": "Apple M1 (Virtual)",
+      "osRelease": "25.5.0",
       "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
     }
   }
