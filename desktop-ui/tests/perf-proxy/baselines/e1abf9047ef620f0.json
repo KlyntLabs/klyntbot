@@ -1,0 +1,128 @@
+{
+  "identity": {
+    "schemaVersion": 1,
+    "measurementContractVersion": 1,
+    "environmentKey": "e1abf9047ef620f0"
+  },
+  "recordedAt": "2026-09-04T03:59:44.558Z",
+  "sourceRevision": "37f5166c0b6013e4faf78649a77ede6ec5e0d630",
+  "repetitions": 5,
+  "rows": {
+    "idle-200×dark": {
+      "raf": {
+        "p95": {
+          "median": 11,
+          "spread": 1,
+          "margin": 3
+        }
+      },
+      "screenshot": {
+        "p50": {
+          "median": 13.47679099999732,
+          "spread": 2.619750000001659,
+          "margin": 7.859250000004977
+        }
+      }
+    },
+    "idle-200×light": {
+      "raf": {
+        "p95": {
+          "median": 11,
+          "spread": 0,
+          "margin": 2
+        }
+      },
+      "screenshot": {
+        "p50": {
+          "median": 13.193957999999839,
+          "spread": 2.8997090000048047,
+          "margin": 8.699127000014414
+        }
+      }
+    },
+    "idle-20×dark": {
+      "raf": {
+        "p95": {
+          "median": 11,
+          "spread": 1,
+          "margin": 3
+        }
+      },
+      "screenshot": {
+        "p50": {
+          "median": 14.091042000000016,
+          "spread": 1.8999999999996362,
+          "margin": 5.699999999998909
+        }
+      }
+    },
+    "idle-20×light": {
+      "raf": {
+        "p95": {
+          "median": 11,
+          "spread": 1,
+          "margin": 3
+        }
+      },
+      "screenshot": {
+        "p50": {
+          "median": 14.633417000000009,
+          "spread": 2.197041999999783,
+          "margin": 6.591125999999349
+        }
+      }
+    },
+    "scroll-200×dark": {
+      "raf": {
+        "p95": {
+          "median": 11,
+          "spread": 1,
+          "margin": 3
+        }
+      },
+      "screenshot": {
+        "p50": {
+          "median": 14.215874999994412,
+          "spread": 2.2201679999998305,
+          "margin": 6.6605039999994915
+        }
+      }
+    },
+    "scroll-200×light": {
+      "raf": {
+        "p95": {
+          "median": 11,
+          "spread": 1,
+          "margin": 3
+        }
+      },
+      "screenshot": {
+        "p50": {
+          "median": 14.314666999998735,
+          "spread": 1.5600420000009763,
+          "margin": 4.680126000002929
+        }
+      }
+    }
+  },
+  "environment": {
+    "keyed": {
+      "runnerClass": "local:81bb67848134e975e1a5dba50c1d7505cfb278c28ae98280e7d0ba1189170a9e",
+      "platform": "darwin",
+      "arch": "arm64",
+      "osMajor": "25",
+      "webkitVersion": "26.5",
+      "headless": true,
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "dpr": 1
+    },
+    "diagnostic": {
+      "cpuModel": "Apple M5 Pro",
+      "osRelease": "25.6.0",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+    }
+  }
+}

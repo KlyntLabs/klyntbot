@@ -16,6 +16,7 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "perf:proxy": "bun scripts/perf-proxy/run.ts",
+    "perf:proxy:recalibrate": "bun scripts/perf-proxy/recalibrate.ts",
     "perf:proxy:typecheck": "tsc --noEmit -p tsconfig.perf.json",
     "check:tokens": "bash ../scripts/check-design-tokens.sh",
     "check:tokens:hard": "HARD=1 bash ../scripts/check-design-tokens.sh",
