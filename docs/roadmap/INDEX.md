@@ -77,7 +77,7 @@ ID rules:
 **Members:**
 - **ROAD-3** frontend-verify-matrix — Surfaces: `docs/agents/project.md`, `desktop-ui/package.json`, `scripts/`
 - **ROAD-25** desktop-ui-lint-green — Surfaces: `desktop-ui/` (Biome config and sources under the existing `lint` script); clears the hard lint errors so `bun run verify:frontend` can exit 0 before proxy/native baseline lanes run
-- **ROAD-4** rendering-proxy-lane — Surfaces: `desktop-ui/playwright.config.ts`, `desktop-ui/tests/`
+- **ROAD-4** rendering-proxy-lane — Surfaces: `desktop-ui/playwright.perf-proxy.config.ts`, `desktop-ui/tests/perf-proxy/`, `desktop-ui/scripts/perf-proxy/`, `.github/workflows/rendering-proxy.yml`
 - **ROAD-5** native-rendering-lane — Surfaces: None — the XCUIAutomation / XCTest / xctrace harness location is decided in its spec
 - **ROAD-6** migration-ledger-and-central-exclusion — Surfaces: `scripts/check-design-tokens.sh`, `docs/standards/`
 - **ROAD-7** backup-salvage-audit — Surfaces: `desktop-ui.new-bak/` (read-only), `docs/design/`
