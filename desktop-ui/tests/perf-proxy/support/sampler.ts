@@ -20,11 +20,13 @@ export async function sampleRaf(
     const gaps: number[] = [];
     const scrollerSelector = '[data-render-path="virtualized"] > div';
     let scroller: HTMLElement | null = null;
+    let stepPx = 0;
     if (options.scroll) {
       scroller = document.querySelector(scrollerSelector) as HTMLElement | null;
       if (!scroller) {
         throw new Error(`scroll scroller not found: ${scrollerSelector}`);
       }
+      stepPx = options.scroll.stepPx;
       scroller.scrollTop = scroller.scrollHeight;
     }
 
@@ -43,11 +45,8 @@ export async function sampleRaf(
         }
         previous = now;
 
-        if (scroller && options.scroll) {
-          scroller.scrollTop = Math.max(
-            0,
-            scroller.scrollTop - options.scroll.stepPx,
-          );
+        if (scroller) {
+          scroller.scrollTop = Math.max(0, scroller.scrollTop - stepPx);
         }
 
         if (gaps.length >= options.sampleFrames) {

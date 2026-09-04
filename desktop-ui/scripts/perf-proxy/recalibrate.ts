@@ -1,6 +1,5 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
-import os from "node:os";
 import { join } from "node:path";
 import {
   MARGIN_POLICY,
@@ -13,8 +12,12 @@ import {
   type RowResult,
   type Subcode,
 } from "./contract.ts";
+import { identityMatches } from "./compare.ts";
 import { describeEnvironment } from "./env.ts";
-import { measureOnce as defaultMeasureOnce } from "./run.ts";
+import {
+  measureOnce as defaultMeasureOnce,
+  realOsFacts,
+} from "./run.ts";
 
 const DEFAULT_BASELINES_ROOT = "tests/perf-proxy/baselines";
 
@@ -40,13 +43,12 @@ export type RecalibrateResult = {
   baselinePath?: string;
 };
 
-function realOsFacts(): OsFacts {
+function identityFailure(): RecalibrateResult {
+  console.log("COULD_NOT_MEASURE / IDENTITY");
   return {
-    platform: os.platform(),
-    arch: os.arch(),
-    release: os.release(),
-    hostname: os.hostname(),
-    cpus: os.cpus().map((cpu) => ({ model: cpu.model })),
+    outcome: "COULD_NOT_MEASURE",
+    subcode: "IDENTITY",
+    exitCode: 2,
   };
 }
 
@@ -108,14 +110,6 @@ export function aggregate(reps: RowResult[][]): Baseline["rows"] {
   return out;
 }
 
-function identitiesEqual(a: Identity, b: Identity): boolean {
-  return (
-    a.schemaVersion === b.schemaVersion &&
-    a.measurementContractVersion === b.measurementContractVersion &&
-    a.environmentKey === b.environmentKey
-  );
-}
-
 function gitHead(): string {
   const result = spawnSync("git", ["rev-parse", "HEAD"], {
     encoding: "utf8",
@@ -156,24 +150,14 @@ export async function recalibrate(
     const once = await measure();
     if (identity === undefined) {
       identity = once.identity;
-    } else if (!identitiesEqual(identity, once.identity)) {
-      console.log("COULD_NOT_MEASURE / IDENTITY");
-      return {
-        outcome: "COULD_NOT_MEASURE",
-        subcode: "IDENTITY",
-        exitCode: 2,
-      };
+    } else if (!identityMatches(identity, once.identity)) {
+      return identityFailure();
     }
     repRows.push(once.rows);
   }
 
   if (!identity) {
-    console.log("COULD_NOT_MEASURE / IDENTITY");
-    return {
-      outcome: "COULD_NOT_MEASURE",
-      subcode: "IDENTITY",
-      exitCode: 2,
-    };
+    return identityFailure();
   }
 
   const lastRows = repRows[repRows.length - 1];

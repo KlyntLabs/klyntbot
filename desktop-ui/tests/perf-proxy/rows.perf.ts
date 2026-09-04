@@ -73,6 +73,10 @@ for (const row of ROWS) {
       const rafStats = stats(rafGaps);
       const shotStats = stats(shotTimes);
       const viewport = page.viewportSize() ?? { width: 1280, height: 800 };
+      const { dpr, userAgent } = await page.evaluate(() => ({
+        dpr: window.devicePixelRatio,
+        userAgent: navigator.userAgent,
+      }));
       const result: RowResult = {
         row: name,
         scenario: row.scenario,
@@ -94,8 +98,8 @@ for (const row of ROWS) {
           webkitVersion: browser.version(),
           headless: testInfo.project.use.headless ?? true,
           viewport: { width: viewport.width, height: viewport.height },
-          dpr: await page.evaluate(() => window.devicePixelRatio),
-          userAgent: await page.evaluate(() => navigator.userAgent),
+          dpr,
+          userAgent,
         },
         durationMs: Date.now() - started,
       };

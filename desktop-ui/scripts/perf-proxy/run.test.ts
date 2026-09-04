@@ -12,17 +12,18 @@ import os from "node:os";
 import { join } from "node:path";
 import { PassThrough } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Baseline, OsFacts, RowEnvironment, RowResult } from "./contract.ts";
+import type { Baseline, RowEnvironment, RowResult } from "./contract.ts";
 import {
   MEASUREMENT_CONTRACT_VERSION,
   SCHEMA_VERSION,
 } from "./contract.ts";
 import { describeEnvironment } from "./env.ts";
-import { EXPECTED_ROWS } from "../../tests/perf-proxy/support/rowfile.ts";
-import { runProxy } from "./run.ts";
-
-const ADVISORY =
-  "This result is an advisory WebKit proxy, not native rendering evidence.";
+import {
+  EXPECTED_ROWS,
+  writeRowFile,
+} from "../../tests/perf-proxy/support/rowfile.ts";
+import { realOsFacts, runProxy } from "./run.ts";
+import { ADVISORY } from "./summary.ts";
 
 function rowEnvironment(overrides: Partial<RowEnvironment> = {}): RowEnvironment {
   return {
@@ -66,23 +67,6 @@ function rowResult(
     environment: opts.environment ?? rowEnvironment(),
     durationMs: 1000,
   };
-}
-
-function realOsFacts(): OsFacts {
-  return {
-    platform: os.platform(),
-    arch: os.arch(),
-    release: os.release(),
-    hostname: os.hostname(),
-    cpus: os.cpus().map((cpu) => ({ model: cpu.model })),
-  };
-}
-
-function writeRows(dir: string, rows: RowResult[]): void {
-  mkdirSync(dir, { recursive: true });
-  for (const row of rows) {
-    writeFileSync(join(dir, `${row.row}.json`), JSON.stringify(row), "utf8");
-  }
 }
 
 function baselineFor(
@@ -240,7 +224,9 @@ describe("runProxy consistency table", () => {
           return;
         }
         if (name === "ROW_MISSING") {
-          writeRows(rowsDir, allRows.slice(0, 5));
+          for (const row of allRows.slice(0, 5)) {
+            writeRowFile(row, rowsDir);
+          }
           return;
         }
         if (name === "IDENTITY") {
@@ -251,10 +237,14 @@ describe("runProxy consistency table", () => {
                 })
               : row,
           );
-          writeRows(rowsDir, mismatched);
+          for (const row of mismatched) {
+            writeRowFile(row, rowsDir);
+          }
           return;
         }
-        writeRows(rowsDir, allRows);
+        for (const row of allRows) {
+          writeRowFile(row, rowsDir);
+        }
       },
     });
 

@@ -23,9 +23,11 @@ export async function expectPlainRendered(
   messages: ChatMessage[],
 ): Promise<void> {
   await page.locator('[data-render-path="plain"]').waitFor();
-  for (const message of messages) {
-    await page.getByText(message.content, { exact: true }).waitFor();
-  }
+  await Promise.all(
+    messages.map((message) =>
+      page.getByText(message.content, { exact: true }).waitFor(),
+    ),
+  );
 }
 
 export async function expectVirtualizedRendered(

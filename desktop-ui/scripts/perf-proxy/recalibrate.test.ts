@@ -23,6 +23,7 @@ import {
 } from "./contract.ts";
 import { describeEnvironment } from "./env.ts";
 import { aggregate, recalibrate } from "./recalibrate.ts";
+import { EXPECTED_ROWS } from "../../tests/perf-proxy/support/rowfile.ts";
 
 const HOSTNAME = "perf-proxy-recalibrate-host.local";
 
@@ -99,15 +100,7 @@ function osFacts(overrides: Partial<OsFacts> = {}): OsFacts {
 }
 
 function sixRows(rafP95: number, screenshotP50: number): RowResult[] {
-  const names = [
-    "idle-20×light",
-    "idle-20×dark",
-    "idle-200×light",
-    "idle-200×dark",
-    "scroll-200×light",
-    "scroll-200×dark",
-  ];
-  return names.map((name) => rowResult(name, { rafP95, screenshotP50 }));
+  return EXPECTED_ROWS.map((name) => rowResult(name, { rafP95, screenshotP50 }));
 }
 
 function identityFor(rows: RowResult[], os: OsFacts = osFacts()): Identity {

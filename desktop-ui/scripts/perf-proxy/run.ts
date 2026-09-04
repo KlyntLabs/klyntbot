@@ -62,13 +62,21 @@ type MeasureRaw = {
   timedOut: boolean;
 };
 
-function realOsFacts(): OsFacts {
+export function realOsFacts(): OsFacts {
   return {
     platform: os.platform(),
     arch: os.arch(),
     release: os.release(),
     hostname: os.hostname(),
     cpus: os.cpus().map((cpu) => ({ model: cpu.model })),
+  };
+}
+
+function identityForKey(key: string): Identity {
+  return {
+    schemaVersion: SCHEMA_VERSION,
+    measurementContractVersion: MEASUREMENT_CONTRACT_VERSION,
+    environmentKey: key,
   };
 }
 
@@ -141,8 +149,10 @@ function printOutcome(
 
 function cleanStart(rowsDir: string, latestPath: string): void {
   rmSync(rowsDir, { recursive: true, force: true });
-  if (existsSync(latestPath)) {
+  try {
     rmSync(latestPath, { force: true });
+  } catch {
+    // Missing path, or parent is not a directory (WRITE_FAILED fixture).
   }
 }
 
@@ -268,7 +278,7 @@ export async function finalizeOutcome(input: {
   comparison?: RowDelta[];
   latestPath: string;
   env: NodeJS.ProcessEnv;
-}): Promise<0 | 1 | 2> {
+}): Promise<{ exitCode: 0 | 1 | 2; outcome: Outcome; subcode?: Subcode }> {
   let outcome = input.outcome;
   let subcode = input.subcode;
   const identity = input.identity ?? unknownIdentity();
@@ -300,7 +310,14 @@ export async function finalizeOutcome(input: {
   printOutcome(outcome, subcode, identity, input.comparison);
   const markdown = renderSummary(run, input.comparison, subcode);
   writeStepSummary(markdown, input.env);
-  return exitFor(outcome);
+  const result: { exitCode: 0 | 1 | 2; outcome: Outcome; subcode?: Subcode } = {
+    exitCode: exitFor(outcome),
+    outcome,
+  };
+  if (subcode) {
+    result.subcode = subcode;
+  }
+  return result;
 }
 
 export async function measureOnce(
@@ -340,11 +357,7 @@ export async function measureOnce(
   });
   return {
     rows: raw.rows,
-    identity: {
-      schemaVersion: SCHEMA_VERSION,
-      measurementContractVersion: MEASUREMENT_CONTRACT_VERSION,
-      environmentKey: described.key,
-    },
+    identity: identityForKey(described.key),
   };
 }
 
@@ -388,11 +401,7 @@ export async function runProxy(opts: RunProxyOpts = {}): Promise<RunProxyResult>
         os: realOsFacts(),
         rows,
       });
-      identity = {
-        schemaVersion: SCHEMA_VERSION,
-        measurementContractVersion: MEASUREMENT_CONTRACT_VERSION,
-        environmentKey: described.key,
-      };
+      identity = identityForKey(described.key);
       environment = {
         keyed: described.keyed,
         diagnostic: described.diagnostic,
@@ -424,7 +433,7 @@ export async function runProxy(opts: RunProxyOpts = {}): Promise<RunProxyResult>
     }
   }
 
-  const exitCode = await finalizeOutcome({
+  const finalized = await finalizeOutcome({
     outcome,
     subcode,
     rows,
@@ -435,21 +444,12 @@ export async function runProxy(opts: RunProxyOpts = {}): Promise<RunProxyResult>
     env,
   });
 
-  if (!existsSync(latestPath)) {
-    return {
-      outcome: "COULD_NOT_MEASURE",
-      subcode: "WRITE_FAILED",
-      exitCode: 2,
-    };
-  }
-
-  const latest = JSON.parse(readFileSync(latestPath, "utf8")) as LatestRun;
   const result: RunProxyResult = {
-    outcome: latest.outcome,
-    exitCode,
+    outcome: finalized.outcome,
+    exitCode: finalized.exitCode,
   };
-  if (latest.subcode) {
-    result.subcode = latest.subcode;
+  if (finalized.subcode) {
+    result.subcode = finalized.subcode;
   }
   return result;
 }

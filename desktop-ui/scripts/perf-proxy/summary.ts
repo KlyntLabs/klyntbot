@@ -1,7 +1,7 @@
 import { appendFileSync } from "node:fs";
 import type { LatestRun, RowDelta, Subcode } from "./contract.ts";
 
-const ADVISORY =
+export const ADVISORY =
   "This result is an advisory WebKit proxy, not native rendering evidence.";
 
 function outcomeHeading(run: LatestRun, subcode?: Subcode): string {

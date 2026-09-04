@@ -3,18 +3,14 @@ name: Rendering proxy
 "on":
   push:
     branches: [main, dev]
-    paths:
+    paths: &perf_proxy_paths
       - "desktop-ui/**"
       - "packages/design-system/**"
       - "scripts/verify-frontend.manifest.json"
       - ".github/workflows/rendering-proxy.yml"
   pull_request:
     branches: [main, dev]
-    paths:
-      - "desktop-ui/**"
-      - "packages/design-system/**"
-      - "scripts/verify-frontend.manifest.json"
-      - ".github/workflows/rendering-proxy.yml"
+    paths: *perf_proxy_paths
   workflow_dispatch:
     inputs:
       recalibrate:

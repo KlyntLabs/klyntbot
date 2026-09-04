@@ -4,10 +4,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { LatestRun, RowDelta } from "./contract.ts";
-import { renderSummary, writeStepSummary } from "./summary.ts";
-
-const ADVISORY =
-  "This result is an advisory WebKit proxy, not native rendering evidence.";
+import { ADVISORY, renderSummary, writeStepSummary } from "./summary.ts";
 
 function sampleRun(overrides: Partial<LatestRun> = {}): LatestRun {
   return {
