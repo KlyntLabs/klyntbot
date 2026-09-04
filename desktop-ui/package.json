@@ -15,6 +15,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "perf:proxy:typecheck": "tsc --noEmit -p tsconfig.perf.json",
     "check:tokens": "bash ../scripts/check-design-tokens.sh",
     "check:tokens:hard": "HARD=1 bash ../scripts/check-design-tokens.sh",
     "check:performance": "bun run build && bash scripts/check-performance-budget.sh"
@@ -94,6 +95,7 @@
     "@types/d3-force": "^3.0.10",
     "@types/diff": "^8.0.0",
     "@types/katex": "^0.16.8",
+    "@types/node": "^26.4.1",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@types/react-window": "^1.8.8",
