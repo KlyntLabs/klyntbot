@@ -1,7 +1,7 @@
 # Requirements: Rendering proxy lane
 
 Feature code: PERFPROXY
-Status: Approved
+Status: In-progress
 Date: 2026-09-03
 
 Roadmap item: ROAD-4 (MILE-2 — Baselines, verification, migration ledger). Build order: after ROAD-25 (desktop-ui lint green). Frame: `.skills/PERFPROXY/close-package.md`; locks `.skills/PERFPROXY/knowns.md`; evidence `.skills/PERFPROXY/spike-repeatability.md`, `probe-raf.md`.
