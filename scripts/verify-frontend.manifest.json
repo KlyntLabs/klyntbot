@@ -40,5 +40,12 @@
     "cwd": "desktop-ui",
     "mode": "hard",
     "profiles": ["default"]
+  },
+  {
+    "name": "perf-proxy",
+    "command": "bun run perf:proxy",
+    "cwd": "desktop-ui",
+    "mode": "report",
+    "profiles": ["perf-proxy"]
   }
 ]
