@@ -31,7 +31,7 @@ Vocabulary. *Row* — one of six measurement rows: `idle-20`, `idle-200`, `scrol
 
 **Story:** As a contributor, I want to run `bun run perf:proxy` and see six rows of rAF and screenshot metrics collected from the real chat page in headless WebKit, so that I can measure a rendering change before opening a pull request.
 
-- **PERFPROXY-1.1** WHEN `bun run perf:proxy` runs THE SYSTEM SHALL execute exactly the rows `idle-20`, `idle-200`, `scroll-200`, each in `light` and `dark`, serially, in one WebKit browser, from `desktop-ui/playwright.perf-proxy.config.ts`.
+- **PERFPROXY-1.1** WHEN a `bun run perf:proxy` measurement completes successfully THE SYSTEM SHALL have executed exactly the rows `idle-20`, `idle-200`, `scroll-200`, each in `light` and `dark`, serially, in one WebKit browser, from `desktop-ui/playwright.perf-proxy.config.ts`; a row failure may skip the remaining rows, and the run is then `COULD_NOT_MEASURE` (PERFPROXY-2.5), never a partial success.
 - **PERFPROXY-1.2** WHEN a row starts THE SYSTEM SHALL create a new browser context with `reducedMotion: "no-preference"`, set the row's theme through page state before navigation, and verify `html[data-theme]` equals the row's theme before any sampling.
 - **PERFPROXY-1.3** WHEN a row navigates THE SYSTEM SHALL answer every `/api/*` request from an in-test allowlist that returns deterministic responses for `app_info`, `chat_threads`, `chat_messages`, `view_clear_active`, `journey_milestones`, `journey_item_count`, `flashcard_total_due`, `autotuner_status`, and `autotuner_get_toast_count`, with message ids, timestamps, and content fixed per row.
 - **PERFPROXY-1.4** IF the page issues an `/api/*` command that is not in the allowlist THEN THE SYSTEM SHALL fail the row with the command name in the failure message.
@@ -65,7 +65,7 @@ Vocabulary. *Row* — one of six measurement rows: `idle-20`, `idle-200`, `scrol
 - **PERFPROXY-3.2** WHEN recalibration runs locally THE SYSTEM SHALL write the baseline to `desktop-ui/tests/perf-proxy/baselines/<environmentKey>.json`, so that the change appears as a reviewable diff.
 - **PERFPROXY-3.3** WHEN recalibration runs in CI THE SYSTEM SHALL upload the baseline as a workflow artifact and SHALL NOT commit, push, or replace any tracked file.
 - **PERFPROXY-3.4** THE SYSTEM SHALL provide no routine-run flag or argument that writes a baseline; recalibration is reachable only through its own entry point.
-- **PERFPROXY-3.5** THE SYSTEM SHALL derive `environmentKey` from stable comparison dimensions only (runner class, platform, architecture, OS major, WebKit revision, headless mode, viewport, device pixel ratio) and record other environment facts as diagnostic metadata outside the key.
+- **PERFPROXY-3.5** THE SYSTEM SHALL derive `environmentKey` from stable comparison dimensions only (runner class, platform, architecture, OS major, WebKit revision, headless mode, viewport, device pixel ratio) and record other environment facts as diagnostic metadata outside the key. On a developer machine the runner class is `local` plus the full SHA-256 digest of the hostname as canonical identity input, truncating only the final `environmentKey`; this prevents accidental baseline sharing between machines with different hostnames (it does not guarantee uniqueness across identical hostnames). The raw hostname SHALL never appear in tracked baselines, candidate artifacts, filenames, or serialized evidence — verified by a test that scans every file the lane writes for the hostname string.
 
 ## 4. CI runs the lane on relevant changes
 
@@ -76,7 +76,7 @@ Vocabulary. *Row* — one of six measurement rows: `idle-20`, `idle-200`, `scrol
 - **PERFPROXY-4.3** WHEN the routine run finishes with any outcome THE SYSTEM SHALL write the terminal outcome, the environment identity, the per-row deltas, and the sentence "This result is an advisory WebKit proxy, not native rendering evidence." to `$GITHUB_STEP_SUMMARY`.
 - **PERFPROXY-4.4** WHEN `latest.json` exists after the run, including `DEGRADED` and `COULD_NOT_MEASURE` runs THE SYSTEM SHALL upload it as a workflow artifact.
 - **PERFPROXY-4.5** WHEN the workflow is dispatched manually with the recalibration input THE SYSTEM SHALL run the recalibration entry point directly and upload the candidate baseline as an artifact (PERFPROXY-3.3).
-- **PERFPROXY-4.6** THE SYSTEM SHALL NOT configure the rendering-proxy workflow as a required branch-protection check.
+- **PERFPROXY-4.6** THE SYSTEM SHALL NOT configure the rendering-proxy workflow as a required branch-protection check — verified at acceptance by a human reading the repository's branch-protection settings for `main` and `dev` (or `gh api repos/{owner}/{repo}/branches/{branch}/protection`) and recording the result in the review; a workflow run or PR description does not prove it.
 - **PERFPROXY-4.7** WHEN the workflow job completes THE SYSTEM SHALL leave its wall-clock duration readable in the job log, so that browser caching and cadence decisions can cite it.
 
 ## 5. Registered in the matrix, isolated from the smoke
