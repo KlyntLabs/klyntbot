@@ -333,7 +333,7 @@ export function VirtualizedMessageList({
   );
 
   return (
-    <div className="relative h-full" aria-live="polite">
+    <div className="relative h-full" aria-live="polite" data-render-path="virtualized">
       <VariableSizeList
         ref={listRef}
         outerRef={outerRef}

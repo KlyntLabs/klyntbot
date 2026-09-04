@@ -132,7 +132,7 @@ export function MessageList({
   }
 
   return (
-    <div className="space-y-6" aria-live="polite">
+    <div className="space-y-6" aria-live="polite" data-render-path="plain">
       {messages.map((msg, idx) => {
         // Insert persona bubbles right after the last user message
         const isLastUser =
